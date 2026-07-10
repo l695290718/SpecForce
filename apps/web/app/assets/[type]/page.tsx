@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Badge, ButtonLink, Card, DataTable, PageHeader } from "../../../components/ui";
-import { assetTitleKeys, getRouteAssets, routeToAssetType, type AssetRouteType } from "../../../lib/assets";
+import { assetTitleKeys, getRouteAssetsWithDatabase, routeToAssetType, type AssetRouteType } from "../../../lib/assets";
 import type { Asset } from "@specforge/core";
 import { T } from "../../../components/language-provider";
 import { LocalizedSearchInput } from "../../../components/localized-search-input";
@@ -8,7 +8,7 @@ import { LocalizedSearchInput } from "../../../components/localized-search-input
 export default async function AssetListPage({ params, searchParams }: { params: Promise<{ type: AssetRouteType }>; searchParams: Promise<{ q?: string }> }) {
   const { type } = await params;
   const { q = "" } = await searchParams;
-  const assets = getRouteAssets(type).filter((asset) => `${assetName(asset)} ${assetDescription(asset)}`.toLowerCase().includes(q.toLowerCase()));
+  const assets = (await getRouteAssetsWithDatabase(type)).filter((asset) => `${assetName(asset)} ${assetDescription(asset)}`.toLowerCase().includes(q.toLowerCase()));
   const assetType = routeToAssetType(type);
 
   return (

@@ -1,16 +1,17 @@
 import ReactMarkdown from "react-markdown";
 import { Badge, Card, DataTable, PageHeader } from "../../../../components/ui";
-import { assetTitleKeys, getRouteAsset, routeToAssetType, type AssetRouteType } from "../../../../lib/assets";
-import { renderAssetSummary, runGovernanceChecks } from "@specforge/core";
+import { assetTitleKeys, getRouteAssetWithDatabase, routeToAssetType, type AssetRouteType } from "../../../../lib/assets";
+import { renderAssetSummary, runGovernanceChecks, type AssetType, type GovernanceCheckResult } from "@specforge/core";
 import { T } from "../../../../components/language-provider";
 import { SpecializedAssetSections } from "../../../../components/asset-detail-sections";
 import { ButtonLink } from "../../../../components/ui";
 
 export default async function AssetDetailPage({ params }: { params: Promise<{ type: AssetRouteType; id: string }> }) {
   const { type, id } = await params;
-  const asset = getRouteAsset(type, id) as Record<string, any>;
-  const checks = await runGovernanceChecks(routeToAssetType(type), id);
-  const summary = await renderAssetSummary(routeToAssetType(type), id);
+  const asset = (await getRouteAssetWithDatabase(type, id)) as Record<string, any>;
+  const assetType = routeToAssetType(type);
+  const checks = await getGovernanceChecks(assetType, id);
+  const summary = await getAssetSummary(assetType, id, asset);
   const title = asset.title ?? asset.name;
 
   return (
@@ -21,7 +22,7 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ ty
           <h2 className="mb-3 text-base font-semibold"><T k="asset.basicInfo" /></h2>
           <DataTable columns={[<T k="table.field" key="field" />, <T k="table.value" key="value" />]} rows={[
             [<T k="field.id" key="id" />, id],
-            [<T k="field.type" key="type-label" />, <Badge key="type" tone="blue">{routeToAssetType(type)}</Badge>],
+            [<T k="field.type" key="type-label" />, <Badge key="type" tone="blue">{assetType}</Badge>],
             [<T k="field.domain" key="domain" />, asset.domainId ?? <T k="field.crossDomain" key="cross-domain" />],
             [<T k="field.updated" key="updated" />, new Date(asset.updatedAt ?? asset.createdAt).toLocaleString("zh-CN")]
           ]} />
@@ -50,4 +51,20 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ ty
       </Card>
     </>
   );
+}
+
+async function getGovernanceChecks(assetType: AssetType, id: string): Promise<GovernanceCheckResult[]> {
+  try {
+    return await runGovernanceChecks(assetType, id);
+  } catch {
+    return [];
+  }
+}
+
+async function getAssetSummary(assetType: AssetType, id: string, asset: Record<string, any>): Promise<string> {
+  try {
+    return await renderAssetSummary(assetType, id);
+  } catch {
+    return asset.description ?? "";
+  }
 }

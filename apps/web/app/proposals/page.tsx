@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { Badge, ButtonLink, DataTable, PageHeader } from "../../components/ui";
-import { getStore } from "@specforge/core";
+import { getProposalsWithDatabase } from "../../lib/assets";
 import { T } from "../../components/language-provider";
 
-export default function ProposalsPage() {
-  const proposals = getStore().proposals;
+export default async function ProposalsPage() {
+  const proposals = await getProposalsWithDatabase();
   return (
     <>
       <PageHeader title={<T k="proposal.title" />} description={<T k="proposal.description" />} action={<ButtonLink href="/proposals/new"><T k="proposal.new" /></ButtonLink>} />

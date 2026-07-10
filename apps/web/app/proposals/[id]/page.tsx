@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { Badge, ButtonLink, Card, DataTable, PageHeader } from "../../../components/ui";
-import { analyzeProposalImpact, getAsset, type Proposal } from "@specforge/core";
+import { analyzeProposalImpact } from "@specforge/core";
 import { T } from "../../../components/language-provider";
+import { getProposalWithDatabase } from "../../../lib/assets";
 
 export default async function ProposalDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const proposal = getAsset<Proposal>("proposal", id);
-  const impact = await analyzeProposalImpact(id);
+  const proposal = await getProposalWithDatabase(id);
+  const impact = await getImpactForProposal(proposal);
 
   return (
     <>
@@ -24,7 +25,7 @@ export default async function ProposalDetailPage({ params }: { params: Promise<{
             ["Goal", proposal.goal],
             ["Non-goal", proposal.nonGoal],
             ["Scope", proposal.scope],
-            ["Rollback", proposal.rollbackPlan ?? "未声明"]
+            ["Rollback", proposal.rollbackPlan ?? "Not specified"]
           ]} />
         </Card>
         <Card>
@@ -45,6 +46,23 @@ export default async function ProposalDetailPage({ params }: { params: Promise<{
 
 function Metric({ label, value, tone }: { label: string; value: string; tone: "amber" | "red" | "blue" }) {
   return <div><div className="text-sm text-muted">{label}</div><div className="mt-2"><Badge tone={tone}>{value}</Badge></div></div>;
+}
+
+async function getImpactForProposal(proposal: Awaited<ReturnType<typeof getProposalWithDatabase>>) {
+  try {
+    return await analyzeProposalImpact(proposal.id);
+  } catch {
+    return {
+      proposalId: proposal.id,
+      impactedAssetCount: proposal.impactedAssets.length,
+      impactedAssets: proposal.impactedAssets,
+      affectedDomains: proposal.domainId ? [proposal.domainId] : [],
+      riskLevel: proposal.risks.some((risk) => /high|high risk/i.test(risk)) ? "high" : proposal.impactedAssets.length > 5 ? "medium" : "low",
+      requiredContextPack: true,
+      governanceWarnings: [],
+      implementationTasks: proposal.specChanges
+    } as const;
+  }
 }
 
 function assetHref(type: string, id: string): string {

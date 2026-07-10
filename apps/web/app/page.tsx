@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { Bot, GitPullRequestArrow, ShieldCheck } from "lucide-react";
 import { Badge, ButtonLink, Card, DataTable, PageHeader } from "../components/ui";
-import { dashboardStats } from "../lib/assets";
+import { dashboardStats, getContextPacksWithDatabase, getProposalsWithDatabase } from "../lib/assets";
 import { getStore, runGovernanceChecks } from "@specforge/core";
 import { T } from "../components/language-provider";
 import type { MessageKey } from "../lib/i18n";
 
 export default async function DashboardPage() {
   const store = getStore();
+  const proposals = await getProposalsWithDatabase();
+  const contextPacks = await getContextPacksWithDatabase();
   const warningResults = (await Promise.all(store.proposals.map((proposal) => runGovernanceChecks("proposal", proposal.id)))).flat().filter((result) => result.status === "fail");
-  const stats = dashboardStats();
+  const stats = await dashboardStats();
 
   return (
     <>
@@ -50,8 +52,8 @@ export default async function DashboardPage() {
       </section>
       <div className="grid gap-4 md:grid-cols-4">
         <MetricCard label={<T k="metric.designAssets" />} value={stats.reduce((sum, item) => sum + item.count, 0)} metaKey="metric.metaAssets" />
-        <MetricCard label={<T k="metric.proposals" />} value={store.proposals.length} metaKey="metric.metaProposals" />
-        <MetricCard label={<T k="metric.contextPacks" />} value={store.contextPacks.length} metaKey="metric.metaContextPacks" />
+        <MetricCard label={<T k="metric.proposals" />} value={proposals.length} metaKey="metric.metaProposals" />
+        <MetricCard label={<T k="metric.contextPacks" />} value={contextPacks.length} metaKey="metric.metaContextPacks" />
         <MetricCard label={<T k="metric.governanceAlerts" />} value={warningResults.length} metaKey="metric.metaGovernance" />
       </div>
       <div className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -82,7 +84,7 @@ export default async function DashboardPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card>
           <h2 className="mb-4 text-base font-semibold"><T k="dashboard.recentProposals" /></h2>
-          <DataTable columns={[<T k="table.proposal" key="proposal" />, <T k="table.status" key="status" />, <T k="table.risk" key="risk" />]} rows={store.proposals.map((proposal) => [
+          <DataTable columns={[<T k="table.proposal" key="proposal" />, <T k="table.status" key="status" />, <T k="table.risk" key="risk" />]} rows={proposals.map((proposal) => [
             <Link className="text-accent" href={`/proposals/${proposal.id}`} key={proposal.id}>{proposal.title}</Link>,
             <Badge key="status" tone="amber">{proposal.status}</Badge>,
             proposal.risks[0] ?? <T k="dashboard.noRisk" key="risk" />

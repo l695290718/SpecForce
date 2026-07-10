@@ -1,13 +1,12 @@
 import ReactMarkdown from "react-markdown";
 import { Card, DataTable, PageHeader } from "../../../components/ui";
-import { generateContextPack } from "@specforge/core";
 import { T } from "../../../components/language-provider";
 import { CopyMarkdownButton } from "../../../components/copy-markdown-button";
+import { getContextPackWithDatabase } from "../../../lib/assets";
 
 export default async function ContextPackDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const proposalId = id === "ctx-partial-refund" ? "proposal-partial-refund" : id.replace(/^ctx-/, "proposal-");
-  const pack = await generateContextPack(proposalId);
+  const pack = await getContextPackWithDatabase(id);
 
   return (
     <>

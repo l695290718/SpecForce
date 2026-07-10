@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@specforge/core": "workspace:*",
+    "@prisma/client": "^6.1.0",
     "@xyflow/react": "^12.4.4",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
