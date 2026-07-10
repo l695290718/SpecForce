@@ -15,6 +15,10 @@ prisma                Prisma schema and seed script
 
 Web and MCP both call `@specforge/core`; business logic should not be duplicated in app-specific layers.
 
+## Specification
+
+The full product and architecture specification lives in [`docs/specforge-design-center-spec.md`](docs/specforge-design-center-spec.md).
+
 ## Local Setup
 
 ```bash
