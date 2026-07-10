@@ -1,0 +1,35 @@
+{
+  "name": "specforge-design-center",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SpecForge Design Center / 智设中枢 - AI-native specification driven design center MVP.",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev": "pnpm --filter @specforge/web dev",
+    "mcp:dev": "pnpm --filter @specforge/mcp-server dev",
+    "build": "pnpm --filter @specforge/core build && pnpm --filter @specforge/mcp-server typecheck && pnpm --filter @specforge/web build",
+    "lint": "pnpm --filter @specforge/web lint",
+    "typecheck": "pnpm --filter @specforge/core typecheck && pnpm --filter @specforge/mcp-server typecheck && pnpm --filter @specforge/web typecheck",
+    "test": "pnpm --filter @specforge/core test",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "eslint": "^8.57.1",
+    "prettier": "^3.4.2",
+    "prisma": "^6.1.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.1.0"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}

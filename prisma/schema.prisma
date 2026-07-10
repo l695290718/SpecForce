@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model DesignAsset {
+  id          String   @id
+  type        String
+  name        String
+  code        String?
+  description String
+  domainId    String?
+  payload     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type])
+  @@index([domainId])
+}
+
+model Proposal {
+  id          String   @id
+  title       String
+  description String
+  status      String
+  domainId    String?
+  payload     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ContextPack {
+  id                String   @id
+  name              String
+  proposalId        String
+  targetAgent       String
+  summary           String
+  includedAssets    String
+  constraints       String
+  instructions      String
+  generatedMarkdown String
+  createdAt         DateTime @default(now())
+
+  @@index([proposalId])
+}
+
+model GovernanceCheckSnapshot {
+  id         String   @id @default(cuid())
+  assetType  String
+  assetId    String
+  results    String
+  createdAt  DateTime @default(now())
+
+  @@index([assetType, assetId])
+}
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  actorType     String
+  actorId       String
+  channel       String
+  action        String
+  targetType    String
+  targetId      String
+  inputSummary  String
+  outputSummary String
+  status        String
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+
+  @@index([actorType, actorId])
+  @@index([channel, action])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
