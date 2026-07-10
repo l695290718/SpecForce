@@ -1,5 +1,19 @@
 import { PrismaClient } from "@prisma/client";
 import { generateContextPack, seedData } from "@specforge/core";
+import {
+  selfDesignAdr,
+  selfDesignApis,
+  selfDesignBusinessRules,
+  selfDesignContextPack,
+  selfDesignDataModels,
+  selfDesignDomain,
+  selfDesignEvents,
+  selfDesignIntegration,
+  selfDesignObservability,
+  selfDesignProposal,
+  selfDesignQuality,
+  selfDesignStateMachines
+} from "./data/specforge-self-design";
 
 const prisma = new PrismaClient();
 
@@ -99,7 +113,20 @@ async function main() {
     ["adr", seedData.adrs]
   ];
 
-  for (const [type, assets] of assetGroups) {
+  const databaseManagedAssetGroups: Array<[string, Array<any>]> = [
+    ["domain", [selfDesignDomain]],
+    ["dataModel", selfDesignDataModels],
+    ["api", selfDesignApis],
+    ["event", selfDesignEvents],
+    ["businessRule", selfDesignBusinessRules],
+    ["stateMachine", selfDesignStateMachines],
+    ["integration", [selfDesignIntegration]],
+    ["quality", [selfDesignQuality]],
+    ["observability", [selfDesignObservability]],
+    ["adr", [selfDesignAdr]]
+  ];
+
+  for (const [type, assets] of [...assetGroups, ...databaseManagedAssetGroups]) {
     for (const asset of assets) {
       await upsertAsset(type, asset);
     }
@@ -128,6 +155,27 @@ async function main() {
     });
   }
 
+  await prisma.proposal.upsert({
+    where: { id: selfDesignProposal.id },
+    create: {
+      id: selfDesignProposal.id,
+      title: selfDesignProposal.title,
+      description: selfDesignProposal.description,
+      status: selfDesignProposal.status,
+      domainId: selfDesignProposal.domainId,
+      payload: JSON.stringify(selfDesignProposal),
+      createdAt: new Date(selfDesignProposal.createdAt),
+      updatedAt: new Date(selfDesignProposal.updatedAt)
+    },
+    update: {
+      title: selfDesignProposal.title,
+      description: selfDesignProposal.description,
+      status: selfDesignProposal.status,
+      domainId: selfDesignProposal.domainId,
+      payload: JSON.stringify(selfDesignProposal)
+    }
+  });
+
   const pack = await generateContextPack("proposal-partial-refund");
   await prisma.contextPack.upsert({
     where: { id: pack.id },
@@ -151,6 +199,31 @@ async function main() {
       constraints: JSON.stringify(pack.constraints),
       instructions: JSON.stringify(pack.instructions),
       generatedMarkdown: pack.generatedMarkdown
+    }
+  });
+
+  await prisma.contextPack.upsert({
+    where: { id: selfDesignContextPack.id },
+    create: {
+      id: selfDesignContextPack.id,
+      name: selfDesignContextPack.name,
+      proposalId: selfDesignContextPack.proposalId,
+      targetAgent: selfDesignContextPack.targetAgent,
+      summary: selfDesignContextPack.summary,
+      includedAssets: JSON.stringify(selfDesignContextPack.includedAssets),
+      constraints: JSON.stringify(selfDesignContextPack.constraints),
+      instructions: JSON.stringify(selfDesignContextPack.instructions),
+      generatedMarkdown: selfDesignContextPack.generatedMarkdown,
+      createdAt: new Date(selfDesignContextPack.createdAt)
+    },
+    update: {
+      name: selfDesignContextPack.name,
+      targetAgent: selfDesignContextPack.targetAgent,
+      summary: selfDesignContextPack.summary,
+      includedAssets: JSON.stringify(selfDesignContextPack.includedAssets),
+      constraints: JSON.stringify(selfDesignContextPack.constraints),
+      instructions: JSON.stringify(selfDesignContextPack.instructions),
+      generatedMarkdown: selfDesignContextPack.generatedMarkdown
     }
   });
 }

@@ -297,6 +297,8 @@ It includes:
 - Partial refund proposal.
 - Agent Context Pack.
 
+SpecForge also seeds its own MCP-first design into the database through `prisma/seed.ts` and `prisma/data/specforge-self-design.ts`. That self-design dataset is database-managed design content, not runtime core business logic. It includes the SpecForge platform domain, MCP tool contracts, audit data model, governance rules, lifecycle state machines, MCP-first ADR, self-design proposal, and self-design Context Pack.
+
 ## 15. Verification
 
 Primary verification commands:

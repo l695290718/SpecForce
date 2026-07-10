@@ -11,7 +11,7 @@ import type {
   Proposal,
   QualityRequirement,
   StateMachine
-} from "../types";
+} from "@specforge/core";
 
 const now = "2026-07-10T00:00:00.000Z";
 

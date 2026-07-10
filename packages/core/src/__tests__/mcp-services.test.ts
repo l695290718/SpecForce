@@ -134,22 +134,4 @@ describe("MCP-facing core services", () => {
     expect(entry.id).toMatch(/^audit-/);
     expect(listAuditLogs().length).toBe(before + 1);
   });
-
-  it("exposes SpecForge's own MCP-first design as managed assets", async () => {
-    const result = await searchDesignAssets({ query: "SpecForge MCP-first self design", limit: 10 });
-
-    expect(result.results.some((asset) => asset.id === "proposal-specforge-self-design")).toBe(true);
-    expect(result.results.some((asset) => asset.id === "domain-specforge-platform")).toBe(true);
-  });
-
-  it("generates a context pack for the SpecForge self-design proposal", async () => {
-    const pack = await generateContextPack("proposal-specforge-self-design", {
-      targetAgent: "codex",
-      includeAssets: ["api-specforge-mcp-tools", "adr-mcp-first-architecture"]
-    });
-
-    expect(pack.generatedMarkdown).toContain("# Agent Context Pack");
-    expect(pack.generatedMarkdown).toContain("SpecForge Design Center");
-    expect(pack.includedAssets.map((asset) => asset.id)).toEqual(expect.arrayContaining(["api-specforge-mcp-tools", "adr-mcp-first-architecture"]));
-  });
 });
