@@ -1,4 +1,18 @@
 import type { ContextPack, SpecForgeDataStore } from "../types";
+import {
+  selfDesignAdr,
+  selfDesignApis,
+  selfDesignBusinessRules,
+  selfDesignContextPack,
+  selfDesignDataModels,
+  selfDesignDomain,
+  selfDesignEvents,
+  selfDesignIntegration,
+  selfDesignObservability,
+  selfDesignProposal,
+  selfDesignQuality,
+  selfDesignStateMachines
+} from "./self-design";
 
 const now = "2026-07-09T00:00:00.000Z";
 
@@ -302,3 +316,15 @@ export const seededContextPack: ContextPack = {
 };
 
 seedData.contextPacks.push(seededContextPack);
+seedData.domains.push(selfDesignDomain);
+seedData.dataModels.push(...selfDesignDataModels);
+seedData.apis.push(...selfDesignApis);
+seedData.events.push(...selfDesignEvents);
+seedData.businessRules.push(...selfDesignBusinessRules);
+seedData.stateMachines.push(...selfDesignStateMachines);
+seedData.integrations.push(selfDesignIntegration);
+seedData.qualityRequirements.push(selfDesignQuality);
+seedData.observabilityDesigns.push(selfDesignObservability);
+seedData.adrs.push(selfDesignAdr);
+seedData.proposals.push(selfDesignProposal);
+seedData.contextPacks.push(selfDesignContextPack);
