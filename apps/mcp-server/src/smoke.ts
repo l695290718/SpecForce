@@ -29,19 +29,19 @@ async function main() {
 
   const search = await client.callTool({
     name: "search_design_assets",
-    arguments: { query: "订单 部分退款", limit: 5 }
+    arguments: { query: "SpecForge MCP", limit: 5 }
   });
   const contextPack = await client.callTool({
     name: "generate_context_pack",
-    arguments: { proposalId: "proposal-partial-refund", targetAgent: "codex", format: "markdown" }
+    arguments: { proposalId: "proposal-specforge-self-design", targetAgent: "codex", format: "markdown" }
   });
   const contextPackJson = await client.callTool({
     name: "generate_context_pack",
-    arguments: { proposalId: "proposal-partial-refund", targetAgent: "codex", format: "json" }
+    arguments: { proposalId: "proposal-specforge-self-design", targetAgent: "codex", format: "json" }
   });
   const governance = await client.callTool({
     name: "run_governance_checks",
-    arguments: { targetType: "proposal", targetId: "proposal-partial-refund" }
+    arguments: { targetType: "proposal", targetId: "proposal-specforge-self-design" }
   });
   const generatedPack = JSON.parse(firstText(contextPackJson));
   const upsert = await client.callTool({
@@ -65,10 +65,10 @@ async function main() {
   if (!resources.resources.some((resource) => resource.uri === "specforge://domains")) throw new Error("domains resource missing");
   if (!templates.resourceTemplates.some((template) => template.uriTemplate === "specforge://apis/{id}")) throw new Error("api resource template missing");
   if (!prompts.prompts.some((prompt) => prompt.name === "design_feature")) throw new Error("design_feature prompt missing");
-  if (!searchText.includes("proposal-partial-refund")) throw new Error("search did not find partial refund proposal");
+  if (!searchText.includes("proposal-specforge-self-design")) throw new Error("search did not find SpecForge self-design proposal");
   if (!packText.includes("# Agent Context Pack")) throw new Error("context pack markdown missing");
   if (!governanceText.includes("results")) throw new Error("governance result missing");
-  if (!upsertText.includes("ctx-partial-refund")) throw new Error("MCP persisted write result missing");
+  if (!upsertText.includes("ctx-specforge-self-design")) throw new Error("MCP persisted write result missing");
 
   console.log(
     JSON.stringify(
@@ -77,10 +77,10 @@ async function main() {
         resources: resources.resources.length,
         resourceTemplates: templates.resourceTemplates.length,
         prompts: prompts.prompts.length,
-        searchFoundPartialRefund: searchText.includes("proposal-partial-refund"),
+        searchFoundSpecForgeSelfDesign: searchText.includes("proposal-specforge-self-design"),
         generatedContextPack: packText.includes("# Agent Context Pack"),
         governanceReturnedResults: governanceText.includes("results"),
-        persistedWriteToolWorked: upsertText.includes("ctx-partial-refund")
+        persistedWriteToolWorked: upsertText.includes("ctx-specforge-self-design")
       },
       null,
       2

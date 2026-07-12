@@ -1,16 +1,16 @@
 import Link from "next/link";
 import { Bot, GitPullRequestArrow, ShieldCheck } from "lucide-react";
 import { Badge, ButtonLink, Card, DataTable, PageHeader } from "../components/ui";
-import { dashboardStats, getContextPacksWithDatabase, getProposalsWithDatabase } from "../lib/assets";
-import { getStore, runGovernanceChecks } from "@specforge/core";
+import { dashboardStats, getContextPacksWithDatabase, getProposalsWithDatabase, getRouteAssetsWithDatabase } from "../lib/assets";
+import { runGovernanceChecks, type Proposal } from "@specforge/core";
 import { T } from "../components/language-provider";
 import type { MessageKey } from "../lib/i18n";
 
 export default async function DashboardPage() {
-  const store = getStore();
   const proposals = await getProposalsWithDatabase();
   const contextPacks = await getContextPacksWithDatabase();
-  const warningResults = (await Promise.all(store.proposals.map((proposal) => runGovernanceChecks("proposal", proposal.id)))).flat().filter((result) => result.status === "fail");
+  const adrs = await getRouteAssetsWithDatabase("adrs");
+  const warningResults = (await Promise.all(proposals.map((proposal) => safeProposalChecks(proposal)))).flat().filter((result) => result.status === "fail");
   const stats = await dashboardStats();
 
   return (
@@ -18,7 +18,7 @@ export default async function DashboardPage() {
       <PageHeader
         title="SpecForge Design Center"
         description={<T k="dashboard.description" />}
-        action={<ButtonLink href="/proposals/proposal-partial-refund"><T k="dashboard.viewRefundProposal" /></ButtonLink>}
+        action={<ButtonLink href="/proposals/proposal-specforge-self-design"><T k="dashboard.viewRefundProposal" /></ButtonLink>}
       />
       <section className="sf-rise sf-scan mb-6 overflow-hidden rounded-lg border border-slate-700 bg-ink p-5 text-white shadow-elevated">
         <div className="relative z-10 grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
@@ -72,11 +72,11 @@ export default async function DashboardPage() {
           <h2 className="mb-4 text-base font-semibold"><T k="dashboard.quickLinks" /></h2>
           <div className="grid gap-3">
             {([
-              ["quick.createRefundApi", "/assets/apis/api-create-refund"],
-              ["quick.refundStateMachine", "/assets/state-machines/sm-refund"],
+              ["quick.mcpTools", "/assets/apis/api-specforge-mcp-tools"],
+              ["quick.proposalLifecycle", "/assets/state-machines/sm-specforge-proposal-lifecycle"],
               ["quick.assetGraph", "/graph"],
               ["quick.governanceChecks", "/governance/checks"],
-              ["quick.contextPack", "/context-packs/ctx-partial-refund"]
+              ["quick.selfContextPack", "/context-packs/ctx-specforge-self-design"]
             ] as const).map(([labelKey, href]) => <Link className="rounded-md border border-border px-3 py-2 text-sm hover:bg-surface" href={href} key={href}><T k={labelKey} /></Link>)}
           </div>
         </Card>
@@ -92,15 +92,23 @@ export default async function DashboardPage() {
         </Card>
         <Card>
           <h2 className="mb-4 text-base font-semibold"><T k="dashboard.recentAdrs" /></h2>
-          <DataTable columns={[<T k="nav.adrs" key="adr" />, <T k="table.status" key="status" />, <T k="table.owner" key="owner" />]} rows={store.adrs.map((adr) => [
-            <Link className="text-accent" href={`/assets/adrs/${adr.id}`} key={adr.id}>{adr.title}</Link>,
-            <Badge key="status" tone="green">{adr.status}</Badge>,
-            adr.owner
+          <DataTable columns={[<T k="nav.adrs" key="adr" />, <T k="table.status" key="status" />, <T k="table.owner" key="owner" />]} rows={adrs.map((adr) => [
+            <Link className="text-accent" href={`/assets/adrs/${adr.id}`} key={adr.id}>{"title" in adr ? adr.title : adr.name}</Link>,
+            <Badge key="status" tone="green">{"status" in adr ? adr.status : "accepted"}</Badge>,
+            "owner" in adr ? adr.owner : "Architecture"
           ])} />
         </Card>
       </div>
     </>
   );
+}
+
+async function safeProposalChecks(proposal: Proposal) {
+  try {
+    return await runGovernanceChecks("proposal", proposal.id);
+  } catch {
+    return [];
+  }
 }
 
 function MetricCard({ label, value, metaKey }: { label: React.ReactNode; value: number; metaKey: MessageKey }) {

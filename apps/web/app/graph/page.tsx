@@ -1,12 +1,12 @@
-import { buildAssetGraph, getStore, type AssetType } from "@specforge/core";
+import type { AssetType } from "@specforge/core";
 import { AssetGraphView } from "../../components/asset-graph";
 import { Card, PageHeader } from "../../components/ui";
 import { T } from "../../components/language-provider";
-import { getDomainsWithDatabase } from "../../lib/assets";
+import { getAssetGraphWithDatabase, getDomainsWithDatabase } from "../../lib/assets";
 
 export default async function GraphPage({ searchParams }: { searchParams: Promise<{ domainId?: string; assetType?: AssetType }> }) {
   const { domainId, assetType } = await searchParams;
-  const graph = await buildAssetGraph(domainId, assetType);
+  const graph = await getAssetGraphWithDatabase(domainId, assetType);
   const domains = await getDomainsWithDatabase();
   const assetTypes: AssetType[] = ["dataModel", "api", "event", "businessRule", "stateMachine", "integration", "quality", "observability", "adr", "proposal"];
 

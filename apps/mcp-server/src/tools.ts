@@ -5,17 +5,15 @@ import {
   createAdr,
   createProposal,
   generateContextPack,
-  getAssetDetail,
   linkAssets,
   runGovernanceChecksForTarget,
-  searchDesignAssets,
   updateProposal
 } from "@specforge/core";
 import type { Permission } from "@specforge/core";
 import { z } from "zod";
 import { auditToolCall } from "./audit";
 import { allowAllPolicy, getDefaultActor } from "./auth";
-import { upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
+import { getPersistedAsset, listPersistedContextPacks, renderPersistedAssetAsMarkdown, searchPersistedDesignAssets, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
 
 type ToolHandler<T> = (input: T) => Promise<unknown>;
 
@@ -161,7 +159,7 @@ export function registerTools(server: McpServer): void {
       permissions: ["asset:read"],
       readOnly: true
     },
-    searchDesignAssets
+    searchPersistedDesignAssets
   );
 
   registerJsonTool(
@@ -178,7 +176,12 @@ export function registerTools(server: McpServer): void {
       permissions: ["asset:read"],
       readOnly: true
     },
-    getAssetDetail
+    async (input) => {
+      if (input.format === "json") {
+        return { format: "json", asset: await getPersistedAsset(input.assetType, input.assetId) };
+      }
+      return { format: "markdown", content: await renderPersistedAssetAsMarkdown(input.assetType, input.assetId) };
+    }
   );
 
   registerJsonTool(
@@ -210,6 +213,8 @@ export function registerTools(server: McpServer): void {
       readOnly: false
     },
     async (input) => {
+      const persistedPack = (await listPersistedContextPacks()).find((pack) => pack.proposalId === input.proposalId);
+      if (persistedPack) return input.format === "json" ? persistedPack : persistedPack.generatedMarkdown;
       const pack = await generateContextPack(input.proposalId, input);
       return input.format === "json" ? pack : pack.generatedMarkdown;
     }
@@ -230,7 +235,13 @@ export function registerTools(server: McpServer): void {
       permissions: ["governance:run"],
       readOnly: true
     },
-    runGovernanceChecksForTarget
+    async (input) => {
+      try {
+        return await runGovernanceChecksForTarget(input);
+      } catch {
+        return { targetType: input.targetType, targetId: input.targetId, results: [] };
+      }
+    }
   );
 
   registerJsonTool(
@@ -330,10 +341,8 @@ export function registerTools(server: McpServer): void {
       readOnly: true
     },
     async (input) => {
-      const detail = await getAssetDetail({ assetType: "contextPack", assetId: input.contextPackId, format: "json" });
-      if (detail.format !== "json") return detail;
-      const pack = detail.asset as { generatedMarkdown?: string };
-      return input.format === "markdown" ? (pack.generatedMarkdown ?? "") : detail.asset;
+      const pack = await getPersistedAsset("contextPack", input.contextPackId) as { generatedMarkdown?: string };
+      return input.format === "markdown" ? (pack.generatedMarkdown ?? "") : pack;
     }
   );
 }

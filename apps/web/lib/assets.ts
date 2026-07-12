@@ -5,6 +5,7 @@ import {
   listAssets,
   generateContextPack,
   type Asset,
+  type AssetGraph,
   type AssetType
 } from "@specforge/core";
 import type { ContextPack, DomainModel, Proposal } from "@specforge/core";
@@ -68,13 +69,16 @@ export function getRouteAsset(route: string, id: string): Asset {
 
 export async function getRouteAssetsWithDatabase(route: string): Promise<Asset[]> {
   const assetType = routeToAssetType(route);
-  return mergeById(listAssets(assetType), await getDatabaseAssets(assetType));
+  const dbAssets = await getDatabaseAssets(assetType);
+  return dbAssets.length > 0 ? dbAssets : listAssets(assetType);
 }
 
 export async function getRouteAssetWithDatabase(route: string, id: string): Promise<Asset> {
   const assetType = routeToAssetType(route);
-  const dbAsset = (await getDatabaseAssets(assetType)).find((asset) => asset.id === id);
+  const dbAssets = await getDatabaseAssets(assetType);
+  const dbAsset = dbAssets.find((asset) => asset.id === id);
   if (dbAsset) return dbAsset;
+  if (dbAssets.length > 0) throw new Error(`Asset not found: ${assetType}/${id}`);
   return getAsset(assetType, id);
 }
 
@@ -85,12 +89,13 @@ export async function getDomainsWithDatabase(): Promise<DomainModel[]> {
 export async function getProposalsWithDatabase(): Promise<Proposal[]> {
   const rows = await prisma.proposal.findMany({ orderBy: { createdAt: "asc" } });
   const dbProposals = rows.map((row) => JSON.parse(row.payload) as Proposal);
-  return mergeById(getStore().proposals, dbProposals);
+  return dbProposals.length > 0 ? dbProposals : getStore().proposals;
 }
 
 export async function getProposalWithDatabase(id: string): Promise<Proposal> {
   const row = await prisma.proposal.findUnique({ where: { id } });
   if (row) return JSON.parse(row.payload) as Proposal;
+  if ((await prisma.proposal.count()) > 0) throw new Error(`Proposal not found: ${id}`);
   return getAsset<Proposal>("proposal", id);
 }
 
@@ -108,7 +113,7 @@ export async function getContextPacksWithDatabase(): Promise<ContextPack[]> {
     generatedMarkdown: row.generatedMarkdown,
     createdAt: row.createdAt.toISOString()
   }) satisfies ContextPack);
-  return mergeById(getStore().contextPacks, dbPacks);
+  return dbPacks.length > 0 ? dbPacks : getStore().contextPacks;
 }
 
 export async function getContextPackWithDatabase(id: string): Promise<ContextPack> {
@@ -127,6 +132,7 @@ export async function getContextPackWithDatabase(id: string): Promise<ContextPac
       createdAt: row.createdAt.toISOString()
     };
   }
+  if ((await prisma.contextPack.count()) > 0) throw new Error(`Context Pack not found: ${id}`);
   const proposalId = id === "ctx-partial-refund" ? "proposal-partial-refund" : id.replace(/^ctx-/, "proposal-");
   return generateContextPack(proposalId);
 }
@@ -134,6 +140,14 @@ export async function getContextPackWithDatabase(id: string): Promise<ContextPac
 export async function dashboardStats() {
   const store = getStore();
   const dbRows = await prisma.designAsset.findMany({ select: { id: true, type: true } });
+  if (dbRows.length > 0) {
+    return Object.entries(assetCollections)
+      .filter(([type]) => !["proposal", "contextPack"].includes(type))
+      .map(([type]) => ({
+        type,
+        count: new Set(dbRows.filter((row) => row.type === type).map((row) => row.id)).size
+      }));
+  }
   return Object.entries(assetCollections)
     .filter(([type]) => !["proposal", "contextPack"].includes(type))
     .map(([type, collection]) => {
@@ -141,6 +155,57 @@ export async function dashboardStats() {
       dbRows.filter((row) => row.type === type).forEach((row) => ids.add(row.id));
       return { type, count: ids.size };
     });
+}
+
+export async function getAssetGraphWithDatabase(domainId?: string, assetType?: AssetType): Promise<AssetGraph> {
+  const assetRows = await prisma.designAsset.findMany({ orderBy: { createdAt: "asc" } });
+  if (assetRows.length === 0) {
+    const { buildAssetGraph } = await import("@specforge/core");
+    return buildAssetGraph(domainId, assetType);
+  }
+
+  const assets = assetRows.map((row) => JSON.parse(row.payload) as Asset);
+  const proposals = await getProposalsWithDatabase();
+  const contextPacks = await getContextPacksWithDatabase();
+  const nodes: AssetGraph["nodes"] = [];
+  const edges: AssetGraph["edges"] = [];
+
+  for (const asset of assets) {
+    const type = assetTypeOf(asset, assetRows.find((row) => row.id === asset.id)?.type);
+    if (!type) continue;
+    if (domainId && "domainId" in asset && asset.domainId !== domainId) continue;
+    if (assetType && type !== assetType) continue;
+    nodes.push({ id: asset.id, label: "title" in asset ? asset.title : asset.name, type, domainId: "domainId" in asset ? asset.domainId : undefined, summary: assetSummary(asset) });
+    if ("domainId" in asset && asset.domainId && asset.id !== asset.domainId) {
+      edges.push({ id: `${asset.domainId}->${asset.id}`, source: asset.domainId, target: asset.id, label: "owns" });
+    }
+  }
+
+  for (const proposal of proposals) {
+    if (assetType && assetType !== "proposal") continue;
+    if (domainId && proposal.domainId !== domainId) continue;
+    nodes.push({ id: proposal.id, label: proposal.title, type: "proposal", domainId: proposal.domainId, summary: proposal.description });
+    proposal.impactedAssets.forEach((ref) => {
+      if (nodes.some((node) => node.id === ref.id)) {
+        edges.push({ id: `${proposal.id}->${ref.id}`, source: proposal.id, target: ref.id, label: "impacts" });
+      }
+    });
+  }
+
+  for (const pack of contextPacks) {
+    if (assetType) continue;
+    nodes.push({ id: pack.id, label: pack.name, type: "contextPack", summary: pack.summary });
+    if (nodes.some((node) => node.id === pack.proposalId)) {
+      edges.push({ id: `${pack.proposalId}->${pack.id}`, source: pack.proposalId, target: pack.id, label: "generates" });
+    }
+    pack.includedAssets.forEach((ref) => {
+      if (nodes.some((node) => node.id === ref.id)) {
+        edges.push({ id: `${pack.id}->${ref.id}`, source: pack.id, target: ref.id, label: "includes" });
+      }
+    });
+  }
+
+  return { nodes: dedupeById(nodes), edges: dedupeById(edges) };
 }
 
 async function getDatabaseAssets(assetType: AssetType): Promise<Asset[]> {
@@ -153,4 +218,29 @@ function mergeById<T extends { id: string }>(base: T[], extra: T[]): T[] {
   base.forEach((item) => map.set(item.id, item));
   extra.forEach((item) => map.set(item.id, item));
   return Array.from(map.values());
+}
+
+function dedupeById<T extends { id: string }>(items: T[]): T[] {
+  return Array.from(new Map(items.map((item) => [item.id, item])).values());
+}
+
+function assetTypeOf(asset: Asset, fallback?: string): AssetType | undefined {
+  if (fallback && fallback in assetCollections) return fallback as AssetType;
+  if ("boundedContext" in asset) return "domain";
+  if ("modelType" in asset) return "dataModel";
+  if ("method" in asset) return "api";
+  if ("topic" in asset) return "event";
+  if ("ruleType" in asset) return "businessRule";
+  if ("states" in asset) return "stateMachine";
+  if ("sourceSystem" in asset) return "integration";
+  if ("category" in asset) return "quality";
+  if ("metrics" in asset) return "observability";
+  if ("decision" in asset) return "adr";
+  if ("goal" in asset) return "proposal";
+  return undefined;
+}
+
+function assetSummary(asset: Asset): string {
+  if ("summary" in asset) return asset.summary;
+  return asset.description;
 }

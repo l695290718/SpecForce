@@ -1,18 +1,25 @@
-import { getStore, runGovernanceChecks } from "@specforge/core";
+import { runGovernanceChecks, type AssetType, type GovernanceCheckResult } from "@specforge/core";
 import { Badge, Card, DataTable, PageHeader } from "../../../components/ui";
 import { T } from "../../../components/language-provider";
+import { getProposalsWithDatabase, getRouteAssetsWithDatabase } from "../../../lib/assets";
 
 export default async function GovernanceChecksPage({ searchParams }: { searchParams: Promise<{ assetType?: string; severity?: string; status?: string }> }) {
   const filters = await searchParams;
-  const store = getStore();
+  const [apis, events, dataModels, businessRules, proposals] = await Promise.all([
+    getRouteAssetsWithDatabase("apis"),
+    getRouteAssetsWithDatabase("events"),
+    getRouteAssetsWithDatabase("data-models"),
+    getRouteAssetsWithDatabase("rules"),
+    getProposalsWithDatabase()
+  ]);
   const targets = [
-    ...store.apis.map((asset) => ({ type: "api", id: asset.id, name: asset.name })),
-    ...store.events.map((asset) => ({ type: "event", id: asset.id, name: asset.name })),
-    ...store.dataModels.map((asset) => ({ type: "dataModel", id: asset.id, name: asset.name })),
-    ...store.businessRules.map((asset) => ({ type: "businessRule", id: asset.id, name: asset.name })),
-    ...store.proposals.map((asset) => ({ type: "proposal", id: asset.id, name: asset.title }))
+    ...apis.map((asset) => ({ type: "api" as AssetType, id: asset.id, name: asset.name })),
+    ...events.map((asset) => ({ type: "event" as AssetType, id: asset.id, name: asset.name })),
+    ...dataModels.map((asset) => ({ type: "dataModel" as AssetType, id: asset.id, name: asset.name })),
+    ...businessRules.map((asset) => ({ type: "businessRule" as AssetType, id: asset.id, name: asset.name })),
+    ...proposals.map((asset) => ({ type: "proposal" as AssetType, id: asset.id, name: asset.title }))
   ];
-  const checks = (await Promise.all(targets.map((target) => runGovernanceChecks(target.type, target.id)))).flat().filter((check) => {
+  const checks = (await Promise.all(targets.map((target) => safeGovernanceChecks(target.type, target.id)))).flat().filter((check) => {
     const matchesType = !filters.assetType || check.assetType === filters.assetType;
     const matchesSeverity = !filters.severity || check.severity === filters.severity;
     const matchesStatus = !filters.status || check.status === filters.status;
@@ -49,4 +56,12 @@ export default async function GovernanceChecksPage({ searchParams }: { searchPar
       ])} />
     </>
   );
+}
+
+async function safeGovernanceChecks(assetType: AssetType, assetId: string): Promise<GovernanceCheckResult[]> {
+  try {
+    return await runGovernanceChecks(assetType, assetId);
+  } catch {
+    return [];
+  }
 }

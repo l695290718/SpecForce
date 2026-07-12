@@ -1,5 +1,4 @@
-import { generateContextPack, seedData } from "@specforge/core";
-import { disconnectMcpPersistence, ensureMcpPersistenceSchema, upsertContextPack, upsertDesignAsset, upsertProposal } from "../apps/mcp-server/src/persistence";
+import { deletePersistedDesignData, disconnectMcpPersistence, ensureMcpPersistenceSchema, upsertContextPack, upsertDesignAsset, upsertProposal } from "../apps/mcp-server/src/persistence";
 import {
   selfDesignAdr,
   selfDesignApis,
@@ -15,20 +14,30 @@ import {
   selfDesignStateMachines
 } from "./data/specforge-self-design";
 
+const legacyDemoAssetIds = [
+  "domain-order",
+  "data-order",
+  "data-refund",
+  "api-create-refund",
+  "event-refund-created",
+  "event-refund-succeeded",
+  "rule-refund-amount",
+  "sm-refund",
+  "integration-payment-refund",
+  "quality-refund-latency",
+  "obs-refund-success-rate",
+  "adr-no-sync-inventory"
+];
+
 async function main() {
   await ensureMcpPersistenceSchema();
+  await deletePersistedDesignData({
+    assetIds: legacyDemoAssetIds,
+    proposalIds: ["proposal-partial-refund"],
+    contextPackIds: ["ctx-partial-refund"]
+  });
 
   const assetGroups = [
-    ["domain", seedData.domains],
-    ["dataModel", seedData.dataModels],
-    ["api", seedData.apis],
-    ["event", seedData.events],
-    ["businessRule", seedData.businessRules],
-    ["stateMachine", seedData.stateMachines],
-    ["integration", seedData.integrations],
-    ["quality", seedData.qualityRequirements],
-    ["observability", seedData.observabilityDesigns],
-    ["adr", seedData.adrs],
     ["domain", [selfDesignDomain]],
     ["dataModel", selfDesignDataModels],
     ["api", selfDesignApis],
@@ -47,12 +56,7 @@ async function main() {
     }
   }
 
-  for (const proposal of seedData.proposals) {
-    await upsertProposal({ proposal });
-  }
   await upsertProposal({ proposal: selfDesignProposal });
-
-  await upsertContextPack({ contextPack: await generateContextPack("proposal-partial-refund") });
   await upsertContextPack({ contextPack: selfDesignContextPack });
 }
 

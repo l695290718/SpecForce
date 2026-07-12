@@ -89,8 +89,10 @@ function assetHref(node: AssetGraphNode): string {
     integration: "integrations",
     quality: "quality",
     observability: "observability",
-    adr: "adrs"
+    adr: "adrs",
+    contextPack: "context-packs"
   };
   if (node.type === "proposal") return `/proposals/${node.id}`;
+  if (node.type === "contextPack") return `/context-packs/${node.id}`;
   return `/assets/${routes[node.type] ?? "domains"}/${node.id}`;
 }

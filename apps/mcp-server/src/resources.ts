@@ -1,6 +1,7 @@
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { buildAssetGraph, getDomainGraphTarget, getStore, listCollectionAsMarkdown, renderAssetAsMarkdown } from "@specforge/core";
+import type { AssetGraph, AssetType } from "@specforge/core";
+import { listPersistedAssets, listPersistedCollectionAsMarkdown, listPersistedContextPacks, listPersistedProposals, renderPersistedAssetAsMarkdown } from "./persistence";
 
 const resourceTypes = [
   ["domains", "domain"],
@@ -22,9 +23,9 @@ function markdownResource(uri: string, text: string) {
 }
 
 async function renderGraph(domainId?: string): Promise<string> {
-  const graph = await buildAssetGraph(domainId);
+  const graph = await buildPersistedGraph(domainId);
   return [
-    `# Asset Graph: ${getDomainGraphTarget(domainId)}`,
+    `# Asset Graph: ${domainId ?? "all domains"}`,
     "",
     "## Nodes",
     ...graph.nodes.map((node) => `- ${node.label} (${node.type}/${node.id}): ${node.summary}`),
@@ -48,16 +49,16 @@ export function registerResources(server: McpServer): void {
         description: `Agent-readable markdown catalog for SpecForge ${path}.`,
         mimeType: "text/markdown"
       },
-      async (uri) => markdownResource(uri.href, listCollectionAsMarkdown(assetType))
+      async (uri) => markdownResource(uri.href, await listPersistedCollectionAsMarkdown(assetType))
     );
 
     server.registerResource(
       `${path}-detail`,
       new ResourceTemplate(`specforge://${path}/{id}`, {
         list: async () => ({
-          resources: getStore()[pathToCollection(path)].map((asset) => ({
+          resources: (await listAssetsForResource(assetType)).map((asset) => ({
             uri: `specforge://${path}/${asset.id}`,
-            name: asset.name,
+            name: "title" in asset && asset.title ? asset.title : asset.name,
             mimeType: "text/markdown"
           }))
         })
@@ -67,7 +68,7 @@ export function registerResources(server: McpServer): void {
         description: `Agent-readable markdown detail for one SpecForge ${path} asset.`,
         mimeType: "text/markdown"
       },
-      async (uri, variables) => markdownResource(uri.href, await renderAssetAsMarkdown(assetType, String(variables.id)))
+      async (uri, variables) => markdownResource(uri.href, await renderPersistedAssetAsMarkdown(assetType, String(variables.id)))
     );
   }
 
@@ -86,7 +87,7 @@ export function registerResources(server: McpServer): void {
     "graph-domain",
     new ResourceTemplate("specforge://graph/{domainId}", {
       list: async () => ({
-        resources: getStore().domains.map((domain) => ({
+        resources: (await listPersistedAssets("domain")).map(({ asset: domain }) => ({
           uri: `specforge://graph/${domain.id}`,
           name: `${domain.name} graph`,
           mimeType: "text/markdown"
@@ -102,18 +103,44 @@ export function registerResources(server: McpServer): void {
   );
 }
 
-function pathToCollection(path: string) {
-  const map = {
-    domains: "domains",
-    "data-models": "dataModels",
-    apis: "apis",
-    events: "events",
-    "business-rules": "businessRules",
-    "state-machines": "stateMachines",
-    integrations: "integrations",
-    adrs: "adrs",
-    proposals: "proposals",
-    "context-packs": "contextPacks"
-  } as const;
-  return map[path as keyof typeof map];
+async function listAssetsForResource(assetType: AssetType) {
+  if (assetType === "proposal") return listPersistedProposals();
+  if (assetType === "contextPack") return listPersistedContextPacks();
+  return (await listPersistedAssets(assetType)).map(({ asset }) => asset);
+}
+
+async function buildPersistedGraph(domainId?: string): Promise<AssetGraph> {
+  const assets = await listPersistedAssets();
+  const proposals = await listPersistedProposals();
+  const contextPacks = await listPersistedContextPacks();
+  const nodes: AssetGraph["nodes"] = [];
+  const edges: AssetGraph["edges"] = [];
+
+  for (const { type, asset } of assets) {
+    if (domainId && "domainId" in asset && asset.domainId !== domainId && asset.id !== domainId) continue;
+    nodes.push({ id: asset.id, label: "title" in asset && asset.title ? asset.title : asset.name, type, domainId: "domainId" in asset ? asset.domainId : undefined, summary: "description" in asset ? asset.description : asset.id });
+    if ("domainId" in asset && asset.domainId && asset.id !== asset.domainId) {
+      edges.push({ id: `${asset.domainId}->${asset.id}`, source: asset.domainId, target: asset.id, label: "owns" });
+    }
+  }
+
+  for (const proposal of proposals) {
+    if (domainId && proposal.domainId !== domainId) continue;
+    nodes.push({ id: proposal.id, label: proposal.title, type: "proposal", domainId: proposal.domainId, summary: proposal.description });
+    proposal.impactedAssets.forEach((ref) => {
+      if (nodes.some((node) => node.id === ref.id)) edges.push({ id: `${proposal.id}->${ref.id}`, source: proposal.id, target: ref.id, label: "impacts" });
+    });
+  }
+
+  for (const pack of contextPacks) {
+    if (domainId) continue;
+    nodes.push({ id: pack.id, label: pack.name, type: "contextPack", summary: pack.summary });
+    if (nodes.some((node) => node.id === pack.proposalId)) edges.push({ id: `${pack.proposalId}->${pack.id}`, source: pack.proposalId, target: pack.id, label: "generates" });
+  }
+
+  return { nodes: dedupe(nodes), edges: dedupe(edges) };
+}
+
+function dedupe<T extends { id: string }>(items: T[]): T[] {
+  return Array.from(new Map(items.map((item) => [item.id, item])).values());
 }
