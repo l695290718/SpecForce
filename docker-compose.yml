@@ -3,8 +3,8 @@ services:
     image: postgres:16-alpine
     container_name: specforge-postgres
     environment:
-      POSTGRES_USER: specforge
-      POSTGRES_PASSWORD: specforge
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
       POSTGRES_DB: specforge
     ports:
       - "5432:5432"

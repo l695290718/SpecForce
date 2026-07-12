@@ -10,4 +10,5 @@ export * from "./ai";
 export * from "./assets/service";
 export * from "./audit/log";
 export * from "./proposals/service";
+export * from "./proposals/localization";
 export * from "./governance/service";

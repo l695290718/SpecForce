@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -56,6 +56,21 @@ model GovernanceCheckSnapshot {
   createdAt  DateTime @default(now())
 
   @@index([assetType, assetId])
+}
+
+model AssetLink {
+  id           String   @id
+  sourceType   String
+  sourceId     String
+  targetType   String
+  targetId     String
+  relationType String
+  description  String?
+  createdAt    DateTime @default(now())
+
+  @@index([sourceType, sourceId])
+  @@index([targetType, targetId])
+  @@index([relationType])
 }
 
 model AuditLog {

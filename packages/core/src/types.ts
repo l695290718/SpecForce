@@ -202,6 +202,7 @@ export interface Proposal extends BaseAsset {
   rolloutPlan: string;
   rollbackPlan?: string;
   status: "draft" | "reviewing" | "approved" | "implemented" | "archived";
+  localizedContent?: Partial<Record<"zh" | "en", Partial<Pick<Proposal, "name" | "title" | "description" | "background" | "goal" | "nonGoal" | "scope" | "specChanges" | "risks" | "rolloutPlan" | "rollbackPlan">>>>;
 }
 
 export interface ContextPack {

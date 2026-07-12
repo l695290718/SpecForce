@@ -45,72 +45,72 @@ export interface PersistedAssetLink extends AssetLinkInput {
 
 export async function ensureMcpPersistenceSchema() {
   await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS DesignAsset (
+    CREATE TABLE IF NOT EXISTS "DesignAsset" (
       id TEXT PRIMARY KEY NOT NULL,
       type TEXT NOT NULL,
       name TEXT NOT NULL,
       code TEXT,
       description TEXT NOT NULL,
-      domainId TEXT,
+      "domainId" TEXT,
       payload TEXT NOT NULL,
-      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
-  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS DesignAsset_type_idx ON DesignAsset(type)`);
-  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS DesignAsset_domainId_idx ON DesignAsset(domainId)`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DesignAsset_type_idx" ON "DesignAsset"(type)`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DesignAsset_domainId_idx" ON "DesignAsset"("domainId")`);
   await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS Proposal (
+    CREATE TABLE IF NOT EXISTS "Proposal" (
       id TEXT PRIMARY KEY NOT NULL,
       title TEXT NOT NULL,
       description TEXT NOT NULL,
       status TEXT NOT NULL,
-      domainId TEXT,
+      "domainId" TEXT,
       payload TEXT NOT NULL,
-      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
   await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS ContextPack (
+    CREATE TABLE IF NOT EXISTS "ContextPack" (
       id TEXT PRIMARY KEY NOT NULL,
       name TEXT NOT NULL,
-      proposalId TEXT NOT NULL,
-      targetAgent TEXT NOT NULL,
+      "proposalId" TEXT NOT NULL,
+      "targetAgent" TEXT NOT NULL,
       summary TEXT NOT NULL,
-      includedAssets TEXT NOT NULL,
+      "includedAssets" TEXT NOT NULL,
       constraints TEXT NOT NULL,
       instructions TEXT NOT NULL,
-      generatedMarkdown TEXT NOT NULL,
-      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      "generatedMarkdown" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
-  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS ContextPack_proposalId_idx ON ContextPack(proposalId)`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ContextPack_proposalId_idx" ON "ContextPack"("proposalId")`);
   await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS GovernanceCheckSnapshot (
+    CREATE TABLE IF NOT EXISTS "GovernanceCheckSnapshot" (
       id TEXT PRIMARY KEY NOT NULL,
-      assetType TEXT NOT NULL,
-      assetId TEXT NOT NULL,
+      "assetType" TEXT NOT NULL,
+      "assetId" TEXT NOT NULL,
       results TEXT NOT NULL,
-      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
-  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS GovernanceCheckSnapshot_assetType_assetId_idx ON GovernanceCheckSnapshot(assetType, assetId)`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "GovernanceCheckSnapshot_assetType_assetId_idx" ON "GovernanceCheckSnapshot"("assetType", "assetId")`);
   await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS AssetLink (
+    CREATE TABLE IF NOT EXISTS "AssetLink" (
       id TEXT PRIMARY KEY NOT NULL,
-      sourceType TEXT NOT NULL,
-      sourceId TEXT NOT NULL,
-      targetType TEXT NOT NULL,
-      targetId TEXT NOT NULL,
-      relationType TEXT NOT NULL,
+      "sourceType" TEXT NOT NULL,
+      "sourceId" TEXT NOT NULL,
+      "targetType" TEXT NOT NULL,
+      "targetId" TEXT NOT NULL,
+      "relationType" TEXT NOT NULL,
       description TEXT,
-      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
-  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS AssetLink_source_idx ON AssetLink(sourceType, sourceId)`);
-  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS AssetLink_target_idx ON AssetLink(targetType, targetId)`);
-  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS AssetLink_relationType_idx ON AssetLink(relationType)`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_source_idx" ON "AssetLink"("sourceType", "sourceId")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_target_idx" ON "AssetLink"("targetType", "targetId")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_relationType_idx" ON "AssetLink"("relationType")`);
 }
 
 export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
@@ -222,8 +222,10 @@ export async function deletePersistedDesignData(input: DeletePersistedDesignData
   await prisma.designAsset.deleteMany({ where: { id: { in: assetIds } } });
   if (assetIds.length || proposalIds.length || contextPackIds.length) {
     const ids = [...assetIds, ...proposalIds, ...contextPackIds];
+    const sourcePlaceholders = ids.map((_, index) => `$${index + 1}`).join(",");
+    const targetPlaceholders = ids.map((_, index) => `$${ids.length + index + 1}`).join(",");
     await prisma.$executeRawUnsafe(
-      `DELETE FROM AssetLink WHERE sourceId IN (${ids.map(() => "?").join(",")}) OR targetId IN (${ids.map(() => "?").join(",")})`,
+      `DELETE FROM "AssetLink" WHERE "sourceId" IN (${sourcePlaceholders}) OR "targetId" IN (${targetPlaceholders})`,
       ...ids,
       ...ids
     );
@@ -247,14 +249,14 @@ export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedA
   const id = assetLinkId({ ...input, sourceType, targetType });
 
   await prisma.$executeRawUnsafe(
-    `INSERT INTO AssetLink (id, sourceType, sourceId, targetType, targetId, relationType, description)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO "AssetLink" (id, "sourceType", "sourceId", "targetType", "targetId", "relationType", description)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT(id) DO UPDATE SET
-       sourceType = excluded.sourceType,
-       sourceId = excluded.sourceId,
-       targetType = excluded.targetType,
-       targetId = excluded.targetId,
-       relationType = excluded.relationType,
+       "sourceType" = excluded."sourceType",
+       "sourceId" = excluded."sourceId",
+       "targetType" = excluded."targetType",
+       "targetId" = excluded."targetId",
+       "relationType" = excluded."relationType",
        description = excluded.description`,
     id,
     sourceType,
@@ -288,7 +290,7 @@ export async function listPersistedAssetLinks(): Promise<PersistedAssetLink[]> {
     relationType: string;
     description: string | null;
     createdAt: Date | string;
-  }>>(`SELECT id, sourceType, sourceId, targetType, targetId, relationType, description, createdAt FROM AssetLink ORDER BY createdAt ASC`);
+  }>>(`SELECT id, "sourceType", "sourceId", "targetType", "targetId", "relationType", description, "createdAt" FROM "AssetLink" ORDER BY "createdAt" ASC`);
   return rows.map((row) => ({
     id: row.id,
     sourceType: row.sourceType,

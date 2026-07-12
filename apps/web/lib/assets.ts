@@ -223,7 +223,7 @@ async function getDatabaseAssets(assetType: AssetType): Promise<Asset[]> {
 async function getDatabaseAssetLinks(): Promise<Array<{ id: string; sourceType: AssetType; sourceId: string; targetType: AssetType; targetId: string; relationType: string }>> {
   try {
     return await prisma.$queryRawUnsafe<Array<{ id: string; sourceType: AssetType; sourceId: string; targetType: AssetType; targetId: string; relationType: string }>>(
-      "SELECT id, sourceType, sourceId, targetType, targetId, relationType FROM AssetLink ORDER BY createdAt ASC"
+      `SELECT id, "sourceType", "sourceId", "targetType", "targetId", "relationType" FROM "AssetLink" ORDER BY "createdAt" ASC`
     );
   } catch {
     return [];

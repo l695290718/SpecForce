@@ -724,28 +724,104 @@ export const selfDesignAdr: Adr = {
 
 export const selfDesignProposal: Proposal = {
   id: "proposal-specforge-self-design",
-  name: "Make SpecForge manage its own design",
-  title: "Make SpecForge manage its own MCP-first design",
-  description: "Write SpecForge Design Center's own architecture, MCP surface, governance rules, and implementation context into SpecForge as first-class design assets.",
+  name: "SpecForge MCP-first self-design",
+  title: "SpecForge MCP-first Self-Design Proposal",
+  description: "Make SpecForge manage its own architecture, MCP surface, governance rules, AI provider abstraction, PostgreSQL persistence, and agent context as first-class design assets.",
   domainId: "domain-specforge-platform",
-  background: "SpecForge should be self-describing: agents should be able to query SpecForge for the design of SpecForge itself rather than relying only on external docs.",
-  goal: "Represent SpecForge's MCP-first design as domain, data, API, event, rule, state-machine, integration, quality, observability, ADR, proposal, and context pack assets, with persisted writes going through MCP write services.",
-  nonGoal: "Do not replace docs/specforge-design-center-spec.md; the design assets complement the spec and make it queryable through Web and MCP.",
-  scope: "Core seed data, MCP search, Context Pack generation, governance visibility, and Web asset browsing.",
+  background: [
+    "SpecForge is intended to be an MCP-native design center for AI Coding Agents, not only a human-facing catalog. Agents need a reliable source of truth for domain concepts, data models, API contracts, event contracts, state machines, business rules, ADRs, governance checks, and context packs before they change code.",
+    "Therefore SpecForge should be self-describing: the design of SpecForge itself must live inside SpecForge and be written through the same MCP persistence path that future agents will use."
+  ].join("\n\n"),
+  goal: [
+    "Establish a complete self-design proposal that makes SpecForge's MCP-first architecture queryable from both Web and MCP clients.",
+    "Persist the platform's design assets through MCP tools into PostgreSQL, covering domain, data, API, event, business rule, state machine, integration, quality, observability, ADR, proposal, context pack, and asset relationship data.",
+    "Keep the system ready for future AI generation capabilities without connecting to real models yet by using MockAIProvider and reserving the OpenAIProvider boundary."
+  ].join("\n\n"),
+  nonGoal: [
+    "Do not replace the written specification documents; database-backed design assets complement docs by making them queryable, governable, and linkable.",
+    "Do not connect to a real LLM provider in this proposal; provider abstraction and mock generation are sufficient for the MVP.",
+    "Do not expose destructive raw database operations through MCP. All writes must remain typed, validated, auditable, and aligned with design assets."
+  ].join("\n\n"),
+  scope: [
+    "In scope: MCP write tools, PostgreSQL persistence, seeded self-design assets, asset relationship links, Web browsing pages, proposal detail content, graph filtering, governance visibility, Context Pack generation, and AI Provider abstraction.",
+    "The proposal covers how SpecForge should be maintained as its own first customer: design changes should update the asset graph and context packs, not only code."
+  ].join("\n\n"),
   impactedAssets: [...selfDesignRefs],
   specChanges: [
-    "Add SpecForge Platform Domain",
-    "Add expanded data models for MCP registry, AI generation, Web workspace, asset graph, and i18n",
-    "Add MCP Tool and Web Console contracts",
-    "Add persisted MCP upsert tools for design assets, proposals, and context packs",
-    "Add Core Service reuse and MCP audit rules",
-    "Add SpecForge lifecycle state machines",
-    "Add ADR for MCP-first architecture"
+    "Define the SpecForge Platform bounded context.",
+    "Persist expanded data models for design assets, MCP registry, AI generation, Web workspace, asset graph, i18n, and audit logs.",
+    "Maintain MCP tool contracts for asset upsert, proposal upsert, context pack upsert, asset search, governance checks, impact analysis, markdown export, and relationship links.",
+    "Keep API, event, and state machine assets strong enough for later impact analysis.",
+    "Preserve Core Service reuse between Web and MCP surfaces.",
+    "Keep MockAIProvider active and reserve OpenAIProvider for future real-model integration.",
+    "Use PostgreSQL as the local durable store and seed/update data through MCP tools."
   ],
-  risks: ["high: self-design assets can drift from implementation if tests and docs are not maintained together"],
-  rolloutPlan: "Add seed assets, verify search and context pack generation, then expose them through Web and MCP automatically.",
-  rollbackPlan: "Remove self-design seed module import and keep external spec documentation only.",
+  risks: [
+    "high: Self-design assets can drift from implementation if code, seed data, database state, and docs are not verified together.",
+    "medium: MCP write tools increase power and therefore require audit, validation, and relationship checks."
+  ],
+  rolloutPlan: [
+    "First, update the self-design seed data and write it into PostgreSQL through the MCP seed client.",
+    "Second, verify the Proposal detail page, MCP smoke test, typecheck, lint, and graph pages.",
+    "Third, use this proposal as the default reference for future SpecForge implementation tasks and context packs."
+  ].join("\n\n"),
+  rollbackPlan: [
+    "Re-run MCP seed with the previous selfDesignProposal payload, or remove the self-design proposal from the seed module if the design center should fall back to external docs only.",
+    "Database rollback does not require schema changes because this update only changes Proposal payload content."
+  ].join("\n\n"),
   status: "approved",
+  localizedContent: {
+    zh: {
+      name: "SpecForge MCP 优先自设计",
+      title: "SpecForge MCP 优先自设计提案",
+      description: "将 SpecForge 自身的架构、MCP 能力面、治理规则、AI Provider 抽象、PostgreSQL 持久化和 Agent 上下文沉淀为一等设计资产。",
+      background: [
+        "SpecForge 的定位是面向 AI Coding Agent 的 MCP-native 设计中心，而不仅是给人看的资产目录。Agent 在改代码前，需要能查询领域概念、数据模型、API 契约、事件契约、状态机、业务规则、ADR、治理检查和 Context Pack 等可信设计事实。",
+        "因此 SpecForge 应该自描述：SpecForge 自身的设计也必须进入 SpecForge，并且通过未来 Agent 会使用的同一条 MCP 持久化链路写入。"
+      ].join("\n\n"),
+      goal: [
+        "建立一份完整的自设计提案，让 SpecForge 的 MCP 优先架构可以同时被 Web 和 MCP 客户端查询。",
+        "通过 MCP 工具将平台设计资产写入 PostgreSQL，覆盖领域、数据、API、事件、业务规则、状态机、集成、质量、可观测性、ADR、提案、Context Pack 和资产关系数据。",
+        "在暂不接入真实模型的前提下，通过 MockAIProvider 和预留 OpenAIProvider 边界，为未来生成 Proposal、ADR、规则、测试建议和 Agent Context Pack 做好准备。"
+      ].join("\n\n"),
+      nonGoal: [
+        "不替代已有书面 spec 文档；数据库中的设计资产是对文档的补充，使其可查询、可治理、可建立关系。",
+        "本提案不接入真实大模型；MVP 阶段完成 Provider 抽象和 Mock 生成即可。",
+        "不通过 MCP 暴露破坏性的原始数据库操作。所有写入必须保持类型化、可校验、可审计，并与设计资产模型对齐。"
+      ].join("\n\n"),
+      scope: [
+        "范围内：MCP 写入工具、PostgreSQL 持久化、自设计种子资产、资产关系、Web 浏览页面、提案详情内容、关系图过滤、治理可见性、Context Pack 生成和 AI Provider 抽象。",
+        "本提案约定 SpecForge 要把自己当成第一个客户维护：设计变更不仅要改代码，也要更新资产图谱和 Context Pack。"
+      ].join("\n\n"),
+      specChanges: [
+        "定义 SpecForge Platform 限界上下文。",
+        "持久化设计资产、MCP 注册表、AI 生成、Web 工作区、资产图谱、国际化和审计日志等数据模型。",
+        "维护资产写入、提案写入、Context Pack 写入、资产搜索、治理检查、影响分析、Markdown 导出和关系链接等 MCP 工具契约。",
+        "保持 API、事件和状态机资产足够完整，为后续影响分析提供依据。",
+        "保持 Web 与 MCP 两个入口复用 Core Service。",
+        "当前启用 MockAIProvider，并为未来真实模型接入预留 OpenAIProvider。",
+        "使用 PostgreSQL 作为本地持久化存储，并通过 MCP 工具写入和更新数据。"
+      ],
+      risks: [
+        "high: 如果代码、种子数据、数据库状态和文档没有一起校验，自设计资产可能与实现漂移。",
+        "medium: MCP 写入工具能力更强，因此必须配套审计、校验和关系检查。"
+      ],
+      rolloutPlan: [
+        "第一步，更新自设计种子数据，并通过 MCP seed client 写入 PostgreSQL。",
+        "第二步，验证 Proposal 详情页、MCP smoke、typecheck、lint 和关系图页面。",
+        "第三步，把这份提案作为后续 SpecForge 实现任务和 Context Pack 的默认设计入口。"
+      ].join("\n\n"),
+      rollbackPlan: [
+        "可以用旧的 selfDesignProposal payload 重新执行 MCP seed；如果设计中心需要退回到只依赖外部文档，则从种子模块移除自设计提案。",
+        "本次只更新 Proposal payload 内容，不涉及数据库 schema，因此数据库回滚不需要结构变更。"
+      ].join("\n\n")
+    },
+    en: {
+      name: "SpecForge MCP-first self-design",
+      title: "SpecForge MCP-first Self-Design Proposal",
+      description: "Make SpecForge manage its own architecture, MCP surface, governance rules, AI provider abstraction, PostgreSQL persistence, and agent context as first-class design assets."
+    }
+  },
   createdAt: now,
   updatedAt: now
 };
