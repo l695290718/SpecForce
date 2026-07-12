@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",
+    "@prisma/client": "^6.1.0",
     "@specforge/core": "workspace:*",
     "zod": "^3.24.1"
   },

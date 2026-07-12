@@ -35,9 +35,20 @@ async function main() {
     name: "generate_context_pack",
     arguments: { proposalId: "proposal-partial-refund", targetAgent: "codex", format: "markdown" }
   });
+  const contextPackJson = await client.callTool({
+    name: "generate_context_pack",
+    arguments: { proposalId: "proposal-partial-refund", targetAgent: "codex", format: "json" }
+  });
   const governance = await client.callTool({
     name: "run_governance_checks",
     arguments: { targetType: "proposal", targetId: "proposal-partial-refund" }
+  });
+  const generatedPack = JSON.parse(firstText(contextPackJson));
+  const upsert = await client.callTool({
+    name: "upsert_context_pack",
+    arguments: {
+      contextPack: generatedPack
+    }
   });
 
   await client.close();
@@ -45,14 +56,19 @@ async function main() {
   const searchText = firstText(search);
   const packText = firstText(contextPack);
   const governanceText = firstText(governance);
+  const upsertText = firstText(upsert);
 
   if (!tools.tools.some((tool) => tool.name === "search_design_assets")) throw new Error("search_design_assets tool missing");
+  if (!tools.tools.some((tool) => tool.name === "upsert_design_asset")) throw new Error("upsert_design_asset tool missing");
+  if (!tools.tools.some((tool) => tool.name === "upsert_proposal")) throw new Error("upsert_proposal tool missing");
+  if (!tools.tools.some((tool) => tool.name === "upsert_context_pack")) throw new Error("upsert_context_pack tool missing");
   if (!resources.resources.some((resource) => resource.uri === "specforge://domains")) throw new Error("domains resource missing");
   if (!templates.resourceTemplates.some((template) => template.uriTemplate === "specforge://apis/{id}")) throw new Error("api resource template missing");
   if (!prompts.prompts.some((prompt) => prompt.name === "design_feature")) throw new Error("design_feature prompt missing");
   if (!searchText.includes("proposal-partial-refund")) throw new Error("search did not find partial refund proposal");
   if (!packText.includes("# Agent Context Pack")) throw new Error("context pack markdown missing");
   if (!governanceText.includes("results")) throw new Error("governance result missing");
+  if (!upsertText.includes("ctx-partial-refund")) throw new Error("MCP persisted write result missing");
 
   console.log(
     JSON.stringify(
@@ -63,7 +79,8 @@ async function main() {
         prompts: prompts.prompts.length,
         searchFoundPartialRefund: searchText.includes("proposal-partial-refund"),
         generatedContextPack: packText.includes("# Agent Context Pack"),
-        governanceReturnedResults: governanceText.includes("results")
+        governanceReturnedResults: governanceText.includes("results"),
+        persistedWriteToolWorked: upsertText.includes("ctx-partial-refund")
       },
       null,
       2

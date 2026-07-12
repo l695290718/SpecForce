@@ -15,6 +15,7 @@ import type { Permission } from "@specforge/core";
 import { z } from "zod";
 import { auditToolCall } from "./audit";
 import { allowAllPolicy, getDefaultActor } from "./auth";
+import { upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
 
 type ToolHandler<T> = (input: T) => Promise<unknown>;
 
@@ -28,6 +29,18 @@ function errorResult(message: string): CallToolResult {
 }
 
 function targetFor(action: string, input: Record<string, unknown>) {
+  if ("asset" in input && "assetType" in input) {
+    const asset = input.asset as { id?: unknown };
+    return { targetType: String(input.assetType), targetId: typeof asset?.id === "string" ? asset.id : "new" };
+  }
+  if ("proposal" in input) {
+    const proposal = input.proposal as { id?: unknown };
+    return { targetType: "proposal", targetId: typeof proposal?.id === "string" ? proposal.id : "new" };
+  }
+  if ("contextPack" in input) {
+    const contextPack = input.contextPack as { id?: unknown };
+    return { targetType: "context-pack", targetId: typeof contextPack?.id === "string" ? contextPack.id : "new" };
+  }
   if ("proposalId" in input) return { targetType: "proposal", targetId: String(input.proposalId) };
   if ("assetId" in input) return { targetType: String(input.assetType ?? "asset"), targetId: String(input.assetId) };
   if ("contextPackId" in input) return { targetType: "context-pack", targetId: String(input.contextPackId) };
@@ -84,7 +97,55 @@ const assetRefSchema = z.object({
   assetId: z.string()
 });
 
+const assetTypeSchema = z.enum(["domain", "dataModel", "api", "event", "businessRule", "stateMachine", "integration", "quality", "observability", "adr", "proposal", "contextPack"]);
+
 export function registerTools(server: McpServer): void {
+  registerJsonTool(
+    server,
+    "upsert_design_asset",
+    {
+      title: "Upsert design asset",
+      description: "Creates or updates a persisted design asset through the MCP write boundary. This validates the envelope, stores the full payload, and is audited.",
+      inputSchema: {
+        assetType: assetTypeSchema,
+        asset: z.record(z.unknown())
+      },
+      permissions: ["asset:write"],
+      readOnly: false
+    },
+    async (input) => upsertDesignAsset(input as unknown as Parameters<typeof upsertDesignAsset>[0])
+  );
+
+  registerJsonTool(
+    server,
+    "upsert_proposal",
+    {
+      title: "Upsert proposal",
+      description: "Creates or updates a persisted proposal through the MCP write boundary. This is intended for MCP-native imports, seed runs, and future agent edits.",
+      inputSchema: {
+        proposal: z.record(z.unknown())
+      },
+      permissions: ["proposal:write"],
+      readOnly: false
+    },
+    async (input) => upsertProposal(input as unknown as Parameters<typeof upsertProposal>[0])
+  );
+
+  registerJsonTool(
+    server,
+    "upsert_context_pack",
+    {
+      title: "Upsert context pack",
+      description: "Creates or updates a persisted Context Pack through the MCP write boundary. This keeps generated agent context queryable by Web and MCP clients.",
+      inputSchema: {
+        contextPack: z.record(z.unknown())
+      },
+      permissions: ["context-pack:generate"],
+      readOnly: false
+    },
+    async (input) => upsertContextPack(input as unknown as Parameters<typeof upsertContextPack>[0])
+  );
+
   registerJsonTool(
     server,
     "search_design_assets",
