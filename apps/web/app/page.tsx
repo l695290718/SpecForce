@@ -18,7 +18,7 @@ export default async function DashboardPage() {
       <PageHeader
         title="SpecForge Design Center"
         description={<T k="dashboard.description" />}
-        action={<ButtonLink href="/proposals/proposal-specforge-self-design"><T k="dashboard.viewRefundProposal" /></ButtonLink>}
+        action={<ButtonLink href="/proposals/proposal-specforge-self-design"><T k="dashboard.viewSelfDesignProposal" /></ButtonLink>}
       />
       <section className="sf-rise sf-scan mb-6 overflow-hidden rounded-lg border border-slate-700 bg-ink p-5 text-white shadow-elevated">
         <div className="relative z-10 grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">

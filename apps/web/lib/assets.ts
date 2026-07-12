@@ -133,8 +133,7 @@ export async function getContextPackWithDatabase(id: string): Promise<ContextPac
     };
   }
   if ((await prisma.contextPack.count()) > 0) throw new Error(`Context Pack not found: ${id}`);
-  const proposalId = id === "ctx-partial-refund" ? "proposal-partial-refund" : id.replace(/^ctx-/, "proposal-");
-  return generateContextPack(proposalId);
+  return generateContextPack(id.replace(/^ctx-/, "proposal-"));
 }
 
 export async function dashboardStats() {
