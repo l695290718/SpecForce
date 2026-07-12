@@ -29,7 +29,7 @@ async function main() {
 
   const search = await client.callTool({
     name: "search_design_assets",
-    arguments: { query: "SpecForge MCP", limit: 5 }
+    arguments: { query: "proposal-specforge-self-design", limit: 10 }
   });
   const contextPack = await client.callTool({
     name: "generate_context_pack",
@@ -50,6 +50,17 @@ async function main() {
       contextPack: generatedPack
     }
   });
+  const link = await client.callTool({
+    name: "link_assets",
+    arguments: {
+      sourceType: "quality",
+      sourceId: "quality-specforge-impact-ready",
+      targetType: "dataModel",
+      targetId: "data-specforge-asset-graph",
+      relationType: "verifies",
+      description: "Smoke verifies persisted asset link writes."
+    }
+  });
 
   await client.close();
 
@@ -57,6 +68,7 @@ async function main() {
   const packText = firstText(contextPack);
   const governanceText = firstText(governance);
   const upsertText = firstText(upsert);
+  const linkText = firstText(link);
 
   if (!tools.tools.some((tool) => tool.name === "search_design_assets")) throw new Error("search_design_assets tool missing");
   if (!tools.tools.some((tool) => tool.name === "upsert_design_asset")) throw new Error("upsert_design_asset tool missing");
@@ -69,6 +81,7 @@ async function main() {
   if (!packText.includes("# Agent Context Pack")) throw new Error("context pack markdown missing");
   if (!governanceText.includes("results")) throw new Error("governance result missing");
   if (!upsertText.includes("ctx-specforge-self-design")) throw new Error("MCP persisted write result missing");
+  if (!linkText.includes("quality-specforge-impact-ready")) throw new Error("MCP persisted link result missing");
 
   console.log(
     JSON.stringify(
@@ -80,7 +93,8 @@ async function main() {
         searchFoundSpecForgeSelfDesign: searchText.includes("proposal-specforge-self-design"),
         generatedContextPack: packText.includes("# Agent Context Pack"),
         governanceReturnedResults: governanceText.includes("results"),
-        persistedWriteToolWorked: upsertText.includes("ctx-specforge-self-design")
+        persistedWriteToolWorked: upsertText.includes("ctx-specforge-self-design"),
+        persistedLinkToolWorked: linkText.includes("quality-specforge-impact-ready")
       },
       null,
       2

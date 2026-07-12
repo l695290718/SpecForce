@@ -164,6 +164,7 @@ export async function getAssetGraphWithDatabase(domainId?: string, assetType?: A
   }
 
   const assets = assetRows.map((row) => JSON.parse(row.payload) as Asset);
+  const assetLinks = await getDatabaseAssetLinks();
   const proposals = await getProposalsWithDatabase();
   const contextPacks = await getContextPacksWithDatabase();
   const nodes: AssetGraph["nodes"] = [];
@@ -191,6 +192,13 @@ export async function getAssetGraphWithDatabase(domainId?: string, assetType?: A
     });
   }
 
+  for (const link of assetLinks) {
+    if (assetType && link.sourceType !== assetType && link.targetType !== assetType) continue;
+    if (nodes.some((node) => node.id === link.sourceId) && nodes.some((node) => node.id === link.targetId)) {
+      edges.push({ id: link.id, source: link.sourceId, target: link.targetId, label: link.relationType });
+    }
+  }
+
   for (const pack of contextPacks) {
     if (assetType) continue;
     nodes.push({ id: pack.id, label: pack.name, type: "contextPack", summary: pack.summary });
@@ -210,6 +218,16 @@ export async function getAssetGraphWithDatabase(domainId?: string, assetType?: A
 async function getDatabaseAssets(assetType: AssetType): Promise<Asset[]> {
   const rows = await prisma.designAsset.findMany({ where: { type: assetType }, orderBy: { createdAt: "asc" } });
   return rows.map((row) => JSON.parse(row.payload) as Asset);
+}
+
+async function getDatabaseAssetLinks(): Promise<Array<{ id: string; sourceType: AssetType; sourceId: string; targetType: AssetType; targetId: string; relationType: string }>> {
+  try {
+    return await prisma.$queryRawUnsafe<Array<{ id: string; sourceType: AssetType; sourceId: string; targetType: AssetType; targetId: string; relationType: string }>>(
+      "SELECT id, sourceType, sourceId, targetType, targetId, relationType FROM AssetLink ORDER BY createdAt ASC"
+    );
+  } catch {
+    return [];
+  }
 }
 
 function mergeById<T extends { id: string }>(base: T[], extra: T[]): T[] {

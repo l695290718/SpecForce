@@ -1,7 +1,7 @@
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AssetGraph, AssetType } from "@specforge/core";
-import { listPersistedAssets, listPersistedCollectionAsMarkdown, listPersistedContextPacks, listPersistedProposals, renderPersistedAssetAsMarkdown } from "./persistence";
+import { listPersistedAssetLinks, listPersistedAssets, listPersistedCollectionAsMarkdown, listPersistedContextPacks, listPersistedProposals, renderPersistedAssetAsMarkdown } from "./persistence";
 
 const resourceTypes = [
   ["domains", "domain"],
@@ -111,6 +111,7 @@ async function listAssetsForResource(assetType: AssetType) {
 
 async function buildPersistedGraph(domainId?: string): Promise<AssetGraph> {
   const assets = await listPersistedAssets();
+  const assetLinks = await listPersistedAssetLinks();
   const proposals = await listPersistedProposals();
   const contextPacks = await listPersistedContextPacks();
   const nodes: AssetGraph["nodes"] = [];
@@ -130,6 +131,11 @@ async function buildPersistedGraph(domainId?: string): Promise<AssetGraph> {
     proposal.impactedAssets.forEach((ref) => {
       if (nodes.some((node) => node.id === ref.id)) edges.push({ id: `${proposal.id}->${ref.id}`, source: proposal.id, target: ref.id, label: "impacts" });
     });
+  }
+
+  for (const link of assetLinks) {
+    if (!nodes.some((node) => node.id === link.sourceId) || !nodes.some((node) => node.id === link.targetId)) continue;
+    edges.push({ id: link.id, source: link.sourceId, target: link.targetId, label: link.relationType });
   }
 
   for (const pack of contextPacks) {

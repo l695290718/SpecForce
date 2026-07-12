@@ -5,7 +5,6 @@ import {
   createAdr,
   createProposal,
   generateContextPack,
-  linkAssets,
   runGovernanceChecksForTarget,
   updateProposal
 } from "@specforge/core";
@@ -13,7 +12,7 @@ import type { Permission } from "@specforge/core";
 import { z } from "zod";
 import { auditToolCall } from "./audit";
 import { allowAllPolicy, getDefaultActor } from "./auth";
-import { getPersistedAsset, listPersistedContextPacks, renderPersistedAssetAsMarkdown, searchPersistedDesignAssets, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
+import { getPersistedAsset, listPersistedContextPacks, renderPersistedAssetAsMarkdown, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
 
 type ToolHandler<T> = (input: T) => Promise<unknown>;
 
@@ -35,11 +34,12 @@ function targetFor(action: string, input: Record<string, unknown>) {
     const proposal = input.proposal as { id?: unknown };
     return { targetType: "proposal", targetId: typeof proposal?.id === "string" ? proposal.id : "new" };
   }
-  if ("contextPack" in input) {
+      if ("contextPack" in input) {
     const contextPack = input.contextPack as { id?: unknown };
     return { targetType: "context-pack", targetId: typeof contextPack?.id === "string" ? contextPack.id : "new" };
   }
   if ("proposalId" in input) return { targetType: "proposal", targetId: String(input.proposalId) };
+  if ("sourceId" in input && "targetId" in input) return { targetType: "asset-link", targetId: `${input.sourceId}->${input.targetId}` };
   if ("assetId" in input) return { targetType: String(input.assetType ?? "asset"), targetId: String(input.assetId) };
   if ("contextPackId" in input) return { targetType: "context-pack", targetId: String(input.contextPackId) };
   if (action.includes("search")) return { targetType: "asset", targetId: "catalog" };
@@ -312,7 +312,7 @@ export function registerTools(server: McpServer): void {
     "link_assets",
     {
       title: "Link assets",
-      description: "Creates an in-memory relationship between two design assets. This write operation is audited and does not delete assets.",
+      description: "Creates or updates a persisted relationship between two design assets for graph traversal and future impact analysis. This write operation is audited and does not delete assets.",
       inputSchema: {
         sourceType: z.string(),
         sourceId: z.string(),
@@ -324,7 +324,7 @@ export function registerTools(server: McpServer): void {
       permissions: ["asset:write"],
       readOnly: false
     },
-    linkAssets
+    upsertAssetLink
   );
 
   registerJsonTool(

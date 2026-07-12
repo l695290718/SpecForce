@@ -29,6 +29,20 @@ export interface DeletePersistedDesignDataInput {
   contextPackIds?: string[];
 }
 
+export interface AssetLinkInput {
+  sourceType: string;
+  sourceId: string;
+  targetType: string;
+  targetId: string;
+  relationType: string;
+  description?: string;
+}
+
+export interface PersistedAssetLink extends AssetLinkInput {
+  id: string;
+  createdAt: string;
+}
+
 export async function ensureMcpPersistenceSchema() {
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS DesignAsset (
@@ -82,6 +96,21 @@ export async function ensureMcpPersistenceSchema() {
     )
   `);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS GovernanceCheckSnapshot_assetType_assetId_idx ON GovernanceCheckSnapshot(assetType, assetId)`);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS AssetLink (
+      id TEXT PRIMARY KEY NOT NULL,
+      sourceType TEXT NOT NULL,
+      sourceId TEXT NOT NULL,
+      targetType TEXT NOT NULL,
+      targetId TEXT NOT NULL,
+      relationType TEXT NOT NULL,
+      description TEXT,
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS AssetLink_source_idx ON AssetLink(sourceType, sourceId)`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS AssetLink_target_idx ON AssetLink(targetType, targetId)`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS AssetLink_relationType_idx ON AssetLink(relationType)`);
 }
 
 export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
@@ -191,6 +220,14 @@ export async function deletePersistedDesignData(input: DeletePersistedDesignData
   await prisma.contextPack.deleteMany({ where: { id: { in: contextPackIds } } });
   await prisma.proposal.deleteMany({ where: { id: { in: proposalIds } } });
   await prisma.designAsset.deleteMany({ where: { id: { in: assetIds } } });
+  if (assetIds.length || proposalIds.length || contextPackIds.length) {
+    const ids = [...assetIds, ...proposalIds, ...contextPackIds];
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM AssetLink WHERE sourceId IN (${ids.map(() => "?").join(",")}) OR targetId IN (${ids.map(() => "?").join(",")})`,
+      ...ids,
+      ...ids
+    );
+  }
 
   return {
     deletedAssetIds: assetIds,
@@ -198,6 +235,70 @@ export async function deletePersistedDesignData(input: DeletePersistedDesignData
     deletedContextPackIds: contextPackIds,
     status: "deleted"
   };
+}
+
+export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedAssetLink> {
+  await ensureMcpPersistenceSchema();
+  const sourceType = normalizeAssetType(input.sourceType);
+  const targetType = normalizeAssetType(input.targetType);
+  assertString(input.sourceId, "sourceId");
+  assertString(input.targetId, "targetId");
+  assertString(input.relationType, "relationType");
+  const id = assetLinkId({ ...input, sourceType, targetType });
+
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO AssetLink (id, sourceType, sourceId, targetType, targetId, relationType, description)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       sourceType = excluded.sourceType,
+       sourceId = excluded.sourceId,
+       targetType = excluded.targetType,
+       targetId = excluded.targetId,
+       relationType = excluded.relationType,
+       description = excluded.description`,
+    id,
+    sourceType,
+    input.sourceId,
+    targetType,
+    input.targetId,
+    input.relationType,
+    input.description ?? null
+  );
+
+  return {
+    id,
+    sourceType,
+    sourceId: input.sourceId,
+    targetType,
+    targetId: input.targetId,
+    relationType: input.relationType,
+    description: input.description,
+    createdAt: new Date().toISOString()
+  };
+}
+
+export async function listPersistedAssetLinks(): Promise<PersistedAssetLink[]> {
+  await ensureMcpPersistenceSchema();
+  const rows = await prisma.$queryRawUnsafe<Array<{
+    id: string;
+    sourceType: string;
+    sourceId: string;
+    targetType: string;
+    targetId: string;
+    relationType: string;
+    description: string | null;
+    createdAt: Date | string;
+  }>>(`SELECT id, sourceType, sourceId, targetType, targetId, relationType, description, createdAt FROM AssetLink ORDER BY createdAt ASC`);
+  return rows.map((row) => ({
+    id: row.id,
+    sourceType: row.sourceType,
+    sourceId: row.sourceId,
+    targetType: row.targetType,
+    targetId: row.targetId,
+    relationType: row.relationType,
+    description: row.description ?? undefined,
+    createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt)
+  }));
 }
 
 export async function listPersistedAssets(assetType?: AssetType): Promise<Array<{ type: AssetType; asset: Asset }>> {
@@ -357,4 +458,10 @@ function assetSummary(asset: Asset): string {
 function scoreAsset(asset: Asset, terms: string[]): number {
   const text = JSON.stringify(asset).toLowerCase();
   return terms.reduce((score, term) => score + (text.includes(term) ? 1 : 0), 0);
+}
+
+function assetLinkId(input: Pick<AssetLinkInput, "sourceType" | "sourceId" | "targetType" | "targetId" | "relationType">): string {
+  return `${input.sourceType}:${input.sourceId}:${input.relationType}:${input.targetType}:${input.targetId}`
+    .toLowerCase()
+    .replace(/[^a-z0-9:_-]+/g, "-");
 }
