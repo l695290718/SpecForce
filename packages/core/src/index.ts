@@ -12,3 +12,6 @@ export * from "./audit/log";
 export * from "./proposals/service";
 export * from "./proposals/localization";
 export * from "./governance/service";
+export * from "./architecture/types";
+export * from "./architecture/mock";
+export * from "./architecture/service";

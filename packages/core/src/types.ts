@@ -1,3 +1,5 @@
+import type { ArchitectureScopeRef } from "./architecture/types";
+
 export type AssetType =
   | "domain"
   | "dataModel"
@@ -34,6 +36,7 @@ export interface BaseAsset {
   domainId?: string;
   createdAt: string;
   updatedAt: string;
+  architectureScope?: ArchitectureScopeRef;
 }
 
 export interface DomainModel extends BaseAsset {
@@ -216,12 +219,25 @@ export interface ContextPack {
   instructions: string[];
   generatedMarkdown: string;
   createdAt: string;
+  architectureScope?: ArchitectureScopeRef;
 }
 
 export interface AssetRef {
   type: AssetType;
   id: string;
   label: string;
+}
+
+export interface AssetLink {
+  id: string;
+  sourceType: AssetType;
+  sourceId: string;
+  targetType: AssetType;
+  targetId: string;
+  relationType: string;
+  description?: string;
+  createdAt: string;
+  architectureScope?: ArchitectureScopeRef;
 }
 
 export interface GovernanceCheckResult {
@@ -279,6 +295,7 @@ export interface ImpactAnalysis {
   requiredContextPack: boolean;
   governanceWarnings: GovernanceCheckResult[];
   implementationTasks: string[];
+  affectedArchitectureScopes?: ArchitectureScopeRef[];
 }
 
 export interface SpecForgeDataStore {
