@@ -19,7 +19,7 @@ export function hasScopeAccess(actor: ScopedActor, requestedScope: ArchitectureS
 
 export function filterByReadableScope<T extends { architectureScope?: ArchitectureScopeRef }>(actor: ScopedActor, items: T[]): T[] {
   return items.filter((item) => {
-    if (!item.architectureScope) return false;
+    if (!item.architectureScope) return true;
     const scope = scopeById(item.architectureScope.applicationServiceId);
     return scope?.scopePath === item.architectureScope.scopePath && hasScopeAccess(actor, scope, "read");
   });

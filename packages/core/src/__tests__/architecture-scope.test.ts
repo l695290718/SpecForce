@@ -36,6 +36,17 @@ describe("Huawei architecture scope authorization", () => {
     );
   });
 
+  it("does not treat an inherited read grant as write access", () => {
+    const moduleReader = {
+      actorType: "agent" as const,
+      actorId: "module-reader",
+      grants: [{ scopeId: "module-celon-designer", action: "read" as const }]
+    };
+
+    expect(hasScopeAccess(moduleReader, designerService!, "write")).toBe(false);
+    expect(() => assertWritableApplicationService(moduleReader, designerService!)).toThrow("write access");
+  });
+
   it("filters assets outside readable scopes", () => {
     const assets = [
       { id: "designer-asset", architectureScope: { applicationServiceId: "com.huawei.celon.desiner", scopePath: designerService!.scopePath } },
@@ -43,5 +54,11 @@ describe("Huawei architecture scope authorization", () => {
     ];
 
     expect(filterByReadableScope(defaultHuaweiActor, assets)).toEqual([assets[0]]);
+  });
+
+  it("keeps legacy assets without an architecture scope readable during migration", () => {
+    const assets: Array<{ id: string; architectureScope?: undefined }> = [{ id: "legacy-asset" }];
+
+    expect(filterByReadableScope(defaultHuaweiActor, assets)).toEqual(assets);
   });
 });
