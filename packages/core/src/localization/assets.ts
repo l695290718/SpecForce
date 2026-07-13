@@ -288,24 +288,26 @@ export function localizeAsset(assetType: AssetType, asset: Asset, locale: AssetL
   const overlay = getOverlay(assetType, normalized);
   const definition = registry[assetType] as LocalizationDefinition<Asset, object>;
   const localized = cloneAsset(normalized);
+  const localizedRecord = localized as Asset & Record<string, unknown>;
+  const overlayRecord = asUnknownRecord(overlay);
 
   for (const field of definition.requiredStringFields) {
-    localized[field] = overlay[field as keyof typeof overlay];
+    localizedRecord[field] = overlayRecord[field];
   }
 
   for (const field of definition.optionalStringFields ?? []) {
-    if (field in overlay) {
-      localized[field] = overlay[field as keyof typeof overlay];
+    if (field in overlayRecord) {
+      localizedRecord[field] = overlayRecord[field];
     }
   }
 
   for (const field of definition.requiredArrayFields ?? []) {
-    localized[field] = cloneStringArray(overlay[field as keyof typeof overlay]);
+    localizedRecord[field] = cloneStringArray(overlayRecord[field]);
   }
 
   for (const field of definition.optionalArrayFields ?? []) {
-    if (field in overlay) {
-      localized[field] = cloneStringArray(overlay[field as keyof typeof overlay]);
+    if (field in overlayRecord) {
+      localizedRecord[field] = cloneStringArray(overlayRecord[field]);
     }
   }
 
@@ -334,29 +336,29 @@ export function validateAssetLocalization(assetType: AssetType, asset: Asset): v
 
   for (const field of definition.requiredStringFields) {
     assertCanonicalString(assetType, normalized, field);
-    assertTranslatedString(assetType, normalized.id, overlay[field as keyof typeof overlay], `localizedContent.zh.${field}`);
+    assertTranslatedString(assetType, normalized.id, asUnknownRecord(overlay)[field], `localizedContent.zh.${field}`);
   }
 
   for (const field of definition.optionalStringFields ?? []) {
     assertOptionalCanonicalString(assetType, normalized, field);
     if (field in overlay) {
-      assertTranslatedString(assetType, normalized.id, overlay[field as keyof typeof overlay], `localizedContent.zh.${field}`);
+      assertTranslatedString(assetType, normalized.id, asUnknownRecord(overlay)[field], `localizedContent.zh.${field}`);
     }
   }
 
   for (const field of definition.requiredArrayFields ?? []) {
-    const canonical = normalized[field];
+    const canonical = (normalized as Asset & Record<string, unknown>)[field];
     assertCanonicalStringArray(assetType, normalized.id, canonical, field);
-    assertTranslatedStringArray(assetType, normalized.id, canonical, overlay[field as keyof typeof overlay], `localizedContent.zh.${field}`);
+    assertTranslatedStringArray(assetType, normalized.id, canonical, asUnknownRecord(overlay)[field], `localizedContent.zh.${field}`);
   }
 
   for (const field of definition.optionalArrayFields ?? []) {
-    const canonical = normalized[field];
+    const canonical = (normalized as Asset & Record<string, unknown>)[field];
     if (canonical !== undefined) {
       assertCanonicalStringArray(assetType, normalized.id, canonical, field);
     }
     if (field in overlay) {
-      assertTranslatedStringArray(assetType, normalized.id, canonical, overlay[field as keyof typeof overlay], `localizedContent.zh.${field}`);
+      assertTranslatedStringArray(assetType, normalized.id, canonical, asUnknownRecord(overlay)[field], `localizedContent.zh.${field}`);
     }
   }
 
@@ -405,20 +407,7 @@ function normalizeAsset<TType extends AssetType>(assetType: TType, asset: AssetT
 function cloneAsset<T extends Asset>(asset: T): T {
   return {
     ...asset,
-    localizedContent: cloneLocalizedContent(asset.localizedContent)
-  };
-}
-
-function cloneLocalizedContent<TZh extends object, TEn extends object = TZh>(
-  localizedContent?: LocalizedContent<TZh, TEn>
-): LocalizedContent<TZh, TEn> | undefined {
-  if (!localizedContent) {
-    return undefined;
-  }
-
-  return {
-    zh: cloneUnknown(localizedContent.zh) as TZh | undefined,
-    en: cloneUnknown(localizedContent.en) as TEn | undefined
+    localizedContent: cloneUnknown(asset.localizedContent) as T["localizedContent"]
   };
 }
 
@@ -434,14 +423,18 @@ function cloneUnknown(value: unknown): unknown {
   return value;
 }
 
+function asUnknownRecord(value: object): Record<string, unknown> {
+  return value as unknown as Record<string, unknown>;
+}
+
 function assertCanonicalString(assetType: AssetType, asset: Asset, field: string): void {
-  if (!isNonEmptyString(asset[field])) {
+  if (!isNonEmptyString((asset as Asset & Record<string, unknown>)[field])) {
     throw createError(assetType, asset.id, field, "CANONICAL_CONTENT_REQUIRED");
   }
 }
 
 function assertOptionalCanonicalString(assetType: AssetType, asset: Asset, field: string): void {
-  const value = asset[field];
+  const value = (asset as Asset & Record<string, unknown>)[field];
   if (value !== undefined && value !== null && typeof value !== "string") {
     throw createError(assetType, asset.id, field, "CANONICAL_CONTENT_REQUIRED");
   }
@@ -540,7 +533,7 @@ function validateTranslatedDataField(
 function applyDataModelOverlay(asset: DataModel, overlay: DataModelLocalizedFields): DataModel {
   return {
     ...asset,
-    fields: asset.fields.map((field) => applyTranslatedDataField(field, overlay.fields[field.fieldName]))
+    fields: asset.fields.map((field) => applyTranslatedDataField(field, requireDataFieldOverlay(asset.id, overlay.fields[field.fieldName], field.fieldName)))
   };
 }
 
@@ -621,7 +614,7 @@ function applyStateMachineOverlay(asset: StateMachine, overlay: StateMachineLoca
     guards: [...overlay.guards],
     actions: [...overlay.actions],
     transitions: asset.transitions.map((transition) => {
-      const translated = overlay.transitions[getTransitionKey(transition)];
+      const translated = requireTransitionOverlay(asset.id, overlay.transitions[getTransitionKey(transition)], getTransitionKey(transition));
       return {
         ...transition,
         condition: translated.condition ?? transition.condition,
@@ -634,4 +627,28 @@ function applyStateMachineOverlay(asset: StateMachine, overlay: StateMachineLoca
 
 function getTransitionKey(transition: StateTransition): string {
   return `${transition.from}::${transition.to}::${transition.trigger}`;
+}
+
+function requireDataFieldOverlay(
+  assetId: string,
+  translated: DataFieldLocalizedFields | undefined,
+  fieldName: string
+): DataFieldLocalizedFields {
+  if (!translated) {
+    throw createError("dataModel", assetId, `localizedContent.zh.fields.${fieldName}`, "ASSET_TRANSLATION_REQUIRED");
+  }
+
+  return translated;
+}
+
+function requireTransitionOverlay(
+  assetId: string,
+  translated: StateTransitionLocalizedFields | undefined,
+  transitionKey: string
+): StateTransitionLocalizedFields {
+  if (!translated) {
+    throw createError("stateMachine", assetId, `localizedContent.zh.transitions.${transitionKey}`, "ASSET_TRANSLATION_REQUIRED");
+  }
+
+  return translated;
 }

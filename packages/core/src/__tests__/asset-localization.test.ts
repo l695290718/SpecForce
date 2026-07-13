@@ -19,6 +19,24 @@ import {
   type StateMachine
 } from "../index";
 
+function withUnsafeZhOverlay<TAsset extends { localizedContent?: unknown }>(
+  asset: TAsset,
+  zhOverlay: Record<string, unknown>
+): TAsset {
+  return {
+    ...asset,
+    localizedContent: {
+      ...(asset.localizedContent as Record<string, unknown> | undefined),
+      zh: zhOverlay
+    }
+  } as TAsset;
+}
+
+function requireZh<T>(value: T | undefined): T {
+  expect(value).toBeDefined();
+  return value as T;
+}
+
 const now = "2026-07-13T00:00:00.000Z";
 
 const domain: DomainModel = {
@@ -457,55 +475,35 @@ describe("asset localization", () => {
 
   it("rejects known technical-field translation attempts with a technical-mutation code", () => {
     expect(() =>
-      localizeAsset("api", {
-        ...api,
-        localizedContent: {
-          zh: {
-            ...api.localizedContent?.zh,
-            path: "/translated"
-          }
-        }
-      }, "zh")
+      localizeAsset("api", withUnsafeZhOverlay(api, {
+        ...api.localizedContent?.zh,
+        path: "/translated"
+      }), "zh")
     ).toThrowError(AssetLocalizationError);
 
     expect(() =>
-      localizeAsset("api", {
-        ...api,
-        localizedContent: {
-          zh: {
-            ...api.localizedContent?.zh,
-            path: "/translated"
-          }
-        }
-      }, "zh")
+      localizeAsset("api", withUnsafeZhOverlay(api, {
+        ...api.localizedContent?.zh,
+        path: "/translated"
+      }), "zh")
     ).toThrowError(/TRANSLATION_TECHNICAL_FIELD_MUTATION/);
   });
 
   it("keeps unknown overlay keys on the generic invalid-field code path", () => {
     expect(() =>
-      localizeAsset("api", {
-        ...api,
-        localizedContent: {
-          zh: {
-            ...api.localizedContent?.zh,
-            unexpectedNarrative: "not in the registry"
-          }
-        }
-      }, "zh")
+      localizeAsset("api", withUnsafeZhOverlay(api, {
+        ...api.localizedContent?.zh,
+        unexpectedNarrative: "not in the registry"
+      }), "zh")
     ).toThrowError(/TRANSLATION_FIELD_NOT_ALLOWED/);
   });
 
   it("rejects translated narrative arrays with a different length", () => {
     expect(() =>
-      localizeAsset("proposal", {
-        ...proposal,
-        localizedContent: {
-          zh: {
-            ...proposal.localizedContent?.zh,
-            specChanges: []
-          }
-        }
-      }, "zh")
+      localizeAsset("proposal", withUnsafeZhOverlay(proposal, {
+        ...proposal.localizedContent?.zh,
+        specChanges: []
+      }), "zh")
     ).toThrowError(/TRANSLATION_STRUCTURE_MISMATCH/);
   });
 
@@ -531,8 +529,9 @@ describe("asset localization", () => {
     expect(localized.transitions[0]?.emitsEvent).toBe("InvoiceSent");
     expect(localized.transitions[0]?.condition).toBe("zh invoice approved");
     expect(localized.transitions[0]?.failureHandling).toBe("zh retry send");
-    expect(localized.localizedContent?.zh.states.DRAFT).toBe("zh draft");
-    expect(localized.localizedContent?.zh.events.InvoiceSent).toBe("zh invoice sent");
+    const zh = requireZh(localized.localizedContent?.zh);
+    expect(zh.states.DRAFT).toBe("zh draft");
+    expect(zh.events.InvoiceSent).toBe("zh invoice sent");
   });
 
   it("keeps legacy proposal English overlays readable through the shared localizer", () => {
@@ -582,14 +581,14 @@ describe("asset localization", () => {
   });
 
   it("exposes typed localized overlays for later consumers", () => {
-    const overlayMap: AssetLocalizedContentMap = {
+    const overlayMap: Pick<AssetLocalizedContentMap, "stateMachine" | "api" | "proposal"> = {
       stateMachine: stateMachine.localizedContent!,
       api: api.localizedContent!,
       proposal: proposal.localizedContent!
     };
 
-    expect(overlayMap.stateMachine.zh.states.DRAFT).toBe("zh draft");
-    expect(overlayMap.api.zh.name).toBe("zh design asset write api");
-    expect(overlayMap.proposal.zh.title).toBe("zh bilingual assets proposal");
+    expect(requireZh(overlayMap.stateMachine.zh).states.DRAFT).toBe("zh draft");
+    expect(requireZh(overlayMap.api.zh).name).toBe("zh design asset write api");
+    expect(requireZh(overlayMap.proposal.zh).title).toBe("zh bilingual assets proposal");
   });
 });
