@@ -16,6 +16,11 @@ export type AssetType =
 
 export type AssetLocale = "zh" | "en";
 
+export interface DerivedViewOptions {
+  catalog?: SpecForgeDataStore;
+  locale?: AssetLocale;
+}
+
 export interface LocalizedContent<TZh extends object, TEn extends object = TZh> {
   zh?: TZh;
   en?: TEn;

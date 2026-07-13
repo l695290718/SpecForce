@@ -1,4 +1,4 @@
-import { renderGovernanceCopy, builtInRules } from "../governance/localization";
+import { localizeGovernanceResult, renderGovernanceCopy, builtInRules } from "../governance/localization";
 import { validateAssetLocalization, AssetLocalizationError } from "../localization/assets";
 import { assetCollections, getAsset, getStore } from "../repository";
 import type {
@@ -10,7 +10,10 @@ import type {
   EventContract,
   GovernanceCheckResult,
   GovernanceMessageParams,
-  Proposal
+  Proposal,
+  DerivedViewOptions,
+  SpecForgeDataStore,
+  AssetLocale
 } from "../types";
 
 function result(
@@ -19,9 +22,10 @@ function result(
   ruleCode: string,
   severity: "info" | "warning" | "error",
   passed: boolean,
-  messageParams?: GovernanceMessageParams
+  messageParams?: GovernanceMessageParams,
+  locale: AssetLocale = "en"
 ): GovernanceCheckResult {
-  const copy = renderGovernanceCopy(ruleCode, "en", messageParams);
+  const copy = renderGovernanceCopy(ruleCode, locale, messageParams);
   if (!copy) {
     throw new Error(`Missing governance localization template for rule ${ruleCode}`);
   }
@@ -43,36 +47,36 @@ function hasValue(value: unknown): boolean {
   return Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && `${value}`.trim().length > 0;
 }
 
-function maybeCheckAssetLocalization(assetType: string, assetId: string): GovernanceCheckResult[] {
+function maybeCheckAssetLocalization(assetType: string, assetId: string, catalog?: SpecForgeDataStore, locale: AssetLocale = "en"): GovernanceCheckResult[] {
   if (!(assetType in assetCollections)) {
     return [];
   }
 
-  const asset = getAsset(assetType as AssetType, assetId) as Asset;
+  const asset = getAsset(assetType as AssetType, assetId, catalog) as Asset;
 
   try {
     validateAssetLocalization(assetType as AssetType, asset);
-    return [result(assetType as AssetType, assetId, "ASSET_BILINGUAL_COMPLETENESS", "error", true, { errorCode: "OK", path: "localizedContent.zh" })];
+    return [result(assetType as AssetType, assetId, "ASSET_BILINGUAL_COMPLETENESS", "error", true, { errorCode: "OK", path: "localizedContent.zh" }, locale)];
   } catch (error) {
     if (error instanceof AssetLocalizationError) {
       return [
         result(assetType as AssetType, assetId, "ASSET_BILINGUAL_COMPLETENESS", "error", false, {
           errorCode: error.code,
           path: error.path
-        })
+        }, locale)
       ];
     }
     throw error;
   }
 }
 
-function checkApi(api: ApiContract): GovernanceCheckResult[] {
+function checkApi(api: ApiContract, locale: AssetLocale): GovernanceCheckResult[] {
   const writeMethod = ["POST", "PUT", "PATCH", "DELETE"].includes(api.method);
   return [
-    result("api", api.id, "API_IDEMPOTENCY", "error", !writeMethod || hasValue(api.idempotency)),
-    result("api", api.id, "API_AUTH", "error", hasValue(api.authType)),
-    result("api", api.id, "API_ERROR_CODES", "warning", api.errorCodes.length > 0),
-    result("api", api.id, "API_COMPATIBILITY", "warning", api.exposure !== "external" || hasValue(api.compatibilityPolicy))
+    result("api", api.id, "API_IDEMPOTENCY", "error", !writeMethod || hasValue(api.idempotency), undefined, locale),
+    result("api", api.id, "API_AUTH", "error", hasValue(api.authType), undefined, locale),
+    result("api", api.id, "API_ERROR_CODES", "warning", api.errorCodes.length > 0, undefined, locale),
+    result("api", api.id, "API_COMPATIBILITY", "warning", api.exposure !== "external" || hasValue(api.compatibilityPolicy), undefined, locale)
   ];
 }
 
@@ -123,48 +127,50 @@ function checkBusinessRule(rule: BusinessRule): GovernanceCheckResult[] {
   ];
 }
 
-function checkProposal(proposal: Proposal): GovernanceCheckResult[] {
+function checkProposal(proposal: Proposal, catalog: SpecForgeDataStore, locale: AssetLocale): GovernanceCheckResult[] {
   const risky = proposal.risks.some((risk) => /高风险|high/i.test(risk));
   const touchesApiOrEvent = proposal.impactedAssets.some((asset) => asset.type === "api" || asset.type === "event");
-  const hasContextPack = getStore().contextPacks.some((pack) => pack.proposalId === proposal.id);
+  const hasContextPack = catalog.contextPacks.some((pack) => pack.proposalId === proposal.id);
   return [
-    result("proposal", proposal.id, "PROPOSAL_GOALS", "error", hasValue(proposal.goal) && hasValue(proposal.nonGoal)),
-    result("proposal", proposal.id, "PROPOSAL_IMPACTED_ASSETS", "error", proposal.impactedAssets.length > 0),
-    result("proposal", proposal.id, "PROPOSAL_ROLLBACK", "error", !risky || hasValue(proposal.rollbackPlan)),
-    result("proposal", proposal.id, "PROPOSAL_CONTEXT_PACK", "warning", !touchesApiOrEvent || hasContextPack)
+    result("proposal", proposal.id, "PROPOSAL_GOALS", "error", hasValue(proposal.goal) && hasValue(proposal.nonGoal), undefined, locale),
+    result("proposal", proposal.id, "PROPOSAL_IMPACTED_ASSETS", "error", proposal.impactedAssets.length > 0, undefined, locale),
+    result("proposal", proposal.id, "PROPOSAL_ROLLBACK", "error", !risky || hasValue(proposal.rollbackPlan), undefined, locale),
+    result("proposal", proposal.id, "PROPOSAL_CONTEXT_PACK", "warning", !touchesApiOrEvent || hasContextPack, undefined, locale)
   ];
 }
 
-function checkDefault(assetType: AssetType, assetId: string): GovernanceCheckResult[] {
-  return [result(assetType, assetId, "GOVERNANCE_NOT_CONFIGURED", "info", true)];
+function checkDefault(assetType: AssetType, assetId: string, locale: AssetLocale): GovernanceCheckResult[] {
+  return [result(assetType, assetId, "GOVERNANCE_NOT_CONFIGURED", "info", true, undefined, locale)];
 }
 
-export async function runGovernanceChecks(assetType: string, assetId: string): Promise<GovernanceCheckResult[]> {
-  const localizationResults = maybeCheckAssetLocalization(assetType, assetId);
+export async function runGovernanceChecks(assetType: string, assetId: string, options: DerivedViewOptions = {}): Promise<GovernanceCheckResult[]> {
+  const catalog = getStore(options.catalog);
+  const locale = options.locale ?? "en";
+  const localizationResults = maybeCheckAssetLocalization(assetType, assetId, catalog, locale);
   let ruleResults: GovernanceCheckResult[];
 
   switch (assetType as AssetType) {
     case "api":
-      ruleResults = checkApi(getAsset<ApiContract>("api", assetId));
+      ruleResults = checkApi(getAsset<ApiContract>("api", assetId, catalog), locale);
       break;
     case "event":
-      ruleResults = checkEvent(getAsset<EventContract>("event", assetId));
+      ruleResults = checkEvent(getAsset<EventContract>("event", assetId, catalog));
       break;
     case "dataModel":
-      ruleResults = checkDataModel(getAsset<DataModel>("dataModel", assetId));
+      ruleResults = checkDataModel(getAsset<DataModel>("dataModel", assetId, catalog));
       break;
     case "businessRule":
-      ruleResults = checkBusinessRule(getAsset<BusinessRule>("businessRule", assetId));
+      ruleResults = checkBusinessRule(getAsset<BusinessRule>("businessRule", assetId, catalog));
       break;
     case "proposal":
-      ruleResults = checkProposal(getAsset<Proposal>("proposal", assetId));
+      ruleResults = checkProposal(getAsset<Proposal>("proposal", assetId, catalog), catalog, locale);
       break;
     default:
-      ruleResults = checkDefault(assetType as AssetType, assetId);
+      ruleResults = checkDefault(assetType as AssetType, assetId, locale);
       break;
   }
 
-  return [...localizationResults, ...ruleResults];
+  return [...localizationResults, ...ruleResults].map((item) => localizeGovernanceResult(item, locale));
 }
 
 export { builtInRules };
