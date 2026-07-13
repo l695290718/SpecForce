@@ -1,18 +1,24 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
-  analyzeProposalImpact,
   createAdr,
   createProposal,
-  generateContextPack,
-  runGovernanceChecksForTarget,
   updateProposal
 } from "@specforge/core";
 import type { Permission } from "@specforge/core";
 import { z } from "zod";
 import { auditToolCall } from "./audit";
 import { allowAllPolicy, getDefaultActor } from "./auth";
-import { deletePersistedDesignData, getPersistedAsset, isSeedMode, listPersistedContextPacks, renderPersistedAssetAsMarkdown, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
+import { deletePersistedDesignData, isSeedMode, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
+import {
+  analyzeScopedProposalImpact,
+  buildScopedAssetGraph,
+  exportScopedContextPack,
+  generateScopedContextPack,
+  getScopedAssetDetail,
+  renderScopedAssetMarkdown,
+  runScopedGovernanceChecks
+} from "./scoped-derived";
 
 type ToolHandler<T> = (input: T) => Promise<unknown>;
 
@@ -215,10 +221,28 @@ export function registerTools(server: McpServer): void {
     },
     async (input) => {
       if (input.format === "json") {
-        return { format: "json", asset: await getPersistedAsset(input.assetType, input.assetId, input.applicationServiceId) };
+        return { format: "json", ...(await getScopedAssetDetail(input)) };
       }
-      return { format: "markdown", content: await renderPersistedAssetAsMarkdown(input.assetType, input.assetId, input.applicationServiceId, input.locale) };
+      return { format: "markdown", ...(await renderScopedAssetMarkdown(input)) };
     }
+  );
+
+  registerJsonTool(
+    server,
+    "get_asset_graph",
+    {
+      title: "Get scoped asset graph",
+      description: "Builds the localized relationship graph from persisted assets in exactly one authorized application-service scope.",
+      inputSchema: {
+        applicationServiceId: z.string().min(1),
+        locale: assetLocaleSchema.optional(),
+        domainId: z.string().optional(),
+        assetType: assetTypeSchema.optional()
+      },
+      permissions: ["asset:read", "graph:read"],
+      readOnly: true
+    },
+    buildScopedAssetGraph
   );
 
   registerJsonTool(
@@ -227,11 +251,15 @@ export function registerTools(server: McpServer): void {
     {
       title: "Analyze proposal impact",
       description: "Analyzes impacted domains, contracts, risks, governance warnings, and implementation tasks for a proposal.",
-      inputSchema: { proposalId: z.string() },
+      inputSchema: {
+        proposalId: z.string(),
+        applicationServiceId: z.string().min(1),
+        locale: assetLocaleSchema.optional()
+      },
       permissions: ["proposal:read", "asset:read", "graph:read"],
       readOnly: true
     },
-    async (input) => analyzeProposalImpact(input.proposalId)
+    analyzeScopedProposalImpact
   );
 
   registerJsonTool(
@@ -245,16 +273,15 @@ export function registerTools(server: McpServer): void {
         applicationServiceId: z.string().min(1),
         targetAgent: z.enum(["codex", "claude-code", "cursor", "copilot", "generic"]).optional(),
         includeAssets: z.array(z.string()).optional(),
-        format: z.enum(["markdown", "json"]).optional()
+        format: z.enum(["markdown", "json"]).optional(),
+        locale: assetLocaleSchema.optional()
       },
       permissions: ["context-pack:generate", "proposal:read", "asset:read"],
       readOnly: false
     },
     async (input) => {
-      const persistedPack = (await listPersistedContextPacks(input.applicationServiceId)).find((pack) => pack.proposalId === input.proposalId);
-      if (persistedPack) return input.format === "json" ? persistedPack : persistedPack.generatedMarkdown;
-      const pack = await generateContextPack(input.proposalId, input);
-      return input.format === "json" ? pack : pack.generatedMarkdown;
+      const result = await generateScopedContextPack(input);
+      return input.format === "json" ? result : result.contextPack.generatedMarkdown;
     }
   );
 
@@ -268,18 +295,14 @@ export function registerTools(server: McpServer): void {
         targetType: z.enum(["asset", "proposal", "context-pack"]),
         targetId: z.string(),
         assetType: z.string().optional(),
-        checks: z.array(z.string()).optional()
+        checks: z.array(z.string()).optional(),
+        applicationServiceId: z.string().min(1),
+        locale: assetLocaleSchema.optional()
       },
       permissions: ["governance:run"],
       readOnly: true
     },
-    async (input) => {
-      try {
-        return await runGovernanceChecksForTarget(input);
-      } catch {
-        return { targetType: input.targetType, targetId: input.targetId, results: [] };
-      }
-    }
+    runScopedGovernanceChecks
   );
 
   registerJsonTool(
@@ -375,14 +398,15 @@ export function registerTools(server: McpServer): void {
       inputSchema: {
         contextPackId: z.string(),
         applicationServiceId: z.string().min(1),
-        format: z.enum(["markdown", "json"])
+        format: z.enum(["markdown", "json"]),
+        locale: assetLocaleSchema.optional()
       },
       permissions: ["asset:read"],
       readOnly: true
     },
     async (input) => {
-      const pack = await getPersistedAsset("contextPack", input.contextPackId, input.applicationServiceId) as { generatedMarkdown?: string };
-      return input.format === "markdown" ? (pack.generatedMarkdown ?? "") : pack;
+      const result = await exportScopedContextPack(input);
+      return input.format === "markdown" ? result.contextPack.generatedMarkdown : result;
     }
   );
 }

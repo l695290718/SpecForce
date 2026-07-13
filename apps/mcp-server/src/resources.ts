@@ -1,7 +1,7 @@
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { AssetGraph, AssetType } from "@specforge/core";
-import { listPersistedAssetLinks, listPersistedAssets, listPersistedCollectionAsMarkdown, listPersistedContextPacks, listPersistedProposals, renderPersistedAssetAsMarkdown } from "./persistence";
+import type { AssetGraph, AssetLocale } from "@specforge/core";
+import { buildScopedAssetGraph, renderScopedAssetMarkdown, renderScopedCollectionMarkdown } from "./scoped-derived";
 
 const resourceTypes = [
   ["domains", "domain"],
@@ -22,15 +22,30 @@ function markdownResource(uri: string, text: string) {
   };
 }
 
-async function renderGraph(applicationServiceId: string, domainId?: string): Promise<string> {
-  const graph = await buildPersistedGraph(applicationServiceId, domainId);
+function resourceVariable(variables: Record<string, string | string[]>, key: string): string {
+  const value = variables[key];
+  const normalized = Array.isArray(value) ? value[0] : value;
+  if (!normalized) throw new Error(`Missing resource variable: ${key}`);
+  return normalized;
+}
+
+function resourceLocale(variables: Record<string, string | string[]>): AssetLocale {
+  const locale = resourceVariable(variables, "locale");
+  if (locale !== "en" && locale !== "zh") throw new Error(`Unsupported locale: ${locale}`);
+  return locale;
+}
+
+function renderGraph(graph: AssetGraph, locale: AssetLocale, domainId?: string): string {
+  const copy = locale === "zh"
+    ? { title: "设计资产关系图", all: "全部领域", nodes: "节点", edges: "关系" }
+    : { title: "Design Asset Graph", all: "all domains", nodes: "Nodes", edges: "Edges" };
   return [
-    `# Asset Graph: ${domainId ?? "all domains"}`,
+    `# ${copy.title}: ${domainId ?? copy.all}`,
     "",
-    "## Nodes",
+    `## ${copy.nodes}`,
     ...graph.nodes.map((node) => `- ${node.label} (${node.type}/${node.id}): ${node.summary}`),
     "",
-    "## Edges",
+    `## ${copy.edges}`,
     ...graph.edges.map((edge) => `- ${edge.source} --${edge.label}--> ${edge.target}`),
     "",
     "```json",
@@ -93,46 +108,59 @@ export function registerResources(server: McpServer): void {
     },
     async (uri) => markdownResource(uri.href, "# Scoped resource required\n\nUse scoped MCP tools to retrieve design data.")
   );
-}
 
-async function buildPersistedGraph(applicationServiceId: string, domainId?: string): Promise<AssetGraph> {
-  const assets = await listPersistedAssets(applicationServiceId);
-  const assetLinks = await listPersistedAssetLinks(applicationServiceId);
-  const proposals = await listPersistedProposals(applicationServiceId);
-  const contextPacks = await listPersistedContextPacks(applicationServiceId);
-  const nodes: AssetGraph["nodes"] = [];
-  const edges: AssetGraph["edges"] = [];
-
-  for (const { type, asset } of assets) {
-    if (domainId && "domainId" in asset && asset.domainId !== domainId && asset.id !== domainId) continue;
-    nodes.push({ id: asset.id, label: "title" in asset && asset.title ? asset.title : asset.name, type, domainId: "domainId" in asset ? asset.domainId : undefined, summary: "description" in asset ? asset.description : asset.id });
-    if ("domainId" in asset && asset.domainId && asset.id !== asset.domainId) {
-      edges.push({ id: `${asset.domainId}->${asset.id}`, source: asset.domainId, target: asset.id, label: "owns" });
+  server.registerResource(
+    "scoped-assets",
+    new ResourceTemplate("specforge://scopes/{applicationServiceId}/{locale}/assets/{assetType}", { list: undefined }),
+    {
+      title: "Scoped localized design asset catalog",
+      description: "Agent-readable catalog for exactly one authorized application service and locale.",
+      mimeType: "text/markdown"
+    },
+    async (uri, variables) => {
+      const result = await renderScopedCollectionMarkdown({
+        applicationServiceId: resourceVariable(variables, "applicationServiceId"),
+        locale: resourceLocale(variables),
+        assetType: resourceVariable(variables, "assetType")
+      });
+      return markdownResource(uri.href, result.content);
     }
-  }
+  );
 
-  for (const proposal of proposals) {
-    if (domainId && proposal.domainId !== domainId) continue;
-    nodes.push({ id: proposal.id, label: proposal.title, type: "proposal", domainId: proposal.domainId, summary: proposal.description });
-    proposal.impactedAssets.forEach((ref) => {
-      if (nodes.some((node) => node.id === ref.id)) edges.push({ id: `${proposal.id}->${ref.id}`, source: proposal.id, target: ref.id, label: "impacts" });
-    });
-  }
+  server.registerResource(
+    "scoped-asset-detail",
+    new ResourceTemplate("specforge://scopes/{applicationServiceId}/{locale}/assets/{assetType}/{id}", { list: undefined }),
+    {
+      title: "Scoped localized design asset detail",
+      description: "Agent-readable asset detail with localized copy and canonical English source.",
+      mimeType: "text/markdown"
+    },
+    async (uri, variables) => {
+      const result = await renderScopedAssetMarkdown({
+        applicationServiceId: resourceVariable(variables, "applicationServiceId"),
+        locale: resourceLocale(variables),
+        assetType: resourceVariable(variables, "assetType"),
+        assetId: resourceVariable(variables, "id")
+      });
+      return markdownResource(uri.href, result.content);
+    }
+  );
 
-  for (const link of assetLinks) {
-    if (!nodes.some((node) => node.id === link.sourceId) || !nodes.some((node) => node.id === link.targetId)) continue;
-    edges.push({ id: link.id, source: link.sourceId, target: link.targetId, label: link.relationType });
-  }
-
-  for (const pack of contextPacks) {
-    if (domainId) continue;
-    nodes.push({ id: pack.id, label: pack.name, type: "contextPack", summary: pack.summary });
-    if (nodes.some((node) => node.id === pack.proposalId)) edges.push({ id: `${pack.proposalId}->${pack.id}`, source: pack.proposalId, target: pack.id, label: "generates" });
-  }
-
-  return { nodes: dedupe(nodes), edges: dedupe(edges) };
-}
-
-function dedupe<T extends { id: string }>(items: T[]): T[] {
-  return Array.from(new Map(items.map((item) => [item.id, item])).values());
+  server.registerResource(
+    "scoped-graph",
+    new ResourceTemplate("specforge://scopes/{applicationServiceId}/{locale}/graph", { list: undefined }),
+    {
+      title: "Scoped localized design asset graph",
+      description: "Agent-readable relationship graph for exactly one authorized application service.",
+      mimeType: "text/markdown"
+    },
+    async (uri, variables) => {
+      const locale = resourceLocale(variables);
+      const result = await buildScopedAssetGraph({
+        applicationServiceId: resourceVariable(variables, "applicationServiceId"),
+        locale
+      });
+      return markdownResource(uri.href, renderGraph(result.graph, locale));
+    }
+  );
 }

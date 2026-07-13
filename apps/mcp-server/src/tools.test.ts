@@ -15,7 +15,18 @@ const persistence = vi.hoisted(() => ({
   upsertProposal: vi.fn()
 }));
 
+const scopedDerived = vi.hoisted(() => ({
+  analyzeScopedProposalImpact: vi.fn().mockResolvedValue({ analysis: { proposalId: "shared-proposal" } }),
+  buildScopedAssetGraph: vi.fn().mockResolvedValue({ graph: { nodes: [], edges: [] } }),
+  exportScopedContextPack: vi.fn().mockResolvedValue({ contextPack: { id: "ctx-shared" } }),
+  generateScopedContextPack: vi.fn().mockResolvedValue({ contextPack: { id: "ctx-shared", generatedMarkdown: "# 中文上下文" } }),
+  getScopedAssetDetail: vi.fn().mockResolvedValue({ asset: { id: "shared-domain" }, canonicalSource: { id: "shared-domain" } }),
+  renderScopedAssetMarkdown: vi.fn().mockResolvedValue({ content: "# 策略领域" }),
+  runScopedGovernanceChecks: vi.fn().mockResolvedValue({ status: "passed", results: [] })
+}));
+
 vi.mock("./persistence", () => persistence);
+vi.mock("./scoped-derived", () => scopedDerived);
 
 import { registerTools } from "./tools";
 
@@ -82,5 +93,48 @@ describe("seed cleanup MCP boundary", () => {
       action: "delete_seed_design_data",
       status: "success"
     }));
+  });
+});
+
+describe("scoped localized derived tools", () => {
+  it.each([
+    "get_asset_graph",
+    "analyze_proposal_impact",
+    "generate_context_pack",
+    "run_governance_checks",
+    "export_context_pack"
+  ])("requires applicationServiceId and exposes locale for %s", (toolName) => {
+    const tool = captureTools().get(toolName);
+    expect(tool).toBeDefined();
+    const shape = tool!.config.inputSchema as Record<string, unknown>;
+    expect(shape.applicationServiceId).toBeDefined();
+    expect(shape.locale).toBeDefined();
+  });
+
+  it("routes graph, impact, governance, and generation through scoped services", async () => {
+    const tools = captureTools();
+    const common = { applicationServiceId: "com.huawei.celon.policyhub", locale: "zh" as const };
+
+    await tools.get("get_asset_graph")!.handler(common);
+    await tools.get("analyze_proposal_impact")!.handler({ ...common, proposalId: "shared-proposal" });
+    await tools.get("run_governance_checks")!.handler({ ...common, targetType: "proposal", targetId: "shared-proposal" });
+    await tools.get("generate_context_pack")!.handler({ ...common, proposalId: "shared-proposal", format: "json" });
+
+    expect(scopedDerived.buildScopedAssetGraph).toHaveBeenCalledWith(common);
+    expect(scopedDerived.analyzeScopedProposalImpact).toHaveBeenCalledWith({ ...common, proposalId: "shared-proposal" });
+    expect(scopedDerived.runScopedGovernanceChecks).toHaveBeenCalledWith({ ...common, targetType: "proposal", targetId: "shared-proposal" });
+    expect(scopedDerived.generateScopedContextPack).toHaveBeenCalledWith(expect.objectContaining({ ...common, proposalId: "shared-proposal" }));
+    expect(persistence.listPersistedContextPacks).not.toHaveBeenCalled();
+  });
+
+  it("localizes detail and export responses through the same scoped boundary", async () => {
+    const tools = captureTools();
+    const common = { applicationServiceId: "com.huawei.celon.policyhub", locale: "zh" as const };
+
+    await tools.get("get_asset_detail")!.handler({ ...common, assetType: "domain", assetId: "shared-domain", format: "markdown" });
+    await tools.get("export_context_pack")!.handler({ ...common, contextPackId: "ctx-shared", format: "json" });
+
+    expect(scopedDerived.renderScopedAssetMarkdown).toHaveBeenCalledWith(expect.objectContaining({ ...common, assetId: "shared-domain" }));
+    expect(scopedDerived.exportScopedContextPack).toHaveBeenCalledWith(expect.objectContaining({ ...common, contextPackId: "ctx-shared" }));
   });
 });

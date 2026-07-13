@@ -20,26 +20,30 @@ export function registerPrompts(server: McpServer): void {
       title: "Design feature",
       description: "Guide an agent from natural-language requirement to proposal, impact analysis, context pack, and governance checks.",
       argsSchema: {
+        applicationServiceId: z.string(),
+        locale: z.enum(["en", "zh"]).optional(),
         requirement: z.string(),
         domainHint: z.string().optional()
       }
     },
-    ({ requirement, domainHint }) =>
+    ({ applicationServiceId, locale, requirement, domainHint }) =>
       promptResult(
         "Design a feature through SpecForge MCP tools.",
         [
           "You are using SpecForge Design Center as the MCP-native source of design truth.",
           `Requirement: ${requirement}`,
+          `Application service: ${applicationServiceId}`,
+          `Locale: ${locale ?? "en"}`,
           domainHint ? `Domain hint: ${domainHint}` : undefined,
           "",
           "Workflow:",
           "1. Clarify business goal, actors, constraints, and success metrics.",
-          "2. Search existing assets with search_design_assets.",
+          "2. Search existing assets with search_design_assets using the applicationServiceId and locale above.",
           "3. Identify domain model, data model, API/event changes, business rules, state machines, and non-functional requirements.",
           "4. Create a Proposal with create_proposal.",
-          "5. Run analyze_proposal_impact.",
-          "6. Generate a Context Pack with generate_context_pack.",
-          "7. Run run_governance_checks and report unresolved warnings.",
+          "5. Run analyze_proposal_impact in the same application-service scope.",
+          "6. Generate a Context Pack with generate_context_pack in the same application-service scope.",
+          "7. Run run_governance_checks in the same application-service scope and report unresolved warnings.",
           "Do not execute arbitrary code or invent asset ids without checking SpecForge first."
         ]
           .filter(Boolean)
@@ -52,12 +56,12 @@ export function registerPrompts(server: McpServer): void {
     {
       title: "Review design proposal",
       description: "Review a SpecForge proposal for impact, missing assets, risks, and governance.",
-      argsSchema: { proposalId: z.string() }
+      argsSchema: { applicationServiceId: z.string(), locale: z.enum(["en", "zh"]).optional(), proposalId: z.string() }
     },
-    ({ proposalId }) =>
+    ({ applicationServiceId, locale, proposalId }) =>
       promptResult(
         "Review a proposal with SpecForge MCP tools.",
-        `Review proposal ${proposalId}. Read specforge://proposals/${proposalId}, run analyze_proposal_impact, run_governance_checks, and summarize missing design assets, risks, and recommended next changes.`
+        `Review proposal ${proposalId} in application service ${applicationServiceId} with locale ${locale ?? "en"}. Use scoped asset tools/resources, run analyze_proposal_impact and run_governance_checks with the same applicationServiceId, then summarize missing design assets, risks, and recommended next changes.`
       )
   );
 
@@ -106,8 +110,8 @@ export function registerPrompts(server: McpServer): void {
     {
       title: "Generate coding context",
       description: "Generate Codex implementation context from a proposal.",
-      argsSchema: { proposalId: z.string() }
+      argsSchema: { applicationServiceId: z.string(), locale: z.enum(["en", "zh"]).optional(), proposalId: z.string() }
     },
-    ({ proposalId }) => promptResult("Generate Codex context", `Generate coding context for Codex from proposal ${proposalId}. Call generate_context_pack with targetAgent=codex, then produce implementation tasks, tests, constraints, and do-not rules.`)
+    ({ applicationServiceId, locale, proposalId }) => promptResult("Generate Codex context", `Generate coding context for Codex from proposal ${proposalId} in application service ${applicationServiceId} with locale ${locale ?? "en"}. Call generate_context_pack with the same applicationServiceId and targetAgent=codex, then produce implementation tasks, tests, constraints, and do-not rules.`)
   );
 }

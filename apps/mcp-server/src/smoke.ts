@@ -54,9 +54,10 @@ async function main() {
   });
   const governance = await client.callTool({
     name: "run_governance_checks",
-    arguments: { targetType: "proposal", targetId: "proposal-specforge-self-design" }
+    arguments: { applicationServiceId, locale: "en", targetType: "proposal", targetId: "proposal-specforge-self-design" }
   });
-  const generatedPack = JSON.parse(requireSuccess("generate_context_pack(json)", contextPackJson));
+  const generatedPackEnvelope = JSON.parse(requireSuccess("generate_context_pack(json)", contextPackJson));
+  const generatedPack = generatedPackEnvelope.contextPack;
   const upsert = await client.callTool({
     name: "upsert_context_pack",
     arguments: {
