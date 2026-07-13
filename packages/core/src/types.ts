@@ -14,6 +14,9 @@ export type AssetType =
   | "proposal"
   | "contextPack";
 
+export type AssetLocale = "zh" | "en";
+export type LocalizedContent = Partial<Record<AssetLocale, Partial<Record<string, unknown>>>>;
+
 export type GovernanceSeverity = "info" | "warning" | "error";
 export type GovernanceStatus = "pass" | "fail";
 export type AuditActorType = "user" | "agent" | "system";
@@ -37,6 +40,7 @@ export interface BaseAsset {
   createdAt: string;
   updatedAt: string;
   architectureScope?: ArchitectureScopeRef;
+  localizedContent?: LocalizedContent;
 }
 
 export interface DomainModel extends BaseAsset {
@@ -205,7 +209,6 @@ export interface Proposal extends BaseAsset {
   rolloutPlan: string;
   rollbackPlan?: string;
   status: "draft" | "reviewing" | "approved" | "implemented" | "archived";
-  localizedContent?: Partial<Record<"zh" | "en", Partial<Pick<Proposal, "name" | "title" | "description" | "background" | "goal" | "nonGoal" | "scope" | "specChanges" | "risks" | "rolloutPlan" | "rollbackPlan">>>>;
 }
 
 export interface ContextPack {
@@ -220,6 +223,7 @@ export interface ContextPack {
   generatedMarkdown: string;
   createdAt: string;
   architectureScope?: ArchitectureScopeRef;
+  localizedContent?: LocalizedContent;
 }
 
 export interface AssetRef {

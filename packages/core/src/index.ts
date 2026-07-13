@@ -1,4 +1,5 @@
 export * from "./types";
+export * from "./localization/assets";
 export * from "./repository";
 export * from "./data/seed-data";
 export * from "./rules/governance";

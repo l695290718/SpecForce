@@ -1,15 +1,8 @@
-import type { Proposal } from "../types";
+import { localizeAsset } from "../localization/assets";
+import type { AssetLocale, Proposal } from "../types";
 
-export type ProposalLocale = "zh" | "en";
+export type ProposalLocale = AssetLocale;
 
 export function localizeProposal(proposal: Proposal, locale: ProposalLocale): Proposal {
-  const localized = proposal.localizedContent?.[locale];
-  if (!localized) return proposal;
-
-  return {
-    ...proposal,
-    ...localized,
-    specChanges: localized.specChanges ?? proposal.specChanges,
-    risks: localized.risks ?? proposal.risks
-  };
+  return localizeAsset("proposal", proposal, locale);
 }
