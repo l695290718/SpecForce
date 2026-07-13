@@ -453,7 +453,8 @@ export async function listPersistedCollectionAsMarkdown(assetType: string, appli
 
 export async function renderPersistedAssetAsMarkdown(assetType: string, assetId: string, applicationServiceId: string, locale: AssetLocale = "en"): Promise<string> {
   const type = normalizeAssetType(assetType);
-  const asset = localizeAsset(type, await getPersistedAsset(type, assetId, applicationServiceId), locale);
+  const canonicalAsset = await getPersistedAsset(type, assetId, applicationServiceId);
+  const asset = localizeAsset(type, canonicalAsset, locale);
   return [
     `# ${assetName(asset)}`,
     "",
@@ -466,7 +467,7 @@ export async function renderPersistedAssetAsMarkdown(assetType: string, assetId:
     "",
     "## Source JSON",
     "```json",
-    JSON.stringify(asset, null, 2),
+    JSON.stringify(canonicalAsset, null, 2),
     "```"
   ]
     .filter((line): line is string => line !== undefined)

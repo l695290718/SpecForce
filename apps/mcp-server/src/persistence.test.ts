@@ -125,6 +125,21 @@ describe("resolveWritableScope", () => {
   it("rejects a sibling application service without write permission", () => {
     expect(() => resolveWritableScope(defaultHuaweiActor, { applicationServiceId: "com.huawei.celon.runtime", scopePath: "client-supplied" })).toThrow("Scope write is not authorized.");
   });
+
+  it("keeps rendered zh source json canonical while leaving localized narratives in the markdown body", async () => {
+    mockSchemaSetup();
+    vi.spyOn(prisma.designAsset, "findFirst").mockResolvedValue(persistedAssetRow(bilingualApi) as never);
+
+    const markdown = await renderPersistedAssetAsMarkdown("api", "api-upsert-design-asset", writableScope.applicationServiceId, "zh");
+    const [, sourceJsonBlock = ""] = markdown.split("## Source JSON\n");
+    const canonicalJson = JSON.parse(sourceJsonBlock.replace(/^```json\s*/u, "").replace(/\s*```$/u, ""));
+
+    expect(markdown).not.toContain("# Upsert design asset API");
+    expect(markdown).not.toContain("## Agent Summary\nWrites design assets through the MCP boundary.");
+    expect(canonicalJson.name).toBe("Upsert design asset API");
+    expect(canonicalJson.description).toBe("Writes design assets through the MCP boundary.");
+    expect(canonicalJson.localizedContent.zh.name).toBe(bilingualApi.localizedContent?.zh?.name);
+  });
 });
 
 describe("Task 2 MCP bilingual enforcement", () => {
