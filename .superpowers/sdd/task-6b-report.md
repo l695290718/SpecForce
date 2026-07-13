@@ -16,12 +16,16 @@
 
 ## Web Integration
 
-- Asset lists search both canonical English and Chinese overlays, then render the request locale.
+- Empty asset searches return the complete scoped collection. Nonempty searches use explicit `limit`/`offset` pagination and return total-count metadata.
+- Asset search matches canonical English and Chinese overlays, then renders the request locale.
 - Asset detail pages and APIs use one scoped catalog for localized content, summary, Markdown, and governance.
 - Proposal pages and impact APIs support database-only proposal IDs without global fallback.
 - Context Pack generation derives localized output from the selected scope and request locale.
 - Dashboard governance warnings and governance pages/APIs are computed from the selected scope.
-- Graph pages/APIs localize node and relationship labels; graph detail navigation preserves the selected scope and uses logical IDs.
+- Graph relationship `label` remains the stable canonical code. UI/API localization is carried separately as `displayLabel`.
+- Graph detail navigation preserves the selected scope and uses logical IDs.
+- Persisted payload scope is normalized from trusted database columns, and rows inconsistent with the requested exact scope are rejected.
+- Web proposal impact and Context Pack flows consume the proposal-derived behavior from Core commit `06d22dc` with the scoped catalog and locale.
 
 ## TDD Evidence
 
@@ -29,10 +33,11 @@
 - Empty-query redirect test failed because empty values were dropped.
 - Near-prefix regression failed with a temporary `startsWith` predicate and passed after restoring exact equality.
 - Graph relationship localization failed on `provides api` and passed after adding the localized display mapping.
+- Review regression tests failed on translated canonical graph codes, the implicit 50-result cap, untrusted payload scope, and inconsistent persisted rows before the fixes were applied.
 
 ## Verification
 
-- Web tests: 30/30 passed across 7 files.
+- Web tests: 33/33 passed across 7 files.
 - Web TypeScript: passed.
 - Next.js production build: passed; 23 app pages/API routes generated.
 - Blockers: none.

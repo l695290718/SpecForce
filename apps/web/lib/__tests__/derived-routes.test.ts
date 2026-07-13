@@ -17,10 +17,10 @@ vi.mock("../assets", () => ({
 
 import { GET as getAssetList } from "../../app/api/assets/[type]/route";
 import { GET as getAssetDetail } from "../../app/api/assets/[type]/[id]/route";
-import { GET as getProposalImpact } from "../../app/api/proposals/[id]/impact/route";
 import { POST as generateContextPack } from "../../app/api/context-packs/generate/route";
 import { GET as getGovernance } from "../../app/api/governance/checks/route";
 import { GET as getGraph } from "../../app/api/graph/route";
+import { GET as getProposalImpact } from "../../app/api/proposals/[id]/impact/route";
 
 describe("scoped derived API routes", () => {
   beforeEach(() => {
@@ -32,20 +32,19 @@ describe("scoped derived API routes", () => {
     const request = new Request("http://localhost/api/read?scope=com.huawei.celon.policyhub&locale=zh");
     await getAssetDetail(request, { params: Promise.resolve({ type: "apis", id: "db-only-api" }) });
     await getProposalImpact(request, { params: Promise.resolve({ id: "db-only-proposal" }) });
-
     expect(readers.detail).toHaveBeenCalledWith("api", "db-only-api", "com.huawei.celon.policyhub", "zh");
     expect(readers.impact).toHaveBeenCalledWith("db-only-proposal", "com.huawei.celon.policyhub", "zh");
   });
 
-  it("uses bilingual scoped search for asset list API queries", async () => {
-    readers.search.mockResolvedValue([{ asset: { id: "db-only-api", name: "策略接口" } }]);
+  it("uses explicitly paginated bilingual scoped search for API queries", async () => {
+    const localizedName = "\u7b56\u7565\u63a5\u53e3";
+    readers.search.mockResolvedValue({ items: [{ asset: { id: "db-only-api", name: localizedName } }], total: 1, limit: 20, offset: 0 });
     const response = await getAssetList(
-      new Request("http://localhost/api/assets/apis?scope=com.huawei.celon.policyhub&q=Policy%20API&locale=zh"),
+      new Request("http://localhost/api/assets/apis?scope=com.huawei.celon.policyhub&q=Policy%20API&locale=zh&limit=20&offset=0"),
       { params: Promise.resolve({ type: "apis" }) }
     );
-
-    expect(readers.search).toHaveBeenCalledWith("api", "com.huawei.celon.policyhub", "Policy API", "zh");
-    await expect(response.json()).resolves.toEqual([{ id: "db-only-api", name: "策略接口" }]);
+    expect(readers.search).toHaveBeenCalledWith("api", "com.huawei.celon.policyhub", "Policy API", "zh", { limit: 20, offset: 0 });
+    await expect(response.json()).resolves.toEqual({ items: [{ id: "db-only-api", name: localizedName }], total: 1, limit: 20, offset: 0 });
   });
 
   it("uses the request locale for generated Context Packs", async () => {
@@ -61,7 +60,6 @@ describe("scoped derived API routes", () => {
   it("passes locale and filters through governance and graph APIs", async () => {
     await getGovernance(new Request("http://localhost/api/governance/checks?scope=com.huawei.celon.policyhub&locale=zh"));
     await getGraph(new Request("http://localhost/api/graph?scope=com.huawei.celon.policyhub&domainId=policy-domain&assetType=api&locale=zh"));
-
     expect(readers.governance).toHaveBeenCalledWith("com.huawei.celon.policyhub", "zh");
     expect(readers.graph).toHaveBeenCalledWith("com.huawei.celon.policyhub", "policy-domain", "api", "zh");
   });

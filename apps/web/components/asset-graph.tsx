@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { AssetGraph, AssetGraphNode } from "@specforge/core";
 import { buildScopedGraphAssetHref } from "../lib/graph-links";
+import { graphEdgeDisplayLabel } from "../lib/graph-labels";
 import { useLanguage } from "./language-provider";
 
 const palette: Record<string, string> = {
@@ -40,7 +41,16 @@ export function AssetGraphView({ graph, scope }: { graph: AssetGraph; scope: str
       whiteSpace: "pre-line"
     }
   }));
-  const edges: Edge[] = graph.edges.map((item) => ({ id: item.id, source: item.source, target: item.target, label: item.label, animated: false }));
+  const edges: Edge[] = graph.edges.map((item) => {
+    const localized = item as typeof item & { displayLabel?: string };
+    return {
+      id: item.id,
+      source: item.source,
+      target: item.target,
+      label: localized.displayLabel ?? graphEdgeDisplayLabel(item.label, locale),
+      animated: false
+    };
+  });
 
   return (
     <div className="grid gap-4 xl:grid-cols-[1fr_320px]">

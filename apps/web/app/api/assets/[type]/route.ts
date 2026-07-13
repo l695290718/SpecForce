@@ -9,8 +9,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ type
   const locale = getApiRequestLocale(request);
   const query = url.searchParams.get("q");
   if (query !== null) {
-    const results = await searchScopedAssets(routeToAssetType(type), scope, query, locale);
-    return NextResponse.json(results.map((result) => result.asset));
+    const limit = boundedInteger(url.searchParams.get("limit"), 20, 1, 100);
+    const offset = boundedInteger(url.searchParams.get("offset"), 0, 0, Number.MAX_SAFE_INTEGER);
+    const results = await searchScopedAssets(routeToAssetType(type), scope, query, locale, { limit, offset });
+    return NextResponse.json({ ...results, items: results.items.map((result) => result.asset) });
   }
   return NextResponse.json(await getRouteAssetsWithDatabase(type, scope, locale));
+}
+
+function boundedInteger(value: string | null, fallback: number, min: number, max: number): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
 }

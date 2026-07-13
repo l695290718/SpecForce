@@ -7,7 +7,6 @@ import {
   renderAssetAsMarkdown,
   renderAssetSummary,
   runGovernanceChecks,
-  searchDesignAssets,
   type Asset,
   type AssetGraph,
   type AssetLocale,
@@ -19,6 +18,7 @@ import type { ContextPack, DomainModel, Proposal } from "@specforge/core";
 import type { MessageKey } from "./i18n";
 import { prisma } from "./db";
 import { requireReadableApplicationService, scopeDatabaseWhere } from "./scope";
+import { graphEdgeDisplayLabel } from "./graph-labels";
 export { buildScopedGraphAssetHref } from "./graph-links";
 
 export const routeAssetTypes = {
@@ -47,6 +47,14 @@ export type ScopedAssetLink = {
 };
 
 export type ScopedAssetCatalog = SpecForgeDataStore & { assetLinks: ScopedAssetLink[] };
+
+type PersistedScopeColumns = { applicationServiceId: string; scopePath: string };
+
+export type LocalizedAssetGraph = Omit<AssetGraph, "edges"> & {
+  edges: Array<AssetGraph["edges"][number] & { displayLabel: string }>;
+};
+
+export type ScopedSearchOptions = { limit: number; offset?: number };
 
 export const assetTitles: Record<AssetRouteType, string> = {
   domains: "Domain Models",
@@ -88,6 +96,7 @@ export async function getRouteAssetsWithDatabase(route: string, scopeId: string,
 export async function getScopedAssetCatalog(scopeId: string): Promise<ScopedAssetCatalog> {
   const scope = requireReadableApplicationService(scopeId);
   const where = scopeDatabaseWhere(scope);
+  const trustedScope = { applicationServiceId: scope.id, scopePath: scope.scopePath };
   const [assetRows, proposalRows, contextPackRows, assetLinks] = await Promise.all([
     prisma.designAsset.findMany({ where, orderBy: { createdAt: "asc" } }),
     prisma.proposal.findMany({ where, orderBy: { createdAt: "asc" } }),
@@ -95,30 +104,60 @@ export async function getScopedAssetCatalog(scopeId: string): Promise<ScopedAsse
     prisma.assetLink.findMany({
       where,
       orderBy: { createdAt: "asc" },
-      select: { id: true, sourceType: true, sourceId: true, targetType: true, targetId: true, relationType: true, description: true }
+      select: {
+        id: true, sourceType: true, sourceId: true, targetType: true, targetId: true, relationType: true, description: true,
+        applicationServiceId: true, scopePath: true
+      }
     })
   ]);
   const catalog = emptyCatalog() as ScopedAssetCatalog;
   for (const row of assetRows) {
+    assertPersistedScope(row, trustedScope);
     const type = row.type as AssetType;
     const collection = assetCollections[type];
     if (collection && type !== "proposal" && type !== "contextPack") {
-      (catalog[collection] as Asset[]).push(JSON.parse(row.payload) as Asset);
+      (catalog[collection] as Asset[]).push(normalizePersistedAsset(JSON.parse(row.payload) as Asset, row, trustedScope));
     }
   }
-  catalog.proposals = proposalRows.map((row) => JSON.parse(row.payload) as Proposal);
-  catalog.contextPacks = contextPackRows.map((row) => parseContextPackPayload(row.payload) ?? contextPackFromLegacyRow(row));
-  catalog.assetLinks = assetLinks as ScopedAssetLink[];
+  catalog.proposals = proposalRows.map((row) => normalizePersistedAsset(JSON.parse(row.payload) as Proposal, row, trustedScope));
+  catalog.contextPacks = contextPackRows.map((row) => normalizePersistedAsset(parseContextPackPayload(row.payload) ?? contextPackFromLegacyRow(row), row, trustedScope));
+  catalog.assetLinks = assetLinks.map((row) => {
+    assertPersistedScope(row, trustedScope);
+    return row as ScopedAssetLink;
+  });
   return catalog;
 }
 
-export async function searchScopedAssets<TType extends AssetType>(assetType: TType, scopeId: string, query: string, locale: AssetLocale) {
+export async function searchScopedAssets<TType extends AssetType>(
+  assetType: TType,
+  scopeId: string,
+  query: string,
+  locale: AssetLocale,
+  options: ScopedSearchOptions
+) {
   const catalog = await getScopedAssetCatalog(scopeId);
-  const { results } = await searchDesignAssets({ query, assetTypes: [assetType], limit: 50 }, { catalog, locale });
-  return results.map((result) => ({
-    ...result,
-    asset: localizeAsset(assetType, (catalog[assetCollections[assetType]] as Asset[]).find((asset) => asset.id === result.id)!, locale) as AssetTypeMap[TType]
-  }));
+  const terms = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const matches = (catalog[assetCollections[assetType]] as Asset[])
+    .map((asset) => ({ asset, score: terms.reduce((score, term) => score + (JSON.stringify(asset).toLocaleLowerCase().includes(term) ? 1 : 0), 0) }))
+    .filter((entry) => terms.length === 0 || entry.score > 0)
+    .sort((left, right) => right.score - left.score || left.asset.id.localeCompare(right.asset.id));
+  const offset = terms.length === 0 ? 0 : Math.max(0, options.offset ?? 0);
+  const limit = terms.length === 0 ? matches.length : Math.max(1, options.limit);
+  const page = terms.length === 0 ? matches : matches.slice(offset, offset + limit);
+  const items = page.map(({ asset, score }) => {
+    const localized = localizeAsset(assetType, asset, locale) as AssetTypeMap[TType];
+    return {
+      id: localized.id,
+      type: assetType,
+      name: "title" in localized && localized.title ? localized.title : localized.name,
+      summary: "description" in localized ? localized.description : localized.summary,
+      relevanceReason: locale === "zh"
+        ? score > 0 ? `\u5339\u914d ${score} \u4e2a\u67e5\u8be2\u8bcd\u3002` : "\u6765\u81ea\u5f53\u524d\u4f5c\u7528\u57df\u76ee\u5f55\u3002"
+        : score > 0 ? `Matched ${score} query term(s).` : "Included from scoped catalog.",
+      asset: localized
+    };
+  });
+  return { items, total: matches.length, limit, offset };
 }
 
 export async function getScopedAssetGraph(
@@ -126,7 +165,7 @@ export async function getScopedAssetGraph(
   domainId?: string,
   assetType?: AssetType,
   locale: AssetLocale = "en"
-): Promise<AssetGraph> {
+): Promise<LocalizedAssetGraph> {
   const catalog = await getScopedAssetCatalog(scopeId);
   const graph = await buildAssetGraph(domainId, assetType, { catalog, locale });
   const nodeByRef = new Map(graph.nodes.map((node) => [`${node.type}:${node.logicalId ?? node.id}`, node.id]));
@@ -148,29 +187,20 @@ export async function getScopedAssetGraph(
     ...graph,
     edges: dedupeById([...graph.edges, ...linkedEdges]).map((edge) => ({
       ...edge,
-      label: localizeGraphEdgeLabel(edge.label, locale)
+      displayLabel: graphEdgeDisplayLabel(edge.label, locale)
     }))
   };
 }
 
-function localizeGraphEdgeLabel(label: string, locale: AssetLocale): string {
-  if (locale === "en") return label;
-  return ({
-    "owns model": "拥有模型",
-    "provides api": "提供 API",
-    "emits event": "发布事件",
-    governs: "治理",
-    "controls state": "控制状态",
-    integrates: "集成",
-    verifies: "验证",
-    observes: "观测",
-    decides: "决策",
-    impacts: "影响",
-    includes: "包含",
-    generates: "生成",
-    depends_on: "依赖",
-    governed_by: "受规则治理"
-  } as Record<string, string>)[label] ?? label;
+function assertPersistedScope(row: PersistedScopeColumns, expected: PersistedScopeColumns): void {
+  if (row.applicationServiceId !== expected.applicationServiceId || row.scopePath !== expected.scopePath) {
+    throw new Error(`Persisted row scope mismatch: ${row.applicationServiceId}/${row.scopePath}`);
+  }
+}
+
+function normalizePersistedAsset<TAsset extends Asset>(asset: TAsset, row: PersistedScopeColumns, expected: PersistedScopeColumns): TAsset {
+  assertPersistedScope(row, expected);
+  return { ...asset, architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath } };
 }
 
 export async function getScopedAssetDetail(assetType: AssetType, assetId: string, scopeId: string, locale: AssetLocale = "en") {
