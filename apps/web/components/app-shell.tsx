@@ -2,7 +2,7 @@
 
 import { Activity, Boxes, ClipboardList, FileCode2, Home, ListChecks, Network, Search, Settings } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { LanguageSwitcher, T } from "./language-provider";
 import { ArchitectureScopeSwitcher } from "./architecture-scope-switcher";
@@ -22,6 +22,9 @@ const assetLinks = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const scope = searchParams.get("scope");
+  const withScope = (href: string) => scope ? `${href}${href.includes("?") ? "&" : "?"}scope=${encodeURIComponent(scope)}` : href;
 
   return (
     <div className="min-h-screen bg-surface">
@@ -42,16 +45,16 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
         <nav className="space-y-1 border-l border-border pl-2 text-sm">
-          <NavItem href="/" icon={<Home size={16} />} isActive={pathname === "/"} labelKey="nav.dashboard" />
+          <NavItem href={withScope("/")} icon={<Home size={16} />} isActive={pathname === "/"} labelKey="nav.dashboard" />
           <div className="px-3 pt-4 text-xs font-semibold uppercase text-muted"><T k="nav.designAssets" /></div>
-          {assetLinks.map(([labelKey, href]) => <NavItem href={href} icon={<Boxes size={16} />} isActive={pathname.startsWith(href)} key={href} labelKey={labelKey} />)}
-          <NavItem href="/assets/adrs" icon={<FileCode2 size={16} />} isActive={pathname.startsWith("/assets/adrs")} labelKey="nav.adrs" />
+          {assetLinks.map(([labelKey, href]) => <NavItem href={withScope(href)} icon={<Boxes size={16} />} isActive={pathname.startsWith(href)} key={href} labelKey={labelKey} />)}
+          <NavItem href={withScope("/assets/adrs")} icon={<FileCode2 size={16} />} isActive={pathname.startsWith("/assets/adrs")} labelKey="nav.adrs" />
           <div className="px-3 pt-4 text-xs font-semibold uppercase text-muted"><T k="nav.workflows" /></div>
-          <NavItem href="/proposals" icon={<ClipboardList size={16} />} isActive={pathname.startsWith("/proposals")} labelKey="nav.proposals" />
-          <NavItem href="/context-packs" icon={<Activity size={16} />} isActive={pathname.startsWith("/context-packs")} labelKey="nav.contextPacks" />
-          <NavItem href="/graph" icon={<Network size={16} />} isActive={pathname.startsWith("/graph")} labelKey="nav.graph" />
-          <NavItem href="/governance/checks" icon={<ListChecks size={16} />} isActive={pathname.startsWith("/governance")} labelKey="nav.governance" />
-          <NavItem href="/settings" icon={<Settings size={16} />} isActive={pathname.startsWith("/settings")} labelKey="nav.settings" />
+          <NavItem href={withScope("/proposals")} icon={<ClipboardList size={16} />} isActive={pathname.startsWith("/proposals")} labelKey="nav.proposals" />
+          <NavItem href={withScope("/context-packs")} icon={<Activity size={16} />} isActive={pathname.startsWith("/context-packs")} labelKey="nav.contextPacks" />
+          <NavItem href={withScope("/graph")} icon={<Network size={16} />} isActive={pathname.startsWith("/graph")} labelKey="nav.graph" />
+          <NavItem href={withScope("/governance/checks")} icon={<ListChecks size={16} />} isActive={pathname.startsWith("/governance")} labelKey="nav.governance" />
+          <NavItem href={withScope("/settings")} icon={<Settings size={16} />} isActive={pathname.startsWith("/settings")} labelKey="nav.settings" />
         </nav>
       </aside>
       <main className="lg:pl-72">

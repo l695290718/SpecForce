@@ -1,12 +1,25 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
+const applicationServiceId = "com.huawei.celon.desiner";
+const architectureScope = {
+  applicationServiceId,
+  scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+};
+
 function firstText(result: unknown): string {
   if (!result || typeof result !== "object" || !("content" in result)) return "";
   const content = (result as { content?: unknown }).content;
   if (!Array.isArray(content)) return "";
   const first = content[0];
   return first && typeof first === "object" && "type" in first && first.type === "text" && "text" in first ? String(first.text) : "";
+}
+
+function requireSuccess(name: string, result: unknown): string {
+  if (result && typeof result === "object" && "isError" in result && result.isError) {
+    throw new Error(`${name} failed: ${firstText(result)}`);
+  }
+  return firstText(result);
 }
 
 async function main() {
@@ -29,25 +42,26 @@ async function main() {
 
   const search = await client.callTool({
     name: "search_design_assets",
-    arguments: { query: "proposal-specforge-self-design", limit: 10 }
+    arguments: { applicationServiceId, query: "proposal-specforge-self-design", limit: 10 }
   });
   const contextPack = await client.callTool({
     name: "generate_context_pack",
-    arguments: { proposalId: "proposal-specforge-self-design", targetAgent: "codex", format: "markdown" }
+    arguments: { applicationServiceId, proposalId: "proposal-specforge-self-design", targetAgent: "codex", format: "markdown" }
   });
   const contextPackJson = await client.callTool({
     name: "generate_context_pack",
-    arguments: { proposalId: "proposal-specforge-self-design", targetAgent: "codex", format: "json" }
+    arguments: { applicationServiceId, proposalId: "proposal-specforge-self-design", targetAgent: "codex", format: "json" }
   });
   const governance = await client.callTool({
     name: "run_governance_checks",
     arguments: { targetType: "proposal", targetId: "proposal-specforge-self-design" }
   });
-  const generatedPack = JSON.parse(firstText(contextPackJson));
+  const generatedPack = JSON.parse(requireSuccess("generate_context_pack(json)", contextPackJson));
   const upsert = await client.callTool({
     name: "upsert_context_pack",
     arguments: {
-      contextPack: generatedPack
+      contextPack: generatedPack,
+      architectureScope
     }
   });
   const link = await client.callTool({
@@ -58,17 +72,18 @@ async function main() {
       targetType: "dataModel",
       targetId: "data-specforge-asset-graph",
       relationType: "verifies",
-      description: "Smoke verifies persisted asset link writes."
+      description: "Smoke verifies persisted asset link writes.",
+      architectureScope
     }
   });
 
   await client.close();
 
-  const searchText = firstText(search);
-  const packText = firstText(contextPack);
-  const governanceText = firstText(governance);
-  const upsertText = firstText(upsert);
-  const linkText = firstText(link);
+  const searchText = requireSuccess("search_design_assets", search);
+  const packText = requireSuccess("generate_context_pack(markdown)", contextPack);
+  const governanceText = requireSuccess("run_governance_checks", governance);
+  const upsertText = requireSuccess("upsert_context_pack", upsert);
+  const linkText = requireSuccess("link_assets", link);
 
   if (!tools.tools.some((tool) => tool.name === "search_design_assets")) throw new Error("search_design_assets tool missing");
   if (!tools.tools.some((tool) => tool.name === "upsert_design_asset")) throw new Error("upsert_design_asset tool missing");

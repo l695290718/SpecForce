@@ -3,14 +3,14 @@ import { Badge, Card, DataTable, PageHeader } from "../../../components/ui";
 import { T } from "../../../components/language-provider";
 import { getProposalsWithDatabase, getRouteAssetsWithDatabase } from "../../../lib/assets";
 
-export default async function GovernanceChecksPage({ searchParams }: { searchParams: Promise<{ assetType?: string; severity?: string; status?: string }> }) {
-  const filters = await searchParams;
+export default async function GovernanceChecksPage({ searchParams }: { searchParams: Promise<{ assetType?: string; severity?: string; status?: string; scope?: string }> }) {
+  const { scope = "", ...filters } = await searchParams;
   const [apis, events, dataModels, businessRules, proposals] = await Promise.all([
-    getRouteAssetsWithDatabase("apis"),
-    getRouteAssetsWithDatabase("events"),
-    getRouteAssetsWithDatabase("data-models"),
-    getRouteAssetsWithDatabase("rules"),
-    getProposalsWithDatabase()
+    getRouteAssetsWithDatabase("apis", scope),
+    getRouteAssetsWithDatabase("events", scope),
+    getRouteAssetsWithDatabase("data-models", scope),
+    getRouteAssetsWithDatabase("rules", scope),
+    getProposalsWithDatabase(scope)
   ]);
   const targets = [
     ...apis.map((asset) => ({ type: "api" as AssetType, id: asset.id, name: asset.name })),
@@ -31,6 +31,7 @@ export default async function GovernanceChecksPage({ searchParams }: { searchPar
       <PageHeader title={<T k="governance.checksTitle" />} description={<T k="governance.checksDescription" />} />
       <Card className="mb-4">
         <form className="grid gap-3 md:grid-cols-4">
+          <input name="scope" type="hidden" value={scope} />
           <select className="h-10 rounded-md border border-border px-3 text-sm" defaultValue={filters.assetType ?? ""} name="assetType">
             <option value=""><T k="filter.allAssetTypes" /></option>
             {["api", "event", "dataModel", "businessRule", "proposal"].map((type) => <option key={type} value={type}>{type}</option>)}

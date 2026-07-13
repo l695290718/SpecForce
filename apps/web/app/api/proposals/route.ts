@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getStore } from "@specforge/core";
+import { getProposalsWithDatabase } from "../../../lib/assets";
 
-export async function GET() {
-  return NextResponse.json(getStore().proposals);
+export async function GET(request: Request) {
+  return NextResponse.json(await getProposalsWithDatabase(new URL(request.url).searchParams.get("scope") ?? ""));
 }

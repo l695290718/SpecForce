@@ -2,9 +2,11 @@ import Link from "next/link";
 import { DataTable, PageHeader } from "../../components/ui";
 import { T } from "../../components/language-provider";
 import { getContextPacksWithDatabase } from "../../lib/assets";
+import { buildScopedHref } from "../../lib/scope";
 
-export default async function ContextPacksPage() {
-  const packs = await getContextPacksWithDatabase();
+export default async function ContextPacksPage({ searchParams }: { searchParams: Promise<{ scope?: string }> }) {
+  const { scope = "" } = await searchParams;
+  const packs = await getContextPacksWithDatabase(scope);
   return (
     <>
       <PageHeader title={<T k="contextPacks.title" />} description={<T k="contextPacks.description" />} />
@@ -12,7 +14,7 @@ export default async function ContextPacksPage() {
         pack.name,
         pack.proposalId,
         pack.targetAgent,
-        <Link className="text-accent" href={`/context-packs/${pack.id}`} key={pack.id}><T k="action.view" /></Link>
+        <Link className="text-accent" href={buildScopedHref(`/context-packs/${pack.id}`, scope)} key={pack.id}><T k="action.view" /></Link>
       ])} />
     </>
   );

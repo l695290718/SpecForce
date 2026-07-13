@@ -1,9 +1,5 @@
 import {
   assetCollections,
-  getAsset,
-  getStore,
-  listAssets,
-  generateContextPack,
   type Asset,
   type AssetGraph,
   type AssetType
@@ -11,6 +7,7 @@ import {
 import type { ContextPack, DomainModel, Proposal } from "@specforge/core";
 import type { MessageKey } from "./i18n";
 import { prisma } from "./db";
+import { requireReadableApplicationService, scopeDatabaseWhere } from "./scope";
 
 export const routeAssetTypes = {
   domains: "domain",
@@ -59,49 +56,57 @@ export function routeToAssetType(route: string): AssetType {
   return assetType;
 }
 
-export function getRouteAssets(route: string): Asset[] {
-  return listAssets(routeToAssetType(route));
-}
-
-export function getRouteAsset(route: string, id: string): Asset {
-  return getAsset(routeToAssetType(route), id);
-}
-
-export async function getRouteAssetsWithDatabase(route: string): Promise<Asset[]> {
+export async function getRouteAssetsWithDatabase(route: string, scopeId: string): Promise<Asset[]> {
   const assetType = routeToAssetType(route);
-  const dbAssets = await getDatabaseAssets(assetType);
-  return dbAssets.length > 0 ? dbAssets : listAssets(assetType);
+  return getDatabaseAssets(assetType, scopeId);
 }
 
-export async function getRouteAssetWithDatabase(route: string, id: string): Promise<Asset> {
+export async function getRouteAssetWithDatabase(route: string, id: string, scopeId: string): Promise<Asset> {
   const assetType = routeToAssetType(route);
-  const dbAssets = await getDatabaseAssets(assetType);
+  const dbAssets = await getDatabaseAssets(assetType, scopeId);
   const dbAsset = dbAssets.find((asset) => asset.id === id);
   if (dbAsset) return dbAsset;
-  if (dbAssets.length > 0) throw new Error(`Asset not found: ${assetType}/${id}`);
-  return getAsset(assetType, id);
+  throw new Error(`Asset not found: ${assetType}/${id}`);
 }
 
-export async function getDomainsWithDatabase(): Promise<DomainModel[]> {
-  return (await getRouteAssetsWithDatabase("domains")) as DomainModel[];
+export async function getDomainsWithDatabase(scopeId: string): Promise<DomainModel[]> {
+  return (await getRouteAssetsWithDatabase("domains", scopeId)) as DomainModel[];
 }
 
-export async function getProposalsWithDatabase(): Promise<Proposal[]> {
-  const rows = await prisma.proposal.findMany({ orderBy: { createdAt: "asc" } });
-  const dbProposals = rows.map((row) => JSON.parse(row.payload) as Proposal);
-  return dbProposals.length > 0 ? dbProposals : getStore().proposals;
+export async function getGovernanceTargetsWithDatabase(scopeId: string): Promise<Array<{ type: AssetType; id: string }>> {
+  const [apis, events, dataModels, businessRules, proposals] = await Promise.all([
+    getRouteAssetsWithDatabase("apis", scopeId),
+    getRouteAssetsWithDatabase("events", scopeId),
+    getRouteAssetsWithDatabase("data-models", scopeId),
+    getRouteAssetsWithDatabase("rules", scopeId),
+    getProposalsWithDatabase(scopeId)
+  ]);
+  return [
+    ...apis.map((asset) => ({ type: "api" as AssetType, id: asset.id })),
+    ...events.map((asset) => ({ type: "event" as AssetType, id: asset.id })),
+    ...dataModels.map((asset) => ({ type: "dataModel" as AssetType, id: asset.id })),
+    ...businessRules.map((asset) => ({ type: "businessRule" as AssetType, id: asset.id })),
+    ...proposals.map((proposal) => ({ type: "proposal" as AssetType, id: proposal.id }))
+  ];
 }
 
-export async function getProposalWithDatabase(id: string): Promise<Proposal> {
-  const row = await prisma.proposal.findUnique({ where: { id } });
+export async function getProposalsWithDatabase(scopeId: string): Promise<Proposal[]> {
+  const scope = requireReadableApplicationService(scopeId);
+  const rows = await prisma.proposal.findMany({ where: scopeDatabaseWhere(scope), orderBy: { createdAt: "asc" } });
+  return rows.map((row) => JSON.parse(row.payload) as Proposal);
+}
+
+export async function getProposalWithDatabase(id: string, scopeId: string): Promise<Proposal> {
+  const scope = requireReadableApplicationService(scopeId);
+  const row = await prisma.proposal.findFirst({ where: { id, ...scopeDatabaseWhere(scope) } });
   if (row) return JSON.parse(row.payload) as Proposal;
-  if ((await prisma.proposal.count()) > 0) throw new Error(`Proposal not found: ${id}`);
-  return getAsset<Proposal>("proposal", id);
+  throw new Error(`Proposal not found: ${id}`);
 }
 
-export async function getContextPacksWithDatabase(): Promise<ContextPack[]> {
-  const rows = await prisma.contextPack.findMany({ orderBy: { createdAt: "asc" } });
-  const dbPacks = rows.map((row) => ({
+export async function getContextPacksWithDatabase(scopeId: string): Promise<ContextPack[]> {
+  const scope = requireReadableApplicationService(scopeId);
+  const rows = await prisma.contextPack.findMany({ where: scopeDatabaseWhere(scope), orderBy: { createdAt: "asc" } });
+  return rows.map((row) => ({
     id: row.id,
     name: row.name,
     proposalId: row.proposalId,
@@ -113,11 +118,11 @@ export async function getContextPacksWithDatabase(): Promise<ContextPack[]> {
     generatedMarkdown: row.generatedMarkdown,
     createdAt: row.createdAt.toISOString()
   }) satisfies ContextPack);
-  return dbPacks.length > 0 ? dbPacks : getStore().contextPacks;
 }
 
-export async function getContextPackWithDatabase(id: string): Promise<ContextPack> {
-  const row = await prisma.contextPack.findUnique({ where: { id } });
+export async function getContextPackWithDatabase(id: string, scopeId: string): Promise<ContextPack> {
+  const scope = requireReadableApplicationService(scopeId);
+  const row = await prisma.contextPack.findFirst({ where: { id, ...scopeDatabaseWhere(scope) } });
   if (row) {
     return {
       id: row.id,
@@ -132,41 +137,37 @@ export async function getContextPackWithDatabase(id: string): Promise<ContextPac
       createdAt: row.createdAt.toISOString()
     };
   }
-  if ((await prisma.contextPack.count()) > 0) throw new Error(`Context Pack not found: ${id}`);
-  return generateContextPack(id.replace(/^ctx-/, "proposal-"));
+  throw new Error(`Context Pack not found: ${id}`);
 }
 
-export async function dashboardStats() {
-  const store = getStore();
-  const dbRows = await prisma.designAsset.findMany({ select: { id: true, type: true } });
-  if (dbRows.length > 0) {
-    return Object.entries(assetCollections)
-      .filter(([type]) => !["proposal", "contextPack"].includes(type))
-      .map(([type]) => ({
-        type,
-        count: new Set(dbRows.filter((row) => row.type === type).map((row) => row.id)).size
-      }));
-  }
+export async function dashboardStats(scopeId: string) {
+  const scope = requireReadableApplicationService(scopeId);
+  const dbRows = await prisma.designAsset.findMany({ where: scopeDatabaseWhere(scope), select: { id: true, type: true } });
   return Object.entries(assetCollections)
     .filter(([type]) => !["proposal", "contextPack"].includes(type))
-    .map(([type, collection]) => {
-      const ids = new Set((store[collection] as Array<{ id: string }>).map((item) => item.id));
-      dbRows.filter((row) => row.type === type).forEach((row) => ids.add(row.id));
-      return { type, count: ids.size };
-    });
+    .map(([type]) => ({
+      type,
+      count: new Set(dbRows.filter((row) => row.type === type).map((row) => row.id)).size
+    }));
 }
 
-export async function getAssetGraphWithDatabase(domainId?: string, assetType?: AssetType): Promise<AssetGraph> {
-  const assetRows = await prisma.designAsset.findMany({ orderBy: { createdAt: "asc" } });
-  if (assetRows.length === 0) {
-    const { buildAssetGraph } = await import("@specforge/core");
-    return buildAssetGraph(domainId, assetType);
-  }
+export async function getAgentServiceWorkspace(applicationServiceId: string, agentId = "specforge-default-agent") {
+  requireReadableApplicationService(applicationServiceId);
+  return prisma.agentServiceWorkspace.upsert({
+    where: { agentType_agentId_applicationServiceId: { agentType: "agent", agentId, applicationServiceId } },
+    create: { agentType: "agent", agentId, applicationServiceId },
+    update: {}
+  });
+}
+
+export async function getAssetGraphWithDatabase(scopeId: string, domainId?: string, assetType?: AssetType): Promise<AssetGraph> {
+  const scope = requireReadableApplicationService(scopeId);
+  const assetRows = await prisma.designAsset.findMany({ where: scopeDatabaseWhere(scope), orderBy: { createdAt: "asc" } });
 
   const assets = assetRows.map((row) => JSON.parse(row.payload) as Asset);
-  const assetLinks = await getDatabaseAssetLinks();
-  const proposals = await getProposalsWithDatabase();
-  const contextPacks = await getContextPacksWithDatabase();
+  const assetLinks = await getDatabaseAssetLinks(scopeId);
+  const proposals = await getProposalsWithDatabase(scopeId);
+  const contextPacks = await getContextPacksWithDatabase(scopeId);
   const nodes: AssetGraph["nodes"] = [];
   const edges: AssetGraph["edges"] = [];
 
@@ -215,19 +216,22 @@ export async function getAssetGraphWithDatabase(domainId?: string, assetType?: A
   return { nodes: dedupeById(nodes), edges: dedupeById(edges) };
 }
 
-async function getDatabaseAssets(assetType: AssetType): Promise<Asset[]> {
-  const rows = await prisma.designAsset.findMany({ where: { type: assetType }, orderBy: { createdAt: "asc" } });
+async function getDatabaseAssets(assetType: AssetType, scopeId: string): Promise<Asset[]> {
+  const scope = requireReadableApplicationService(scopeId);
+  const rows = await prisma.designAsset.findMany({
+    where: { type: assetType, ...scopeDatabaseWhere(scope) },
+    orderBy: { createdAt: "asc" }
+  });
   return rows.map((row) => JSON.parse(row.payload) as Asset);
 }
 
-async function getDatabaseAssetLinks(): Promise<Array<{ id: string; sourceType: AssetType; sourceId: string; targetType: AssetType; targetId: string; relationType: string }>> {
-  try {
-    return await prisma.$queryRawUnsafe<Array<{ id: string; sourceType: AssetType; sourceId: string; targetType: AssetType; targetId: string; relationType: string }>>(
-      `SELECT id, "sourceType", "sourceId", "targetType", "targetId", "relationType" FROM "AssetLink" ORDER BY "createdAt" ASC`
-    );
-  } catch {
-    return [];
-  }
+async function getDatabaseAssetLinks(scopeId: string): Promise<Array<{ id: string; sourceType: AssetType; sourceId: string; targetType: AssetType; targetId: string; relationType: string }>> {
+  const scope = requireReadableApplicationService(scopeId);
+  return prisma.assetLink.findMany({
+    where: scopeDatabaseWhere(scope),
+    orderBy: { createdAt: "asc" },
+    select: { id: true, sourceType: true, sourceId: true, targetType: true, targetId: true, relationType: true }
+  }) as Promise<Array<{ id: string; sourceType: AssetType; sourceId: string; targetType: AssetType; targetId: string; relationType: string }>>;
 }
 
 function mergeById<T extends { id: string }>(base: T[], extra: T[]): T[] {

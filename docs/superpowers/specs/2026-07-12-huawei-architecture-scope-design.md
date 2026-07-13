@@ -76,6 +76,13 @@ seeded records are assigned to the default application service during reseeding.
 The payload retains architecture scope as well, allowing MCP JSON and database
 records to remain consistent.
 
+After the MCP migration seed completes, `applicationServiceId` and `scopePath`
+are mandatory for every scoped record. There is no runtime fallback to legacy
+null-scope data. All Web helpers, API routes, MCP tools, resources, graph
+queries, dashboard totals, governance checks, and searches accept an explicit
+scope context; a missing or unauthorized context is rejected rather than
+silently defaulting to the Designer service.
+
 ## Error Handling
 
 Unknown scope ids, non-service write targets, and unauthorized reads/writes return

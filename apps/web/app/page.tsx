@@ -1,24 +1,36 @@
 import Link from "next/link";
 import { Bot, GitPullRequestArrow, ShieldCheck } from "lucide-react";
 import { Badge, ButtonLink, Card, DataTable, PageHeader } from "../components/ui";
-import { dashboardStats, getContextPacksWithDatabase, getProposalsWithDatabase, getRouteAssetsWithDatabase } from "../lib/assets";
+import { dashboardStats, getAgentServiceWorkspace, getContextPacksWithDatabase, getProposalsWithDatabase, getRouteAssetsWithDatabase } from "../lib/assets";
 import { runGovernanceChecks, type Proposal } from "@specforge/core";
 import { T } from "../components/language-provider";
 import type { MessageKey } from "../lib/i18n";
+import { buildScopedHref, listReadableApplicationServices } from "../lib/scope";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
-export default async function DashboardPage() {
-  const proposals = await getProposalsWithDatabase();
-  const contextPacks = await getContextPacksWithDatabase();
-  const adrs = await getRouteAssetsWithDatabase("adrs");
+const defaultScopeId = "com.huawei.celon.desiner";
+
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ scope?: string }> }) {
+  const { scope } = await searchParams;
+  if (!scope) {
+    const savedScope = (await cookies()).get("specforge-architecture-scope")?.value;
+    const initialScope = listReadableApplicationServices().some((item) => item.id === savedScope) ? savedScope! : defaultScopeId;
+    redirect(buildScopedHref("/", initialScope));
+  }
+  const workspace = await getAgentServiceWorkspace(scope);
+  const proposals = await getProposalsWithDatabase(scope);
+  const contextPacks = await getContextPacksWithDatabase(scope);
+  const adrs = await getRouteAssetsWithDatabase("adrs", scope);
   const warningResults = (await Promise.all(proposals.map((proposal) => safeProposalChecks(proposal)))).flat().filter((result) => result.status === "fail");
-  const stats = await dashboardStats();
+  const stats = await dashboardStats(scope);
 
   return (
     <>
       <PageHeader
         title="SpecForge Design Center"
-        description={<T k="dashboard.description" />}
-        action={<ButtonLink href="/proposals/proposal-specforge-self-design"><T k="dashboard.viewSelfDesignProposal" /></ButtonLink>}
+        description={<>{workspace.agentId} · {workspace.applicationServiceId}</>}
+        action={<ButtonLink href={buildScopedHref("/proposals/proposal-specforge-self-design", scope)}><T k="dashboard.viewSelfDesignProposal" /></ButtonLink>}
       />
       <section className="sf-rise sf-scan mb-6 overflow-hidden rounded-lg border border-slate-700 bg-ink p-5 text-white shadow-elevated">
         <div className="relative z-10 grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
@@ -64,7 +76,7 @@ export default async function DashboardPage() {
             rows={stats.map((item) => [
               <Badge key="type" tone="blue">{item.type}</Badge>,
               item.count,
-              <Link className="text-accent" href={routeForType(item.type)} key="link"><T k="action.open" /></Link>
+              <Link className="text-accent" href={buildScopedHref(routeForType(item.type), scope)} key="link"><T k="action.open" /></Link>
             ])}
           />
         </Card>
@@ -77,7 +89,7 @@ export default async function DashboardPage() {
               ["quick.assetGraph", "/graph"],
               ["quick.governanceChecks", "/governance/checks"],
               ["quick.selfContextPack", "/context-packs/ctx-specforge-self-design"]
-            ] as const).map(([labelKey, href]) => <Link className="rounded-md border border-border px-3 py-2 text-sm hover:bg-surface" href={href} key={href}><T k={labelKey} /></Link>)}
+            ] as const).map(([labelKey, href]) => <Link className="rounded-md border border-border px-3 py-2 text-sm hover:bg-surface" href={buildScopedHref(href, scope)} key={href}><T k={labelKey} /></Link>)}
           </div>
         </Card>
       </div>
@@ -85,7 +97,7 @@ export default async function DashboardPage() {
         <Card>
           <h2 className="mb-4 text-base font-semibold"><T k="dashboard.recentProposals" /></h2>
           <DataTable columns={[<T k="table.proposal" key="proposal" />, <T k="table.status" key="status" />, <T k="table.risk" key="risk" />]} rows={proposals.map((proposal) => [
-            <Link className="text-accent" href={`/proposals/${proposal.id}`} key={proposal.id}>{proposal.title}</Link>,
+            <Link className="text-accent" href={buildScopedHref(`/proposals/${proposal.id}`, scope)} key={proposal.id}>{proposal.title}</Link>,
             <Badge key="status" tone="amber">{proposal.status}</Badge>,
             proposal.risks[0] ?? <T k="dashboard.noRisk" key="risk" />
           ])} />
@@ -93,7 +105,7 @@ export default async function DashboardPage() {
         <Card>
           <h2 className="mb-4 text-base font-semibold"><T k="dashboard.recentAdrs" /></h2>
           <DataTable columns={[<T k="nav.adrs" key="adr" />, <T k="table.status" key="status" />, <T k="table.owner" key="owner" />]} rows={adrs.map((adr) => [
-            <Link className="text-accent" href={`/assets/adrs/${adr.id}`} key={adr.id}>{"title" in adr ? adr.title : adr.name}</Link>,
+            <Link className="text-accent" href={buildScopedHref(`/assets/adrs/${adr.id}`, scope)} key={adr.id}>{"title" in adr ? adr.title : adr.name}</Link>,
             <Badge key="status" tone="green">{"status" in adr ? adr.status : "accepted"}</Badge>,
             "owner" in adr ? adr.owner : "Architecture"
           ])} />

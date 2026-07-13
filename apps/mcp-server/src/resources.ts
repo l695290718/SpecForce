@@ -22,8 +22,8 @@ function markdownResource(uri: string, text: string) {
   };
 }
 
-async function renderGraph(domainId?: string): Promise<string> {
-  const graph = await buildPersistedGraph(domainId);
+async function renderGraph(applicationServiceId: string, domainId?: string): Promise<string> {
+  const graph = await buildPersistedGraph(applicationServiceId, domainId);
   return [
     `# Asset Graph: ${domainId ?? "all domains"}`,
     "",
@@ -49,18 +49,14 @@ export function registerResources(server: McpServer): void {
         description: `Agent-readable markdown catalog for SpecForge ${path}.`,
         mimeType: "text/markdown"
       },
-      async (uri) => markdownResource(uri.href, await listPersistedCollectionAsMarkdown(assetType))
+      async (uri) => markdownResource(uri.href, "# Scoped resource required\n\nUse the MCP search_design_assets tool with applicationServiceId. Static resources do not select a service scope.")
     );
 
     server.registerResource(
       `${path}-detail`,
       new ResourceTemplate(`specforge://${path}/{id}`, {
         list: async () => ({
-          resources: (await listAssetsForResource(assetType)).map((asset) => ({
-            uri: `specforge://${path}/${asset.id}`,
-            name: "title" in asset && asset.title ? asset.title : asset.name,
-            mimeType: "text/markdown"
-          }))
+          resources: []
         })
       }),
       {
@@ -68,7 +64,7 @@ export function registerResources(server: McpServer): void {
         description: `Agent-readable markdown detail for one SpecForge ${path} asset.`,
         mimeType: "text/markdown"
       },
-      async (uri, variables) => markdownResource(uri.href, await renderPersistedAssetAsMarkdown(assetType, String(variables.id)))
+      async (uri) => markdownResource(uri.href, "# Scoped resource required\n\nUse get_asset_detail with applicationServiceId.")
     );
   }
 
@@ -80,18 +76,14 @@ export function registerResources(server: McpServer): void {
       description: "Agent-readable markdown graph of all design asset relationships.",
       mimeType: "text/markdown"
     },
-    async (uri) => markdownResource(uri.href, await renderGraph())
+    async (uri) => markdownResource(uri.href, "# Scoped resource required\n\nUse scoped MCP tools to retrieve design data.")
   );
 
   server.registerResource(
     "graph-domain",
     new ResourceTemplate("specforge://graph/{domainId}", {
       list: async () => ({
-        resources: (await listPersistedAssets("domain")).map(({ asset: domain }) => ({
-          uri: `specforge://graph/${domain.id}`,
-          name: `${domain.name} graph`,
-          mimeType: "text/markdown"
-        }))
+          resources: []
       })
     }),
     {
@@ -99,21 +91,15 @@ export function registerResources(server: McpServer): void {
       description: "Agent-readable markdown graph filtered by a domain id.",
       mimeType: "text/markdown"
     },
-    async (uri, variables) => markdownResource(uri.href, await renderGraph(String(variables.domainId)))
+    async (uri) => markdownResource(uri.href, "# Scoped resource required\n\nUse scoped MCP tools to retrieve design data.")
   );
 }
 
-async function listAssetsForResource(assetType: AssetType) {
-  if (assetType === "proposal") return listPersistedProposals();
-  if (assetType === "contextPack") return listPersistedContextPacks();
-  return (await listPersistedAssets(assetType)).map(({ asset }) => asset);
-}
-
-async function buildPersistedGraph(domainId?: string): Promise<AssetGraph> {
-  const assets = await listPersistedAssets();
-  const assetLinks = await listPersistedAssetLinks();
-  const proposals = await listPersistedProposals();
-  const contextPacks = await listPersistedContextPacks();
+async function buildPersistedGraph(applicationServiceId: string, domainId?: string): Promise<AssetGraph> {
+  const assets = await listPersistedAssets(applicationServiceId);
+  const assetLinks = await listPersistedAssetLinks(applicationServiceId);
+  const proposals = await listPersistedProposals(applicationServiceId);
+  const contextPacks = await listPersistedContextPacks(applicationServiceId);
   const nodes: AssetGraph["nodes"] = [];
   const edges: AssetGraph["edges"] = [];
 

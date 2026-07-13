@@ -5,10 +5,12 @@ import { renderAssetSummary, runGovernanceChecks, type AssetType, type Governanc
 import { T } from "../../../../components/language-provider";
 import { SpecializedAssetSections } from "../../../../components/asset-detail-sections";
 import { ButtonLink } from "../../../../components/ui";
+import { buildScopedHref } from "../../../../lib/scope";
 
-export default async function AssetDetailPage({ params }: { params: Promise<{ type: AssetRouteType; id: string }> }) {
+export default async function AssetDetailPage({ params, searchParams }: { params: Promise<{ type: AssetRouteType; id: string }>; searchParams: Promise<{ scope?: string }> }) {
   const { type, id } = await params;
-  const asset = (await getRouteAssetWithDatabase(type, id)) as Record<string, any>;
+  const { scope = "" } = await searchParams;
+  const asset = (await getRouteAssetWithDatabase(type, id, scope)) as Record<string, any>;
   const assetType = routeToAssetType(type);
   const checks = await getGovernanceChecks(assetType, id);
   const summary = await getAssetSummary(assetType, id, asset);
@@ -16,7 +18,7 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ ty
 
   return (
     <>
-      <PageHeader title={title} description={<T k={assetTitleKeys[type]} />} action={<ButtonLink href={`/assets/${type}/${id}/edit`}><T k="action.edit" /></ButtonLink>} />
+      <PageHeader title={title} description={<T k={assetTitleKeys[type]} />} action={<ButtonLink href={buildScopedHref(`/assets/${type}/${id}/edit`, scope)}><T k="action.edit" /></ButtonLink>} />
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <Card>
           <h2 className="mb-3 text-base font-semibold"><T k="asset.basicInfo" /></h2>

@@ -3,9 +3,10 @@ import { AssetDraftForm } from "../../../../../components/asset-draft-form";
 import { assetTitleKeys, getRouteAssetWithDatabase, routeToAssetType, type AssetRouteType } from "../../../../../lib/assets";
 import { T } from "../../../../../components/language-provider";
 
-export default async function EditAssetPage({ params }: { params: Promise<{ type: AssetRouteType; id: string }> }) {
+export default async function EditAssetPage({ params, searchParams }: { params: Promise<{ type: AssetRouteType; id: string }>; searchParams: Promise<{ scope?: string }> }) {
   const { type, id } = await params;
-  const asset = (await getRouteAssetWithDatabase(type, id)) as unknown as Record<string, unknown>;
+  const { scope = "" } = await searchParams;
+  const asset = (await getRouteAssetWithDatabase(type, id, scope)) as unknown as Record<string, unknown>;
   const assetType = routeToAssetType(type);
 
   return (

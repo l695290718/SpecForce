@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertWritableApplicationService,
   defaultHuaweiActor,
+  seedHuaweiActor,
   filterByReadableScope,
   hasScopeAccess,
   scopeById
@@ -22,6 +23,24 @@ describe("Huawei architecture scope authorization", () => {
     expect(designerService).toBeDefined();
     expect(hasScopeAccess(moduleReader, designerService!, "read")).toBe(true);
     expect(hasScopeAccess(moduleReader, designerModule!, "read")).toBe(true);
+  });
+
+  it("exposes additional mock application services under the Designer module as read-only scopes", () => {
+    const studioService = scopeById("com.huawei.celon.specstudio");
+    const policyService = scopeById("com.huawei.celon.policyhub");
+
+    expect(studioService?.parentId).toBe("module-celon-designer");
+    expect(policyService?.parentId).toBe("module-celon-designer");
+    expect(hasScopeAccess(defaultHuaweiActor, studioService!, "read")).toBe(true);
+    expect(hasScopeAccess(defaultHuaweiActor, policyService!, "read")).toBe(true);
+    expect(hasScopeAccess(defaultHuaweiActor, studioService!, "write")).toBe(false);
+  });
+
+  it("allows only the dedicated seed actor to write mock sibling services", () => {
+    const policyService = scopeById("com.huawei.celon.policyhub")!;
+
+    expect(hasScopeAccess(defaultHuaweiActor, policyService, "write")).toBe(false);
+    expect(hasScopeAccess(seedHuaweiActor, policyService, "write")).toBe(true);
   });
 
   it("only accepts an application service as a writable target", () => {

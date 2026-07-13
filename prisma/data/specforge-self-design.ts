@@ -826,6 +826,142 @@ export const selfDesignProposal: Proposal = {
   updatedAt: now
 };
 
+export const architectureChangeProposals: Proposal[] = [
+  {
+    id: "proposal-strict-application-service-isolation",
+    name: "Strict application-service isolation",
+    title: "Enforce Application-Service Scope as a Hard Data Boundary",
+    description: "Bind every normal Web and MCP read or write to one explicit, authorized Huawei application service.",
+    domainId: "domain-specforge-platform",
+    background: "The previous implementation allowed unscoped database rows, implicit Designer fallback, and service switches that did not consistently change dashboard, asset, graph, governance, and API results.",
+    goal: "Make application-service scope mandatory and consistent across Web pages, API routes, repositories, MCP tools, PostgreSQL queries, graph construction, and governance views.",
+    nonGoal: "Do not provide a multi-service aggregation or comparison view in this change. Cross-service traversal remains limited to a future explicit impact-analysis workflow.",
+    scope: "Introduce shared scope resolution, inherited read authorization, service-only write checks, scoped links and counts, URL/cookie scope persistence, and fail-closed handling for missing or unauthorized scope.",
+    impactedAssets: [
+      { type: "api", id: "api-specforge-web-console", label: "SpecForge Web Console API Contract" },
+      { type: "api", id: "api-specforge-mcp-tools", label: "SpecForge MCP Tool Contract" },
+      { type: "dataModel", id: "data-specforge-assets", label: "SpecForge Design Asset Data Model" },
+      { type: "dataModel", id: "data-specforge-asset-graph", label: "SpecForge Asset Graph Data Model" },
+      { type: "businessRule", id: "rule-specforge-core-service-reuse", label: "Web and MCP must reuse Core Service" }
+    ],
+    specChanges: [
+      "Require an authorized applicationServiceId for all database-backed reads.",
+      "Remove legacy in-memory and default-service fallbacks from normal views.",
+      "Filter dashboard totals, proposals, context packs, governance checks, graph nodes, links, and API responses by the active service.",
+      "Preserve the selected service in URLs and a validated browser cookie.",
+      "Require architectureScope on MCP writes and applicationServiceId on MCP reads."
+    ],
+    risks: [
+      "Existing null-scope rows become invisible until migrated through MCP seed.",
+      "A missing scope now fails closed, so every caller must propagate service context."
+    ],
+    rolloutPlan: "Deploy shared scope validation first, migrate persisted records through MCP seed, then enable scoped Web and MCP queries and verify service-specific counts.",
+    rollbackPlan: "Revert the strict repository and MCP signatures together, then restore the previous seed payload. Do not partially restore implicit fallback because that would reintroduce cross-service leakage.",
+    status: "implemented",
+    localizedContent: {
+      en: {
+        name: "Strict application-service isolation",
+        title: "Enforce Application-Service Scope as a Hard Data Boundary",
+        description: "Bind every normal Web and MCP read or write to one explicit, authorized Huawei application service.",
+        background: "The previous implementation allowed unscoped database rows, implicit Designer fallback, and service switches that did not consistently change dashboard, asset, graph, governance, and API results.",
+        goal: "Make application-service scope mandatory and consistent across Web pages, API routes, repositories, MCP tools, PostgreSQL queries, graph construction, and governance views.",
+        nonGoal: "Do not provide a multi-service aggregation or comparison view in this change. Cross-service traversal remains limited to a future explicit impact-analysis workflow.",
+        scope: "Introduce shared scope resolution, inherited read authorization, service-only write checks, scoped links and counts, URL/cookie scope persistence, and fail-closed handling for missing or unauthorized scope.",
+        specChanges: ["Require explicit scope for all reads and writes.", "Remove fallback data paths.", "Filter every normal view by one service.", "Persist and validate the selected service.", "Align Web and MCP authorization."],
+        risks: ["Null-scope legacy rows require migration.", "Callers missing scope fail closed."],
+        rolloutPlan: "Deploy validation, migrate records through MCP seed, and verify service-specific results.",
+        rollbackPlan: "Revert repository and MCP contracts together and restore the previous seed; never restore only part of the boundary."
+      },
+      zh: {
+        name: "应用服务严格隔离",
+        title: "将应用服务 Scope 建设为强制数据边界",
+        description: "所有常规 Web 与 MCP 读写都必须绑定一个明确且已授权的华为应用服务。",
+        background: "此前存在无 scope 数据、隐式回退 Designer，以及切换应用服务后仪表盘、设计资产、关系图、治理和 API 结果未完全变化的问题。",
+        goal: "让应用服务 scope 在 Web 页面、API 路由、仓储、MCP 工具、PostgreSQL 查询、关系图和治理视图中保持强制且一致。",
+        nonGoal: "本次不提供多应用服务聚合或对比视图；跨服务遍历仅保留给后续显式影响分析流程。",
+        scope: "增加统一 scope 解析、继承式读权限、仅应用服务可写校验、按服务过滤的关系与统计、URL/Cookie 状态保持，以及缺失或越权时的失败关闭。",
+        specChanges: ["所有读写必须显式携带 scope。", "删除内存预置和默认服务回退。", "所有常规视图按单一应用服务过滤。", "持久化并校验用户选择的服务。", "统一 Web 与 MCP 授权边界。"],
+        risks: ["历史无 scope 数据必须先迁移。", "未传 scope 的调用方将直接失败。"],
+        rolloutPlan: "先发布统一校验，再通过 MCP seed 迁移数据，最后验证各应用服务结果完全独立。",
+        rollbackPlan: "仓储与 MCP 契约必须一起回滚并恢复旧 seed，禁止只恢复局部隐式回退。"
+      }
+    },
+    createdAt: now,
+    updatedAt: now
+  },
+  {
+    id: "proposal-agent-service-workspace",
+    name: "Agent service workspace",
+    title: "Create an Agent-by-Application-Service Workspace",
+    description: "Replace the global dashboard assumption with one workspace per Agent and application service.",
+    domainId: "domain-specforge-platform",
+    background: "A global dashboard mixes an Agent's recent work, drafts, pending tasks, and generation history across services even though design assets belong to a specific application service.",
+    goal: "Persist and restore independent workspace state for each Agent and authorized application service while keeping service design assets shared facts.",
+    nonGoal: "Do not duplicate service assets per Agent and do not implement the deferred multi-service comparison dashboard.",
+    scope: "Add AgentServiceWorkspace keyed by agentType, agentId, and applicationServiceId; scope dashboard metrics and recent work to the selected service.",
+    impactedAssets: [
+      { type: "dataModel", id: "data-specforge-web-workspace", label: "SpecForge Web Workspace Data Model" },
+      { type: "api", id: "api-specforge-web-console", label: "SpecForge Web Console API Contract" },
+      { type: "businessRule", id: "rule-specforge-relationships-required", label: "Design assets require explicit relationships" }
+    ],
+    specChanges: ["Persist one workspace per Agent and service.", "Restore service-specific recent assets, drafts, tasks, and generation history.", "Scope dashboard totals to the active service.", "Keep shared service assets independent from personal workspace state."],
+    risks: ["Workspace state can drift if service selection is not preserved.", "Personal state must never alter shared design-asset ownership."],
+    rolloutPlan: "Create the workspace model, initialize it on first service visit, then switch dashboard queries to the selected service.",
+    rollbackPlan: "Stop reading AgentServiceWorkspace and return to service-only dashboards; retain workspace rows for later migration because they do not own design assets.",
+    status: "implemented",
+    localizedContent: {
+      en: {
+        name: "Agent service workspace", title: "Create an Agent-by-Application-Service Workspace", description: "Replace the global dashboard assumption with one workspace per Agent and application service.",
+        background: "A global dashboard mixes Agent activity across services even though design assets belong to a specific application service.", goal: "Persist and restore independent workspace state for each Agent and authorized service.", nonGoal: "Do not duplicate service assets per Agent or add multi-service comparison.", scope: "Persist AgentServiceWorkspace and scope dashboard state to one service.",
+        specChanges: ["Persist one workspace per Agent and service.", "Restore service-specific activity.", "Scope dashboard totals.", "Keep shared assets outside personal state."], risks: ["Selection persistence can cause workspace drift.", "Personal state must not own shared assets."], rolloutPlan: "Create the model, initialize on first visit, and switch dashboard queries.", rollbackPlan: "Return to service-only dashboards while retaining non-owning workspace rows."
+      },
+      zh: {
+        name: "Agent 应用服务工作区", title: "建设 Agent × 应用服务独立工作区", description: "将全局仪表盘改为每个 Agent、每个应用服务一份独立工作区。",
+        background: "全局仪表盘会混合 Agent 在不同服务中的最近工作、草稿、待办和生成历史，而设计资产本身属于特定应用服务。", goal: "为每个 Agent 和已授权应用服务持久化并恢复独立工作区状态，同时保持服务设计资产为共享事实。", nonGoal: "不为每个 Agent 复制服务资产，也不实现多服务对比仪表盘。", scope: "增加 AgentServiceWorkspace，并让仪表盘状态绑定单一服务。",
+        specChanges: ["每个 Agent 和服务持久化一个工作区。", "恢复服务级最近活动、草稿和待办。", "仪表盘统计按当前服务过滤。", "个人状态与共享资产所有权分离。"], risks: ["服务选择未保持会造成工作区漂移。", "个人状态不得改变共享资产归属。"], rolloutPlan: "创建模型，首次访问服务时初始化，并切换仪表盘查询。", rollbackPlan: "退回仅服务级仪表盘，保留不拥有设计资产的工作区记录供后续迁移。"
+      }
+    },
+    createdAt: now,
+    updatedAt: now
+  },
+  {
+    id: "proposal-mcp-native-scoped-seeding",
+    name: "MCP-native scoped seeding",
+    title: "Seed Scoped Multi-Service Design Data Through MCP",
+    description: "Make seed data exercise the same validated and audited MCP write path used by future Agents.",
+    domainId: "domain-specforge-platform",
+    background: "Direct or legacy seed data produced null-scope rows and left mock application services empty, hiding isolation defects and making service switching appear ineffective.",
+    goal: "Migrate all design fixtures through MCP and provide distinct, queryable assets for Designer, Spec Studio, Policy Hub, and Integration Gateway.",
+    nonGoal: "Do not grant the normal Agent write permission to read-only sibling services and do not expose a general administrative bypass.",
+    scope: "Use a seed-only system actor, fail fast on MCP tool errors, write architectureScope explicitly, and create minimal domain-specific fixtures for each mock service.",
+    impactedAssets: [
+      { type: "api", id: "api-specforge-asset-upsert", label: "SpecForge Asset Upsert MCP Contract" },
+      { type: "api", id: "api-specforge-proposal-upsert", label: "SpecForge Proposal Upsert MCP Contract" },
+      { type: "businessRule", id: "rule-specforge-seed-through-mcp", label: "Seed writes must call MCP tools" },
+      { type: "quality", id: "quality-specforge-mcp-smoke", label: "SpecForge MCP Smoke Quality Requirement" }
+    ],
+    specChanges: ["Add a seed-only system actor with module write access.", "Propagate the seed actor only to the MCP child process.", "Fail seed execution when any MCP tool returns isError.", "Write distinct assets for four application services.", "Verify PostgreSQL counts by applicationServiceId."],
+    risks: ["A leaked seed flag could broaden write access in the local process.", "Non-idempotent fixtures could create duplicate design assets."],
+    rolloutPlan: "Enable the seed actor only in the seed child process, upsert deterministic IDs, and verify per-service database counts after every run.",
+    rollbackPlan: "Remove the seed-only fixtures and actor selection, then rerun the previous MCP seed. Existing deterministic rows can be deleted by their stable IDs.",
+    status: "implemented",
+    localizedContent: {
+      en: {
+        name: "MCP-native scoped seeding", title: "Seed Scoped Multi-Service Design Data Through MCP", description: "Make seed data exercise the same validated and audited MCP write path used by future Agents.",
+        background: "Legacy seed data produced null-scope rows and empty sibling services.", goal: "Write all fixtures through MCP and provide distinct assets for four services.", nonGoal: "Do not widen normal Agent permissions or expose an administrative bypass.", scope: "Use a seed-only actor, fail-fast MCP calls, explicit scope, and deterministic fixtures.",
+        specChanges: ["Add a seed-only actor.", "Pass it only to the MCP child process.", "Fail on MCP isError.", "Seed four services.", "Verify service counts."], risks: ["The seed flag must remain process-local.", "Fixtures must remain idempotent."], rolloutPlan: "Use deterministic MCP upserts and verify counts after every seed.", rollbackPlan: "Remove seed fixtures and rerun the previous MCP seed; delete deterministic rows by stable IDs if needed."
+      },
+      zh: {
+        name: "MCP-native 分服务种子数据", title: "通过 MCP 写入分 Scope 的多应用服务设计数据", description: "让种子数据走未来 Agent 使用的同一条可校验、可审计 MCP 写入链路。",
+        background: "旧种子数据产生了无 scope 记录，并让其他 mock 应用服务为空，既掩盖隔离缺陷，也让服务切换看起来无效。", goal: "所有设计样例通过 MCP 迁移，并为 Designer、Spec Studio、Policy Hub 和 Integration Gateway 提供不同且可查询的资产。", nonGoal: "不扩大普通 Agent 对只读兄弟服务的写权限，也不暴露通用管理绕过。", scope: "使用仅 seed 生效的 system actor、MCP 错误快速失败、显式 architectureScope 和确定性服务样例。",
+        specChanges: ["增加仅 seed 使用的 system actor。", "只向 MCP 子进程传递 seed 权限。", "MCP 返回 isError 时立即失败。", "为四个应用服务写入不同资产。", "按 applicationServiceId 验证数据库数量。"], risks: ["seed 标记必须限制在进程内。", "样例必须保持幂等，避免重复资产。"], rolloutPlan: "使用稳定 ID 执行 MCP upsert，并在每次 seed 后核对分服务统计。", rollbackPlan: "移除 seed 专用样例和 actor 选择，重新运行旧 MCP seed；必要时按稳定 ID 删除记录。"
+      }
+    },
+    createdAt: now,
+    updatedAt: now
+  }
+];
+
 export const selfDesignContextPack: ContextPack = {
   id: "ctx-specforge-self-design",
   name: "SpecForge Self-Design Agent Context Pack",

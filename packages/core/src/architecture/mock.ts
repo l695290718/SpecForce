@@ -57,6 +57,36 @@ export const huaweiArchitectureScopes: ArchitectureScope[] = [
     scopePath: `${designerModulePath}/com.huawei.celon.desiner`
   },
   {
+    id: "com.huawei.celon.specstudio",
+    code: "com.huawei.celon.specstudio",
+    name: "Celon Specification Studio",
+    description: "Mock application service for specification composition and review.",
+    owner: "Celon Designer Team",
+    level: "applicationService",
+    parentId: "module-celon-designer",
+    scopePath: `${designerModulePath}/com.huawei.celon.specstudio`
+  },
+  {
+    id: "com.huawei.celon.policyhub",
+    code: "com.huawei.celon.policyhub",
+    name: "Celon Policy Hub",
+    description: "Mock application service for architecture policies and governance rules.",
+    owner: "Celon Governance Team",
+    level: "applicationService",
+    parentId: "module-celon-designer",
+    scopePath: `${designerModulePath}/com.huawei.celon.policyhub`
+  },
+  {
+    id: "com.huawei.celon.integrationgateway",
+    code: "com.huawei.celon.integrationgateway",
+    name: "Celon Integration Gateway",
+    description: "Mock application service for external contract and event integration.",
+    owner: "Celon Integration Team",
+    level: "applicationService",
+    parentId: "module-celon-designer",
+    scopePath: `${designerModulePath}/com.huawei.celon.integrationgateway`
+  },
+  {
     id: "module-celon-runtime",
     code: "CELON-RUNTIME",
     name: "Celon Runtime Module",
@@ -85,5 +115,14 @@ export const defaultHuaweiActor: ScopedActor = {
     { scopeId: "com.huawei.celon.desiner", action: "read" },
     { scopeId: "com.huawei.celon.desiner", action: "write" },
     { scopeId: "module-celon-designer", action: "read" }
+  ]
+};
+
+export const seedHuaweiActor: ScopedActor = {
+  actorType: "system",
+  actorId: "specforge-seed",
+  grants: [
+    { scopeId: "module-celon-designer", action: "read" },
+    { scopeId: "module-celon-designer", action: "write" }
   ]
 };

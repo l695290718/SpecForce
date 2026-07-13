@@ -118,6 +118,22 @@ model ActorScopeGrant {
   @@index([actorType, actorId])
 }
 
+model AgentServiceWorkspace {
+  id                   String   @id @default(cuid())
+  agentType            String
+  agentId              String
+  applicationServiceId String
+  recentAssetIds       String   @default("[]")
+  pendingTasks         String   @default("[]")
+  draftIds             String   @default("[]")
+  generationHistory    String   @default("[]")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([agentType, agentId, applicationServiceId])
+  @@index([applicationServiceId])
+}
+
 model AuditLog {
   id            String   @id @default(cuid())
   actorType     String

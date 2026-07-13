@@ -3,11 +3,13 @@
 import { ChevronDown, Layers3 } from "lucide-react";
 import { huaweiArchitectureScopes } from "@specforge/core";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { listReadableApplicationServices } from "../lib/scope";
 
 const defaultScopeId = "com.huawei.celon.desiner";
 
 function readableScopes() {
-  return huaweiArchitectureScopes.filter((scope) => scope.id === "module-celon-designer" || scope.id === defaultScopeId);
+  return listReadableApplicationServices();
 }
 
 function labelFor(scopeId: string) {
@@ -23,13 +25,34 @@ export function ArchitectureScopeSwitcher() {
   const pathname = usePathname();
   const params = useSearchParams();
   const requested = params.get("scope");
-  const scopeId = readableScopes().some((scope) => scope.id === requested) ? requested! : defaultScopeId;
+  const [persistedScopeId, setPersistedScopeId] = useState(defaultScopeId);
+  const requestedScopeId = readableScopes().some((scope) => scope.id === requested) ? requested! : undefined;
+  const scopeId = requestedScopeId ?? persistedScopeId;
   const selected = huaweiArchitectureScopes.find((scope) => scope.id === scopeId)!;
 
+  useEffect(() => {
+    if (requestedScopeId) {
+      window.localStorage.setItem("specforge-architecture-scope", requestedScopeId);
+      document.cookie = `specforge-architecture-scope=${encodeURIComponent(requestedScopeId)}; path=/; samesite=lax`;
+      setPersistedScopeId(requestedScopeId);
+      return;
+    }
+    const saved = window.localStorage.getItem("specforge-architecture-scope");
+    if (readableScopes().some((scope) => scope.id === saved)) {
+      setPersistedScopeId(saved!);
+      const next = new URLSearchParams(params.toString());
+      next.set("scope", saved!);
+      router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+    }
+  }, [requestedScopeId, pathname, params, router]);
+
   const changeScope = (nextScopeId: string) => {
+    window.localStorage.setItem("specforge-architecture-scope", nextScopeId);
+    document.cookie = `specforge-architecture-scope=${encodeURIComponent(nextScopeId)}; path=/; samesite=lax`;
+    setPersistedScopeId(nextScopeId);
     const next = new URLSearchParams(params.toString());
     next.set("scope", nextScopeId);
-    router.replace(`${pathname}?${next.toString()}`);
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
   };
 
   return (
@@ -41,7 +64,6 @@ export function ArchitectureScopeSwitcher() {
       </select>
       <ChevronDown className="pointer-events-none shrink-0 text-muted" size={13} />
       <span className="hidden max-w-72 truncate border-l border-border pl-2 text-[11px] text-muted 2xl:inline">{labelFor(scopeId)}</span>
-      <span className={selected.level === "applicationService" ? "hidden" : "rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"}>{selected.level === "applicationService" ? "" : "Read only"}</span>
     </label>
   );
 }

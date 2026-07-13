@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { assertWritableApplicationService, assetLabel, defaultHuaweiActor, huaweiArchitectureScopes, normalizeAssetType } from "@specforge/core";
+import { assertWritableApplicationService, assetLabel, defaultHuaweiActor, hasScopeAccess, huaweiArchitectureScopes, normalizeAssetType, scopeById, seedHuaweiActor } from "@specforge/core";
 import type { ArchitectureScopeRef, Asset, AssetType, ContextPack, Proposal, ScopedActor } from "@specforge/core";
 
 const globalForPrisma = globalThis as unknown as { specforgeMcpPrisma?: PrismaClient };
@@ -46,11 +46,19 @@ export interface PersistedAssetLink extends AssetLinkInput {
 
 export function resolveWritableScope(actor: ScopedActor, scope: ArchitectureScopeRef | undefined): ArchitectureScopeRef {
   if (!scope) throw new Error("Architecture scope is required.");
-  try {
-    return assertWritableApplicationService(actor, huaweiArchitectureScopes, scope.applicationServiceId);
-  } catch {
-    throw new Error("Scope write is not authorized.");
-  }
+  const applicationService = scopeById(scope.applicationServiceId);
+  if (!applicationService || applicationService.scopePath !== scope.scopePath) throw new Error("Scope write is not authorized.");
+  return assertWritableApplicationService(actor, applicationService);
+}
+
+function writableActor(): ScopedActor {
+  return process.env.SPECFORGE_MCP_SEED === "1" ? seedHuaweiActor : defaultHuaweiActor;
+}
+
+function readableScope(applicationServiceId: string): ArchitectureScopeRef {
+  const scope = scopeById(applicationServiceId);
+  if (!scope || scope.level !== "applicationService" || !hasScopeAccess(defaultHuaweiActor, scope, "read")) throw new Error("Scope read is not authorized.");
+  return { applicationServiceId: scope.id, scopePath: scope.scopePath };
 }
 
 export async function ensureArchitectureScopes() {
@@ -70,10 +78,10 @@ export async function ensureArchitectureScopes() {
     });
   }
 
-  for (const grant of defaultHuaweiActor.grants) {
+  for (const actor of [defaultHuaweiActor, seedHuaweiActor]) for (const grant of actor.grants) {
     await prisma.actorScopeGrant.upsert({
-      where: { actorType_actorId_scopeId_action: { actorType: defaultHuaweiActor.actorType, actorId: defaultHuaweiActor.actorId, scopeId: grant.scopeId, action: grant.action } },
-      create: { actorType: defaultHuaweiActor.actorType, actorId: defaultHuaweiActor.actorId, scopeId: grant.scopeId, action: grant.action },
+      where: { actorType_actorId_scopeId_action: { actorType: actor.actorType, actorId: actor.actorId, scopeId: grant.scopeId, action: grant.action } },
+      create: { actorType: actor.actorType, actorId: actor.actorId, scopeId: grant.scopeId, action: grant.action },
       update: {}
     });
   }
@@ -178,7 +186,7 @@ export async function ensureMcpPersistenceSchema() {
 export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
   await ensureMcpPersistenceSchema();
   const asset = input.asset as unknown as Record<string, unknown>;
-  const scope = resolveWritableScope(defaultHuaweiActor, asset.architectureScope as ArchitectureScopeRef | undefined);
+  const scope = resolveWritableScope(writableActor(), asset.architectureScope as ArchitectureScopeRef | undefined);
   asset.architectureScope = scope;
   assertString(asset.id, "asset.id");
   assertString(asset.name ?? asset.title, "asset.name");
@@ -217,7 +225,7 @@ export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
 export async function upsertProposal(input: UpsertProposalInput) {
   await ensureMcpPersistenceSchema();
   const proposal = input.proposal;
-  const scope = resolveWritableScope(defaultHuaweiActor, proposal.architectureScope);
+  const scope = resolveWritableScope(writableActor(), proposal.architectureScope);
   proposal.architectureScope = scope;
   assertString(proposal.id, "proposal.id");
   assertString(proposal.title, "proposal.title");
@@ -254,7 +262,7 @@ export async function upsertProposal(input: UpsertProposalInput) {
 export async function upsertContextPack(input: UpsertContextPackInput) {
   await ensureMcpPersistenceSchema();
   const pack = input.contextPack;
-  const scope = resolveWritableScope(defaultHuaweiActor, pack.architectureScope);
+  const scope = resolveWritableScope(writableActor(), pack.architectureScope);
   pack.architectureScope = scope;
   assertString(pack.id, "contextPack.id");
   assertString(pack.proposalId, "contextPack.proposalId");
@@ -321,7 +329,7 @@ export async function deletePersistedDesignData(input: DeletePersistedDesignData
 
 export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedAssetLink> {
   await ensureMcpPersistenceSchema();
-  const scope = resolveWritableScope(defaultHuaweiActor, input.architectureScope);
+  const scope = resolveWritableScope(writableActor(), input.architectureScope);
   const sourceType = normalizeAssetType(input.sourceType);
   const targetType = normalizeAssetType(input.targetType);
   assertString(input.sourceId, "sourceId");
@@ -365,8 +373,9 @@ export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedA
   };
 }
 
-export async function listPersistedAssetLinks(): Promise<PersistedAssetLink[]> {
+export async function listPersistedAssetLinks(applicationServiceId: string): Promise<PersistedAssetLink[]> {
   await ensureMcpPersistenceSchema();
+  const scope = readableScope(applicationServiceId);
   const rows = await prisma.$queryRawUnsafe<Array<{
     id: string;
     sourceType: string;
@@ -376,7 +385,7 @@ export async function listPersistedAssetLinks(): Promise<PersistedAssetLink[]> {
     relationType: string;
     description: string | null;
     createdAt: Date | string;
-  }>>(`SELECT id, "sourceType", "sourceId", "targetType", "targetId", "relationType", description, "createdAt" FROM "AssetLink" ORDER BY "createdAt" ASC`);
+  }>>(`SELECT id, "sourceType", "sourceId", "targetType", "targetId", "relationType", description, "createdAt" FROM "AssetLink" WHERE "applicationServiceId" = '${scope.applicationServiceId}' AND "scopePath" LIKE '${scope.scopePath}%' ORDER BY "createdAt" ASC`);
   return rows.map((row) => ({
     id: row.id,
     sourceType: row.sourceType,
@@ -389,54 +398,58 @@ export async function listPersistedAssetLinks(): Promise<PersistedAssetLink[]> {
   }));
 }
 
-export async function listPersistedAssets(assetType?: AssetType): Promise<Array<{ type: AssetType; asset: Asset }>> {
+export async function listPersistedAssets(applicationServiceId: string, assetType?: AssetType): Promise<Array<{ type: AssetType; asset: Asset }>> {
   await ensureMcpPersistenceSchema();
+  const scope = readableScope(applicationServiceId);
   const rows = await prisma.designAsset.findMany({
-    where: assetType ? { type: assetType } : undefined,
+    where: { ...(assetType ? { type: assetType } : {}), applicationServiceId: scope.applicationServiceId, scopePath: { startsWith: scope.scopePath } },
     orderBy: { createdAt: "asc" }
   });
   return rows.map((row) => ({ type: normalizeAssetType(row.type), asset: JSON.parse(row.payload) as Asset }));
 }
 
-export async function listPersistedProposals(): Promise<Proposal[]> {
+export async function listPersistedProposals(applicationServiceId: string): Promise<Proposal[]> {
   await ensureMcpPersistenceSchema();
-  const rows = await prisma.proposal.findMany({ orderBy: { createdAt: "asc" } });
+  const scope = readableScope(applicationServiceId);
+  const rows = await prisma.proposal.findMany({ where: { applicationServiceId: scope.applicationServiceId, scopePath: { startsWith: scope.scopePath } }, orderBy: { createdAt: "asc" } });
   return rows.map((row) => JSON.parse(row.payload) as Proposal);
 }
 
-export async function listPersistedContextPacks(): Promise<ContextPack[]> {
+export async function listPersistedContextPacks(applicationServiceId: string): Promise<ContextPack[]> {
   await ensureMcpPersistenceSchema();
-  const rows = await prisma.contextPack.findMany({ orderBy: { createdAt: "asc" } });
+  const scope = readableScope(applicationServiceId);
+  const rows = await prisma.contextPack.findMany({ where: { applicationServiceId: scope.applicationServiceId, scopePath: { startsWith: scope.scopePath } }, orderBy: { createdAt: "asc" } });
   return rows.map(rowToContextPack);
 }
 
-export async function getPersistedAsset(assetType: string, assetId: string): Promise<Asset> {
+export async function getPersistedAsset(assetType: string, assetId: string, applicationServiceId: string): Promise<Asset> {
   await ensureMcpPersistenceSchema();
+  const scope = readableScope(applicationServiceId);
   const type = normalizeAssetType(assetType);
   if (type === "proposal") {
-    const proposal = (await listPersistedProposals()).find((item) => item.id === assetId);
+    const proposal = (await listPersistedProposals(applicationServiceId)).find((item) => item.id === assetId);
     if (!proposal) throw new Error(`Asset not found: ${type}/${assetId}`);
     return proposal;
   }
   if (type === "contextPack") {
-    const pack = (await listPersistedContextPacks()).find((item) => item.id === assetId);
+    const pack = (await listPersistedContextPacks(applicationServiceId)).find((item) => item.id === assetId);
     if (!pack) throw new Error(`Asset not found: ${type}/${assetId}`);
     return pack;
   }
-  const row = await prisma.designAsset.findFirst({ where: { id: assetId, type } });
+  const row = await prisma.designAsset.findFirst({ where: { id: assetId, type, applicationServiceId: scope.applicationServiceId, scopePath: { startsWith: scope.scopePath } } });
   if (!row) throw new Error(`Asset not found: ${type}/${assetId}`);
   return JSON.parse(row.payload) as Asset;
 }
 
-export async function listPersistedCollectionAsMarkdown(assetType: string): Promise<string> {
+export async function listPersistedCollectionAsMarkdown(assetType: string, applicationServiceId: string): Promise<string> {
   const type = normalizeAssetType(assetType);
-  const assets = await listAssetsForType(type);
+  const assets = await listAssetsForType(type, applicationServiceId);
   return [`# ${assetLabel(type)} Catalog`, "", ...assets.map((asset) => `- ${assetName(asset)} (${type}/${asset.id})`)].join("\n");
 }
 
-export async function renderPersistedAssetAsMarkdown(assetType: string, assetId: string): Promise<string> {
+export async function renderPersistedAssetAsMarkdown(assetType: string, assetId: string, applicationServiceId: string): Promise<string> {
   const type = normalizeAssetType(assetType);
-  const asset = await getPersistedAsset(type, assetId);
+  const asset = await getPersistedAsset(type, assetId, applicationServiceId);
   return [
     `# ${assetName(asset)}`,
     "",
@@ -456,15 +469,15 @@ export async function renderPersistedAssetAsMarkdown(assetType: string, assetId:
     .join("\n");
 }
 
-export async function searchPersistedDesignAssets(input: { query: string; assetTypes?: string[]; domainId?: string; limit?: number }) {
+export async function searchPersistedDesignAssets(input: { applicationServiceId: string; query: string; assetTypes?: string[]; domainId?: string; limit?: number }) {
   const terms = input.query.toLowerCase().split(/\s+/).map((term) => term.trim()).filter(Boolean);
   const types = input.assetTypes?.length ? input.assetTypes.map(normalizeAssetType) : undefined;
   const candidates = types
-    ? (await Promise.all(types.map((type) => listPersistedAssets(type)))).flat()
+    ? (await Promise.all(types.map((type) => listPersistedAssets(input.applicationServiceId, type)))).flat()
     : [
-        ...(await listPersistedAssets()),
-        ...(await listPersistedProposals()).map((asset) => ({ type: "proposal" as AssetType, asset })),
-        ...(await listPersistedContextPacks()).map((asset) => ({ type: "contextPack" as AssetType, asset }))
+        ...(await listPersistedAssets(input.applicationServiceId)),
+        ...(await listPersistedProposals(input.applicationServiceId)).map((asset) => ({ type: "proposal" as AssetType, asset })),
+        ...(await listPersistedContextPacks(input.applicationServiceId)).map((asset) => ({ type: "contextPack" as AssetType, asset }))
       ];
   const scored = candidates
     .filter(({ asset }) => !input.domainId || !("domainId" in asset) || asset.domainId === input.domainId || asset.id === input.domainId)
@@ -502,10 +515,10 @@ function optionalDate(value: unknown): Date {
   return typeof value === "string" ? new Date(value) : new Date();
 }
 
-async function listAssetsForType(assetType: AssetType): Promise<Asset[]> {
-  if (assetType === "proposal") return listPersistedProposals();
-  if (assetType === "contextPack") return listPersistedContextPacks();
-  return (await listPersistedAssets(assetType)).map(({ asset }) => asset);
+async function listAssetsForType(assetType: AssetType, applicationServiceId: string): Promise<Asset[]> {
+  if (assetType === "proposal") return listPersistedProposals(applicationServiceId);
+  if (assetType === "contextPack") return listPersistedContextPacks(applicationServiceId);
+  return (await listPersistedAssets(applicationServiceId, assetType)).map(({ asset }) => asset);
 }
 
 function rowToContextPack(row: {

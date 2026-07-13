@@ -50,3 +50,12 @@ indexed. A unique constraint covers `(agentType, agentId, applicationServiceId)`
 - Service-level assets are not duplicated per Agent.
 - A read-only service does not show persistent write actions.
 - Platform overview is separate from the default Agent home page.
+
+## Deferred Features
+
+- **Authorized multi-service comparison:** an explicit view that lets an Agent
+  compare or aggregate only the application services for which it has read
+  grants. This is deferred from the MVP. Until it is implemented, every normal
+  dashboard, catalog, search result, and graph is bound to exactly one selected
+  application service; cross-service results appear only in explicit impact
+  analysis.

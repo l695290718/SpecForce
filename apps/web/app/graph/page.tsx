@@ -4,10 +4,10 @@ import { Card, PageHeader } from "../../components/ui";
 import { T } from "../../components/language-provider";
 import { getAssetGraphWithDatabase, getDomainsWithDatabase } from "../../lib/assets";
 
-export default async function GraphPage({ searchParams }: { searchParams: Promise<{ domainId?: string; assetType?: AssetType }> }) {
-  const { domainId, assetType } = await searchParams;
-  const graph = await getAssetGraphWithDatabase(domainId, assetType);
-  const domains = await getDomainsWithDatabase();
+export default async function GraphPage({ searchParams }: { searchParams: Promise<{ domainId?: string; assetType?: AssetType; scope?: string }> }) {
+  const { domainId, assetType, scope = "" } = await searchParams;
+  const graph = await getAssetGraphWithDatabase(scope, domainId, assetType);
+  const domains = await getDomainsWithDatabase(scope);
   const assetTypes: AssetType[] = ["dataModel", "api", "event", "businessRule", "stateMachine", "integration", "quality", "observability", "adr", "proposal"];
 
   return (
@@ -15,6 +15,7 @@ export default async function GraphPage({ searchParams }: { searchParams: Promis
       <PageHeader title={<T k="graph.title" />} description={<T k="graph.description" />} />
       <Card className="mb-4">
         <form className="flex flex-wrap items-center gap-3">
+          <input name="scope" type="hidden" value={scope} />
           <label className="text-sm font-medium"><T k="graph.domain" /></label>
           <select className="h-9 rounded-md border border-border px-3 text-sm" name="domainId" defaultValue={domainId ?? ""}>
             <option value=""><T k="graph.allDomains" /></option>

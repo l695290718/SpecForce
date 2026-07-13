@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
-import { getStore, runGovernanceChecks } from "@specforge/core";
+import { runGovernanceChecks } from "@specforge/core";
+import { getGovernanceTargetsWithDatabase } from "../../../../lib/assets";
 
-export async function GET() {
-  const store = getStore();
-  const targets = [
-    ...store.apis.map((asset) => ({ type: "api", id: asset.id })),
-    ...store.events.map((asset) => ({ type: "event", id: asset.id })),
-    ...store.dataModels.map((asset) => ({ type: "dataModel", id: asset.id })),
-    ...store.businessRules.map((asset) => ({ type: "businessRule", id: asset.id })),
-    ...store.proposals.map((asset) => ({ type: "proposal", id: asset.id }))
-  ];
+export async function GET(request: Request) {
+  const targets = await getGovernanceTargetsWithDatabase(new URL(request.url).searchParams.get("scope") ?? "");
   return NextResponse.json((await Promise.all(targets.map((target) => runGovernanceChecks(target.type, target.id)))).flat());
 }

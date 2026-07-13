@@ -96,6 +96,10 @@ const assetRefSchema = z.object({
 });
 
 const assetTypeSchema = z.enum(["domain", "dataModel", "api", "event", "businessRule", "stateMachine", "integration", "quality", "observability", "adr", "proposal", "contextPack"]);
+const architectureScopeSchema = z.object({
+  applicationServiceId: z.string().min(1),
+  scopePath: z.string().min(1)
+});
 
 export function registerTools(server: McpServer): void {
   registerJsonTool(
@@ -106,12 +110,13 @@ export function registerTools(server: McpServer): void {
       description: "Creates or updates a persisted design asset through the MCP write boundary. This validates the envelope, stores the full payload, and is audited.",
       inputSchema: {
         assetType: assetTypeSchema,
-        asset: z.record(z.unknown())
+        asset: z.record(z.unknown()),
+        architectureScope: architectureScopeSchema
       },
       permissions: ["asset:write"],
       readOnly: false
     },
-    async (input) => upsertDesignAsset(input as unknown as Parameters<typeof upsertDesignAsset>[0])
+    async (input) => upsertDesignAsset({ ...input, asset: { ...input.asset, architectureScope: input.architectureScope } } as unknown as Parameters<typeof upsertDesignAsset>[0])
   );
 
   registerJsonTool(
@@ -121,12 +126,13 @@ export function registerTools(server: McpServer): void {
       title: "Upsert proposal",
       description: "Creates or updates a persisted proposal through the MCP write boundary. This is intended for MCP-native imports, seed runs, and future agent edits.",
       inputSchema: {
-        proposal: z.record(z.unknown())
+        proposal: z.record(z.unknown()),
+        architectureScope: architectureScopeSchema
       },
       permissions: ["proposal:write"],
       readOnly: false
     },
-    async (input) => upsertProposal(input as unknown as Parameters<typeof upsertProposal>[0])
+    async (input) => upsertProposal({ ...input, proposal: { ...input.proposal, architectureScope: input.architectureScope } } as unknown as Parameters<typeof upsertProposal>[0])
   );
 
   registerJsonTool(
@@ -136,12 +142,13 @@ export function registerTools(server: McpServer): void {
       title: "Upsert context pack",
       description: "Creates or updates a persisted Context Pack through the MCP write boundary. This keeps generated agent context queryable by Web and MCP clients.",
       inputSchema: {
-        contextPack: z.record(z.unknown())
+        contextPack: z.record(z.unknown()),
+        architectureScope: architectureScopeSchema
       },
       permissions: ["context-pack:generate"],
       readOnly: false
     },
-    async (input) => upsertContextPack(input as unknown as Parameters<typeof upsertContextPack>[0])
+    async (input) => upsertContextPack({ ...input, contextPack: { ...input.contextPack, architectureScope: input.architectureScope } } as unknown as Parameters<typeof upsertContextPack>[0])
   );
 
   registerJsonTool(
@@ -152,6 +159,7 @@ export function registerTools(server: McpServer): void {
       description: "Searches SpecForge design assets by query, type, and optional domain. This is read-only and returns summaries, not raw database access.",
       inputSchema: {
         query: z.string(),
+        applicationServiceId: z.string().min(1),
         assetTypes: z.array(z.string()).optional(),
         domainId: z.string().optional(),
         limit: z.number().int().min(1).max(50).optional()
@@ -171,6 +179,7 @@ export function registerTools(server: McpServer): void {
       inputSchema: {
         assetType: z.string(),
         assetId: z.string(),
+        applicationServiceId: z.string().min(1),
         format: z.enum(["markdown", "json"]).optional()
       },
       permissions: ["asset:read"],
@@ -178,9 +187,9 @@ export function registerTools(server: McpServer): void {
     },
     async (input) => {
       if (input.format === "json") {
-        return { format: "json", asset: await getPersistedAsset(input.assetType, input.assetId) };
+        return { format: "json", asset: await getPersistedAsset(input.assetType, input.assetId, input.applicationServiceId) };
       }
-      return { format: "markdown", content: await renderPersistedAssetAsMarkdown(input.assetType, input.assetId) };
+      return { format: "markdown", content: await renderPersistedAssetAsMarkdown(input.assetType, input.assetId, input.applicationServiceId) };
     }
   );
 
@@ -205,6 +214,7 @@ export function registerTools(server: McpServer): void {
       description: "Generates an Agent Context Pack for a proposal with implementation guidance and explicit do-not rules.",
       inputSchema: {
         proposalId: z.string(),
+        applicationServiceId: z.string().min(1),
         targetAgent: z.enum(["codex", "claude-code", "cursor", "copilot", "generic"]).optional(),
         includeAssets: z.array(z.string()).optional(),
         format: z.enum(["markdown", "json"]).optional()
@@ -213,7 +223,7 @@ export function registerTools(server: McpServer): void {
       readOnly: false
     },
     async (input) => {
-      const persistedPack = (await listPersistedContextPacks()).find((pack) => pack.proposalId === input.proposalId);
+      const persistedPack = (await listPersistedContextPacks(input.applicationServiceId)).find((pack) => pack.proposalId === input.proposalId);
       if (persistedPack) return input.format === "json" ? persistedPack : persistedPack.generatedMarkdown;
       const pack = await generateContextPack(input.proposalId, input);
       return input.format === "json" ? pack : pack.generatedMarkdown;
@@ -319,7 +329,8 @@ export function registerTools(server: McpServer): void {
         targetType: z.string(),
         targetId: z.string(),
         relationType: z.string(),
-        description: z.string().optional()
+        description: z.string().optional(),
+        architectureScope: architectureScopeSchema
       },
       permissions: ["asset:write"],
       readOnly: false
@@ -335,13 +346,14 @@ export function registerTools(server: McpServer): void {
       description: "Exports a generated Context Pack by id in markdown or JSON format.",
       inputSchema: {
         contextPackId: z.string(),
+        applicationServiceId: z.string().min(1),
         format: z.enum(["markdown", "json"])
       },
       permissions: ["asset:read"],
       readOnly: true
     },
     async (input) => {
-      const pack = await getPersistedAsset("contextPack", input.contextPackId) as { generatedMarkdown?: string };
+      const pack = await getPersistedAsset("contextPack", input.contextPackId, input.applicationServiceId) as { generatedMarkdown?: string };
       return input.format === "markdown" ? (pack.generatedMarkdown ?? "") : pack;
     }
   );

@@ -4,9 +4,10 @@ import { T } from "../../../components/language-provider";
 import { CopyMarkdownButton } from "../../../components/copy-markdown-button";
 import { getContextPackWithDatabase } from "../../../lib/assets";
 
-export default async function ContextPackDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ContextPackDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ scope?: string }> }) {
   const { id } = await params;
-  const pack = await getContextPackWithDatabase(id);
+  const { scope = "" } = await searchParams;
+  const pack = await getContextPackWithDatabase(id, scope);
 
   return (
     <>
