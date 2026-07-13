@@ -156,6 +156,8 @@ export interface AssetLocalizedContentMap {
 
 export type GovernanceSeverity = "info" | "warning" | "error";
 export type GovernanceStatus = "pass" | "fail";
+export type GovernanceMessageParamValue = string | string[];
+export type GovernanceMessageParams = Record<string, GovernanceMessageParamValue>;
 export type AuditActorType = "user" | "agent" | "system";
 export type AuditChannel = "web" | "mcp" | "api";
 export type AuditStatus = "success" | "failed";
@@ -390,6 +392,7 @@ export interface GovernanceCheckResult {
   assetId: string;
   reason: string;
   suggestion: string;
+  messageParams?: GovernanceMessageParams;
 }
 
 export interface AssetGraphNode {
