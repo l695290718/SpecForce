@@ -401,6 +401,7 @@ export async function upsertContextPack(input: UpsertContextPackInput) {
       createdAt: new Date(canonicalPack.createdAt)
     },
     update: {
+      proposalId: canonicalPack.proposalId,
       name: canonicalPack.name,
       targetAgent: canonicalPack.targetAgent,
       summary: canonicalPack.summary,

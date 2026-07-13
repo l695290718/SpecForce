@@ -451,6 +451,42 @@ describe("Task 2 MCP bilingual enforcement", () => {
     });
   });
 
+  it("updates every persisted Context Pack projection when the canonical proposal changes", async () => {
+    mockSchemaSetup();
+    const upsertSpy = vi.spyOn(prisma.contextPack, "upsert").mockResolvedValue({} as never);
+    const changedPack: ContextPack = {
+      ...bilingualContextPack,
+      proposalId: "proposal-bilingual-assets-v2",
+      name: "Updated bilingual assets context",
+      summary: "Updated implementation guidance.",
+      targetAgent: "claude-code",
+      includedAssets: [{ type: "proposal", id: "proposal-bilingual-assets-v2", label: "Updated proposal" }],
+      constraints: ["Use the updated proposal.", "Keep all projections aligned."],
+      instructions: ["Refresh all persisted projections.", "Verify the legacy reader."],
+      generatedMarkdown: "# Updated context"
+    };
+
+    await upsertContextPack({ contextPack: changedPack });
+
+    expect(upsertSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: {
+          proposalId: changedPack.proposalId,
+          name: changedPack.name,
+          targetAgent: changedPack.targetAgent,
+          summary: changedPack.summary,
+          includedAssets: JSON.stringify(changedPack.includedAssets),
+          constraints: JSON.stringify(changedPack.constraints),
+          instructions: JSON.stringify(changedPack.instructions),
+          generatedMarkdown: changedPack.generatedMarkdown,
+          payload: JSON.stringify(changedPack),
+          applicationServiceId: writableScope.applicationServiceId,
+          scopePath: writableScope.scopePath
+        }
+      })
+    );
+  });
+
   it("falls back to legacy context pack columns when persisted payload JSON is invalid or incomplete", async () => {
     mockSchemaSetup();
     vi.spyOn(prisma.contextPack, "findUnique")

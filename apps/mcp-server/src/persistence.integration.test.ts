@@ -1,5 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { scopeById, type ArchitectureScopeRef, type ContextPack, type DomainModel, type Proposal } from "@specforge/core";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   deletePersistedDesignData,
@@ -26,6 +28,16 @@ const policyScope = applicationServiceScope("com.huawei.celon.policyhub");
 const sharedId = "shared-logical-id";
 const legacyId = "legacy-logical-id";
 const timestamp = "2026-07-13T00:00:00.000Z";
+const migrationSql = readFileSync(
+  resolve(process.cwd(), "prisma/migrations/20260713233000_migrate_legacy_persisted_identities/migration.sql"),
+  "utf8"
+);
+
+describe("persisted identity migration SQL", () => {
+  it("guards composite constraints when an identically named Prisma index already exists", () => {
+    expect(migrationSql).toContain("to_regclass(format('%I.%I', current_schema(), composite_constraint)) IS NULL");
+  });
+});
 
 describe.runIf(integrationEnabled)("scope-aware persisted identity", () => {
   beforeAll(async () => {
@@ -43,6 +55,8 @@ describe.runIf(integrationEnabled)("scope-aware persisted identity", () => {
   });
 
   it("upgrades legacy global-id tables before scoped Prisma operations", async () => {
+    await executeMigrationSql();
+    await executeMigrationSql();
     await ensureMcpPersistenceSchema();
     await ensureMcpPersistenceSchema();
 
@@ -113,6 +127,42 @@ describe.runIf(integrationEnabled)("scope-aware persisted identity", () => {
     );
   });
 
+  it("keeps Context Pack payload and legacy columns aligned when proposalId changes", async () => {
+    const id = "context-pack-proposal-update";
+    const initialPack = {
+      ...contextPackForScope(designerScope, "Initial proposal context", "\u521d\u59cb\u63d0\u6848\u4e0a\u4e0b\u6587"),
+      id,
+      proposalId: "proposal-v1"
+    };
+    const changedPack = {
+      ...initialPack,
+      proposalId: "proposal-v2",
+      name: "Updated proposal context",
+      summary: "Context for the updated proposal."
+    };
+
+    await upsertContextPack({ contextPack: initialPack });
+    await upsertContextPack({ contextPack: changedPack });
+
+    const where = {
+      applicationServiceId_scopePath_id: {
+        applicationServiceId: designerScope.applicationServiceId,
+        scopePath: designerScope.scopePath,
+        id
+      }
+    };
+    const persisted = await prisma.contextPack.findUniqueOrThrow({ where });
+    expect(persisted.proposalId).toBe("proposal-v2");
+    expect(JSON.parse(persisted.payload ?? "{}")).toMatchObject({ proposalId: "proposal-v2" });
+
+    await prisma.contextPack.update({ where, data: { payload: null } });
+    await expect(getPersistedAsset("contextPack", id, designerScope.applicationServiceId)).resolves.toMatchObject({
+      proposalId: "proposal-v2",
+      name: "Updated proposal context",
+      summary: "Context for the updated proposal."
+    });
+  });
+
   it("cleans only the exact scope and preserves a sibling scope plus a near-prefix row", async () => {
     const nearPrefixScopePath = `${designerScope.scopePath}-near`;
     const nearPrefixAsset = domainForScope(designerScope, "Near-prefix shared domain", "近似前缀共享领域");
@@ -159,6 +209,14 @@ describe.runIf(integrationEnabled)("scope-aware persisted identity", () => {
     })).resolves.not.toBeNull();
   });
 });
+
+async function executeMigrationSql() {
+  const blockEnd = "END $$;";
+  const blockEndIndex = migrationSql.indexOf(blockEnd) + blockEnd.length;
+  if (blockEndIndex < blockEnd.length) throw new Error("Migration DO block terminator not found.");
+  await prisma.$executeRawUnsafe(migrationSql.slice(0, blockEndIndex));
+  await prisma.$executeRawUnsafe(migrationSql.slice(blockEndIndex).trim());
+}
 
 async function installLegacySchema() {
   await prisma.$executeRawUnsafe(`CREATE TABLE "DesignAsset" (

@@ -57,7 +57,7 @@ BEGIN
     IF NOT EXISTS (
       SELECT 1 FROM pg_constraint
       WHERE conrelid = to_regclass(format('%I', table_name)) AND conname = composite_constraint
-    ) THEN
+    ) AND to_regclass(format('%I.%I', current_schema(), composite_constraint)) IS NULL THEN
       EXECUTE format(
         'ALTER TABLE %I ADD CONSTRAINT %I UNIQUE ("applicationServiceId", "scopePath", id)',
         table_name,
