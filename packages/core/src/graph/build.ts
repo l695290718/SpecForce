@@ -61,7 +61,9 @@ export async function buildAssetGraph(domainId?: string, assetType?: AssetType, 
   const identityOf = (asset: GraphAsset) => identities.get(asset) ?? asset.id;
   const resolveTarget = (source: GraphAsset, targetType: AssetType, logicalId: string): { id: string; asset?: GraphAsset } => {
     const candidates = allAssets.filter((entry) => entry.type === targetType && entry.asset.id === logicalId).map((entry) => entry.asset);
-    const target = candidates.find((candidate) => sameScope(source, candidate)) ?? (candidates.length === 1 ? candidates[0] : undefined);
+    const target = source.architectureScope
+      ? candidates.find((candidate) => sameScope(source, candidate))
+      : candidates.find((candidate) => !candidate.architectureScope) ?? (candidates.length === 1 ? candidates[0] : undefined);
     return { id: target ? identityOf(target) : logicalId, asset: target };
   };
   const addNode = (type: AssetType, canonical: GraphAsset, label: string, summary: string, nodeDomainId?: string) => {
@@ -86,6 +88,7 @@ export async function buildAssetGraph(domainId?: string, assetType?: AssetType, 
   ) => {
     const source = resolveTarget(owner, sourceType, sourceLogicalId);
     const target = resolveTarget(owner, targetType, targetLogicalId);
+    if (!source.asset || !target.asset) return;
     edges.push({
       id: `${source.id}->${target.id}:${label}`,
       source: source.id,

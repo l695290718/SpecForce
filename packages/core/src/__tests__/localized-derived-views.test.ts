@@ -257,6 +257,40 @@ describe("scoped localized derived views", () => {
     }
   });
 
+  it.each([
+    ["different application service", "com.example.beta", "/family/product/com.example.beta"],
+    ["different scope path", "com.example.alpha", "/family/product/com.example.alpha/other"]
+  ])("does not resolve a scoped relation to the sole same-ID target in %s", async (_case, applicationServiceId, scopePath) => {
+    const alpha = scopedCatalog("alpha");
+    const beta = scopedCatalog("beta");
+    const sourceProposal = alpha.proposals[0]!;
+    const crossScopeApi = beta.apis[0]!;
+    crossScopeApi.architectureScope = { applicationServiceId, scopePath };
+    const catalog: SpecForgeDataStore = {
+      domains: [...alpha.domains, ...beta.domains],
+      dataModels: [],
+      apis: [crossScopeApi],
+      events: [],
+      businessRules: [],
+      stateMachines: [],
+      integrations: [],
+      qualityRequirements: [],
+      observabilityDesigns: [],
+      adrs: [],
+      proposals: [sourceProposal],
+      contextPacks: []
+    };
+
+    const graph = await buildAssetGraph(undefined, undefined, { catalog, locale: "en" });
+    const sourceNode = graph.nodes.find((node) => node.logicalId === sourceProposal.id);
+    const targetNode = graph.nodes.find((node) => node.logicalId === crossScopeApi.id);
+    const crossScopeEdge = graph.edges.find((edge) => edge.source === sourceNode?.id && edge.target === targetNode?.id && edge.label === "impacts");
+
+    expect(sourceNode?.applicationServiceId).toBe("com.example.alpha");
+    expect(targetNode?.architectureScope).toEqual({ applicationServiceId, scopePath });
+    expect(crossScopeEdge).toBeUndefined();
+  });
+
   it("indexes canonical English and Chinese overlay before localizing search results", async () => {
     const beta = scopedCatalog("beta");
 

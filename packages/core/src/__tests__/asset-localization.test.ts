@@ -507,6 +507,99 @@ describe("asset localization", () => {
     ).toThrowError(/TRANSLATION_STRUCTURE_MISMATCH/);
   });
 
+  it.each([
+    ["api.authType", "api", api, "authType", "localizedContent.zh.authType"],
+    ["api.idempotency", "api", api, "idempotency", "localizedContent.zh.idempotency"],
+    ["api.rateLimit", "api", api, "rateLimit", "localizedContent.zh.rateLimit"],
+    ["api.timeout", "api", api, "timeout", "localizedContent.zh.timeout"],
+    ["api.compatibilityPolicy", "api", api, "compatibilityPolicy", "localizedContent.zh.compatibilityPolicy"],
+    ["event.orderingRequirement", "event", eventContract, "orderingRequirement", "localizedContent.zh.orderingRequirement"],
+    ["event.retryPolicy", "event", eventContract, "retryPolicy", "localizedContent.zh.retryPolicy"],
+    ["event.deadLetterPolicy", "event", eventContract, "deadLetterPolicy", "localizedContent.zh.deadLetterPolicy"],
+    ["event.compatibilityPolicy", "event", eventContract, "compatibilityPolicy", "localizedContent.zh.compatibilityPolicy"],
+    ["rule.condition", "businessRule", businessRule, "condition", "localizedContent.zh.condition"],
+    ["rule.exception", "businessRule", businessRule, "exception", "localizedContent.zh.exception"],
+    ["proposal.rollbackPlan", "proposal", proposal, "rollbackPlan", "localizedContent.zh.rollbackPlan"]
+  ] as const)("requires zh for populated optional canonical field %s", (_name, assetType, source, field, path) => {
+    const candidate = structuredClone(source) as Asset & { localizedContent?: { zh?: Record<string, unknown> } };
+    delete candidate.localizedContent?.zh?.[field];
+
+    expect(() => localizeAsset(assetType, candidate, "zh")).toThrowError(
+      expect.objectContaining({ code: "ASSET_TRANSLATION_REQUIRED", path })
+    );
+  });
+
+  it.each([
+    ["meaning", "localizedContent.zh.fields.invoice_id.meaning"],
+    ["constraint", "localizedContent.zh.fields.invoice_id.constraint"],
+    ["classification", "localizedContent.zh.fields.invoice_id.classification"],
+    ["example", "localizedContent.zh.fields.invoice_id.example"]
+  ] as const)("requires zh for populated optional data-field %s", (field, path) => {
+    const candidate = structuredClone(dataModel);
+    const canonicalField = candidate.fields[0]! as unknown as Record<string, unknown>;
+    const translatedField = candidate.localizedContent!.zh!.fields.invoice_id as unknown as Record<string, unknown>;
+    canonicalField[field] = `Canonical ${field}`;
+    delete translatedField[field];
+
+    expect(() => localizeAsset("dataModel", candidate, "zh")).toThrowError(
+      expect.objectContaining({ code: "ASSET_TRANSLATION_REQUIRED", path })
+    );
+  });
+
+  it.each([
+    ["api", api, "authType"],
+    ["event", eventContract, "orderingRequirement"],
+    ["businessRule", businessRule, "exception"],
+    ["proposal", proposal, "rollbackPlan"]
+  ] as const)("does not require zh when optional canonical field is absent for %s", (assetType, source, field) => {
+    const candidate = structuredClone(source) as Asset & Record<string, unknown> & { localizedContent?: { zh?: Record<string, unknown> } };
+    delete candidate[field];
+    delete candidate.localizedContent?.zh?.[field];
+
+    expect(() => localizeAsset(assetType, candidate, "zh")).not.toThrow();
+  });
+
+  it("does not require zh when optional canonical data-field content is absent", () => {
+    const candidate = structuredClone(dataModel);
+    delete candidate.fields[0]!.example;
+    const translatedField = candidate.localizedContent!.zh!.fields.invoice_id!;
+    delete translatedField.example;
+
+    expect(() => localizeAsset("dataModel", candidate, "zh")).not.toThrow();
+  });
+
+  it.each(["condition", "action", "failureHandling"] as const)(
+    "requires zh for populated optional state-transition field %s",
+    (field) => {
+      const candidate = structuredClone(stateMachine);
+      const transition = candidate.transitions[0]!;
+      const key = `${transition.from}::${transition.to}::${transition.trigger}`;
+      const translated = candidate.localizedContent!.zh!.transitions[key]!;
+      delete translated[field];
+
+      expect(() => localizeAsset("stateMachine", candidate, "zh")).toThrowError(
+        expect.objectContaining({
+          code: "ASSET_TRANSLATION_REQUIRED",
+          path: `localizedContent.zh.transitions.${key}.${field}`
+        })
+      );
+    }
+  );
+
+  it.each(["condition", "action", "failureHandling"] as const)(
+    "does not require zh when optional canonical state-transition field %s is absent",
+    (field) => {
+      const candidate = structuredClone(stateMachine);
+      const transition = candidate.transitions[0]!;
+      const key = `${transition.from}::${transition.to}::${transition.trigger}`;
+      const translated = candidate.localizedContent!.zh!.transitions[key]!;
+      delete transition[field];
+      delete translated[field];
+
+      expect(() => localizeAsset("stateMachine", candidate, "zh")).not.toThrow();
+    }
+  );
+
   it("matches translated data-field content by fieldName while preserving technical keys", () => {
     const localized = localizeAsset("dataModel", dataModel, "zh");
 

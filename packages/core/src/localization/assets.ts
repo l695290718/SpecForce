@@ -341,8 +341,10 @@ export function validateAssetLocalization(assetType: AssetType, asset: Asset): v
 
   for (const field of definition.optionalStringFields ?? []) {
     assertOptionalCanonicalString(assetType, normalized, field);
-    if (field in overlay) {
-      assertTranslatedString(assetType, normalized.id, asUnknownRecord(overlay)[field], `localizedContent.zh.${field}`);
+    const canonical = (normalized as Asset & Record<string, unknown>)[field];
+    const translated = asUnknownRecord(overlay)[field];
+    if (isNonEmptyString(canonical) || translated !== undefined) {
+      assertTranslatedString(assetType, normalized.id, translated, `localizedContent.zh.${field}`);
     }
   }
 
@@ -357,8 +359,9 @@ export function validateAssetLocalization(assetType: AssetType, asset: Asset): v
     if (canonical !== undefined) {
       assertCanonicalStringArray(assetType, normalized.id, canonical, field);
     }
-    if (field in overlay) {
-      assertTranslatedStringArray(assetType, normalized.id, canonical, asUnknownRecord(overlay)[field], `localizedContent.zh.${field}`);
+    const translated = asUnknownRecord(overlay)[field];
+    if ((Array.isArray(canonical) && canonical.length > 0) || translated !== undefined) {
+      assertTranslatedStringArray(assetType, normalized.id, canonical, translated, `localizedContent.zh.${field}`);
     }
   }
 
@@ -521,12 +524,15 @@ function validateTranslatedDataField(
 
   assertTranslatedString(assetType, assetId, translated.displayName, `localizedContent.zh.fields.${field.fieldName}.displayName`);
 
-  if (field.meaning !== undefined) {
-    assertTranslatedString(assetType, assetId, translated.meaning, `localizedContent.zh.fields.${field.fieldName}.meaning`);
-  }
-
-  if (field.constraint !== undefined) {
-    assertTranslatedString(assetType, assetId, translated.constraint, `localizedContent.zh.fields.${field.fieldName}.constraint`);
+  for (const narrativeField of ["meaning", "constraint", "classification", "example"] as const) {
+    if (isNonEmptyString(field[narrativeField]) || translated[narrativeField] !== undefined) {
+      assertTranslatedString(
+        assetType,
+        assetId,
+        translated[narrativeField],
+        `localizedContent.zh.fields.${field.fieldName}.${narrativeField}`
+      );
+    }
   }
 }
 
