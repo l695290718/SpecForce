@@ -19,7 +19,10 @@ const scopedDerived = vi.hoisted(() => ({
   analyzeScopedProposalImpact: vi.fn().mockResolvedValue({ analysis: { proposalId: "shared-proposal" } }),
   buildScopedAssetGraph: vi.fn().mockResolvedValue({ graph: { nodes: [], edges: [] } }),
   exportScopedContextPack: vi.fn().mockResolvedValue({ contextPack: { id: "ctx-shared" } }),
-  generateScopedContextPack: vi.fn().mockResolvedValue({ contextPack: { id: "ctx-shared", generatedMarkdown: "# 中文上下文" } }),
+  generateScopedContextPack: vi.fn().mockResolvedValue({
+    contextPack: { id: "ctx-shared", generatedMarkdown: "# 中文上下文" },
+    canonicalSource: { generatedContextPack: { id: "ctx-shared", name: "Canonical English Context" } }
+  }),
   getScopedAssetDetail: vi.fn().mockResolvedValue({ asset: { id: "shared-domain" }, canonicalSource: { id: "shared-domain" } }),
   renderScopedAssetMarkdown: vi.fn().mockResolvedValue({ content: "# 策略领域" }),
   runScopedGovernanceChecks: vi.fn().mockResolvedValue({ status: "passed", results: [] })
@@ -47,8 +50,8 @@ function captureTools(): Map<string, RegisteredTool> {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   delete process.env.SPECFORGE_MCP_SEED;
-  persistence.deletePersistedDesignData.mockClear();
 });
 
 afterEach(() => {
@@ -127,6 +130,19 @@ describe("scoped localized derived tools", () => {
     expect(persistence.listPersistedContextPacks).not.toHaveBeenCalled();
   });
 
+  it("returns canonical generation provenance for markdown responses", async () => {
+    const result = await captureTools().get("generate_context_pack")!.handler({
+      applicationServiceId: "com.huawei.celon.desiner",
+      proposalId: "shared-proposal",
+      locale: "zh",
+      format: "markdown"
+    });
+    const payload = JSON.parse(result.content[0]!.text);
+
+    expect(payload.content).toBe("# 中文上下文");
+    expect(payload.canonicalSource.generatedContextPack.name).toBe("Canonical English Context");
+  });
+
   it("localizes detail and export responses through the same scoped boundary", async () => {
     const tools = captureTools();
     const common = { applicationServiceId: "com.huawei.celon.policyhub", locale: "zh" as const };
@@ -136,5 +152,56 @@ describe("scoped localized derived tools", () => {
 
     expect(scopedDerived.renderScopedAssetMarkdown).toHaveBeenCalledWith(expect.objectContaining({ ...common, assetId: "shared-domain" }));
     expect(scopedDerived.exportScopedContextPack).toHaveBeenCalledWith(expect.objectContaining({ ...common, contextPackId: "ctx-shared" }));
+  });
+
+  it.each(["create_proposal", "update_proposal", "create_adr"])("requires applicationServiceId and architectureScope for %s", (toolName) => {
+    const shape = captureTools().get(toolName)!.config.inputSchema as Record<string, unknown>;
+    expect(shape.applicationServiceId).toBeDefined();
+    expect(shape.architectureScope).toBeDefined();
+  });
+
+  it("routes proposal create and update through persisted bilingual upsert", async () => {
+    const tools = captureTools();
+    const architectureScope = {
+      applicationServiceId: "com.huawei.celon.desiner",
+      scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+    };
+    const proposal = { id: "proposal-bilingual", title: "Canonical English", localizedContent: { zh: { title: "中文" } } };
+
+    await tools.get("create_proposal")!.handler({ applicationServiceId: architectureScope.applicationServiceId, architectureScope, proposal });
+    await tools.get("update_proposal")!.handler({ applicationServiceId: architectureScope.applicationServiceId, architectureScope, proposal });
+
+    expect(persistence.upsertProposal).toHaveBeenCalledTimes(2);
+    expect(persistence.upsertProposal).toHaveBeenNthCalledWith(1, { proposal: { ...proposal, architectureScope } });
+    expect(persistence.upsertProposal).toHaveBeenNthCalledWith(2, { proposal: { ...proposal, architectureScope } });
+  });
+
+  it("routes ADR creation through persisted bilingual design asset upsert", async () => {
+    const architectureScope = {
+      applicationServiceId: "com.huawei.celon.desiner",
+      scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+    };
+    const adr = { id: "adr-bilingual", title: "Canonical English ADR", localizedContent: { zh: { title: "中文决策" } } };
+
+    await captureTools().get("create_adr")!.handler({ applicationServiceId: architectureScope.applicationServiceId, architectureScope, adr });
+
+    expect(persistence.upsertDesignAsset).toHaveBeenCalledWith({
+      assetType: "adr",
+      asset: { ...adr, architectureScope }
+    });
+  });
+
+  it("rejects a mismatched applicationServiceId before persisted writes", async () => {
+    const result = await captureTools().get("create_proposal")!.handler({
+      applicationServiceId: "com.huawei.celon.policyhub",
+      architectureScope: {
+        applicationServiceId: "com.huawei.celon.desiner",
+        scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+      },
+      proposal: { id: "proposal-bilingual" }
+    });
+
+    expect(result.isError).toBe(true);
+    expect(persistence.upsertProposal).not.toHaveBeenCalled();
   });
 });

@@ -1,10 +1,5 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import {
-  createAdr,
-  createProposal,
-  updateProposal
-} from "@specforge/core";
 import type { Permission } from "@specforge/core";
 import { z } from "zod";
 import { auditToolCall } from "./audit";
@@ -94,6 +89,7 @@ function registerJsonTool<T extends z.ZodRawShape>(
         return textResult(output);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown tool error";
+        if (isSeedMode()) console.error(`[specforge-seed] ${name}: ${message}`);
         auditToolCall({ actor, action: name, ...target, toolInput: input, output: "failed", status: "failed", errorMessage: message });
         return errorResult(`SpecForge tool call failed: ${name}. Check input and asset identifiers.`);
       }
@@ -101,17 +97,18 @@ function registerJsonTool<T extends z.ZodRawShape>(
   );
 }
 
-const assetRefSchema = z.object({
-  assetType: z.string(),
-  assetId: z.string()
-});
-
 const assetTypeSchema = z.enum(["domain", "dataModel", "api", "event", "businessRule", "stateMachine", "integration", "quality", "observability", "adr", "proposal", "contextPack"]);
 const assetLocaleSchema = z.enum(["zh", "en"]);
 const architectureScopeSchema = z.object({
   applicationServiceId: z.string().min(1),
   scopePath: z.string().min(1)
 });
+
+function assertMatchingApplicationService(input: { applicationServiceId: string; architectureScope: { applicationServiceId: string } }): void {
+  if (input.applicationServiceId !== input.architectureScope.applicationServiceId) {
+    throw new Error("applicationServiceId must match architectureScope.applicationServiceId.");
+  }
+}
 
 export function registerTools(server: McpServer): void {
   if (isSeedMode()) registerJsonTool(
@@ -281,7 +278,9 @@ export function registerTools(server: McpServer): void {
     },
     async (input) => {
       const result = await generateScopedContextPack(input);
-      return input.format === "json" ? result : result.contextPack.generatedMarkdown;
+      return input.format === "json"
+        ? result
+        : { format: "markdown", content: result.contextPack.generatedMarkdown, canonicalSource: result.canonicalSource };
     }
   );
 
@@ -310,23 +309,19 @@ export function registerTools(server: McpServer): void {
     "create_proposal",
     {
       title: "Create proposal",
-      description: "Creates a design change proposal. This is a validated write operation and is audited.",
+      description: "Creates a bilingual English-canonical proposal in one authorized application-service scope through persisted storage.",
       inputSchema: {
-        title: z.string().min(1),
-        description: z.string().min(1),
-        background: z.string().optional(),
-        goal: z.string().min(1),
-        nonGoal: z.string().optional(),
-        scope: z.string().optional(),
-        impactedAssets: z.array(assetRefSchema).optional(),
-        risks: z.string().optional(),
-        rolloutPlan: z.string().optional(),
-        rollbackPlan: z.string().optional()
+        applicationServiceId: z.string().min(1),
+        architectureScope: architectureScopeSchema,
+        proposal: z.record(z.unknown())
       },
       permissions: ["proposal:write"],
       readOnly: false
     },
-    createProposal
+    async (input) => {
+      assertMatchingApplicationService(input);
+      return upsertProposal({ proposal: { ...input.proposal, architectureScope: input.architectureScope } } as unknown as Parameters<typeof upsertProposal>[0]);
+    }
   );
 
   registerJsonTool(
@@ -334,15 +329,19 @@ export function registerTools(server: McpServer): void {
     "update_proposal",
     {
       title: "Update proposal",
-      description: "Updates allowed proposal fields with a patch object. This is a validated write operation and is audited.",
+      description: "Replaces a persisted bilingual English-canonical proposal inside one authorized application-service scope.",
       inputSchema: {
-        proposalId: z.string(),
-        patch: z.record(z.unknown())
+        applicationServiceId: z.string().min(1),
+        architectureScope: architectureScopeSchema,
+        proposal: z.record(z.unknown())
       },
       permissions: ["proposal:write"],
       readOnly: false
     },
-    updateProposal
+    async (input) => {
+      assertMatchingApplicationService(input);
+      return upsertProposal({ proposal: { ...input.proposal, architectureScope: input.architectureScope } } as unknown as Parameters<typeof upsertProposal>[0]);
+    }
   );
 
   registerJsonTool(
@@ -350,22 +349,19 @@ export function registerTools(server: McpServer): void {
     "create_adr",
     {
       title: "Create ADR",
-      description: "Creates an Architecture Decision Record linked to optional design assets. This is a validated write operation and is audited.",
+      description: "Creates a persisted bilingual English-canonical ADR inside one authorized application-service scope.",
       inputSchema: {
-        title: z.string().min(1),
-        status: z.enum(["proposed", "accepted", "deprecated", "superseded"]).optional(),
-        context: z.string().min(1),
-        decision: z.string().min(1),
-        alternatives: z.string().optional(),
-        consequences: z.string().optional(),
-        constraints: z.string().optional(),
-        relatedAssets: z.array(assetRefSchema).optional(),
-        owner: z.string().optional()
+        applicationServiceId: z.string().min(1),
+        architectureScope: architectureScopeSchema,
+        adr: z.record(z.unknown())
       },
       permissions: ["adr:write"],
       readOnly: false
     },
-    createAdr
+    async (input) => {
+      assertMatchingApplicationService(input);
+      return upsertDesignAsset({ assetType: "adr", asset: { ...input.adr, architectureScope: input.architectureScope } } as unknown as Parameters<typeof upsertDesignAsset>[0]);
+    }
   );
 
   registerJsonTool(

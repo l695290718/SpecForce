@@ -71,7 +71,7 @@ async function main() {
       SPECFORGE_MCP_SEED: "1",
       ...(process.env.DATABASE_URL ? { DATABASE_URL: process.env.DATABASE_URL } : {})
     },
-    stderr: "pipe"
+    stderr: "inherit"
   });
   const client = new Client({ name: "specforge-seed", version: "0.1.0" }, { capabilities: {} });
 

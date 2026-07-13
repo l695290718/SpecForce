@@ -1,12 +1,13 @@
-import { seedData, scopeById } from "@specforge/core";
-import type { ArchitectureScopeRef, DomainModel, Proposal } from "@specforge/core";
+import { seedData, scopeById, validateAssetLocalization } from "@specforge/core";
+import type { ArchitectureScopeRef, ContextPack, DomainModel, Proposal } from "@specforge/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const persistence = vi.hoisted(() => ({
   listPersistedAssetLinks: vi.fn(),
   listPersistedAssets: vi.fn(),
   listPersistedContextPacks: vi.fn(),
-  listPersistedProposals: vi.fn()
+  listPersistedProposals: vi.fn(),
+  upsertContextPack: vi.fn()
 }));
 
 vi.mock("./persistence", () => persistence);
@@ -80,14 +81,41 @@ function localizedProposal(applicationServiceId: string, englishTitle: string, c
   };
 }
 
+function localizedContextPack(applicationServiceId: string, englishName: string, chineseName: string): ContextPack {
+  return {
+    id: "shared-context-pack",
+    name: englishName,
+    proposalId: "shared-proposal",
+    targetAgent: "codex",
+    summary: `${englishName} canonical summary`,
+    includedAssets: [{ type: "domain", id: "shared-domain", label: `${englishName} domain` }],
+    constraints: ["Canonical constraint"],
+    instructions: ["Canonical instruction"],
+    generatedMarkdown: `# ${englishName}`,
+    createdAt: "2026-07-13T00:00:00.000Z",
+    architectureScope: scope(applicationServiceId),
+    localizedContent: {
+      zh: {
+        name: chineseName,
+        summary: `${chineseName}中文摘要`,
+        constraints: ["中文约束"],
+        instructions: ["中文指令"],
+        generatedMarkdown: `# ${chineseName}`
+      }
+    }
+  };
+}
+
 const fixtures = {
   [designerId]: {
     domain: localizedDomain(designerId, "Designer Domain", "设计器领域"),
-    proposal: localizedProposal(designerId, "Designer Proposal", "设计器提案")
+    proposal: localizedProposal(designerId, "Designer Proposal", "设计器提案"),
+    contextPack: localizedContextPack(designerId, "Designer Context", "设计器上下文")
   },
   [policyId]: {
     domain: localizedDomain(policyId, "Policy Domain", "策略领域"),
-    proposal: localizedProposal(policyId, "Policy Proposal", "策略提案")
+    proposal: localizedProposal(policyId, "Policy Proposal", "策略提案"),
+    contextPack: localizedContextPack(policyId, "Policy Context", "策略上下文")
   }
 };
 
@@ -100,8 +128,20 @@ beforeEach(() => {
   persistence.listPersistedProposals.mockImplementation(async (applicationServiceId: keyof typeof fixtures) => [
     fixtures[applicationServiceId].proposal
   ]);
-  persistence.listPersistedContextPacks.mockResolvedValue([]);
-  persistence.listPersistedAssetLinks.mockResolvedValue([]);
+  persistence.listPersistedContextPacks.mockImplementation(async (applicationServiceId: keyof typeof fixtures) => [
+    fixtures[applicationServiceId].contextPack
+  ]);
+  persistence.listPersistedAssetLinks.mockImplementation(async (applicationServiceId: keyof typeof fixtures) => [{
+    id: "shared-link",
+    sourceType: "proposal",
+    sourceId: "shared-proposal",
+    targetType: "domain",
+    targetId: "shared-domain",
+    relationType: "depends-on",
+    architectureScope: scope(applicationServiceId),
+    createdAt: "2026-07-13T00:00:00.000Z"
+  }]);
+  persistence.upsertContextPack.mockImplementation(async ({ contextPack }: { contextPack: ContextPack }) => contextPack);
 });
 
 describe("scoped MCP derived views", () => {
@@ -131,10 +171,22 @@ describe("scoped MCP derived views", () => {
     expect(designer.graph.nodes.map((node) => node.label)).toContain("Designer Domain");
     expect(designer.graph.nodes.map((node) => node.label)).not.toContain("Policy Domain");
     expect(policy.graph.nodes.map((node) => node.label)).toContain("策略领域");
+    expect(policy.graph.nodes.map((node) => node.label)).toContain("策略上下文");
     expect(policy.graph.nodes.every((node) => node.applicationServiceId === policyId)).toBe(true);
     expect(policy.graph.nodes.map((node) => node.logicalId)).toContain("shared-domain");
     expect(JSON.stringify(policy.canonicalSource)).toContain("Policy Domain");
     expect(JSON.stringify(policy.canonicalSource)).not.toContain("Designer Domain");
+  });
+
+  it("builds canonical graph independently and keeps provenance identical across locales", async () => {
+    const english = await buildScopedAssetGraph({ applicationServiceId: designerId, locale: "en" });
+    const chinese = await buildScopedAssetGraph({ applicationServiceId: designerId, locale: "zh" });
+
+    expect(english.canonicalSource).toEqual(chinese.canonicalSource);
+    expect(english.canonicalSource.graph).not.toBe(english.graph);
+    expect(english.canonicalSource.graph.nodes.map((node) => node.label)).toContain("Designer Context");
+    expect(english.canonicalSource.graph.edges.map((edge) => edge.label)).toContain("depends-on");
+    expect(chinese.canonicalSource.graph.nodes.map((node) => node.label)).not.toContain("设计器上下文");
   });
 
   it("uses the scoped proposal for impact analysis and preserves its canonical source", async () => {
@@ -168,7 +220,7 @@ describe("scoped MCP derived views", () => {
     expect(chinese.canonicalSource).toMatchObject({ title: "Policy Proposal" });
   });
 
-  it("requires write scope for generation and returns localized context with canonical sources", async () => {
+  it("generates and persists canonical English while returning the requested Chinese view", async () => {
     process.env.SPECFORGE_MCP_SEED = "1";
     const result = await generateScopedContextPack({
       applicationServiceId: policyId,
@@ -177,7 +229,21 @@ describe("scoped MCP derived views", () => {
       locale: "zh"
     });
 
+    const persisted = persistence.upsertContextPack.mock.calls[0]![0].contextPack as ContextPack;
     expect(result.contextPack.name).toContain("策略提案");
+    expect(persisted.name).toContain("Policy Proposal");
+    expect(persisted.name).not.toContain("策略提案");
+    expect(persisted.architectureScope).toEqual(scope(policyId));
+    expect(persisted.localizedContent?.zh?.name).toContain("策略提案");
+    expect(() => validateAssetLocalization("contextPack", persisted)).not.toThrow();
+    expect(result.canonicalSource.generatedContextPack).toEqual(persisted);
+    expect(result.contextPack.id).toBe(persisted.id);
+    expect(result.contextPack.proposalId).toBe(persisted.proposalId);
+    expect(result.contextPack.includedAssets.map((ref) => ({ type: ref.type, id: ref.id }))).toEqual(
+      persisted.includedAssets.map((ref) => ({ type: ref.type, id: ref.id }))
+    );
+    expect(result.contextPack.includedAssets[0]!.label).toBe("策略领域");
+    expect(persisted.includedAssets[0]!.label).toBe("Policy Domain");
     expect(result.canonicalSource.proposal.title).toBe("Policy Proposal");
     expect(result.canonicalSource.assets.map((item) => item.name)).toEqual(["Policy Domain"]);
   });

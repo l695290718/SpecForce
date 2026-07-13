@@ -13,7 +13,8 @@ import {
   renderAssetSummary,
   runGovernanceChecks,
   scopeById,
-  seedHuaweiActor
+  seedHuaweiActor,
+  validateAssetLocalization
 } from "@specforge/core";
 import type {
   Asset,
@@ -29,7 +30,8 @@ import {
   listPersistedAssetLinks,
   listPersistedAssets,
   listPersistedContextPacks,
-  listPersistedProposals
+  listPersistedProposals,
+  upsertContextPack
 } from "./persistence";
 
 export interface ScopedDerivedInput {
@@ -114,12 +116,28 @@ function governanceStatus(results: GovernanceCheckResult[]): "passed" | "warning
 export async function buildScopedAssetGraph(input: ScopedDerivedInput & { domainId?: string; assetType?: AssetType }) {
   const locale = input.locale ?? "en";
   const catalog = await loadScopedAssetCatalog(input.applicationServiceId);
-  const graph = await buildAssetGraph(input.domainId, input.assetType, { catalog, locale });
-  const canonicalGraph = locale === "en"
-    ? graph
-    : await buildAssetGraph(input.domainId, input.assetType, { catalog, locale: "en" });
   const links = await listPersistedAssetLinks(input.applicationServiceId);
-  if (!input.assetType && !input.domainId) {
+  const canonicalGraph = await buildAssetGraph(input.domainId, input.assetType, { catalog, locale: "en" });
+  appendPersistedGraphRecords(canonicalGraph, catalog, links, input.applicationServiceId, "en", input);
+  const graph = await buildAssetGraph(input.domainId, input.assetType, { catalog, locale });
+  appendPersistedGraphRecords(graph, catalog, links, input.applicationServiceId, locale, input);
+  return {
+    applicationServiceId: input.applicationServiceId,
+    locale,
+    graph,
+    canonicalSource: { graph: canonicalGraph, assets: catalog }
+  };
+}
+
+function appendPersistedGraphRecords(
+  graph: AssetGraph,
+  catalog: SpecForgeDataStore,
+  links: Awaited<ReturnType<typeof listPersistedAssetLinks>>,
+  applicationServiceId: string,
+  locale: AssetLocale,
+  filters: { domainId?: string; assetType?: AssetType }
+): void {
+  if (!filters.assetType && !filters.domainId) {
     for (const canonicalPack of catalog.contextPacks) {
       const pack = localizeAsset("contextPack", canonicalPack, locale);
       graph.nodes.push({
@@ -128,7 +146,7 @@ export async function buildScopedAssetGraph(input: ScopedDerivedInput & { domain
         label: pack.name,
         type: "contextPack",
         summary: pack.summary,
-        applicationServiceId: input.applicationServiceId,
+        applicationServiceId,
         architectureScope: pack.architectureScope
       });
       if (graph.nodes.some((node) => (node.logicalId ?? node.id) === pack.proposalId)) {
@@ -139,15 +157,16 @@ export async function buildScopedAssetGraph(input: ScopedDerivedInput & { domain
           sourceLogicalId: pack.proposalId,
           targetLogicalId: pack.id,
           label: "generates",
-          applicationServiceId: input.applicationServiceId,
+          applicationServiceId,
           architectureScope: pack.architectureScope
         });
       }
     }
   }
   const nodeIds = new Set(graph.nodes.map((node) => node.logicalId ?? node.id));
-  const persistedEdges: AssetGraph["edges"] = links
-    .filter((link) => nodeIds.has(link.sourceId) && nodeIds.has(link.targetId))
+  const edgeIds = new Set(graph.edges.map((edge) => edge.id));
+  graph.edges.push(...links
+    .filter((link) => nodeIds.has(link.sourceId) && nodeIds.has(link.targetId) && !edgeIds.has(link.id))
     .map((link) => ({
       id: link.id,
       source: link.sourceId,
@@ -155,17 +174,9 @@ export async function buildScopedAssetGraph(input: ScopedDerivedInput & { domain
       sourceLogicalId: link.sourceId,
       targetLogicalId: link.targetId,
       label: link.relationType,
-      applicationServiceId: input.applicationServiceId,
+      applicationServiceId,
       architectureScope: link.architectureScope
-    }));
-  const edgeIds = new Set(graph.edges.map((edge) => edge.id));
-  graph.edges.push(...persistedEdges.filter((edge) => !edgeIds.has(edge.id)));
-  return {
-    applicationServiceId: input.applicationServiceId,
-    locale,
-    graph,
-    canonicalSource: { graph: canonicalGraph, assets: catalog }
-  };
+    })));
 }
 
 export async function analyzeScopedProposalImpact(input: ScopedDerivedInput & { proposalId: string }) {
@@ -218,22 +229,32 @@ export async function generateScopedContextPack(input: ScopedDerivedInput & {
   targetAgent?: string;
   includeAssets?: string[];
 }) {
-  authorizedScope(input.applicationServiceId, "write");
+  const architectureScope = authorizedScope(input.applicationServiceId, "write");
   const locale = input.locale ?? "en";
   const catalog = await loadScopedAssetCatalog(input.applicationServiceId);
   const proposal = getAsset<Proposal>("proposal", input.proposalId, catalog);
   const assets = proposal.impactedAssets.map((ref) => getAsset(ref.type, ref.id, catalog));
-  const contextPack = await generateContextPack(input.proposalId, {
+  const generated = await generateContextPack(input.proposalId, {
     catalog,
-    locale,
+    locale: "en",
     targetAgent: input.targetAgent,
     includeAssets: input.includeAssets
   });
+  const canonicalContextPack: ContextPack = { ...generated, architectureScope };
+  validateAssetLocalization("contextPack", canonicalContextPack);
+  await upsertContextPack({ contextPack: canonicalContextPack });
+  const contextPack = localizeAsset("contextPack", canonicalContextPack, locale);
+  if (locale === "zh") {
+    contextPack.includedAssets = canonicalContextPack.includedAssets.map((ref) => {
+      const localized = localizeAsset(ref.type, getAsset(ref.type, ref.id, catalog), "zh") as Asset;
+      return { ...ref, label: "title" in localized && localized.title ? localized.title : localized.name };
+    });
+  }
   return {
     applicationServiceId: input.applicationServiceId,
     locale,
     contextPack,
-    canonicalSource: { proposal, assets }
+    canonicalSource: { generatedContextPack: canonicalContextPack, proposal, assets }
   };
 }
 

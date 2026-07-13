@@ -22,6 +22,18 @@ function requireSuccess(name: string, result: unknown): string {
   return firstText(result);
 }
 
+async function requireFailure(name: string, operation: () => Promise<unknown>): Promise<string> {
+  try {
+    const result = await operation();
+    if (result && typeof result === "object" && "isError" in result && result.isError) return firstText(result);
+    throw new Error(`${name} unexpectedly succeeded.`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("unexpectedly succeeded")) throw error;
+    return message;
+  }
+}
+
 async function main() {
   const command = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
   const transport = new StdioClientTransport({
@@ -44,27 +56,40 @@ async function main() {
     name: "search_design_assets",
     arguments: { applicationServiceId, query: "proposal-specforge-self-design", limit: 10 }
   });
-  const contextPack = await client.callTool({
-    name: "generate_context_pack",
-    arguments: { applicationServiceId, proposalId: "proposal-specforge-self-design", targetAgent: "codex", format: "markdown" }
-  });
   const contextPackJson = await client.callTool({
     name: "generate_context_pack",
-    arguments: { applicationServiceId, proposalId: "proposal-specforge-self-design", targetAgent: "codex", format: "json" }
+    arguments: { applicationServiceId, locale: "en", proposalId: "proposal-specforge-self-design", targetAgent: "codex", format: "json" }
+  });
+  const graphZh = await client.callTool({
+    name: "get_asset_graph",
+    arguments: { applicationServiceId, locale: "zh" }
   });
   const governance = await client.callTool({
     name: "run_governance_checks",
     arguments: { applicationServiceId, locale: "en", targetType: "proposal", targetId: "proposal-specforge-self-design" }
   });
   const generatedPackEnvelope = JSON.parse(requireSuccess("generate_context_pack(json)", contextPackJson));
-  const generatedPack = generatedPackEnvelope.contextPack;
-  const upsert = await client.callTool({
-    name: "upsert_context_pack",
+  const generatedPack = generatedPackEnvelope.canonicalSource.generatedContextPack;
+  const exportedPack = await client.callTool({
+    name: "export_context_pack",
     arguments: {
-      contextPack: generatedPack,
-      architectureScope
+      applicationServiceId,
+      contextPackId: generatedPack.id,
+      locale: "zh",
+      format: "json"
     }
   });
+  const scopedDomainResource = await client.readResource({
+    uri: `specforge://scopes/${applicationServiceId}/zh/assets/domain`
+  });
+  const missingScopeFailure = await requireFailure("missing scope", () => client.callTool({
+    name: "get_asset_graph",
+    arguments: { locale: "en" }
+  }));
+  const deniedScopeFailure = await requireFailure("denied scope", () => client.callTool({
+    name: "get_asset_graph",
+    arguments: { applicationServiceId: "com.huawei.celon.runtime", locale: "en" }
+  }));
   const link = await client.callTool({
     name: "link_assets",
     arguments: {
@@ -81,9 +106,13 @@ async function main() {
   await client.close();
 
   const searchText = requireSuccess("search_design_assets", search);
-  const packText = requireSuccess("generate_context_pack(markdown)", contextPack);
+  const packText = generatedPack.generatedMarkdown as string;
+  const graphZhText = requireSuccess("get_asset_graph(zh)", graphZh);
+  const exportedPackText = requireSuccess("export_context_pack(zh)", exportedPack);
+  const graphZhEnvelope = JSON.parse(graphZhText);
+  const exportedPackEnvelope = JSON.parse(exportedPackText);
+  const scopedDomainText = scopedDomainResource.contents.map((content) => "text" in content ? content.text : "").join("\n");
   const governanceText = requireSuccess("run_governance_checks", governance);
-  const upsertText = requireSuccess("upsert_context_pack", upsert);
   const linkText = requireSuccess("link_assets", link);
 
   if (!tools.tools.some((tool) => tool.name === "search_design_assets")) throw new Error("search_design_assets tool missing");
@@ -92,11 +121,18 @@ async function main() {
   if (!tools.tools.some((tool) => tool.name === "upsert_context_pack")) throw new Error("upsert_context_pack tool missing");
   if (!resources.resources.some((resource) => resource.uri === "specforge://domains")) throw new Error("domains resource missing");
   if (!templates.resourceTemplates.some((template) => template.uriTemplate === "specforge://apis/{id}")) throw new Error("api resource template missing");
+  if (!templates.resourceTemplates.some((template) => template.uriTemplate.includes("/{applicationServiceId}/{locale}/assets/{assetType}"))) throw new Error("scoped resource template missing");
   if (!prompts.prompts.some((prompt) => prompt.name === "design_feature")) throw new Error("design_feature prompt missing");
   if (!searchText.includes("proposal-specforge-self-design")) throw new Error("search did not find SpecForge self-design proposal");
   if (!packText.includes("# Agent Context Pack")) throw new Error("context pack markdown missing");
+  const canonicalLabels = new Map(graphZhEnvelope.canonicalSource.graph.nodes.map((node: { logicalId?: string; id: string; label: string }) => [node.logicalId ?? node.id, node.label]));
+  if (!graphZhEnvelope.graph.nodes.some((node: { logicalId?: string; id: string; label: string }) => canonicalLabels.get(node.logicalId ?? node.id) !== node.label)) throw new Error("localized graph result missing");
+  if (!exportedPackText.includes(generatedPack.id)) throw new Error("generated Context Pack was not persisted for export");
+  if (exportedPackEnvelope.contextPack.name === exportedPackEnvelope.canonicalSource.name) throw new Error("exported Context Pack was not localized");
+  if (!scopedDomainText.includes("Canonical Source JSON")) throw new Error("scoped domain resource missing canonical source");
+  if (!missingScopeFailure) throw new Error("missing scope was not rejected");
+  if (!deniedScopeFailure) throw new Error("denied scope was not rejected");
   if (!governanceText.includes("results")) throw new Error("governance result missing");
-  if (!upsertText.includes("ctx-specforge-self-design")) throw new Error("MCP persisted write result missing");
   if (!linkText.includes("quality-specforge-impact-ready")) throw new Error("MCP persisted link result missing");
 
   console.log(
@@ -108,8 +144,12 @@ async function main() {
         prompts: prompts.prompts.length,
         searchFoundSpecForgeSelfDesign: searchText.includes("proposal-specforge-self-design"),
         generatedContextPack: packText.includes("# Agent Context Pack"),
+        generatedContextPackPersisted: exportedPackText.includes(generatedPack.id),
+        scopedResourceReadWorked: scopedDomainText.includes("Canonical Source JSON"),
+        localizedGraphWorked: graphZhEnvelope.graph.nodes.some((node: { logicalId?: string; id: string; label: string }) => canonicalLabels.get(node.logicalId ?? node.id) !== node.label),
+        missingScopeRejected: Boolean(missingScopeFailure),
+        deniedScopeRejected: Boolean(deniedScopeFailure),
         governanceReturnedResults: governanceText.includes("results"),
-        persistedWriteToolWorked: upsertText.includes("ctx-specforge-self-design"),
         persistedLinkToolWorked: linkText.includes("quality-specforge-impact-ready")
       },
       null,
