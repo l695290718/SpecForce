@@ -211,6 +211,12 @@ async function installLegacySchema() {
      VALUES ('legacy-link', 'proposal', $1, 'domain', $1, 'impacts')`,
     legacyId
   );
+  for (const table of ["DesignAsset", "Proposal", "ContextPack", "AssetLink"]) {
+    await prisma.$executeRawUnsafe(
+      `CREATE UNIQUE INDEX "${table}_applicationServiceId_scopePath_id_key"
+       ON "${table}"("applicationServiceId", "scopePath", id)`
+    );
+  }
 }
 
 function applicationServiceScope(id: string): ArchitectureScopeRef {

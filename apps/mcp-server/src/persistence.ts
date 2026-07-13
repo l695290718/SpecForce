@@ -268,7 +268,7 @@ function scopedIdentityConstraintUpgradeSql(table: string): string {
     IF NOT EXISTS (
       SELECT 1 FROM pg_constraint
       WHERE conrelid = '"${table}"'::regclass AND conname = '${compositeConstraint}'
-    ) THEN
+    ) AND to_regclass(format('%I.%I', current_schema(), '${compositeConstraint}')) IS NULL THEN
       ALTER TABLE "${table}" ADD CONSTRAINT "${compositeConstraint}"
         UNIQUE ("applicationServiceId", "scopePath", id);
     END IF;
