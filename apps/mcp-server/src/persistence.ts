@@ -145,6 +145,7 @@ export async function ensureMcpPersistenceSchema() {
       constraints TEXT NOT NULL,
       instructions TEXT NOT NULL,
       "generatedMarkdown" TEXT NOT NULL,
+      payload TEXT,
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -180,6 +181,7 @@ export async function ensureMcpPersistenceSchema() {
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "${table}_applicationServiceId_idx" ON "${table}"("applicationServiceId")`);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "${table}_scopePath_idx" ON "${table}"("scopePath")`);
   }
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ContextPack" ADD COLUMN IF NOT EXISTS "payload" TEXT`);
   await ensureArchitectureScopes();
 }
 
@@ -264,43 +266,47 @@ export async function upsertProposal(input: UpsertProposalInput) {
 }
 
 export async function upsertContextPack(input: UpsertContextPackInput) {
-  await ensureMcpPersistenceSchema();
   const pack = input.contextPack;
+  validateAssetLocalization("contextPack", pack);
   const scope = resolveWritableScope(writableActor(), pack.architectureScope);
-  pack.architectureScope = scope;
+  const localizedPack = { ...pack, architectureScope: scope };
+  const canonicalPack = localizeAsset("contextPack", localizedPack, "en") as ContextPack;
   assertString(pack.id, "contextPack.id");
   assertString(pack.proposalId, "contextPack.proposalId");
+  await ensureMcpPersistenceSchema();
 
   await prisma.contextPack.upsert({
-    where: { id: pack.id },
+    where: { id: canonicalPack.id },
     create: {
-      id: pack.id,
-      name: pack.name,
-      proposalId: pack.proposalId,
-      targetAgent: pack.targetAgent,
-      summary: pack.summary,
-      includedAssets: JSON.stringify(pack.includedAssets),
-      constraints: JSON.stringify(pack.constraints),
-      instructions: JSON.stringify(pack.instructions),
-      generatedMarkdown: pack.generatedMarkdown,
+      id: canonicalPack.id,
+      name: canonicalPack.name,
+      proposalId: canonicalPack.proposalId,
+      targetAgent: canonicalPack.targetAgent,
+      summary: canonicalPack.summary,
+      includedAssets: JSON.stringify(canonicalPack.includedAssets),
+      constraints: JSON.stringify(canonicalPack.constraints),
+      instructions: JSON.stringify(canonicalPack.instructions),
+      generatedMarkdown: canonicalPack.generatedMarkdown,
+      payload: JSON.stringify(canonicalPack),
       applicationServiceId: scope.applicationServiceId,
       scopePath: scope.scopePath,
-      createdAt: new Date(pack.createdAt)
+      createdAt: new Date(canonicalPack.createdAt)
     },
     update: {
-      name: pack.name,
-      targetAgent: pack.targetAgent,
-      summary: pack.summary,
-      includedAssets: JSON.stringify(pack.includedAssets),
-      constraints: JSON.stringify(pack.constraints),
-      instructions: JSON.stringify(pack.instructions),
-      generatedMarkdown: pack.generatedMarkdown,
+      name: canonicalPack.name,
+      targetAgent: canonicalPack.targetAgent,
+      summary: canonicalPack.summary,
+      includedAssets: JSON.stringify(canonicalPack.includedAssets),
+      constraints: JSON.stringify(canonicalPack.constraints),
+      instructions: JSON.stringify(canonicalPack.instructions),
+      generatedMarkdown: canonicalPack.generatedMarkdown,
+      payload: JSON.stringify(canonicalPack),
       applicationServiceId: scope.applicationServiceId,
       scopePath: scope.scopePath
     }
   });
 
-  return { id: pack.id, proposalId: pack.proposalId, status: "upserted" };
+  return { id: canonicalPack.id, proposalId: canonicalPack.proposalId, status: "upserted" };
 }
 
 export async function deletePersistedDesignData(input: DeletePersistedDesignDataInput) {
@@ -487,7 +493,7 @@ export async function searchPersistedDesignAssets(input: { applicationServiceId:
       ];
   const scored = candidates
     .filter(({ asset }) => !input.domainId || !("domainId" in asset) || asset.domainId === input.domainId || asset.id === input.domainId)
-    .map(({ type, asset }) => ({ type, asset, localized: localizeAsset(type, asset, locale), score: scoreAsset(asset, terms) }))
+    .map(({ type, asset }) => ({ type, asset, localized: localizeAssetForRead(type, asset, locale), score: scoreAsset(asset, terms) }))
     .filter((item) => item.score > 0 || terms.length === 0)
     .sort((a, b) => b.score - a.score || assetName(a.localized).localeCompare(assetName(b.localized)))
     .slice(0, Math.max(1, Math.min(input.limit ?? 10, 50)));
@@ -537,8 +543,16 @@ function rowToContextPack(row: {
   constraints: string;
   instructions: string;
   generatedMarkdown: string;
+  payload: string | null;
+  applicationServiceId: string | null;
+  scopePath: string | null;
   createdAt: Date;
 }): ContextPack {
+  const payloadPack = parseContextPackPayload(row.payload);
+  if (payloadPack) {
+    return payloadPack;
+  }
+
   return {
     id: row.id,
     name: row.name,
@@ -549,8 +563,36 @@ function rowToContextPack(row: {
     constraints: JSON.parse(row.constraints),
     instructions: JSON.parse(row.instructions),
     generatedMarkdown: row.generatedMarkdown,
-    createdAt: row.createdAt.toISOString()
+    createdAt: row.createdAt.toISOString(),
+    architectureScope:
+      row.applicationServiceId && row.scopePath
+        ? { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }
+        : undefined
   };
+}
+
+function parseContextPackPayload(payload: string | null): ContextPack | null {
+  if (!payload) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(payload);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed as ContextPack;
+  } catch {
+    return null;
+  }
+}
+
+function localizeAssetForRead<T extends Asset>(assetType: AssetType, asset: T, locale: AssetLocale): T {
+  if (locale === "en" || !asset.localizedContent?.[locale]) {
+    return asset;
+  }
+
+  return localizeAsset(assetType, asset, locale) as T;
 }
 
 function assetName(asset: Asset): string {

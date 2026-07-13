@@ -1,4 +1,4 @@
-import { defaultHuaweiActor, type ApiContract, type Proposal } from "@specforge/core";
+import { defaultHuaweiActor, type ApiContract, type ContextPack, type Proposal } from "@specforge/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getPersistedAsset,
@@ -6,6 +6,7 @@ import {
   renderPersistedAssetAsMarkdown,
   resolveWritableScope,
   searchPersistedDesignAssets,
+  upsertContextPack,
   upsertDesignAsset,
   upsertProposal
 } from "./persistence";
@@ -87,6 +88,29 @@ const bilingualProposal: Proposal = {
   }
 };
 
+const bilingualContextPack: ContextPack = {
+  id: "ctx-bilingual-assets",
+  name: "Bilingual assets implementation context",
+  proposalId: "proposal-bilingual-assets",
+  targetAgent: "codex",
+  summary: "Implementation guidance for canonical English design assets with Chinese overlays.",
+  includedAssets: [{ type: "api", id: bilingualApi.id, label: "Upsert design asset API" }],
+  constraints: ["Keep technical identifiers unchanged.", "Persist the complete Context Pack payload."],
+  instructions: ["Validate localization before writing.", "Prefer the stored payload when reading Context Packs."],
+  generatedMarkdown: "# Context\nUse canonical English payloads with localized Chinese overlays.",
+  createdAt: now,
+  architectureScope: writableScope,
+  localizedContent: {
+    zh: {
+      name: "双语资产实现上下文",
+      summary: "用于实现规范英文设计资产和中文覆盖层的上下文说明。",
+      constraints: ["保持技术标识不变。", "持久化完整的 Context Pack 载荷。"],
+      instructions: ["写入前校验本地化内容。", "读取 Context Pack 时优先使用已存储的完整载荷。"],
+      generatedMarkdown: "# 上下文\n使用规范英文载荷，并提供中文本地化覆盖层。"
+    }
+  }
+};
+
 function mockSchemaSetup() {
   vi.spyOn(prisma, "$executeRawUnsafe").mockResolvedValue(0);
   vi.spyOn(prisma.architectureScope, "upsert").mockResolvedValue({} as never);
@@ -106,6 +130,24 @@ function persistedAssetRow(asset: ApiContract) {
     payload: JSON.stringify(asset),
     createdAt: new Date(asset.createdAt),
     updatedAt: new Date(asset.updatedAt)
+  };
+}
+
+function persistedContextPackRow(pack: ContextPack, payload?: string | null) {
+  return {
+    id: pack.id,
+    name: pack.name,
+    proposalId: pack.proposalId,
+    targetAgent: pack.targetAgent,
+    summary: pack.summary,
+    includedAssets: JSON.stringify(pack.includedAssets),
+    constraints: JSON.stringify(pack.constraints),
+    instructions: JSON.stringify(pack.instructions),
+    generatedMarkdown: pack.generatedMarkdown,
+    payload,
+    applicationServiceId: writableScope.applicationServiceId,
+    scopePath: writableScope.scopePath,
+    createdAt: new Date(pack.createdAt)
   };
 }
 
@@ -207,6 +249,72 @@ describe("Task 2 MCP bilingual enforcement", () => {
 
     expect(assetUpsertSpy).toHaveBeenCalledOnce();
     expect(proposalUpsertSpy).toHaveBeenCalledOnce();
+  });
+
+  it("rejects invalid context packs before schema setup or prisma writes", async () => {
+    const executeSpy = vi.spyOn(prisma, "$executeRawUnsafe");
+    const upsertSpy = vi.spyOn(prisma.contextPack, "upsert");
+
+    await expect(
+      upsertContextPack({
+        contextPack: {
+          ...bilingualContextPack,
+          localizedContent: undefined
+        }
+      })
+    ).rejects.toMatchObject({
+      code: "ASSET_TRANSLATION_REQUIRED",
+      assetType: "contextPack",
+      assetId: "ctx-bilingual-assets",
+      path: "localizedContent.zh"
+    });
+
+    expect(executeSpy).not.toHaveBeenCalled();
+    expect(upsertSpy).not.toHaveBeenCalled();
+  });
+
+  it("stores and reads complete context pack payloads before falling back to legacy columns", async () => {
+    mockSchemaSetup();
+    const upsertSpy = vi.spyOn(prisma.contextPack, "upsert").mockResolvedValue({} as never);
+    vi.spyOn(prisma.designAsset, "findMany").mockResolvedValue([] as never);
+    vi.spyOn(prisma.proposal, "findMany").mockResolvedValue([] as never);
+    vi.spyOn(prisma.contextPack, "findMany").mockResolvedValue([
+      persistedContextPackRow(bilingualContextPack, JSON.stringify(bilingualContextPack)),
+      persistedContextPackRow({ ...bilingualContextPack, id: "ctx-legacy-pack" }, null)
+    ] as never);
+
+    await expect(upsertContextPack({ contextPack: bilingualContextPack })).resolves.toEqual({
+      id: "ctx-bilingual-assets",
+      proposalId: "proposal-bilingual-assets",
+      status: "upserted"
+    });
+
+    expect(upsertSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ payload: JSON.stringify(bilingualContextPack) }),
+        update: expect.objectContaining({ payload: JSON.stringify(bilingualContextPack) })
+      })
+    );
+
+    await expect(searchPersistedDesignAssets({ applicationServiceId: writableScope.applicationServiceId, query: "中文覆盖层", locale: "zh" })).resolves.toEqual({
+      results: [
+        expect.objectContaining({
+          id: "ctx-bilingual-assets",
+          type: "contextPack",
+          name: "双语资产实现上下文",
+          summary: "用于实现规范英文设计资产和中文覆盖层的上下文说明。"
+        })
+      ]
+    });
+
+    await expect(getPersistedAsset("contextPack", "ctx-legacy-pack", writableScope.applicationServiceId)).resolves.toMatchObject({
+      id: "ctx-legacy-pack",
+      name: bilingualContextPack.name,
+      summary: bilingualContextPack.summary,
+      constraints: bilingualContextPack.constraints,
+      instructions: bilingualContextPack.instructions,
+      generatedMarkdown: bilingualContextPack.generatedMarkdown
+    });
   });
 
   it("matches Chinese semantic search terms and returns localized results for the requested locale", async () => {

@@ -52,6 +52,7 @@ model ContextPack {
   constraints       String
   instructions      String
   generatedMarkdown String
+  payload           String?
   applicationServiceId String?
   scopePath           String?
   createdAt         DateTime @default(now())
