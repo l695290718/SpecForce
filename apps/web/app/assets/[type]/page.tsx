@@ -1,20 +1,22 @@
 import Link from "next/link";
-import { Badge, ButtonLink, Card, DataTable, PageHeader } from "../../../components/ui";
+import { Badge, Card, DataTable, PageHeader } from "../../../components/ui";
 import { assetTitleKeys, getRouteAssetsWithDatabase, routeToAssetType, type AssetRouteType } from "../../../lib/assets";
 import type { Asset } from "@specforge/core";
 import { T } from "../../../components/language-provider";
 import { LocalizedSearchInput } from "../../../components/localized-search-input";
 import { buildScopedHref } from "../../../lib/scope";
+import { getRequestLocale } from "../../../lib/locale";
 
 export default async function AssetListPage({ params, searchParams }: { params: Promise<{ type: AssetRouteType }>; searchParams: Promise<{ q?: string; scope?: string }> }) {
   const { type } = await params;
   const { q = "", scope = "" } = await searchParams;
-  const assets = (await getRouteAssetsWithDatabase(type, scope)).filter((asset) => `${assetName(asset)} ${assetDescription(asset)}`.toLowerCase().includes(q.toLowerCase()));
+  const locale = await getRequestLocale();
+  const assets = (await getRouteAssetsWithDatabase(type, scope, locale)).filter((asset) => `${assetName(asset)} ${assetDescription(asset)}`.toLowerCase().includes(q.toLowerCase()));
   const assetType = routeToAssetType(type);
 
   return (
     <>
-      <PageHeader title={<T k={assetTitleKeys[type]} />} description={<T k="asset.browseDescription" />} action={<ButtonLink href={buildScopedHref(`/assets/${type}/new`, scope)}><T k="action.new" /></ButtonLink>} />
+      <PageHeader title={<T k={assetTitleKeys[type]} />} description={<T k="asset.browseDescription" />} action={<McpManaged locale={locale} />} />
       <Card className="mb-4">
         <form className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <input name="scope" type="hidden" value={scope} />
@@ -31,12 +33,16 @@ export default async function AssetListPage({ params, searchParams }: { params: 
           </div>,
           <Badge key="type" tone="blue">{assetType}</Badge>,
           <span className="line-clamp-2" key="desc">{assetDescription(asset)}</span>,
-          new Date(assetUpdatedAt(asset)).toLocaleDateString("zh-CN"),
+          new Date(assetUpdatedAt(asset)).toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US"),
           <Link className="font-medium text-accent" href={buildScopedHref(`/assets/${type}/${asset.id}`, scope)} key="details"><T k="action.details" /></Link>
         ])}
       />
     </>
   );
+}
+
+function McpManaged({ locale }: { locale: "zh" | "en" }) {
+  return <span className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-muted">{locale === "zh" ? "内容由 MCP 管理" : "Content managed via MCP"}</span>;
 }
 
 function assetName(asset: Asset): string {

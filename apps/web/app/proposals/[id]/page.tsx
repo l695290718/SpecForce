@@ -1,14 +1,16 @@
 import { analyzeProposalImpact, type ImpactAnalysis } from "@specforge/core";
 import { ProposalDetail } from "../../../components/proposal-detail";
 import { getProposalWithDatabase } from "../../../lib/assets";
+import { getRequestLocale } from "../../../lib/locale";
 
 export default async function ProposalDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ scope?: string }> }) {
   const { id } = await params;
   const { scope = "" } = await searchParams;
-  const proposal = await getProposalWithDatabase(id, scope);
+  const locale = await getRequestLocale();
+  const proposal = await getProposalWithDatabase(id, scope, locale);
   const impact = await getImpactForProposal(proposal);
 
-  return <ProposalDetail impact={impact} proposal={proposal} />;
+  return <ProposalDetail impact={impact} proposal={proposal} scope={scope} />;
 }
 
 async function getImpactForProposal(proposal: Awaited<ReturnType<typeof getProposalWithDatabase>>) {

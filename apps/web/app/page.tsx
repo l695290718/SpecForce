@@ -8,6 +8,7 @@ import type { MessageKey } from "../lib/i18n";
 import { buildScopedHref, listReadableApplicationServices } from "../lib/scope";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getRequestLocale } from "../lib/locale";
 
 const defaultScopeId = "com.huawei.celon.desiner";
 
@@ -18,10 +19,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     const initialScope = listReadableApplicationServices().some((item) => item.id === savedScope) ? savedScope! : defaultScopeId;
     redirect(buildScopedHref("/", initialScope));
   }
+  const locale = await getRequestLocale();
   const workspace = await getAgentServiceWorkspace(scope);
-  const proposals = await getProposalsWithDatabase(scope);
-  const contextPacks = await getContextPacksWithDatabase(scope);
-  const adrs = await getRouteAssetsWithDatabase("adrs", scope);
+  const proposals = await getProposalsWithDatabase(scope, locale);
+  const contextPacks = await getContextPacksWithDatabase(scope, locale);
+  const adrs = await getRouteAssetsWithDatabase("adrs", scope, locale);
   const warningResults = (await Promise.all(proposals.map((proposal) => safeProposalChecks(proposal)))).flat().filter((result) => result.status === "fail");
   const stats = await dashboardStats(scope);
 

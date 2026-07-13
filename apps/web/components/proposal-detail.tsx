@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { localizeProposal, type ImpactAnalysis, type Proposal } from "@specforge/core";
+import { type ImpactAnalysis, type Proposal } from "@specforge/core";
 import { useLanguage } from "./language-provider";
 import { Badge, ButtonLink, Card, DataTable, PageHeader } from "./ui";
+import { buildScopedHref } from "../lib/scope";
 
 interface ProposalDetailProps {
   proposal: Proposal;
   impact: ImpactAnalysis;
+  scope: string;
 }
 
 const labels = {
@@ -47,17 +49,16 @@ const labels = {
   }
 } as const;
 
-export function ProposalDetail({ proposal, impact }: ProposalDetailProps) {
+export function ProposalDetail({ proposal, impact, scope }: ProposalDetailProps) {
   const { locale, t } = useLanguage();
   const copy = labels[locale];
-  const localized = localizeProposal(proposal, locale);
 
   return (
     <>
       <PageHeader
-        action={<ButtonLink href={`/context-packs/ctx-${proposal.id.replace(/^proposal-/, "")}`}>{t("action.generateContextPack")}</ButtonLink>}
-        description={localized.description}
-        title={localized.title}
+        action={<ButtonLink href={buildScopedHref(`/context-packs/ctx-${proposal.id.replace(/^proposal-/, "")}`, scope)}>{t("action.generateContextPack")}</ButtonLink>}
+        description={proposal.description}
+        title={proposal.title}
       />
       <div className="grid gap-6 lg:grid-cols-3">
         <Card><Metric label={copy.status} value={proposal.status} tone="amber" /></Card>
@@ -68,24 +69,24 @@ export function ProposalDetail({ proposal, impact }: ProposalDetailProps) {
         <Card>
           <h2 className="mb-3 text-base font-semibold">{copy.scope}</h2>
           <DataTable columns={[copy.item, copy.content]} rows={[
-            [copy.background, <MultilineText key="background" value={localized.background} />],
-            [copy.goal, <MultilineText key="goal" value={localized.goal} />],
-            [copy.nonGoal, <MultilineText key="nonGoal" value={localized.nonGoal} />],
-            [copy.scope, <MultilineText key="scope" value={localized.scope} />],
-            [copy.rollback, <MultilineText key="rollback" value={localized.rollbackPlan ?? copy.notSpecified} />]
+            [copy.background, <MultilineText key="background" value={proposal.background} />],
+            [copy.goal, <MultilineText key="goal" value={proposal.goal} />],
+            [copy.nonGoal, <MultilineText key="nonGoal" value={proposal.nonGoal} />],
+            [copy.scope, <MultilineText key="scope" value={proposal.scope} />],
+            [copy.rollback, <MultilineText key="rollback" value={proposal.rollbackPlan ?? copy.notSpecified} />]
           ]} />
         </Card>
         <Card>
           <h2 className="mb-3 text-base font-semibold">{copy.impactAnalysis}</h2>
           <DataTable columns={[copy.asset, copy.type]} rows={proposal.impactedAssets.map((asset) => [
-            <Link className="text-accent" href={assetHref(asset.type, asset.id)} key={asset.id}>{asset.label}</Link>,
+            <Link className="text-accent" href={buildScopedHref(assetHref(asset.type, asset.id), scope)} key={asset.id}>{asset.label}</Link>,
             <Badge key="type" tone="blue">{asset.type}</Badge>
           ])} />
         </Card>
       </div>
       <Card className="mt-6">
         <h2 className="mb-3 text-base font-semibold">{copy.implementationTasks}</h2>
-        <ul className="list-disc space-y-2 pl-5 text-sm">{localized.specChanges.map((task) => <li key={task}>{task}</li>)}</ul>
+        <ul className="list-disc space-y-2 pl-5 text-sm">{proposal.specChanges.map((task) => <li key={task}>{task}</li>)}</ul>
       </Card>
     </>
   );

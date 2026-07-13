@@ -1,7 +1,9 @@
 import {
   assetCollections,
+  localizeAsset,
   type Asset,
   type AssetGraph,
+  type AssetLocale,
   type AssetType
 } from "@specforge/core";
 import type { ContextPack, DomainModel, Proposal } from "@specforge/core";
@@ -56,21 +58,21 @@ export function routeToAssetType(route: string): AssetType {
   return assetType;
 }
 
-export async function getRouteAssetsWithDatabase(route: string, scopeId: string): Promise<Asset[]> {
+export async function getRouteAssetsWithDatabase(route: string, scopeId: string, locale: AssetLocale = "en"): Promise<Asset[]> {
   const assetType = routeToAssetType(route);
-  return getDatabaseAssets(assetType, scopeId);
+  return getDatabaseAssets(assetType, scopeId, locale);
 }
 
-export async function getRouteAssetWithDatabase(route: string, id: string, scopeId: string): Promise<Asset> {
+export async function getRouteAssetWithDatabase(route: string, id: string, scopeId: string, locale: AssetLocale = "en"): Promise<Asset> {
   const assetType = routeToAssetType(route);
-  const dbAssets = await getDatabaseAssets(assetType, scopeId);
+  const dbAssets = await getDatabaseAssets(assetType, scopeId, locale);
   const dbAsset = dbAssets.find((asset) => asset.id === id);
   if (dbAsset) return dbAsset;
   throw new Error(`Asset not found: ${assetType}/${id}`);
 }
 
-export async function getDomainsWithDatabase(scopeId: string): Promise<DomainModel[]> {
-  return (await getRouteAssetsWithDatabase("domains", scopeId)) as DomainModel[];
+export async function getDomainsWithDatabase(scopeId: string, locale: AssetLocale = "en"): Promise<DomainModel[]> {
+  return (await getRouteAssetsWithDatabase("domains", scopeId, locale)) as DomainModel[];
 }
 
 export async function getGovernanceTargetsWithDatabase(scopeId: string): Promise<Array<{ type: AssetType; id: string }>> {
@@ -90,23 +92,56 @@ export async function getGovernanceTargetsWithDatabase(scopeId: string): Promise
   ];
 }
 
-export async function getProposalsWithDatabase(scopeId: string): Promise<Proposal[]> {
+export async function getProposalsWithDatabase(scopeId: string, locale: AssetLocale = "en"): Promise<Proposal[]> {
   const scope = requireReadableApplicationService(scopeId);
   const rows = await prisma.proposal.findMany({ where: scopeDatabaseWhere(scope), orderBy: { createdAt: "asc" } });
-  return rows.map((row) => JSON.parse(row.payload) as Proposal);
+  return rows.map((row) => localizeAsset("proposal", JSON.parse(row.payload) as Proposal, locale));
 }
 
-export async function getProposalWithDatabase(id: string, scopeId: string): Promise<Proposal> {
+export async function getProposalWithDatabase(id: string, scopeId: string, locale: AssetLocale = "en"): Promise<Proposal> {
   const scope = requireReadableApplicationService(scopeId);
   const row = await prisma.proposal.findFirst({ where: { id, ...scopeDatabaseWhere(scope) } });
-  if (row) return JSON.parse(row.payload) as Proposal;
+  if (row) return localizeAsset("proposal", JSON.parse(row.payload) as Proposal, locale);
   throw new Error(`Proposal not found: ${id}`);
 }
 
-export async function getContextPacksWithDatabase(scopeId: string): Promise<ContextPack[]> {
+export async function getContextPacksWithDatabase(scopeId: string, locale: AssetLocale = "en"): Promise<ContextPack[]> {
   const scope = requireReadableApplicationService(scopeId);
   const rows = await prisma.contextPack.findMany({ where: scopeDatabaseWhere(scope), orderBy: { createdAt: "asc" } });
-  return rows.map((row) => ({
+  return rows.map((row) => localizeContextPackRow(row, locale));
+}
+
+type ContextPackRow = {
+  id: string;
+  name: string;
+  proposalId: string;
+  targetAgent: string;
+  summary: string;
+  includedAssets: string;
+  constraints: string;
+  instructions: string;
+  generatedMarkdown: string;
+  createdAt: Date;
+  payload: string | null;
+};
+
+function localizeContextPackRow(row: ContextPackRow, locale: AssetLocale): ContextPack {
+  const persisted = parseContextPackPayload(row.payload);
+  if (!persisted) return contextPackFromLegacyRow(row);
+  return localizeAsset("contextPack", persisted, locale);
+}
+
+function parseContextPackPayload(payload: string | null): ContextPack | null {
+  if (!payload) return null;
+  try {
+    return JSON.parse(payload) as ContextPack;
+  } catch {
+    return null;
+  }
+}
+
+function contextPackFromLegacyRow(row: ContextPackRow): ContextPack {
+  return {
     id: row.id,
     name: row.name,
     proposalId: row.proposalId,
@@ -117,25 +152,14 @@ export async function getContextPacksWithDatabase(scopeId: string): Promise<Cont
     instructions: JSON.parse(row.instructions),
     generatedMarkdown: row.generatedMarkdown,
     createdAt: row.createdAt.toISOString()
-  }) satisfies ContextPack);
+  };
 }
 
-export async function getContextPackWithDatabase(id: string, scopeId: string): Promise<ContextPack> {
+export async function getContextPackWithDatabase(id: string, scopeId: string, locale: AssetLocale = "en"): Promise<ContextPack> {
   const scope = requireReadableApplicationService(scopeId);
   const row = await prisma.contextPack.findFirst({ where: { id, ...scopeDatabaseWhere(scope) } });
   if (row) {
-    return {
-      id: row.id,
-      name: row.name,
-      proposalId: row.proposalId,
-      targetAgent: row.targetAgent,
-      summary: row.summary,
-      includedAssets: JSON.parse(row.includedAssets),
-      constraints: JSON.parse(row.constraints),
-      instructions: JSON.parse(row.instructions),
-      generatedMarkdown: row.generatedMarkdown,
-      createdAt: row.createdAt.toISOString()
-    };
+    return localizeContextPackRow(row, locale);
   }
   throw new Error(`Context Pack not found: ${id}`);
 }
@@ -216,13 +240,13 @@ export async function getAssetGraphWithDatabase(scopeId: string, domainId?: stri
   return { nodes: dedupeById(nodes), edges: dedupeById(edges) };
 }
 
-async function getDatabaseAssets(assetType: AssetType, scopeId: string): Promise<Asset[]> {
+async function getDatabaseAssets(assetType: AssetType, scopeId: string, locale: AssetLocale): Promise<Asset[]> {
   const scope = requireReadableApplicationService(scopeId);
   const rows = await prisma.designAsset.findMany({
     where: { type: assetType, ...scopeDatabaseWhere(scope) },
     orderBy: { createdAt: "asc" }
   });
-  return rows.map((row) => JSON.parse(row.payload) as Asset);
+  return rows.map((row) => localizeAsset(assetType, JSON.parse(row.payload) as Asset, locale));
 }
 
 async function getDatabaseAssetLinks(scopeId: string): Promise<Array<{ id: string; sourceType: AssetType; sourceId: string; targetType: AssetType; targetId: string; relationType: string }>> {
