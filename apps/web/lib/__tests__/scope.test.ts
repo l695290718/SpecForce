@@ -14,7 +14,7 @@ describe("application-service scope context", () => {
     expect(scope.id).toBe("com.huawei.celon.policyhub");
     expect(scopeDatabaseWhere(scope)).toEqual({
       applicationServiceId: "com.huawei.celon.policyhub",
-      scopePath: { startsWith: scope.scopePath }
+      scopePath: scope.scopePath
     });
   });
 

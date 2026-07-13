@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getApiRequestLocale, localeFromCookie, withQueryParam, withRequestLocale } from "../locale";
+import { getApiRequestLocale, localeFromCookie, withQueryParam, withRequestLocale, withSearchParams } from "../locale";
 
 describe("request locale", () => {
   it("accepts supported cookie values", () => {
@@ -36,6 +36,11 @@ describe("request locale", () => {
 });
 
 describe("query preservation", () => {
+  it("preserves empty query values in restricted route redirects", () => {
+    expect(withSearchParams("/assets/apis", { scope: "service-a", flag: "" }))
+      .toBe("/assets/apis?scope=service-a&flag=");
+  });
+
   it("adds or replaces one query parameter without dropping the rest or the hash", () => {
     expect(withQueryParam("/assets/apis?scope=service-a&q=write#results", "scope", "service-b"))
       .toBe("/assets/apis?scope=service-b&q=write#results");

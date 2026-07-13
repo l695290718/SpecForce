@@ -21,7 +21,7 @@ export function listReadableApplicationServices(): ResolvedApplicationServiceSco
 export function scopeDatabaseWhere(scope: ResolvedApplicationServiceScope) {
   return {
     applicationServiceId: scope.id,
-    scopePath: { startsWith: scope.scopePath }
+    scopePath: scope.scopePath
   };
 }
 

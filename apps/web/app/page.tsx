@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { Bot, GitPullRequestArrow, ShieldCheck } from "lucide-react";
 import { Badge, ButtonLink, Card, DataTable, PageHeader } from "../components/ui";
-import { dashboardStats, getAgentServiceWorkspace, getContextPacksWithDatabase, getProposalsWithDatabase, getRouteAssetsWithDatabase } from "../lib/assets";
-import { runGovernanceChecks, type Proposal } from "@specforge/core";
+import { dashboardStats, getAgentServiceWorkspace, getContextPacksWithDatabase, getProposalsWithDatabase, getRouteAssetsWithDatabase, getScopedGovernanceOverview } from "../lib/assets";
 import { T } from "../components/language-provider";
 import type { MessageKey } from "../lib/i18n";
 import { buildScopedHref, listReadableApplicationServices } from "../lib/scope";
@@ -24,7 +23,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const proposals = await getProposalsWithDatabase(scope, locale);
   const contextPacks = await getContextPacksWithDatabase(scope, locale);
   const adrs = await getRouteAssetsWithDatabase("adrs", scope, locale);
-  const warningResults = (await Promise.all(proposals.map((proposal) => safeProposalChecks(proposal)))).flat().filter((result) => result.status === "fail");
+  const warningResults = (await getScopedGovernanceOverview(scope, locale)).filter((result) => result.status === "fail");
   const stats = await dashboardStats(scope);
 
   return (
@@ -115,14 +114,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </div>
     </>
   );
-}
-
-async function safeProposalChecks(proposal: Proposal) {
-  try {
-    return await runGovernanceChecks("proposal", proposal.id);
-  } catch {
-    return [];
-  }
 }
 
 function MetricCard({ label, value, metaKey }: { label: React.ReactNode; value: number; metaKey: MessageKey }) {

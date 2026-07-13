@@ -1,25 +1,11 @@
-import { runGovernanceChecks, type AssetType, type GovernanceCheckResult } from "@specforge/core";
 import { Badge, Card, DataTable, PageHeader } from "../../../components/ui";
 import { T } from "../../../components/language-provider";
-import { getProposalsWithDatabase, getRouteAssetsWithDatabase } from "../../../lib/assets";
+import { getScopedGovernanceOverview } from "../../../lib/assets";
+import { getRequestLocale } from "../../../lib/locale";
 
 export default async function GovernanceChecksPage({ searchParams }: { searchParams: Promise<{ assetType?: string; severity?: string; status?: string; scope?: string }> }) {
   const { scope = "", ...filters } = await searchParams;
-  const [apis, events, dataModels, businessRules, proposals] = await Promise.all([
-    getRouteAssetsWithDatabase("apis", scope),
-    getRouteAssetsWithDatabase("events", scope),
-    getRouteAssetsWithDatabase("data-models", scope),
-    getRouteAssetsWithDatabase("rules", scope),
-    getProposalsWithDatabase(scope)
-  ]);
-  const targets = [
-    ...apis.map((asset) => ({ type: "api" as AssetType, id: asset.id, name: asset.name })),
-    ...events.map((asset) => ({ type: "event" as AssetType, id: asset.id, name: asset.name })),
-    ...dataModels.map((asset) => ({ type: "dataModel" as AssetType, id: asset.id, name: asset.name })),
-    ...businessRules.map((asset) => ({ type: "businessRule" as AssetType, id: asset.id, name: asset.name })),
-    ...proposals.map((asset) => ({ type: "proposal" as AssetType, id: asset.id, name: asset.title }))
-  ];
-  const checks = (await Promise.all(targets.map((target) => safeGovernanceChecks(target.type, target.id)))).flat().filter((check) => {
+  const checks = (await getScopedGovernanceOverview(scope, await getRequestLocale())).filter((check) => {
     const matchesType = !filters.assetType || check.assetType === filters.assetType;
     const matchesSeverity = !filters.severity || check.severity === filters.severity;
     const matchesStatus = !filters.status || check.status === filters.status;
@@ -57,12 +43,4 @@ export default async function GovernanceChecksPage({ searchParams }: { searchPar
       ])} />
     </>
   );
-}
-
-async function safeGovernanceChecks(assetType: AssetType, assetId: string): Promise<GovernanceCheckResult[]> {
-  try {
-    return await runGovernanceChecks(assetType, assetId);
-  } catch {
-    return [];
-  }
 }

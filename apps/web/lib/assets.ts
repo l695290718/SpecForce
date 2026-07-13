@@ -1,15 +1,25 @@
 import {
   assetCollections,
+  analyzeProposalImpact,
+  buildAssetGraph,
+  generateContextPack,
   localizeAsset,
+  renderAssetAsMarkdown,
+  renderAssetSummary,
+  runGovernanceChecks,
+  searchDesignAssets,
   type Asset,
   type AssetGraph,
   type AssetLocale,
-  type AssetType
+  type AssetType,
+  type AssetTypeMap,
+  type SpecForgeDataStore
 } from "@specforge/core";
 import type { ContextPack, DomainModel, Proposal } from "@specforge/core";
 import type { MessageKey } from "./i18n";
 import { prisma } from "./db";
 import { requireReadableApplicationService, scopeDatabaseWhere } from "./scope";
+export { buildScopedGraphAssetHref } from "./graph-links";
 
 export const routeAssetTypes = {
   domains: "domain",
@@ -25,6 +35,18 @@ export const routeAssetTypes = {
 } as const;
 
 export type AssetRouteType = keyof typeof routeAssetTypes;
+
+export type ScopedAssetLink = {
+  id: string;
+  sourceType: AssetType;
+  sourceId: string;
+  targetType: AssetType;
+  targetId: string;
+  relationType: string;
+  description?: string | null;
+};
+
+export type ScopedAssetCatalog = SpecForgeDataStore & { assetLinks: ScopedAssetLink[] };
 
 export const assetTitles: Record<AssetRouteType, string> = {
   domains: "Domain Models",
@@ -61,6 +83,148 @@ export function routeToAssetType(route: string): AssetType {
 export async function getRouteAssetsWithDatabase(route: string, scopeId: string, locale: AssetLocale = "en"): Promise<Asset[]> {
   const assetType = routeToAssetType(route);
   return getDatabaseAssets(assetType, scopeId, locale);
+}
+
+export async function getScopedAssetCatalog(scopeId: string): Promise<ScopedAssetCatalog> {
+  const scope = requireReadableApplicationService(scopeId);
+  const where = scopeDatabaseWhere(scope);
+  const [assetRows, proposalRows, contextPackRows, assetLinks] = await Promise.all([
+    prisma.designAsset.findMany({ where, orderBy: { createdAt: "asc" } }),
+    prisma.proposal.findMany({ where, orderBy: { createdAt: "asc" } }),
+    prisma.contextPack.findMany({ where, orderBy: { createdAt: "asc" } }),
+    prisma.assetLink.findMany({
+      where,
+      orderBy: { createdAt: "asc" },
+      select: { id: true, sourceType: true, sourceId: true, targetType: true, targetId: true, relationType: true, description: true }
+    })
+  ]);
+  const catalog = emptyCatalog() as ScopedAssetCatalog;
+  for (const row of assetRows) {
+    const type = row.type as AssetType;
+    const collection = assetCollections[type];
+    if (collection && type !== "proposal" && type !== "contextPack") {
+      (catalog[collection] as Asset[]).push(JSON.parse(row.payload) as Asset);
+    }
+  }
+  catalog.proposals = proposalRows.map((row) => JSON.parse(row.payload) as Proposal);
+  catalog.contextPacks = contextPackRows.map((row) => parseContextPackPayload(row.payload) ?? contextPackFromLegacyRow(row));
+  catalog.assetLinks = assetLinks as ScopedAssetLink[];
+  return catalog;
+}
+
+export async function searchScopedAssets<TType extends AssetType>(assetType: TType, scopeId: string, query: string, locale: AssetLocale) {
+  const catalog = await getScopedAssetCatalog(scopeId);
+  const { results } = await searchDesignAssets({ query, assetTypes: [assetType], limit: 50 }, { catalog, locale });
+  return results.map((result) => ({
+    ...result,
+    asset: localizeAsset(assetType, (catalog[assetCollections[assetType]] as Asset[]).find((asset) => asset.id === result.id)!, locale) as AssetTypeMap[TType]
+  }));
+}
+
+export async function getScopedAssetGraph(
+  scopeId: string,
+  domainId?: string,
+  assetType?: AssetType,
+  locale: AssetLocale = "en"
+): Promise<AssetGraph> {
+  const catalog = await getScopedAssetCatalog(scopeId);
+  const graph = await buildAssetGraph(domainId, assetType, { catalog, locale });
+  const nodeByRef = new Map(graph.nodes.map((node) => [`${node.type}:${node.logicalId ?? node.id}`, node.id]));
+  const linkedEdges = catalog.assetLinks.flatMap((link) => {
+    const source = nodeByRef.get(`${link.sourceType}:${link.sourceId}`);
+    const target = nodeByRef.get(`${link.targetType}:${link.targetId}`);
+    if (!source || !target) return [];
+    return [{
+      id: `db:${link.id}`,
+      source,
+      target,
+      sourceLogicalId: link.sourceId,
+      targetLogicalId: link.targetId,
+      label: link.relationType,
+      applicationServiceId: scopeId
+    }];
+  });
+  return {
+    ...graph,
+    edges: dedupeById([...graph.edges, ...linkedEdges]).map((edge) => ({
+      ...edge,
+      label: localizeGraphEdgeLabel(edge.label, locale)
+    }))
+  };
+}
+
+function localizeGraphEdgeLabel(label: string, locale: AssetLocale): string {
+  if (locale === "en") return label;
+  return ({
+    "owns model": "拥有模型",
+    "provides api": "提供 API",
+    "emits event": "发布事件",
+    governs: "治理",
+    "controls state": "控制状态",
+    integrates: "集成",
+    verifies: "验证",
+    observes: "观测",
+    decides: "决策",
+    impacts: "影响",
+    includes: "包含",
+    generates: "生成",
+    depends_on: "依赖",
+    governed_by: "受规则治理"
+  } as Record<string, string>)[label] ?? label;
+}
+
+export async function getScopedAssetDetail(assetType: AssetType, assetId: string, scopeId: string, locale: AssetLocale = "en") {
+  const catalog = await getScopedAssetCatalog(scopeId);
+  const canonical = (catalog[assetCollections[assetType]] as Asset[]).find((asset) => asset.id === assetId);
+  if (!canonical) throw new Error(`Asset not found: ${assetType}/${assetId}`);
+  const options = { catalog, locale };
+  const [summary, markdown, governance] = await Promise.all([
+    renderAssetSummary(assetType, assetId, options),
+    renderAssetAsMarkdown(assetType, assetId, options),
+    runGovernanceChecks(assetType, assetId, options)
+  ]);
+  return { asset: localizeAsset(assetType, canonical, locale), summary, markdown, governance };
+}
+
+export async function getScopedProposalImpact(proposalId: string, scopeId: string, locale: AssetLocale = "en") {
+  const catalog = await getScopedAssetCatalog(scopeId);
+  return analyzeProposalImpact(proposalId, { catalog, locale });
+}
+
+export async function generateScopedContextPack(proposalId: string, scopeId: string, locale: AssetLocale = "en") {
+  const catalog = await getScopedAssetCatalog(scopeId);
+  return generateContextPack(proposalId, { catalog, locale });
+}
+
+export async function getScopedGovernanceChecks(assetType: AssetType, assetId: string, scopeId: string, locale: AssetLocale = "en") {
+  const catalog = await getScopedAssetCatalog(scopeId);
+  return runGovernanceChecks(assetType, assetId, { catalog, locale });
+}
+
+export async function getScopedGovernanceOverview(scopeId: string, locale: AssetLocale = "en") {
+  const catalog = await getScopedAssetCatalog(scopeId);
+  const targetTypes: AssetType[] = ["api", "event", "dataModel", "businessRule", "proposal"];
+  const targets = targetTypes.flatMap((type) =>
+    (catalog[assetCollections[type]] as Asset[]).map((asset) => ({ type, id: asset.id }))
+  );
+  return (await Promise.all(targets.map((target) => runGovernanceChecks(target.type, target.id, { catalog, locale })))).flat();
+}
+
+export async function renderScopedAssetSummary(assetType: AssetType, assetId: string, scopeId: string, locale: AssetLocale = "en") {
+  const catalog = await getScopedAssetCatalog(scopeId);
+  return renderAssetSummary(assetType, assetId, { catalog, locale });
+}
+
+export async function renderScopedAssetMarkdown(assetType: AssetType, assetId: string, scopeId: string, locale: AssetLocale = "en") {
+  const catalog = await getScopedAssetCatalog(scopeId);
+  return renderAssetAsMarkdown(assetType, assetId, { catalog, locale });
+}
+
+function emptyCatalog(): SpecForgeDataStore {
+  return {
+    domains: [], dataModels: [], apis: [], events: [], businessRules: [], stateMachines: [], integrations: [],
+    qualityRequirements: [], observabilityDesigns: [], adrs: [], proposals: [], contextPacks: []
+  };
 }
 
 export async function getRouteAssetWithDatabase(route: string, id: string, scopeId: string, locale: AssetLocale = "en"): Promise<Asset> {
@@ -184,60 +348,8 @@ export async function getAgentServiceWorkspace(applicationServiceId: string, age
   });
 }
 
-export async function getAssetGraphWithDatabase(scopeId: string, domainId?: string, assetType?: AssetType): Promise<AssetGraph> {
-  const scope = requireReadableApplicationService(scopeId);
-  const assetRows = await prisma.designAsset.findMany({ where: scopeDatabaseWhere(scope), orderBy: { createdAt: "asc" } });
-
-  const assets = assetRows.map((row) => JSON.parse(row.payload) as Asset);
-  const assetLinks = await getDatabaseAssetLinks(scopeId);
-  const proposals = await getProposalsWithDatabase(scopeId);
-  const contextPacks = await getContextPacksWithDatabase(scopeId);
-  const nodes: AssetGraph["nodes"] = [];
-  const edges: AssetGraph["edges"] = [];
-
-  for (const asset of assets) {
-    const type = assetTypeOf(asset, assetRows.find((row) => row.id === asset.id)?.type);
-    if (!type) continue;
-    if (domainId && "domainId" in asset && asset.domainId !== domainId) continue;
-    if (assetType && type !== assetType) continue;
-    nodes.push({ id: asset.id, label: "title" in asset ? asset.title : asset.name, type, domainId: "domainId" in asset ? asset.domainId : undefined, summary: assetSummary(asset) });
-    if ("domainId" in asset && asset.domainId && asset.id !== asset.domainId) {
-      edges.push({ id: `${asset.domainId}->${asset.id}`, source: asset.domainId, target: asset.id, label: "owns" });
-    }
-  }
-
-  for (const proposal of proposals) {
-    if (assetType && assetType !== "proposal") continue;
-    if (domainId && proposal.domainId !== domainId) continue;
-    nodes.push({ id: proposal.id, label: proposal.title, type: "proposal", domainId: proposal.domainId, summary: proposal.description });
-    proposal.impactedAssets.forEach((ref) => {
-      if (nodes.some((node) => node.id === ref.id)) {
-        edges.push({ id: `${proposal.id}->${ref.id}`, source: proposal.id, target: ref.id, label: "impacts" });
-      }
-    });
-  }
-
-  for (const link of assetLinks) {
-    if (assetType && link.sourceType !== assetType && link.targetType !== assetType) continue;
-    if (nodes.some((node) => node.id === link.sourceId) && nodes.some((node) => node.id === link.targetId)) {
-      edges.push({ id: link.id, source: link.sourceId, target: link.targetId, label: link.relationType });
-    }
-  }
-
-  for (const pack of contextPacks) {
-    if (assetType) continue;
-    nodes.push({ id: pack.id, label: pack.name, type: "contextPack", summary: pack.summary });
-    if (nodes.some((node) => node.id === pack.proposalId)) {
-      edges.push({ id: `${pack.proposalId}->${pack.id}`, source: pack.proposalId, target: pack.id, label: "generates" });
-    }
-    pack.includedAssets.forEach((ref) => {
-      if (nodes.some((node) => node.id === ref.id)) {
-        edges.push({ id: `${pack.id}->${ref.id}`, source: pack.id, target: ref.id, label: "includes" });
-      }
-    });
-  }
-
-  return { nodes: dedupeById(nodes), edges: dedupeById(edges) };
+export async function getAssetGraphWithDatabase(scopeId: string, domainId?: string, assetType?: AssetType, locale: AssetLocale = "en"): Promise<AssetGraph> {
+  return getScopedAssetGraph(scopeId, domainId, assetType, locale);
 }
 
 async function getDatabaseAssets(assetType: AssetType, scopeId: string, locale: AssetLocale): Promise<Asset[]> {
@@ -249,43 +361,6 @@ async function getDatabaseAssets(assetType: AssetType, scopeId: string, locale: 
   return rows.map((row) => localizeAsset(assetType, JSON.parse(row.payload) as Asset, locale));
 }
 
-async function getDatabaseAssetLinks(scopeId: string): Promise<Array<{ id: string; sourceType: AssetType; sourceId: string; targetType: AssetType; targetId: string; relationType: string }>> {
-  const scope = requireReadableApplicationService(scopeId);
-  return prisma.assetLink.findMany({
-    where: scopeDatabaseWhere(scope),
-    orderBy: { createdAt: "asc" },
-    select: { id: true, sourceType: true, sourceId: true, targetType: true, targetId: true, relationType: true }
-  }) as Promise<Array<{ id: string; sourceType: AssetType; sourceId: string; targetType: AssetType; targetId: string; relationType: string }>>;
-}
-
-function mergeById<T extends { id: string }>(base: T[], extra: T[]): T[] {
-  const map = new Map<string, T>();
-  base.forEach((item) => map.set(item.id, item));
-  extra.forEach((item) => map.set(item.id, item));
-  return Array.from(map.values());
-}
-
 function dedupeById<T extends { id: string }>(items: T[]): T[] {
   return Array.from(new Map(items.map((item) => [item.id, item])).values());
-}
-
-function assetTypeOf(asset: Asset, fallback?: string): AssetType | undefined {
-  if (fallback && fallback in assetCollections) return fallback as AssetType;
-  if ("boundedContext" in asset) return "domain";
-  if ("modelType" in asset) return "dataModel";
-  if ("method" in asset) return "api";
-  if ("topic" in asset) return "event";
-  if ("ruleType" in asset) return "businessRule";
-  if ("states" in asset) return "stateMachine";
-  if ("sourceSystem" in asset) return "integration";
-  if ("category" in asset) return "quality";
-  if ("metrics" in asset) return "observability";
-  if ("decision" in asset) return "adr";
-  if ("goal" in asset) return "proposal";
-  return undefined;
-}
-
-function assetSummary(asset: Asset): string {
-  if ("summary" in asset) return asset.summary;
-  return asset.description;
 }

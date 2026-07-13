@@ -1,7 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import { Badge, Card, DataTable, PageHeader } from "../../../../components/ui";
-import { assetTitleKeys, getRouteAssetWithDatabase, routeToAssetType, type AssetRouteType } from "../../../../lib/assets";
-import { localizeGovernanceResult, runGovernanceChecks, type AssetLocale, type AssetType, type GovernanceCheckResult } from "@specforge/core";
+import { assetTitleKeys, getScopedAssetDetail, routeToAssetType, type AssetRouteType } from "../../../../lib/assets";
 import { T } from "../../../../components/language-provider";
 import { SpecializedAssetSections } from "../../../../components/asset-detail-sections";
 import { getRequestLocale } from "../../../../lib/locale";
@@ -10,10 +9,10 @@ export default async function AssetDetailPage({ params, searchParams }: { params
   const { type, id } = await params;
   const { scope = "" } = await searchParams;
   const locale = await getRequestLocale();
-  const asset = (await getRouteAssetWithDatabase(type, id, scope, locale)) as Record<string, any>;
   const assetType = routeToAssetType(type);
-  const checks = await getGovernanceChecks(assetType, id, locale);
-  const summary = asset.description ?? "";
+  const detail = await getScopedAssetDetail(assetType, id, scope, locale);
+  const asset = detail.asset as Record<string, any>;
+  const checks = detail.governance;
   const title = asset.title ?? asset.name;
 
   return (
@@ -32,7 +31,7 @@ export default async function AssetDetailPage({ params, searchParams }: { params
         <Card>
           <h2 className="mb-3 text-base font-semibold"><T k="asset.markdownDescription" /></h2>
           <div className="prose max-w-none text-sm">
-            <ReactMarkdown>{`### ${title}\n\n${asset.description ?? ""}\n\n${summary}`}</ReactMarkdown>
+            <ReactMarkdown>{detail.markdown}</ReactMarkdown>
           </div>
         </Card>
       </div>
@@ -53,12 +52,4 @@ export default async function AssetDetailPage({ params, searchParams }: { params
       </Card>
     </>
   );
-}
-
-async function getGovernanceChecks(assetType: AssetType, id: string, locale: AssetLocale): Promise<GovernanceCheckResult[]> {
-  try {
-    return (await runGovernanceChecks(assetType, id)).map((result) => localizeGovernanceResult(result, locale));
-  } catch {
-    return [];
-  }
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Badge, Card, DataTable, PageHeader } from "../../../components/ui";
-import { assetTitleKeys, getRouteAssetsWithDatabase, routeToAssetType, type AssetRouteType } from "../../../lib/assets";
+import { assetTitleKeys, searchScopedAssets, routeToAssetType, type AssetRouteType } from "../../../lib/assets";
 import type { Asset } from "@specforge/core";
 import { T } from "../../../components/language-provider";
 import { LocalizedSearchInput } from "../../../components/localized-search-input";
@@ -11,8 +11,8 @@ export default async function AssetListPage({ params, searchParams }: { params: 
   const { type } = await params;
   const { q = "", scope = "" } = await searchParams;
   const locale = await getRequestLocale();
-  const assets = (await getRouteAssetsWithDatabase(type, scope, locale)).filter((asset) => `${assetName(asset)} ${assetDescription(asset)}`.toLowerCase().includes(q.toLowerCase()));
   const assetType = routeToAssetType(type);
+  const assets = (await searchScopedAssets(assetType, scope, q, locale)).map((result) => result.asset);
 
   return (
     <>

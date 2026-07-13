@@ -5,6 +5,8 @@ import { Background, Controls, MiniMap, ReactFlow, type Edge, type Node } from "
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { AssetGraph, AssetGraphNode } from "@specforge/core";
+import { buildScopedGraphAssetHref } from "../lib/graph-links";
+import { useLanguage } from "./language-provider";
 
 const palette: Record<string, string> = {
   domain: "#2563eb",
@@ -17,7 +19,11 @@ const palette: Record<string, string> = {
   adr: "#475569"
 };
 
-export function AssetGraphView({ graph }: { graph: AssetGraph }) {
+export function AssetGraphView({ graph, scope }: { graph: AssetGraph; scope: string }) {
+  const { locale } = useLanguage();
+  const copy = locale === "zh"
+    ? { details: "节点详情", label: "名称", type: "类型", summary: "摘要", open: "打开详情", select: "选择节点查看详情。" }
+    : { details: "Node Details", label: "Label", type: "Type", summary: "Summary", open: "Open detail", select: "Select a node to inspect it." };
   const [selected, setSelected] = useState<AssetGraphNode | null>(graph.nodes[0] ?? null);
   const graphNodeById = useMemo(() => new Map(graph.nodes.map((item) => [item.id, item])), [graph.nodes]);
   const nodes: Node[] = graph.nodes.map((item, index) => ({
@@ -51,48 +57,29 @@ export function AssetGraphView({ graph }: { graph: AssetGraph }) {
         </ReactFlow>
       </div>
       <aside className="rounded-lg border border-border bg-white p-4 shadow-panel">
-        <h2 className="text-base font-semibold">Node Details</h2>
+        <h2 className="text-base font-semibold">{copy.details}</h2>
         {selected ? (
           <div className="mt-4 space-y-3 text-sm">
             <div>
-              <div className="text-xs uppercase text-muted">Label</div>
+              <div className="text-xs uppercase text-muted">{copy.label}</div>
               <div className="font-medium">{selected.label}</div>
             </div>
             <div>
-              <div className="text-xs uppercase text-muted">Type</div>
+              <div className="text-xs uppercase text-muted">{copy.type}</div>
               <div>{selected.type}</div>
             </div>
             <div>
-              <div className="text-xs uppercase text-muted">Summary</div>
+              <div className="text-xs uppercase text-muted">{copy.summary}</div>
               <p className="mt-1 text-muted">{selected.summary}</p>
             </div>
-            <Link className="inline-flex h-9 items-center rounded-md bg-accent px-3 text-sm font-medium text-white" href={assetHref(selected)}>
-              Open detail
+            <Link className="inline-flex h-9 items-center rounded-md bg-accent px-3 text-sm font-medium text-white" href={buildScopedGraphAssetHref(selected, scope)}>
+              {copy.open}
             </Link>
           </div>
         ) : (
-          <p className="mt-3 text-sm text-muted">Select a node to inspect it.</p>
+          <p className="mt-3 text-sm text-muted">{copy.select}</p>
         )}
       </aside>
     </div>
   );
-}
-
-function assetHref(node: AssetGraphNode): string {
-  const routes: Record<string, string> = {
-    domain: "domains",
-    dataModel: "data-models",
-    api: "apis",
-    event: "events",
-    businessRule: "rules",
-    stateMachine: "state-machines",
-    integration: "integrations",
-    quality: "quality",
-    observability: "observability",
-    adr: "adrs",
-    contextPack: "context-packs"
-  };
-  if (node.type === "proposal") return `/proposals/${node.id}`;
-  if (node.type === "contextPack") return `/context-packs/${node.id}`;
-  return `/assets/${routes[node.type] ?? "domains"}/${node.id}`;
 }
