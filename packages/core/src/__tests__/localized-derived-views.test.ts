@@ -147,6 +147,52 @@ function mixedScopeCatalog(): SpecForgeDataStore {
   };
 }
 
+function policyCacheCatalog(): SpecForgeDataStore {
+  const catalog = scopedCatalog("beta");
+  const api = catalog.apis[0]!;
+  const proposal = catalog.proposals[0]!;
+
+  api.id = "api-evaluate-policy";
+  api.name = "Evaluate Policy API";
+  api.description = "Evaluates an application policy with cache-aware lookup.";
+  api.path = "/api/v1/policies/evaluate";
+  api.requestSchema = { subjectId: "string", policyCode: "string" };
+  api.responseSchema = { decision: "ALLOW | DENY", cacheHit: "boolean" };
+  api.localizedContent!.zh!.name = "策略评估接口";
+  api.localizedContent!.zh!.description = "通过缓存感知查询评估应用策略。";
+
+  proposal.id = "proposal-policy-cache";
+  proposal.name = "Add Policy Evaluation Cache";
+  proposal.title = "Add Policy Evaluation Cache";
+  proposal.description = "Introduce bounded caching for policy evaluations.";
+  proposal.background = "Repeated evaluations currently call the policy engine every time.";
+  proposal.goal = "Reduce evaluation latency without changing decisions.";
+  proposal.nonGoal = "Do not change policy semantics.";
+  proposal.scope = "Policy evaluation read path.";
+  proposal.specChanges = ["Add a bounded cache adapter", "Invalidate cache entries when a policy version changes"];
+  proposal.risks = ["Stale entries could delay policy updates"];
+  proposal.rolloutPlan = "Enable by tenant cohort and observe cache hit rate.";
+  proposal.rollbackPlan = "Disable the cache feature flag.";
+  proposal.impactedAssets = [{ type: "api", id: api.id, label: api.name }];
+  proposal.localizedContent = {
+    zh: {
+      name: "增加策略评估缓存",
+      title: "增加策略评估缓存",
+      description: "为策略评估引入有界缓存。",
+      background: "重复评估当前每次都会调用策略引擎。",
+      goal: "在不改变决策的前提下降低评估延迟。",
+      nonGoal: "不改变策略语义。",
+      scope: "策略评估读取链路。",
+      specChanges: ["增加有界缓存适配器", "策略版本变化时失效缓存条目"],
+      risks: ["陈旧条目可能延迟策略更新"],
+      rolloutPlan: "按租户批次启用并观察缓存命中率。",
+      rollbackPlan: "关闭缓存特性开关。"
+    }
+  };
+
+  return catalog;
+}
+
 describe("scoped localized derived views", () => {
   it("renders summaries from the supplied catalog in either locale without changing technical values", async () => {
     const alpha = scopedCatalog("alpha");
@@ -262,10 +308,28 @@ describe("scoped localized derived views", () => {
     expect(english.affectedDomains).toContain("alpha Order Domain");
     expect(chinese.affectedDomains).toContain("beta 订单域");
     expect(chinese.affectedDomains).not.toContain("alpha Order Domain");
-    expect(english.implementationTasks[0]).toMatch(/^Update /);
-    expect(chinese.implementationTasks[0]).toMatch(/^更新/);
+    expect(english.implementationTasks[0]).toMatch(/^Implement proposal specification change:/);
+    expect(chinese.implementationTasks[0]).toMatch(/^实施提案规格变更：/);
     expect(chinese.impactedAssets.find((ref) => ref.id === "api-create-refund")?.label).toBe("beta 创建退款接口");
     expect(chinese.impactedAssets.find((ref) => ref.id === "api-create-refund")?.id).toBe("api-create-refund");
+  });
+
+  it("derives non-refund implementation tasks from the selected proposal in English and Chinese", async () => {
+    const catalog = policyCacheCatalog();
+
+    const english = await analyzeProposalImpact("proposal-policy-cache", { catalog, locale: "en" });
+    const chinese = await analyzeProposalImpact("proposal-policy-cache", { catalog, locale: "zh" });
+
+    expect(english.implementationTasks.join("\n")).toContain("Add a bounded cache adapter");
+    expect(english.implementationTasks.join("\n")).toContain("Enable by tenant cohort");
+    expect(english.implementationTasks.join("\n")).toContain("Evaluate Policy API");
+    expect(chinese.implementationTasks.join("\n")).toContain("增加有界缓存适配器");
+    expect(chinese.implementationTasks.join("\n")).toContain("按租户批次启用");
+    expect(chinese.implementationTasks.join("\n")).toContain("策略评估接口");
+    expect(english.implementationTasks.join("\n")).not.toMatch(/refund|order|inventory/i);
+    expect(chinese.implementationTasks.join("\n")).not.toContain("退款");
+    expect(english.proposalId).toBe("proposal-policy-cache");
+    expect(english.impactedAssets[0]).toMatchObject({ type: "api", id: "api-evaluate-policy" });
   });
 
   it("generates locale-specific Context Pack copy from a supplied catalog", async () => {
@@ -300,6 +364,28 @@ describe("scoped localized derived views", () => {
       english.includedAssets.map(({ type, id }) => ({ type, id }))
     );
     expect(chinese.generatedMarkdown).toContain("POST /api/orders/{orderId}/refunds");
+  });
+
+  it("generates proposal-derived generic Context Pack tasks and tests for a non-refund proposal", async () => {
+    const catalog = policyCacheCatalog();
+
+    const english = await generateContextPack("proposal-policy-cache", { catalog, locale: "en" });
+    const chinese = await generateContextPack("proposal-policy-cache", { catalog, locale: "zh" });
+    const allEnglishCopy = [english.instructions.join("\n"), english.generatedMarkdown].join("\n");
+    const allChineseCopy = [chinese.instructions.join("\n"), chinese.generatedMarkdown].join("\n");
+
+    expect(allEnglishCopy).toContain("Add a bounded cache adapter");
+    expect(allEnglishCopy).toContain("contract tests for Evaluate Policy API");
+    expect(allChineseCopy).toContain("增加有界缓存适配器");
+    expect(allChineseCopy).toContain("为策略评估接口增加契约测试");
+    expect(allEnglishCopy).not.toMatch(/refund|order domain|inventory domain/i);
+    expect(allChineseCopy).not.toContain("退款");
+    expect(english.proposalId).toBe("proposal-policy-cache");
+    expect(chinese.proposalId).toBe("proposal-policy-cache");
+    expect(english.includedAssets[0]).toMatchObject({ type: "api", id: "api-evaluate-policy" });
+    expect(chinese.includedAssets[0]).toMatchObject({ type: "api", id: "api-evaluate-policy" });
+    expect(english.generatedMarkdown).toContain("POST /api/v1/policies/evaluate");
+    expect(chinese.generatedMarkdown).toContain("POST /api/v1/policies/evaluate");
   });
 
   it("localizes governance reason and suggestion for representative contract types", async () => {

@@ -20,18 +20,69 @@ const localizedSectionTitles = {
   ]
 } as const;
 
-const testSuggestions = {
-  en: ["Unit test refund amount boundary conditions.", "Contract test CreateRefund idempotency behavior.", "Event schema test for required envelope fields.", "State machine transition test for duplicate callbacks."],
-  zh: ["单元测试退款金额边界条件。", "契约测试 CreateRefund 幂等行为。", "测试事件信封必填字段。", "测试重复回调时的状态机转换。"]
-} as const;
-
-const doNotRules = {
-  en: ["Do not bypass refund amount validation.", "Do not introduce synchronous dependency from order domain to inventory domain.", "Do not expose raw database access or execute arbitrary code.", "Keep API and event changes backward compatible.", "Preserve idempotency for API calls and event consumption."],
-  zh: ["不得绕过退款金额校验。", "不得引入订单域到库存域的同步依赖。", "不得暴露原始数据库访问或执行任意代码。", "API 和事件变更必须保持向后兼容。", "保持 API 调用与事件消费的幂等性。"]
-} as const;
-
 function refsOfType(refs: AssetRef[], types: string[]): AssetRef[] {
   return refs.filter((ref) => types.includes(ref.type));
+}
+
+function deriveTestSuggestions(proposal: Proposal, refs: AssetRef[], locale: AssetLocale, options: DerivedViewOptions): string[] {
+  const assetSuggestions = refs.map((ref) => {
+    const asset = localizeCatalogAsset(ref.type, findAsset(ref, options.catalog), locale, options.catalog);
+    const label = "title" in asset && asset.title ? asset.title : asset.name;
+
+    if (ref.type === "api" && "method" in asset && "path" in asset) {
+      return locale === "zh"
+        ? `为${label}增加契约测试（${asset.method} ${asset.path}），覆盖声明的请求、响应、错误、兼容性和幂等要求。`
+        : `Add contract tests for ${label} (${asset.method} ${asset.path}), covering declared request, response, errors, compatibility, and idempotency requirements.`;
+    }
+    if (ref.type === "event") {
+      return locale === "zh"
+        ? `为${label}增加事件 schema、兼容性、幂等消费和失败处理测试。`
+        : `Add event schema, compatibility, idempotent-consumption, and failure-handling tests for ${label}.`;
+    }
+    if (ref.type === "stateMachine") {
+      return locale === "zh"
+        ? `为${label}增加状态转换、守卫、重复触发和失败处理测试。`
+        : `Add transition, guard, duplicate-trigger, and failure-handling tests for ${label}.`;
+    }
+    if (ref.type === "businessRule") {
+      return locale === "zh" ? `为${label}增加正例、反例和边界条件测试。` : `Add positive, negative, and boundary-condition tests for ${label}.`;
+    }
+    return locale === "zh" ? `为${label}增加覆盖其声明约束的验证测试。` : `Add verification tests for the declared constraints of ${label}.`;
+  });
+  const acceptance = locale === "zh"
+    ? `增加验收测试以验证提案目标：${proposal.goal}`
+    : `Add acceptance tests for proposal goal: ${proposal.goal}`;
+  return [acceptance, ...assetSuggestions];
+}
+
+function deriveConstraints(proposal: Proposal, locale: AssetLocale): string[] {
+  return locale === "zh"
+    ? [
+        `遵守提案范围：${proposal.scope}`,
+        `保持非目标边界：${proposal.nonGoal}`,
+        "保持所含资产的技术标识和契约兼容性。"
+      ]
+    : [
+        `Honor proposal scope: ${proposal.scope}`,
+        `Preserve non-goal boundary: ${proposal.nonGoal}`,
+        "Preserve technical identifiers and contract compatibility for included assets."
+      ];
+}
+
+function deriveDoNotRules(proposal: Proposal, locale: AssetLocale): string[] {
+  return locale === "zh"
+    ? [
+        `不得扩展到声明范围之外：${proposal.scope}`,
+        `不得违反非目标：${proposal.nonGoal}`,
+        "不得更改资产 ID、API path、event topic、schema key、状态码或关系码。",
+        "不得绕过提案和受影响资产中声明的业务规则、验证或兼容性约束。"
+      ]
+    : [
+        `Do not expand beyond the declared scope: ${proposal.scope}`,
+        `Do not violate the non-goal: ${proposal.nonGoal}`,
+        "Do not change asset IDs, API paths, event topics, schema keys, state codes, or relation codes.",
+        "Do not bypass business rules, validation, or compatibility constraints declared by the proposal and impacted assets."
+      ];
 }
 
 async function summaries(refs: AssetRef[], options: DerivedViewOptions): Promise<string> {
@@ -60,6 +111,9 @@ export async function generateContextPack(proposalId: string, options: GenerateC
       const asset = localizeCatalogAsset(ref.type, findAsset(ref, options.catalog), locale, options.catalog);
       return { ...ref, label: "title" in asset && asset.title ? asset.title : asset.name };
     });
+    const testSuggestions = deriveTestSuggestions(proposal, includedAssets, locale, derivedOptions);
+    const constraints = deriveConstraints(proposal, locale);
+    const doNotRules = deriveDoNotRules(proposal, locale);
     const markdown = [
       locale === "zh" ? "# Agent 上下文包" : "# Agent Context Pack", "",
       `## ${titles[0]}`, proposal.description, "",
@@ -77,11 +131,11 @@ export async function generateContextPack(proposalId: string, options: GenerateC
       `## ${titles[12]}`, await summaries(refsOfType(includedAssets, ["quality"]), derivedOptions), "",
       `## ${titles[13]}`, await summaries(refsOfType(includedAssets, ["observability"]), derivedOptions), "",
       `## ${titles[14]}`, ...impact.implementationTasks.map((task) => `- ${task}`), "",
-      `## ${titles[15]}`, ...testSuggestions[locale].map((item) => `- ${item}`), "",
-      `## ${titles[16]}`, ...doNotRules[locale].map((item) => `- ${item}`)
+      `## ${titles[15]}`, ...testSuggestions.map((item) => `- ${item}`), "",
+      `## ${titles[16]}`, ...doNotRules.map((item) => `- ${item}`)
     ].join("\n");
 
-    return { proposal, impact, includedAssets: localizedIncludedAssets, markdown };
+    return { proposal, impact, includedAssets: localizedIncludedAssets, constraints, markdown };
   };
 
   const english = await renderLocale("en");
@@ -94,7 +148,7 @@ export async function generateContextPack(proposalId: string, options: GenerateC
     targetAgent: options.targetAgent ?? "codex",
     summary: `${english.proposal.title}: ${english.impact.impactedAssetCount} impacted assets, ${english.impact.riskLevel} risk.`,
     includedAssets: english.includedAssets,
-    constraints: ["Backward-compatible contracts", "Idempotent writes", "Event-driven inventory integration"],
+    constraints: english.constraints,
     instructions: english.impact.implementationTasks,
     generatedMarkdown: english.markdown,
     createdAt: new Date().toISOString(),
@@ -102,7 +156,7 @@ export async function generateContextPack(proposalId: string, options: GenerateC
       zh: {
         name: `${chinese.proposal.title} Agent 上下文包`,
         summary: `${chinese.proposal.title}：影响 ${chinese.impact.impactedAssetCount} 个资产，风险级别为${chineseRisk}。`,
-        constraints: ["契约保持向后兼容", "写操作保持幂等", "库存集成采用事件驱动"],
+        constraints: chinese.constraints,
         instructions: chinese.impact.implementationTasks,
         generatedMarkdown: chinese.markdown
       }
