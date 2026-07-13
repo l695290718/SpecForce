@@ -96,6 +96,7 @@ const assetRefSchema = z.object({
 });
 
 const assetTypeSchema = z.enum(["domain", "dataModel", "api", "event", "businessRule", "stateMachine", "integration", "quality", "observability", "adr", "proposal", "contextPack"]);
+const assetLocaleSchema = z.enum(["zh", "en"]);
 const architectureScopeSchema = z.object({
   applicationServiceId: z.string().min(1),
   scopePath: z.string().min(1)
@@ -162,7 +163,8 @@ export function registerTools(server: McpServer): void {
         applicationServiceId: z.string().min(1),
         assetTypes: z.array(z.string()).optional(),
         domainId: z.string().optional(),
-        limit: z.number().int().min(1).max(50).optional()
+        limit: z.number().int().min(1).max(50).optional(),
+        locale: assetLocaleSchema.optional()
       },
       permissions: ["asset:read"],
       readOnly: true
@@ -180,7 +182,8 @@ export function registerTools(server: McpServer): void {
         assetType: z.string(),
         assetId: z.string(),
         applicationServiceId: z.string().min(1),
-        format: z.enum(["markdown", "json"]).optional()
+        format: z.enum(["markdown", "json"]).optional(),
+        locale: assetLocaleSchema.optional()
       },
       permissions: ["asset:read"],
       readOnly: true
@@ -189,7 +192,7 @@ export function registerTools(server: McpServer): void {
       if (input.format === "json") {
         return { format: "json", asset: await getPersistedAsset(input.assetType, input.assetId, input.applicationServiceId) };
       }
-      return { format: "markdown", content: await renderPersistedAssetAsMarkdown(input.assetType, input.assetId, input.applicationServiceId) };
+      return { format: "markdown", content: await renderPersistedAssetAsMarkdown(input.assetType, input.assetId, input.applicationServiceId, input.locale) };
     }
   );
 

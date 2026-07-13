@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
-import { assertWritableApplicationService, assetLabel, defaultHuaweiActor, hasScopeAccess, huaweiArchitectureScopes, normalizeAssetType, scopeById, seedHuaweiActor } from "@specforge/core";
-import type { ArchitectureScopeRef, Asset, AssetType, ContextPack, Proposal, ScopedActor } from "@specforge/core";
+import { assertWritableApplicationService, assetLabel, defaultHuaweiActor, hasScopeAccess, huaweiArchitectureScopes, localizeAsset, normalizeAssetType, scopeById, seedHuaweiActor, validateAssetLocalization } from "@specforge/core";
+import type { ArchitectureScopeRef, Asset, AssetLocale, AssetType, ContextPack, Proposal, ScopedActor } from "@specforge/core";
 
 const globalForPrisma = globalThis as unknown as { specforgeMcpPrisma?: PrismaClient };
 
@@ -184,79 +184,83 @@ export async function ensureMcpPersistenceSchema() {
 }
 
 export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
-  await ensureMcpPersistenceSchema();
   const asset = input.asset as unknown as Record<string, unknown>;
   const scope = resolveWritableScope(writableActor(), asset.architectureScope as ArchitectureScopeRef | undefined);
-  asset.architectureScope = scope;
-  assertString(asset.id, "asset.id");
-  assertString(asset.name ?? asset.title, "asset.name");
+  const localizedAsset = { ...asset, architectureScope: scope } as Asset;
+  validateAssetLocalization(input.assetType, localizedAsset);
+  const canonicalAsset = localizeAsset(input.assetType, localizedAsset, "en") as unknown as Record<string, unknown>;
+  assertString(canonicalAsset.id, "asset.id");
+  assertString(canonicalAsset.name ?? canonicalAsset.title, "asset.name");
+  await ensureMcpPersistenceSchema();
 
   await prisma.designAsset.upsert({
-    where: { id: asset.id },
+    where: { id: canonicalAsset.id },
     create: {
-      id: asset.id,
+      id: canonicalAsset.id,
       type: input.assetType,
-      name: String(asset.name ?? asset.title ?? asset.id),
-      code: optionalString(asset.code),
-      description: optionalString(asset.description) ?? "",
-      domainId: optionalString(asset.domainId),
+      name: String(canonicalAsset.name ?? canonicalAsset.title ?? canonicalAsset.id),
+      code: optionalString(canonicalAsset.code),
+      description: optionalString(canonicalAsset.description) ?? "",
+      domainId: optionalString(canonicalAsset.domainId),
       applicationServiceId: scope.applicationServiceId,
       scopePath: scope.scopePath,
-      payload: JSON.stringify(asset),
-      createdAt: optionalDate(asset.createdAt),
-      updatedAt: optionalDate(asset.updatedAt)
+      payload: JSON.stringify(canonicalAsset),
+      createdAt: optionalDate(canonicalAsset.createdAt),
+      updatedAt: optionalDate(canonicalAsset.updatedAt)
     },
     update: {
       type: input.assetType,
-      name: String(asset.name ?? asset.title ?? asset.id),
-      code: optionalString(asset.code),
-      description: optionalString(asset.description) ?? "",
-      domainId: optionalString(asset.domainId),
+      name: String(canonicalAsset.name ?? canonicalAsset.title ?? canonicalAsset.id),
+      code: optionalString(canonicalAsset.code),
+      description: optionalString(canonicalAsset.description) ?? "",
+      domainId: optionalString(canonicalAsset.domainId),
       applicationServiceId: scope.applicationServiceId,
       scopePath: scope.scopePath,
-      payload: JSON.stringify(asset),
-      updatedAt: optionalDate(asset.updatedAt)
+      payload: JSON.stringify(canonicalAsset),
+      updatedAt: optionalDate(canonicalAsset.updatedAt)
     }
   });
 
-  return { id: asset.id, type: input.assetType, status: "upserted" };
+  return { id: canonicalAsset.id, type: input.assetType, status: "upserted" };
 }
 
 export async function upsertProposal(input: UpsertProposalInput) {
-  await ensureMcpPersistenceSchema();
-  const proposal = input.proposal;
+  const proposal = input.proposal as Proposal;
   const scope = resolveWritableScope(writableActor(), proposal.architectureScope);
-  proposal.architectureScope = scope;
+  const localizedProposal = { ...proposal, architectureScope: scope } as Proposal;
+  validateAssetLocalization("proposal", localizedProposal);
+  const canonicalProposal = localizeAsset("proposal", localizedProposal, "en");
   assertString(proposal.id, "proposal.id");
-  assertString(proposal.title, "proposal.title");
+  assertString(canonicalProposal.title, "proposal.title");
+  await ensureMcpPersistenceSchema();
 
   await prisma.proposal.upsert({
-    where: { id: proposal.id },
+    where: { id: canonicalProposal.id },
     create: {
-      id: proposal.id,
-      title: proposal.title,
-      description: proposal.description,
-      status: proposal.status,
-      domainId: proposal.domainId,
+      id: canonicalProposal.id,
+      title: canonicalProposal.title,
+      description: canonicalProposal.description,
+      status: canonicalProposal.status,
+      domainId: canonicalProposal.domainId,
       applicationServiceId: scope.applicationServiceId,
       scopePath: scope.scopePath,
-      payload: JSON.stringify(proposal),
-      createdAt: new Date(proposal.createdAt),
-      updatedAt: new Date(proposal.updatedAt)
+      payload: JSON.stringify(canonicalProposal),
+      createdAt: new Date(canonicalProposal.createdAt),
+      updatedAt: new Date(canonicalProposal.updatedAt)
     },
     update: {
-      title: proposal.title,
-      description: proposal.description,
-      status: proposal.status,
-      domainId: proposal.domainId,
+      title: canonicalProposal.title,
+      description: canonicalProposal.description,
+      status: canonicalProposal.status,
+      domainId: canonicalProposal.domainId,
       applicationServiceId: scope.applicationServiceId,
       scopePath: scope.scopePath,
-      payload: JSON.stringify(proposal),
-      updatedAt: new Date(proposal.updatedAt)
+      payload: JSON.stringify(canonicalProposal),
+      updatedAt: new Date(canonicalProposal.updatedAt)
     }
   });
 
-  return { id: proposal.id, status: "upserted" };
+  return { id: canonicalProposal.id, status: "upserted" };
 }
 
 export async function upsertContextPack(input: UpsertContextPackInput) {
@@ -447,9 +451,9 @@ export async function listPersistedCollectionAsMarkdown(assetType: string, appli
   return [`# ${assetLabel(type)} Catalog`, "", ...assets.map((asset) => `- ${assetName(asset)} (${type}/${asset.id})`)].join("\n");
 }
 
-export async function renderPersistedAssetAsMarkdown(assetType: string, assetId: string, applicationServiceId: string): Promise<string> {
+export async function renderPersistedAssetAsMarkdown(assetType: string, assetId: string, applicationServiceId: string, locale: AssetLocale = "en"): Promise<string> {
   const type = normalizeAssetType(assetType);
-  const asset = await getPersistedAsset(type, assetId, applicationServiceId);
+  const asset = localizeAsset(type, await getPersistedAsset(type, assetId, applicationServiceId), locale);
   return [
     `# ${assetName(asset)}`,
     "",
@@ -469,9 +473,10 @@ export async function renderPersistedAssetAsMarkdown(assetType: string, assetId:
     .join("\n");
 }
 
-export async function searchPersistedDesignAssets(input: { applicationServiceId: string; query: string; assetTypes?: string[]; domainId?: string; limit?: number }) {
+export async function searchPersistedDesignAssets(input: { applicationServiceId: string; query: string; assetTypes?: string[]; domainId?: string; limit?: number; locale?: AssetLocale }) {
   const terms = input.query.toLowerCase().split(/\s+/).map((term) => term.trim()).filter(Boolean);
   const types = input.assetTypes?.length ? input.assetTypes.map(normalizeAssetType) : undefined;
+  const locale = input.locale ?? "en";
   const candidates = types
     ? (await Promise.all(types.map((type) => listPersistedAssets(input.applicationServiceId, type)))).flat()
     : [
@@ -481,17 +486,17 @@ export async function searchPersistedDesignAssets(input: { applicationServiceId:
       ];
   const scored = candidates
     .filter(({ asset }) => !input.domainId || !("domainId" in asset) || asset.domainId === input.domainId || asset.id === input.domainId)
-    .map(({ type, asset }) => ({ type, asset, score: scoreAsset(asset, terms) }))
+    .map(({ type, asset }) => ({ type, asset, localized: localizeAsset(type, asset, locale), score: scoreAsset(asset, terms) }))
     .filter((item) => item.score > 0 || terms.length === 0)
-    .sort((a, b) => b.score - a.score || assetName(a.asset).localeCompare(assetName(b.asset)))
+    .sort((a, b) => b.score - a.score || assetName(a.localized).localeCompare(assetName(b.localized)))
     .slice(0, Math.max(1, Math.min(input.limit ?? 10, 50)));
 
   return {
-    results: scored.map(({ type, asset, score }) => ({
-      id: asset.id,
+    results: scored.map(({ type, asset, localized, score }) => ({
+      id: localized.id,
       type,
-      name: assetName(asset),
-      summary: assetSummary(asset),
+      name: assetName(localized),
+      summary: assetSummary(localized),
       relevanceReason: score > 0 ? `Matched ${score} query term(s) in persisted ${assetLabel(type)} metadata.` : `Included from persisted ${assetLabel(type)} catalog.`
     }))
   };
