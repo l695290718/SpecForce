@@ -182,6 +182,32 @@ describe("resolveWritableScope", () => {
     expect(canonicalJson.description).toBe("Writes design assets through the MCP boundary.");
     expect(canonicalJson.localizedContent.zh.name).toBe(bilingualApi.localizedContent?.zh?.name);
   });
+
+  it("preserves strict zh read behavior for non-context-pack assets without localization overlays", async () => {
+    mockSchemaSetup();
+    vi.spyOn(prisma.designAsset, "findMany").mockResolvedValue([
+      {
+        ...persistedAssetRow(bilingualApi),
+        payload: JSON.stringify({ ...bilingualApi, localizedContent: undefined })
+      }
+    ] as never);
+    vi.spyOn(prisma.proposal, "findMany").mockResolvedValue([] as never);
+    vi.spyOn(prisma.contextPack, "findMany").mockResolvedValue([] as never);
+
+    await expect(
+      searchPersistedDesignAssets({
+        applicationServiceId: writableScope.applicationServiceId,
+        assetTypes: ["api"],
+        query: "Upsert",
+        locale: "zh"
+      })
+    ).rejects.toMatchObject({
+      code: "ASSET_TRANSLATION_REQUIRED",
+      assetType: "api",
+      assetId: "api-upsert-design-asset",
+      path: "localizedContent.zh"
+    });
+  });
 });
 
 describe("Task 2 MCP bilingual enforcement", () => {
@@ -309,6 +335,32 @@ describe("Task 2 MCP bilingual enforcement", () => {
 
     await expect(getPersistedAsset("contextPack", "ctx-legacy-pack", writableScope.applicationServiceId)).resolves.toMatchObject({
       id: "ctx-legacy-pack",
+      name: bilingualContextPack.name,
+      summary: bilingualContextPack.summary,
+      constraints: bilingualContextPack.constraints,
+      instructions: bilingualContextPack.instructions,
+      generatedMarkdown: bilingualContextPack.generatedMarkdown
+    });
+  });
+
+  it("falls back to legacy context pack columns when persisted payload JSON is invalid or incomplete", async () => {
+    mockSchemaSetup();
+    vi.spyOn(prisma.contextPack, "findMany").mockResolvedValue([
+      persistedContextPackRow({ ...bilingualContextPack, id: "ctx-invalid-json-pack" }, "{"),
+      persistedContextPackRow({ ...bilingualContextPack, id: "ctx-empty-object-pack" }, "{}")
+    ] as never);
+
+    await expect(getPersistedAsset("contextPack", "ctx-invalid-json-pack", writableScope.applicationServiceId)).resolves.toMatchObject({
+      id: "ctx-invalid-json-pack",
+      name: bilingualContextPack.name,
+      summary: bilingualContextPack.summary,
+      constraints: bilingualContextPack.constraints,
+      instructions: bilingualContextPack.instructions,
+      generatedMarkdown: bilingualContextPack.generatedMarkdown
+    });
+
+    await expect(getPersistedAsset("contextPack", "ctx-empty-object-pack", writableScope.applicationServiceId)).resolves.toMatchObject({
+      id: "ctx-empty-object-pack",
       name: bilingualContextPack.name,
       summary: bilingualContextPack.summary,
       constraints: bilingualContextPack.constraints,

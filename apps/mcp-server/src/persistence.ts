@@ -3,6 +3,7 @@ import { assertWritableApplicationService, assetLabel, defaultHuaweiActor, hasSc
 import type { ArchitectureScopeRef, Asset, AssetLocale, AssetType, ContextPack, Proposal, ScopedActor } from "@specforge/core";
 
 const globalForPrisma = globalThis as unknown as { specforgeMcpPrisma?: PrismaClient };
+const legacyContextPackFallbackSymbol = Symbol("legacyContextPackFallback");
 
 export const prisma = globalForPrisma.specforgeMcpPrisma ?? new PrismaClient();
 
@@ -493,7 +494,7 @@ export async function searchPersistedDesignAssets(input: { applicationServiceId:
       ];
   const scored = candidates
     .filter(({ asset }) => !input.domainId || !("domainId" in asset) || asset.domainId === input.domainId || asset.id === input.domainId)
-    .map(({ type, asset }) => ({ type, asset, localized: localizeAssetForRead(type, asset, locale), score: scoreAsset(asset, terms) }))
+    .map(({ type, asset }) => ({ type, asset, localized: localizePersistedAssetForRead(type, asset, locale), score: scoreAsset(asset, terms) }))
     .filter((item) => item.score > 0 || terms.length === 0)
     .sort((a, b) => b.score - a.score || assetName(a.localized).localeCompare(assetName(b.localized)))
     .slice(0, Math.max(1, Math.min(input.limit ?? 10, 50)));
@@ -553,7 +554,7 @@ function rowToContextPack(row: {
     return payloadPack;
   }
 
-  return {
+  const legacyPack: ContextPack & { [legacyContextPackFallbackSymbol]?: true } = {
     id: row.id,
     name: row.name,
     proposalId: row.proposalId,
@@ -569,6 +570,8 @@ function rowToContextPack(row: {
         ? { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }
         : undefined
   };
+  legacyPack[legacyContextPackFallbackSymbol] = true;
+  return legacyPack;
 }
 
 function parseContextPackPayload(payload: string | null): ContextPack | null {
@@ -578,21 +581,66 @@ function parseContextPackPayload(payload: string | null): ContextPack | null {
 
   try {
     const parsed = JSON.parse(payload);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    if (!isValidPersistedContextPackPayload(parsed)) {
       return null;
     }
-    return parsed as ContextPack;
+
+    validateAssetLocalization("contextPack", parsed);
+    return parsed;
   } catch {
     return null;
   }
 }
 
-function localizeAssetForRead<T extends Asset>(assetType: AssetType, asset: T, locale: AssetLocale): T {
-  if (locale === "en" || !asset.localizedContent?.[locale]) {
+function isValidPersistedContextPackPayload(value: unknown): value is ContextPack {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const pack = value as Record<string, unknown>;
+  return (
+    typeof pack.id === "string" &&
+    typeof pack.name === "string" &&
+    typeof pack.proposalId === "string" &&
+    typeof pack.targetAgent === "string" &&
+    typeof pack.summary === "string" &&
+    Array.isArray(pack.includedAssets) &&
+    pack.includedAssets.every(isValidAssetRef) &&
+    Array.isArray(pack.constraints) &&
+    pack.constraints.every((item) => typeof item === "string") &&
+    Array.isArray(pack.instructions) &&
+    pack.instructions.every((item) => typeof item === "string") &&
+    typeof pack.generatedMarkdown === "string" &&
+    typeof pack.createdAt === "string" &&
+    !!pack.localizedContent &&
+    typeof pack.localizedContent === "object" &&
+    !Array.isArray(pack.localizedContent)
+  );
+}
+
+function isValidAssetRef(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const ref = value as Record<string, unknown>;
+  return typeof ref.type === "string" && typeof ref.id === "string" && typeof ref.label === "string";
+}
+
+function localizePersistedAssetForRead<T extends Asset>(assetType: AssetType, asset: T, locale: AssetLocale): T {
+  if (assetType === "contextPack" && locale !== "en" && isLegacyContextPackFallback(asset) && !asset.localizedContent?.[locale]) {
     return asset;
   }
 
   return localizeAsset(assetType, asset, locale) as T;
+}
+
+function isLegacyContextPackFallback(asset: Asset): asset is ContextPack & { [legacyContextPackFallbackSymbol]?: true } {
+  return assetTypeLooksLikeContextPack(asset) && Boolean((asset as ContextPack & { [legacyContextPackFallbackSymbol]?: true })[legacyContextPackFallbackSymbol]);
+}
+
+function assetTypeLooksLikeContextPack(asset: Asset): asset is ContextPack {
+  return "proposalId" in asset && "targetAgent" in asset && "includedAssets" in asset && "generatedMarkdown" in asset;
 }
 
 function assetName(asset: Asset): string {
