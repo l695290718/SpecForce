@@ -61,9 +61,15 @@ describe("SpecForge architecture change proposals", () => {
 
 describe("Task 4 bilingual seed inventory", () => {
   it("provides canonical English and complete Chinese overlays for every exported seed asset", () => {
+    const issues: string[] = [];
     for (const { type, asset } of exportedSeedAssets()) {
-      expect(() => validateAssetLocalization(type, asset)).not.toThrow();
+      try {
+        validateAssetLocalization(type, asset);
+      } catch (error) {
+        issues.push(`${type}/${asset.id}: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
+    expect(issues).toEqual([]);
   });
 
   it("normalizes legacy proposal English overlays away", () => {
