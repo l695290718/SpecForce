@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { translate, type Locale, type MessageKey } from "../lib/i18n";
+import { applyClientLocale } from "../lib/locale-client";
 
 interface LanguageContextValue {
   locale: Locale;
@@ -21,11 +22,13 @@ export function LanguageProvider({ children, initialLocale }: { children: ReactN
   }, [initialLocale]);
 
   const setLocale = useCallback((nextLocale: Locale) => {
-    document.cookie = `specforge-locale=${nextLocale}; Path=/; Max-Age=31536000; SameSite=Lax`;
     setLocaleState(nextLocale);
-    window.localStorage.setItem("specforge-locale", nextLocale);
-    document.documentElement.lang = nextLocale === "zh" ? "zh-CN" : "en";
-    router.refresh();
+    applyClientLocale(nextLocale, {
+      writeCookie: (value) => { document.cookie = value; },
+      writeStorage: (value) => window.localStorage.setItem("specforge-locale", value),
+      setDocumentLanguage: (value) => { document.documentElement.lang = value; },
+      refresh: () => router.refresh()
+    });
   }, [router]);
 
   const value = useMemo(

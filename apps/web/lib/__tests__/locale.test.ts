@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { localeCookieValue, localeFromCookie, withQueryParam } from "../locale";
+import { getApiRequestLocale, localeFromCookie, withQueryParam, withRequestLocale } from "../locale";
 
 describe("request locale", () => {
   it("accepts supported cookie values", () => {
@@ -12,8 +12,26 @@ describe("request locale", () => {
     expect(localeFromCookie("fr")).toBe("en");
   });
 
-  it("serializes a one-year locale cookie visible to server requests", () => {
-    expect(localeCookieValue("zh")).toBe("specforge-locale=zh; Path=/; Max-Age=31536000; SameSite=Lax");
+  it("uses a validated explicit API locale before the cookie", () => {
+    const request = new Request("http://localhost/api/assets/apis?locale=zh", {
+      headers: { cookie: "other=value; specforge-locale=en" }
+    });
+
+    expect(getApiRequestLocale(request)).toBe("zh");
+  });
+
+  it("falls back from an invalid explicit API locale to the request cookie", () => {
+    const request = new Request("http://localhost/api/assets/apis?locale=fr", {
+      headers: { cookie: "specforge-locale=zh" }
+    });
+
+    expect(getApiRequestLocale(request)).toBe("zh");
+  });
+
+  it("passes the resolved locale into an API reader boundary", async () => {
+    const request = new Request("http://localhost/api/proposals?locale=zh");
+
+    await expect(withRequestLocale(request, async (locale) => `reader:${locale}`)).resolves.toBe("reader:zh");
   });
 });
 

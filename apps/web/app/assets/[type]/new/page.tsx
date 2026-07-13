@@ -1,16 +1,8 @@
-import { PageHeader } from "../../../../components/ui";
-import { AssetDraftForm } from "../../../../components/asset-draft-form";
-import { assetTitleKeys, routeToAssetType, type AssetRouteType } from "../../../../lib/assets";
-import { T } from "../../../../components/language-provider";
+import { redirect } from "next/navigation";
+import type { AssetRouteType } from "../../../../lib/assets";
+import { withSearchParams, type RouteSearchParams } from "../../../../lib/locale";
 
-export default async function NewAssetPage({ params }: { params: Promise<{ type: AssetRouteType }> }) {
+export default async function NewAssetPage({ params, searchParams }: { params: Promise<{ type: AssetRouteType }>; searchParams: Promise<RouteSearchParams> }) {
   const { type } = await params;
-  const assetType = routeToAssetType(type);
-
-  return (
-    <>
-      <PageHeader title={<><T k="action.new" /> <T k={assetTitleKeys[type]} /></>} description={<T k="asset.newDescription" />} />
-      <AssetDraftForm assetType={assetType} routeType={type} />
-    </>
-  );
+  redirect(withSearchParams(`/assets/${type}`, await searchParams));
 }
