@@ -41,3 +41,21 @@
 - Core tests: 58 passed.
 - Core, MCP, and Web typechecks: passed.
 - No `db push` or seed was executed; the PostgreSQL integration suite created and removed only its isolated temporary schema.
+
+## Legacy Identity Migration Follow-up
+
+- Added an idempotent runtime upgrade before generated Prisma composite-key operations.
+- Added a matching Prisma migration SQL artifact for managed deployments.
+- Existing rows receive database-generated UUID `dbId` values; missing or empty scope fields are assigned to the legacy Designer application-service scope.
+- Legacy `id` primary keys and single-column unique constraints/indexes are removed, then replaced with `dbId` primary keys and exact `applicationServiceId + scopePath + id` unique constraints.
+- The upgrade covers `DesignAsset`, `Proposal`, `ContextPack`, and `AssetLink` and can be executed repeatedly.
+
+### Migration Verification
+
+- PostgreSQL old-schema upgrade integration tests: 3 passed.
+- Historical rows for all four persisted record types remained readable after upgrade.
+- The same logical design-asset ID was inserted and read independently in a second application-service scope.
+- MCP persistence/seed tests: 27 passed.
+- MCP typecheck: passed.
+- Prisma Client generation and schema validation: passed.
+- No local business-schema `db push` or seed was executed.

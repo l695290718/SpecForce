@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   deletePersistedDesignData,
   disconnectMcpPersistence,
+  ensureMcpPersistenceSchema,
   getPersistedAsset,
   listPersistedAssetLinks,
   prisma,
@@ -23,6 +24,7 @@ const admin = integrationEnabled ? new PrismaClient({ datasourceUrl: parsedUrl!.
 const designerScope = applicationServiceScope("com.huawei.celon.desiner");
 const policyScope = applicationServiceScope("com.huawei.celon.policyhub");
 const sharedId = "shared-logical-id";
+const legacyId = "legacy-logical-id";
 const timestamp = "2026-07-13T00:00:00.000Z";
 
 describe.runIf(integrationEnabled)("scope-aware persisted identity", () => {
@@ -30,6 +32,7 @@ describe.runIf(integrationEnabled)("scope-aware persisted identity", () => {
     process.env.SPECFORGE_MCP_SEED = "1";
     await admin!.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${testSchema}" CASCADE`);
     await admin!.$executeRawUnsafe(`CREATE SCHEMA "${testSchema}"`);
+    await installLegacySchema();
   });
 
   afterAll(async () => {
@@ -37,6 +40,53 @@ describe.runIf(integrationEnabled)("scope-aware persisted identity", () => {
     await disconnectMcpPersistence();
     await admin!.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${testSchema}" CASCADE`);
     await admin!.$disconnect();
+  });
+
+  it("upgrades legacy global-id tables before scoped Prisma operations", async () => {
+    await ensureMcpPersistenceSchema();
+    await ensureMcpPersistenceSchema();
+
+    await expect(getPersistedAsset("domain", legacyId, designerScope.applicationServiceId)).resolves.toMatchObject({
+      id: legacyId,
+      name: "Legacy domain"
+    });
+    await expect(getPersistedAsset("proposal", legacyId, designerScope.applicationServiceId)).resolves.toMatchObject({
+      id: legacyId,
+      title: "Legacy proposal"
+    });
+    await expect(getPersistedAsset("contextPack", legacyId, designerScope.applicationServiceId)).resolves.toMatchObject({
+      id: legacyId,
+      name: "Legacy pack"
+    });
+    expect(await listPersistedAssetLinks(designerScope.applicationServiceId)).toContainEqual(
+      expect.objectContaining({ id: "legacy-link", sourceId: legacyId, targetId: legacyId })
+    );
+    const legacyRow = await prisma.designAsset.findUnique({
+      where: {
+        applicationServiceId_scopePath_id: {
+          applicationServiceId: designerScope.applicationServiceId,
+          scopePath: designerScope.scopePath,
+          id: legacyId
+        }
+      }
+    });
+    expect(legacyRow).toMatchObject({
+      id: legacyId,
+      applicationServiceId: designerScope.applicationServiceId,
+      scopePath: designerScope.scopePath
+    });
+    expect(legacyRow?.dbId).toMatch(/^[0-9a-f-]{36}$/u);
+
+    await upsertDesignAsset({
+      assetType: "domain",
+      asset: { ...domainForScope(policyScope, "Policy legacy-id domain", "策略旧标识领域"), id: legacyId }
+    });
+    await expect(getPersistedAsset("domain", legacyId, policyScope.applicationServiceId)).resolves.toMatchObject({
+      name: "Policy legacy-id domain"
+    });
+    await expect(getPersistedAsset("domain", legacyId, designerScope.applicationServiceId)).resolves.toMatchObject({
+      name: "Legacy domain"
+    });
   });
 
   it("stores the same asset, proposal, Context Pack, and link ids in two application-service scopes", async () => {
@@ -55,8 +105,12 @@ describe.runIf(integrationEnabled)("scope-aware persisted identity", () => {
     await expect(getPersistedAsset("proposal", sharedId, policyScope.applicationServiceId)).resolves.toMatchObject({ title: "Policy shared proposal" });
     await expect(getPersistedAsset("contextPack", sharedId, designerScope.applicationServiceId)).resolves.toMatchObject({ name: "Designer shared context" });
     await expect(getPersistedAsset("contextPack", sharedId, policyScope.applicationServiceId)).resolves.toMatchObject({ name: "Policy shared context" });
-    expect(await listPersistedAssetLinks(designerScope.applicationServiceId)).toHaveLength(1);
-    expect(await listPersistedAssetLinks(policyScope.applicationServiceId)).toHaveLength(1);
+    expect(await listPersistedAssetLinks(designerScope.applicationServiceId)).toContainEqual(
+      expect.objectContaining({ sourceId: sharedId, targetId: sharedId })
+    );
+    expect(await listPersistedAssetLinks(policyScope.applicationServiceId)).toContainEqual(
+      expect.objectContaining({ sourceId: sharedId, targetId: sharedId })
+    );
   });
 
   it("cleans only the exact scope and preserves a sibling scope plus a near-prefix row", async () => {
@@ -92,7 +146,9 @@ describe.runIf(integrationEnabled)("scope-aware persisted identity", () => {
     await expect(getPersistedAsset("domain", sharedId, policyScope.applicationServiceId)).resolves.toMatchObject({ name: "Policy shared domain" });
     await expect(getPersistedAsset("proposal", sharedId, policyScope.applicationServiceId)).resolves.toMatchObject({ title: "Policy shared proposal" });
     await expect(getPersistedAsset("contextPack", sharedId, policyScope.applicationServiceId)).resolves.toMatchObject({ name: "Policy shared context" });
-    expect(await listPersistedAssetLinks(designerScope.applicationServiceId)).toHaveLength(0);
+    expect(await listPersistedAssetLinks(designerScope.applicationServiceId)).toEqual([
+      expect.objectContaining({ id: "legacy-link", sourceId: legacyId, targetId: legacyId })
+    ]);
     expect(await listPersistedAssetLinks(policyScope.applicationServiceId)).toHaveLength(1);
     await expect(prisma.designAsset.findFirst({
       where: {
@@ -103,6 +159,59 @@ describe.runIf(integrationEnabled)("scope-aware persisted identity", () => {
     })).resolves.not.toBeNull();
   });
 });
+
+async function installLegacySchema() {
+  await prisma.$executeRawUnsafe(`CREATE TABLE "DesignAsset" (
+    id TEXT PRIMARY KEY NOT NULL, type TEXT NOT NULL, name TEXT NOT NULL, code TEXT,
+    description TEXT NOT NULL, "domainId" TEXT, "applicationServiceId" TEXT, "scopePath" TEXT,
+    payload TEXT NOT NULL, "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await prisma.$executeRawUnsafe(`CREATE TABLE "Proposal" (
+    id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL, status TEXT NOT NULL,
+    "domainId" TEXT, "applicationServiceId" TEXT, "scopePath" TEXT, payload TEXT NOT NULL,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await prisma.$executeRawUnsafe(`CREATE TABLE "ContextPack" (
+    id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, "proposalId" TEXT NOT NULL, "targetAgent" TEXT NOT NULL,
+    summary TEXT NOT NULL, "includedAssets" TEXT NOT NULL, constraints TEXT NOT NULL, instructions TEXT NOT NULL,
+    "generatedMarkdown" TEXT NOT NULL, "applicationServiceId" TEXT, "scopePath" TEXT,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await prisma.$executeRawUnsafe(`CREATE TABLE "AssetLink" (
+    id TEXT PRIMARY KEY NOT NULL, "sourceType" TEXT NOT NULL, "sourceId" TEXT NOT NULL,
+    "targetType" TEXT NOT NULL, "targetId" TEXT NOT NULL, "relationType" TEXT NOT NULL,
+    description TEXT, "applicationServiceId" TEXT, "scopePath" TEXT,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  const legacyDomain = { ...domainForScope(designerScope, "Legacy domain", "旧版领域"), id: legacyId };
+  const legacyProposal = { ...proposalForScope(designerScope, "Legacy proposal", "旧版提案"), id: legacyId };
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "DesignAsset" (id, type, name, description, payload) VALUES ($1, 'domain', $2, $3, $4)`,
+    legacyId,
+    legacyDomain.name,
+    legacyDomain.description,
+    JSON.stringify(legacyDomain)
+  );
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "Proposal" (id, title, description, status, payload) VALUES ($1, $2, $3, 'draft', $4)`,
+    legacyId,
+    legacyProposal.title,
+    legacyProposal.description,
+    JSON.stringify(legacyProposal)
+  );
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "ContextPack" (id, name, "proposalId", "targetAgent", summary, "includedAssets", constraints, instructions, "generatedMarkdown")
+     VALUES ($1, 'Legacy pack', $1, 'codex', 'Legacy summary', '[]', '[]', '[]', '# Legacy')`,
+    legacyId
+  );
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "AssetLink" (id, "sourceType", "sourceId", "targetType", "targetId", "relationType")
+     VALUES ('legacy-link', 'proposal', $1, 'domain', $1, 'impacts')`,
+    legacyId
+  );
+}
 
 function applicationServiceScope(id: string): ArchitectureScopeRef {
   const scope = scopeById(id);

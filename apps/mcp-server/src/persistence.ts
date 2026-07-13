@@ -197,12 +197,82 @@ export async function ensureMcpPersistenceSchema() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_source_idx" ON "AssetLink"("sourceType", "sourceId")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_target_idx" ON "AssetLink"("targetType", "targetId")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_relationType_idx" ON "AssetLink"("relationType")`);
+  await upgradeLegacyPersistedIdentitySchema();
   for (const table of ["DesignAsset", "Proposal", "ContextPack", "AssetLink"]) {
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "${table}_applicationServiceId_idx" ON "${table}"("applicationServiceId")`);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "${table}_scopePath_idx" ON "${table}"("scopePath")`);
   }
   await prisma.$executeRawUnsafe(`ALTER TABLE "ContextPack" ADD COLUMN IF NOT EXISTS "payload" TEXT`);
   await ensureArchitectureScopes();
+}
+
+export async function upgradeLegacyPersistedIdentitySchema() {
+  const fallbackScope = scopeById("com.huawei.celon.desiner");
+  if (!fallbackScope) throw new Error("Default application-service scope is unavailable.");
+
+  for (const table of ["DesignAsset", "Proposal", "ContextPack", "AssetLink"]) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "dbId" UUID`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "applicationServiceId" TEXT`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "scopePath" TEXT`);
+    await prisma.$executeRawUnsafe(
+      `UPDATE "${table}"
+       SET "dbId" = COALESCE("dbId", gen_random_uuid()),
+           "applicationServiceId" = COALESCE(NULLIF("applicationServiceId", ''), $1),
+           "scopePath" = COALESCE(NULLIF("scopePath", ''), $2)
+       WHERE "dbId" IS NULL OR "applicationServiceId" IS NULL OR "applicationServiceId" = '' OR "scopePath" IS NULL OR "scopePath" = ''`,
+      fallbackScope.id,
+      fallbackScope.scopePath
+    );
+    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ALTER COLUMN "dbId" SET DEFAULT gen_random_uuid()`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ALTER COLUMN "dbId" SET NOT NULL`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ALTER COLUMN "applicationServiceId" SET NOT NULL`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ALTER COLUMN "scopePath" SET NOT NULL`);
+    await prisma.$executeRawUnsafe(scopedIdentityConstraintUpgradeSql(table));
+  }
+}
+
+function scopedIdentityConstraintUpgradeSql(table: string): string {
+  const compositeConstraint = `${table}_applicationServiceId_scopePath_id_key`;
+  return `DO $$
+  DECLARE
+    legacy_constraint RECORD;
+    legacy_index RECORD;
+  BEGIN
+    FOR legacy_constraint IN
+      SELECT conname
+      FROM pg_constraint
+      WHERE conrelid = '"${table}"'::regclass
+        AND ((contype = 'p' AND pg_get_constraintdef(oid) ~ '^PRIMARY KEY \\(\"?id\"?\\)$')
+          OR (contype = 'u' AND pg_get_constraintdef(oid) ~ '^UNIQUE \\(\"?id\"?\\)$'))
+    LOOP
+      EXECUTE format('ALTER TABLE %I DROP CONSTRAINT %I', '${table}', legacy_constraint.conname);
+    END LOOP;
+
+    FOR legacy_index IN
+      SELECT indexname
+      FROM pg_indexes
+      WHERE schemaname = current_schema()
+        AND tablename = '${table}'
+        AND indexdef ~ '^CREATE UNIQUE INDEX .* \\(\"?id\"?\\)$'
+    LOOP
+      EXECUTE format('DROP INDEX IF EXISTS %I.%I', current_schema(), legacy_index.indexname);
+    END LOOP;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conrelid = '"${table}"'::regclass AND contype = 'p'
+    ) THEN
+      ALTER TABLE "${table}" ADD CONSTRAINT "${table}_pkey" PRIMARY KEY ("dbId");
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conrelid = '"${table}"'::regclass AND conname = '${compositeConstraint}'
+    ) THEN
+      ALTER TABLE "${table}" ADD CONSTRAINT "${compositeConstraint}"
+        UNIQUE ("applicationServiceId", "scopePath", id);
+    END IF;
+  END $$`;
 }
 
 export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
