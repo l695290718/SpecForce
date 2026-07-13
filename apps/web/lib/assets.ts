@@ -3,7 +3,6 @@ import {
   analyzeProposalImpact,
   buildAssetGraph,
   generateContextPack,
-  localizeAsset,
   renderAssetAsMarkdown,
   renderAssetSummary,
   runGovernanceChecks,
@@ -19,6 +18,7 @@ import type { MessageKey } from "./i18n";
 import { prisma } from "./db";
 import { requireReadableApplicationService, scopeDatabaseWhere } from "./scope";
 import { graphEdgeDisplayLabel } from "./graph-labels";
+import { isLegacyTranslationError, safeLocalizeAssetForRead, withLegacyDerivedReadFallback } from "./read-localization";
 export { buildScopedGraphAssetHref } from "./graph-links";
 
 export const routeAssetTypes = {
@@ -145,7 +145,7 @@ export async function searchScopedAssets<TType extends AssetType>(
   const limit = terms.length === 0 ? matches.length : Math.max(1, options.limit);
   const page = terms.length === 0 ? matches : matches.slice(offset, offset + limit);
   const items = page.map(({ asset, score }) => {
-    const localized = localizeAsset(assetType, asset, locale) as AssetTypeMap[TType];
+    const localized = safeLocalizeAssetForRead(assetType, asset, locale) as AssetTypeMap[TType];
     return {
       id: localized.id,
       type: assetType,
@@ -167,7 +167,9 @@ export async function getScopedAssetGraph(
   locale: AssetLocale = "en"
 ): Promise<LocalizedAssetGraph> {
   const catalog = await getScopedAssetCatalog(scopeId);
-  const graph = await buildAssetGraph(domainId, assetType, { catalog, locale });
+  const graph = await withLegacyDerivedReadFallback(locale, (resolvedLocale) =>
+    buildAssetGraph(domainId, assetType, { catalog, locale: resolvedLocale })
+  );
   const nodeByRef = new Map(graph.nodes.map((node) => [`${node.type}:${node.logicalId ?? node.id}`, node.id]));
   const linkedEdges = catalog.assetLinks.flatMap((link) => {
     const source = nodeByRef.get(`${link.sourceType}:${link.sourceId}`);
@@ -209,21 +211,63 @@ export async function getScopedAssetDetail(assetType: AssetType, assetId: string
   if (!canonical) throw new Error(`Asset not found: ${assetType}/${assetId}`);
   const options = { catalog, locale };
   const [summary, markdown, governance] = await Promise.all([
-    renderAssetSummary(assetType, assetId, options),
-    renderAssetAsMarkdown(assetType, assetId, options),
+    withLegacyDerivedReadFallback(locale, (resolvedLocale) => renderAssetSummary(assetType, assetId, { catalog, locale: resolvedLocale })),
+    withLegacyDerivedReadFallback(locale, (resolvedLocale) => renderAssetAsMarkdown(assetType, assetId, { catalog, locale: resolvedLocale })),
     runGovernanceChecks(assetType, assetId, options)
   ]);
-  return { asset: localizeAsset(assetType, canonical, locale), summary, markdown, governance };
+  return { asset: safeLocalizeAssetForRead(assetType, canonical, locale), summary, markdown, governance };
 }
 
 export async function getScopedProposalImpact(proposalId: string, scopeId: string, locale: AssetLocale = "en") {
   const catalog = await getScopedAssetCatalog(scopeId);
-  return analyzeProposalImpact(proposalId, { catalog, locale });
+  return withLegacyDerivedReadFallback(locale, (resolvedLocale) => analyzeProposalImpact(proposalId, { catalog, locale: resolvedLocale }));
 }
 
 export async function generateScopedContextPack(proposalId: string, scopeId: string, locale: AssetLocale = "en") {
   const catalog = await getScopedAssetCatalog(scopeId);
-  return generateContextPack(proposalId, { catalog, locale });
+  try {
+    return await generateContextPack(proposalId, { catalog, locale });
+  } catch (error) {
+    if (!isLegacyTranslationError(error)) throw error;
+    return generateCanonicalLegacyContextPack(proposalId, catalog);
+  }
+}
+
+async function generateCanonicalLegacyContextPack(proposalId: string, catalog: ScopedAssetCatalog): Promise<ContextPack> {
+  const proposal = catalog.proposals.find((item) => item.id === proposalId);
+  if (!proposal) throw new Error(`Proposal not found: ${proposalId}`);
+  const impact = await analyzeProposalImpact(proposalId, { catalog, locale: "en" });
+  const includedAssets = proposal.impactedAssets.map((ref) => {
+    const asset = (catalog[assetCollections[ref.type]] as Asset[]).find((item) => item.id === ref.id);
+    if (!asset) throw new Error(`Asset not found: ${ref.type}/${ref.id}`);
+    return { ...ref, label: "title" in asset && asset.title ? asset.title : asset.name };
+  });
+  const constraints = [
+    `Honor proposal scope: ${proposal.scope}`,
+    `Preserve non-goal boundary: ${proposal.nonGoal}`,
+    "Preserve technical identifiers and contract compatibility for included assets."
+  ];
+  const generatedMarkdown = [
+    `# ${proposal.title} Agent Context Pack`, "",
+    "## Feature Summary", proposal.description, "",
+    "## Goals", proposal.goal, "",
+    "## Impacted Assets", ...includedAssets.map((ref) => `- ${ref.label} (${ref.type}/${ref.id})`), "",
+    "## Implementation Tasks", ...impact.implementationTasks.map((task) => `- ${task}`), "",
+    "## Constraints", ...constraints.map((item) => `- ${item}`)
+  ].join("\n");
+  return {
+    id: `ctx-${proposal.id.replace(/^proposal-/, "")}`,
+    name: `${proposal.title} Agent Context Pack`,
+    proposalId,
+    targetAgent: "codex",
+    summary: `${proposal.title}: ${impact.impactedAssetCount} impacted assets, ${impact.riskLevel} risk.`,
+    includedAssets,
+    constraints,
+    instructions: impact.implementationTasks,
+    generatedMarkdown,
+    createdAt: proposal.updatedAt ?? proposal.createdAt,
+    architectureScope: proposal.architectureScope
+  };
 }
 
 export async function getScopedGovernanceChecks(assetType: AssetType, assetId: string, scopeId: string, locale: AssetLocale = "en") {
@@ -242,12 +286,12 @@ export async function getScopedGovernanceOverview(scopeId: string, locale: Asset
 
 export async function renderScopedAssetSummary(assetType: AssetType, assetId: string, scopeId: string, locale: AssetLocale = "en") {
   const catalog = await getScopedAssetCatalog(scopeId);
-  return renderAssetSummary(assetType, assetId, { catalog, locale });
+  return withLegacyDerivedReadFallback(locale, (resolvedLocale) => renderAssetSummary(assetType, assetId, { catalog, locale: resolvedLocale }));
 }
 
 export async function renderScopedAssetMarkdown(assetType: AssetType, assetId: string, scopeId: string, locale: AssetLocale = "en") {
   const catalog = await getScopedAssetCatalog(scopeId);
-  return renderAssetAsMarkdown(assetType, assetId, { catalog, locale });
+  return withLegacyDerivedReadFallback(locale, (resolvedLocale) => renderAssetAsMarkdown(assetType, assetId, { catalog, locale: resolvedLocale }));
 }
 
 function emptyCatalog(): SpecForgeDataStore {
@@ -289,13 +333,13 @@ export async function getGovernanceTargetsWithDatabase(scopeId: string): Promise
 export async function getProposalsWithDatabase(scopeId: string, locale: AssetLocale = "en"): Promise<Proposal[]> {
   const scope = requireReadableApplicationService(scopeId);
   const rows = await prisma.proposal.findMany({ where: scopeDatabaseWhere(scope), orderBy: { createdAt: "asc" } });
-  return rows.map((row) => localizeAsset("proposal", JSON.parse(row.payload) as Proposal, locale));
+  return rows.map((row) => safeLocalizeAssetForRead("proposal", JSON.parse(row.payload) as Proposal, locale));
 }
 
 export async function getProposalWithDatabase(id: string, scopeId: string, locale: AssetLocale = "en"): Promise<Proposal> {
   const scope = requireReadableApplicationService(scopeId);
   const row = await prisma.proposal.findFirst({ where: { id, ...scopeDatabaseWhere(scope) } });
-  if (row) return localizeAsset("proposal", JSON.parse(row.payload) as Proposal, locale);
+  if (row) return safeLocalizeAssetForRead("proposal", JSON.parse(row.payload) as Proposal, locale);
   throw new Error(`Proposal not found: ${id}`);
 }
 
@@ -322,7 +366,7 @@ type ContextPackRow = {
 function localizeContextPackRow(row: ContextPackRow, locale: AssetLocale): ContextPack {
   const persisted = parseContextPackPayload(row.payload);
   if (!persisted) return contextPackFromLegacyRow(row);
-  return localizeAsset("contextPack", persisted, locale);
+  return safeLocalizeAssetForRead("contextPack", persisted, locale);
 }
 
 function parseContextPackPayload(payload: string | null): ContextPack | null {
@@ -388,7 +432,7 @@ async function getDatabaseAssets(assetType: AssetType, scopeId: string, locale: 
     where: { type: assetType, ...scopeDatabaseWhere(scope) },
     orderBy: { createdAt: "asc" }
   });
-  return rows.map((row) => localizeAsset(assetType, JSON.parse(row.payload) as Asset, locale));
+  return rows.map((row) => safeLocalizeAssetForRead(assetType, JSON.parse(row.payload) as Asset, locale));
 }
 
 function dedupeById<T extends { id: string }>(items: T[]): T[] {
