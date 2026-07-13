@@ -22,3 +22,22 @@
 ## Database
 
 - No real database migration or seed was executed in this review-fix task.
+
+## P1 Scope Identity Follow-up
+
+- `delete_seed_design_data` is registered only when `SPECFORGE_MCP_SEED=1`, and both the tool handler and persistence function reject execution outside seed mode.
+- Seed tool calls are audited as `system/specforge-seed`.
+- Cleanup and MCP readers use exact `applicationServiceId` and `scopePath` matches; near-prefix paths are not included.
+- `DesignAsset`, `Proposal`, `ContextPack`, and `AssetLink` now use an internal PostgreSQL UUID primary key and a unique logical identity of `applicationServiceId + scopePath + id`.
+- Every MCP single-record read and upsert uses the generated scoped composite Prisma identity.
+
+### Follow-up Verification
+
+- Prisma Client generation: passed.
+- Prisma schema validation: passed.
+- MCP focused tests: 30 passed.
+- Seed-only tool boundary tests: 3 passed.
+- PostgreSQL isolated-schema persistence tests: 2 passed, including same logical IDs in two services and exact-scope cleanup preservation.
+- Core tests: 58 passed.
+- Core, MCP, and Web typechecks: passed.
+- No `db push` or seed was executed; the PostgreSQL integration suite created and removed only its isolated temporary schema.

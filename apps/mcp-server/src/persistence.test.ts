@@ -172,7 +172,7 @@ describe("resolveWritableScope", () => {
 
   it("keeps rendered zh source json canonical while leaving localized narratives in the markdown body", async () => {
     mockSchemaSetup();
-    vi.spyOn(prisma.designAsset, "findFirst").mockResolvedValue(persistedAssetRow(bilingualApi) as never);
+    const findUnique = vi.spyOn(prisma.designAsset, "findUnique").mockResolvedValue(persistedAssetRow(bilingualApi) as never);
 
     const markdown = await renderPersistedAssetAsMarkdown("api", "api-upsert-design-asset", writableScope.applicationServiceId, "zh");
     const [, sourceJsonBlock = ""] = markdown.split("## Source JSON\n");
@@ -183,6 +183,15 @@ describe("resolveWritableScope", () => {
     expect(canonicalJson.name).toBe("Upsert design asset API");
     expect(canonicalJson.description).toBe("Writes design assets through the MCP boundary.");
     expect(canonicalJson.localizedContent.zh.name).toBe(bilingualApi.localizedContent?.zh?.name);
+    expect(findUnique).toHaveBeenCalledWith({
+      where: {
+        applicationServiceId_scopePath_id: {
+          applicationServiceId: writableScope.applicationServiceId,
+          scopePath: writableScope.scopePath,
+          id: bilingualApi.id
+        }
+      }
+    });
   });
 
   it("preserves strict zh read behavior for non-context-pack assets without localization overlays", async () => {
@@ -214,6 +223,7 @@ describe("resolveWritableScope", () => {
 
 describe("scoped seed cleanup", () => {
   it("rejects cleanup outside the seed actor's authorized application services before database access", async () => {
+    process.env.SPECFORGE_MCP_SEED = "1";
     const executeSpy = vi.spyOn(prisma, "$executeRawUnsafe");
 
     await expect(
@@ -225,6 +235,17 @@ describe("scoped seed cleanup", () => {
         assetIds: ["shared-id"]
       })
     ).rejects.toThrow("Scope write is not authorized.");
+
+    expect(executeSpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects direct cleanup execution when the MCP process is not in seed mode", async () => {
+    const executeSpy = vi.spyOn(prisma, "$executeRawUnsafe");
+
+    await expect(deletePersistedDesignData({
+      architectureScope: writableScope,
+      assetIds: ["shared-id"]
+    })).rejects.toThrow("Seed cleanup is not enabled.");
 
     expect(executeSpy).not.toHaveBeenCalled();
   });
@@ -245,7 +266,7 @@ describe("scoped seed cleanup", () => {
 
     const scopedWhere = {
       applicationServiceId: writableScope.applicationServiceId,
-      scopePath: { startsWith: writableScope.scopePath }
+      scopePath: writableScope.scopePath
     };
     expect(assetDelete).toHaveBeenCalledWith({
       where: { ...scopedWhere, id: { in: ["shared-id"] } }
@@ -259,11 +280,38 @@ describe("scoped seed cleanup", () => {
 
     const linkDeleteCall = vi.mocked(prisma.$executeRawUnsafe).mock.calls.at(-1);
     expect(linkDeleteCall?.[0]).toContain('"applicationServiceId" = $1');
-    expect(linkDeleteCall?.[0]).toContain('"scopePath" LIKE $2');
+    expect(linkDeleteCall?.[0]).toContain('"scopePath" = $2');
     expect(linkDeleteCall?.slice(1, 3)).toEqual([
       writableScope.applicationServiceId,
-      `${writableScope.scopePath}%`
+      writableScope.scopePath
     ]);
+  });
+
+  it("uses scope-aware composite identities for every persisted upsert", async () => {
+    process.env.SPECFORGE_MCP_SEED = "1";
+    mockSchemaSetup();
+    const assetUpsert = vi.spyOn(prisma.designAsset, "upsert").mockResolvedValue({} as never);
+    const proposalUpsert = vi.spyOn(prisma.proposal, "upsert").mockResolvedValue({} as never);
+    const contextPackUpsert = vi.spyOn(prisma.contextPack, "upsert").mockResolvedValue({} as never);
+
+    await upsertDesignAsset({ assetType: "api", asset: bilingualApi });
+    await upsertProposal({ proposal: bilingualProposal });
+    await upsertContextPack({ contextPack: bilingualContextPack });
+
+    const composite = (id: string) => ({
+      applicationServiceId: writableScope.applicationServiceId,
+      scopePath: writableScope.scopePath,
+      id
+    });
+    expect(assetUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { applicationServiceId_scopePath_id: composite(bilingualApi.id) }
+    }));
+    expect(proposalUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { applicationServiceId_scopePath_id: composite(bilingualProposal.id) }
+    }));
+    expect(contextPackUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { applicationServiceId_scopePath_id: composite(bilingualContextPack.id) }
+    }));
   });
 });
 
@@ -365,6 +413,9 @@ describe("Task 2 MCP bilingual enforcement", () => {
       persistedContextPackRow(bilingualContextPack, JSON.stringify(bilingualContextPack)),
       persistedContextPackRow({ ...bilingualContextPack, id: "ctx-legacy-pack" }, null)
     ] as never);
+    vi.spyOn(prisma.contextPack, "findUnique").mockResolvedValue(
+      persistedContextPackRow({ ...bilingualContextPack, id: "ctx-legacy-pack" }, null) as never
+    );
 
     await expect(upsertContextPack({ contextPack: bilingualContextPack })).resolves.toEqual({
       id: "ctx-bilingual-assets",
@@ -402,10 +453,9 @@ describe("Task 2 MCP bilingual enforcement", () => {
 
   it("falls back to legacy context pack columns when persisted payload JSON is invalid or incomplete", async () => {
     mockSchemaSetup();
-    vi.spyOn(prisma.contextPack, "findMany").mockResolvedValue([
-      persistedContextPackRow({ ...bilingualContextPack, id: "ctx-invalid-json-pack" }, "{"),
-      persistedContextPackRow({ ...bilingualContextPack, id: "ctx-empty-object-pack" }, "{}")
-    ] as never);
+    vi.spyOn(prisma.contextPack, "findUnique")
+      .mockResolvedValueOnce(persistedContextPackRow({ ...bilingualContextPack, id: "ctx-invalid-json-pack" }, "{") as never)
+      .mockResolvedValueOnce(persistedContextPackRow({ ...bilingualContextPack, id: "ctx-empty-object-pack" }, "{}") as never);
 
     await expect(getPersistedAsset("contextPack", "ctx-invalid-json-pack", writableScope.applicationServiceId)).resolves.toMatchObject({
       id: "ctx-invalid-json-pack",
@@ -452,7 +502,7 @@ describe("Task 2 MCP bilingual enforcement", () => {
 
   it("keeps raw reads canonical while locale-aware renders use localized narratives", async () => {
     mockSchemaSetup();
-    vi.spyOn(prisma.designAsset, "findFirst").mockResolvedValue(persistedAssetRow(bilingualApi) as never);
+    vi.spyOn(prisma.designAsset, "findUnique").mockResolvedValue(persistedAssetRow(bilingualApi) as never);
 
     await expect(
       getPersistedAsset("api", "api-upsert-design-asset", writableScope.applicationServiceId)

@@ -57,6 +57,10 @@ function writableActor(): ScopedActor {
   return process.env.SPECFORGE_MCP_SEED === "1" ? seedHuaweiActor : defaultHuaweiActor;
 }
 
+export function isSeedMode(): boolean {
+  return process.env.SPECFORGE_MCP_SEED === "1";
+}
+
 function readableScope(applicationServiceId: string): ArchitectureScopeRef {
   const scope = scopeById(applicationServiceId);
   if (!scope || scope.level !== "applicationService" || !hasScopeAccess(defaultHuaweiActor, scope, "read")) throw new Error("Scope read is not authorized.");
@@ -111,34 +115,43 @@ export async function ensureMcpPersistenceSchema() {
   )`);
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "DesignAsset" (
-      id TEXT PRIMARY KEY NOT NULL,
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
       type TEXT NOT NULL,
       name TEXT NOT NULL,
       code TEXT,
       description TEXT NOT NULL,
       "domainId" TEXT,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
       payload TEXT NOT NULL,
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id)
     )
   `);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DesignAsset_type_idx" ON "DesignAsset"(type)`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DesignAsset_domainId_idx" ON "DesignAsset"("domainId")`);
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Proposal" (
-      id TEXT PRIMARY KEY NOT NULL,
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
       title TEXT NOT NULL,
       description TEXT NOT NULL,
       status TEXT NOT NULL,
       "domainId" TEXT,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
       payload TEXT NOT NULL,
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id)
     )
   `);
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "ContextPack" (
-      id TEXT PRIMARY KEY NOT NULL,
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
       name TEXT NOT NULL,
       "proposalId" TEXT NOT NULL,
       "targetAgent" TEXT NOT NULL,
@@ -148,7 +161,10 @@ export async function ensureMcpPersistenceSchema() {
       instructions TEXT NOT NULL,
       "generatedMarkdown" TEXT NOT NULL,
       payload TEXT,
-      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id)
     )
   `);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ContextPack_proposalId_idx" ON "ContextPack"("proposalId")`);
@@ -164,22 +180,24 @@ export async function ensureMcpPersistenceSchema() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "GovernanceCheckSnapshot_assetType_assetId_idx" ON "GovernanceCheckSnapshot"("assetType", "assetId")`);
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "AssetLink" (
-      id TEXT PRIMARY KEY NOT NULL,
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
       "sourceType" TEXT NOT NULL,
       "sourceId" TEXT NOT NULL,
       "targetType" TEXT NOT NULL,
       "targetId" TEXT NOT NULL,
       "relationType" TEXT NOT NULL,
       description TEXT,
-      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id)
     )
   `);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_source_idx" ON "AssetLink"("sourceType", "sourceId")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_target_idx" ON "AssetLink"("targetType", "targetId")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_relationType_idx" ON "AssetLink"("relationType")`);
   for (const table of ["DesignAsset", "Proposal", "ContextPack", "AssetLink"]) {
-    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "applicationServiceId" TEXT`);
-    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "scopePath" TEXT`);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "${table}_applicationServiceId_idx" ON "${table}"("applicationServiceId")`);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "${table}_scopePath_idx" ON "${table}"("scopePath")`);
   }
@@ -198,7 +216,13 @@ export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
   await ensureMcpPersistenceSchema();
 
   await prisma.designAsset.upsert({
-    where: { id: canonicalAsset.id },
+    where: {
+      applicationServiceId_scopePath_id: {
+        applicationServiceId: scope.applicationServiceId,
+        scopePath: scope.scopePath,
+        id: String(canonicalAsset.id)
+      }
+    },
     create: {
       id: canonicalAsset.id,
       type: input.assetType,
@@ -239,7 +263,13 @@ export async function upsertProposal(input: UpsertProposalInput) {
   await ensureMcpPersistenceSchema();
 
   await prisma.proposal.upsert({
-    where: { id: canonicalProposal.id },
+    where: {
+      applicationServiceId_scopePath_id: {
+        applicationServiceId: scope.applicationServiceId,
+        scopePath: scope.scopePath,
+        id: canonicalProposal.id
+      }
+    },
     create: {
       id: canonicalProposal.id,
       title: canonicalProposal.title,
@@ -278,7 +308,13 @@ export async function upsertContextPack(input: UpsertContextPackInput) {
   await ensureMcpPersistenceSchema();
 
   await prisma.contextPack.upsert({
-    where: { id: canonicalPack.id },
+    where: {
+      applicationServiceId_scopePath_id: {
+        applicationServiceId: scope.applicationServiceId,
+        scopePath: scope.scopePath,
+        id: canonicalPack.id
+      }
+    },
     create: {
       id: canonicalPack.id,
       name: canonicalPack.name,
@@ -312,6 +348,7 @@ export async function upsertContextPack(input: UpsertContextPackInput) {
 }
 
 export async function deletePersistedDesignData(input: DeletePersistedDesignDataInput) {
+  if (!isSeedMode()) throw new Error("Seed cleanup is not enabled.");
   const scope = resolveWritableScope(writableActor(), input.architectureScope);
   await ensureMcpPersistenceSchema();
   const assetIds = input.assetIds ?? [];
@@ -320,7 +357,7 @@ export async function deletePersistedDesignData(input: DeletePersistedDesignData
 
   const scopedWhere = {
     applicationServiceId: scope.applicationServiceId,
-    scopePath: { startsWith: scope.scopePath }
+    scopePath: scope.scopePath
   };
   await prisma.contextPack.deleteMany({ where: { ...scopedWhere, id: { in: contextPackIds } } });
   await prisma.proposal.deleteMany({ where: { ...scopedWhere, id: { in: proposalIds } } });
@@ -332,10 +369,10 @@ export async function deletePersistedDesignData(input: DeletePersistedDesignData
     await prisma.$executeRawUnsafe(
       `DELETE FROM "AssetLink"
        WHERE "applicationServiceId" = $1
-         AND "scopePath" LIKE $2
+         AND "scopePath" = $2
          AND ("sourceId" IN (${sourcePlaceholders}) OR "targetId" IN (${targetPlaceholders}))`,
       scope.applicationServiceId,
-      `${scope.scopePath}%`,
+      scope.scopePath,
       ...ids,
       ...ids
     );
@@ -351,7 +388,6 @@ export async function deletePersistedDesignData(input: DeletePersistedDesignData
 }
 
 export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedAssetLink> {
-  await ensureMcpPersistenceSchema();
   const scope = resolveWritableScope(writableActor(), input.architectureScope);
   const sourceType = normalizeAssetType(input.sourceType);
   const targetType = normalizeAssetType(input.targetType);
@@ -359,29 +395,35 @@ export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedA
   assertString(input.targetId, "targetId");
   assertString(input.relationType, "relationType");
   const id = assetLinkId({ ...input, sourceType, targetType });
-
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO "AssetLink" (id, "sourceType", "sourceId", "targetType", "targetId", "relationType", description, "applicationServiceId", "scopePath")
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-     ON CONFLICT(id) DO UPDATE SET
-       "sourceType" = excluded."sourceType",
-       "sourceId" = excluded."sourceId",
-       "targetType" = excluded."targetType",
-       "targetId" = excluded."targetId",
-       "relationType" = excluded."relationType",
-       description = excluded.description,
-       "applicationServiceId" = excluded."applicationServiceId",
-       "scopePath" = excluded."scopePath"`,
-    id,
-    sourceType,
-    input.sourceId,
-    targetType,
-    input.targetId,
-    input.relationType,
-    input.description ?? null,
-    scope.applicationServiceId,
-    scope.scopePath
-  );
+  await ensureMcpPersistenceSchema();
+  await prisma.assetLink.upsert({
+    where: {
+      applicationServiceId_scopePath_id: {
+        applicationServiceId: scope.applicationServiceId,
+        scopePath: scope.scopePath,
+        id
+      }
+    },
+    create: {
+      id,
+      sourceType,
+      sourceId: input.sourceId,
+      targetType,
+      targetId: input.targetId,
+      relationType: input.relationType,
+      description: input.description,
+      applicationServiceId: scope.applicationServiceId,
+      scopePath: scope.scopePath
+    },
+    update: {
+      sourceType,
+      sourceId: input.sourceId,
+      targetType,
+      targetId: input.targetId,
+      relationType: input.relationType,
+      description: input.description
+    }
+  });
 
   return {
     id,
@@ -399,16 +441,10 @@ export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedA
 export async function listPersistedAssetLinks(applicationServiceId: string): Promise<PersistedAssetLink[]> {
   await ensureMcpPersistenceSchema();
   const scope = readableScope(applicationServiceId);
-  const rows = await prisma.$queryRawUnsafe<Array<{
-    id: string;
-    sourceType: string;
-    sourceId: string;
-    targetType: string;
-    targetId: string;
-    relationType: string;
-    description: string | null;
-    createdAt: Date | string;
-  }>>(`SELECT id, "sourceType", "sourceId", "targetType", "targetId", "relationType", description, "createdAt" FROM "AssetLink" WHERE "applicationServiceId" = '${scope.applicationServiceId}' AND "scopePath" LIKE '${scope.scopePath}%' ORDER BY "createdAt" ASC`);
+  const rows = await prisma.assetLink.findMany({
+    where: { applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath },
+    orderBy: { createdAt: "asc" }
+  });
   return rows.map((row) => ({
     id: row.id,
     sourceType: row.sourceType,
@@ -417,7 +453,8 @@ export async function listPersistedAssetLinks(applicationServiceId: string): Pro
     targetId: row.targetId,
     relationType: row.relationType,
     description: row.description ?? undefined,
-    createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt)
+    architectureScope: scope,
+    createdAt: row.createdAt.toISOString()
   }));
 }
 
@@ -425,7 +462,7 @@ export async function listPersistedAssets(applicationServiceId: string, assetTyp
   await ensureMcpPersistenceSchema();
   const scope = readableScope(applicationServiceId);
   const rows = await prisma.designAsset.findMany({
-    where: { ...(assetType ? { type: assetType } : {}), applicationServiceId: scope.applicationServiceId, scopePath: { startsWith: scope.scopePath } },
+    where: { ...(assetType ? { type: assetType } : {}), applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath },
     orderBy: { createdAt: "asc" }
   });
   return rows.map((row) => ({ type: normalizeAssetType(row.type), asset: JSON.parse(row.payload) as Asset }));
@@ -434,14 +471,14 @@ export async function listPersistedAssets(applicationServiceId: string, assetTyp
 export async function listPersistedProposals(applicationServiceId: string): Promise<Proposal[]> {
   await ensureMcpPersistenceSchema();
   const scope = readableScope(applicationServiceId);
-  const rows = await prisma.proposal.findMany({ where: { applicationServiceId: scope.applicationServiceId, scopePath: { startsWith: scope.scopePath } }, orderBy: { createdAt: "asc" } });
+  const rows = await prisma.proposal.findMany({ where: { applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath }, orderBy: { createdAt: "asc" } });
   return rows.map((row) => JSON.parse(row.payload) as Proposal);
 }
 
 export async function listPersistedContextPacks(applicationServiceId: string): Promise<ContextPack[]> {
   await ensureMcpPersistenceSchema();
   const scope = readableScope(applicationServiceId);
-  const rows = await prisma.contextPack.findMany({ where: { applicationServiceId: scope.applicationServiceId, scopePath: { startsWith: scope.scopePath } }, orderBy: { createdAt: "asc" } });
+  const rows = await prisma.contextPack.findMany({ where: { applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath }, orderBy: { createdAt: "asc" } });
   return rows.map(rowToContextPack);
 }
 
@@ -449,18 +486,25 @@ export async function getPersistedAsset(assetType: string, assetId: string, appl
   await ensureMcpPersistenceSchema();
   const scope = readableScope(applicationServiceId);
   const type = normalizeAssetType(assetType);
+  const where = {
+    applicationServiceId_scopePath_id: {
+      applicationServiceId: scope.applicationServiceId,
+      scopePath: scope.scopePath,
+      id: assetId
+    }
+  };
   if (type === "proposal") {
-    const proposal = (await listPersistedProposals(applicationServiceId)).find((item) => item.id === assetId);
-    if (!proposal) throw new Error(`Asset not found: ${type}/${assetId}`);
-    return proposal;
+    const row = await prisma.proposal.findUnique({ where });
+    if (!row) throw new Error(`Asset not found: ${type}/${assetId}`);
+    return JSON.parse(row.payload) as Proposal;
   }
   if (type === "contextPack") {
-    const pack = (await listPersistedContextPacks(applicationServiceId)).find((item) => item.id === assetId);
-    if (!pack) throw new Error(`Asset not found: ${type}/${assetId}`);
-    return pack;
+    const row = await prisma.contextPack.findUnique({ where });
+    if (!row) throw new Error(`Asset not found: ${type}/${assetId}`);
+    return rowToContextPack(row);
   }
-  const row = await prisma.designAsset.findFirst({ where: { id: assetId, type, applicationServiceId: scope.applicationServiceId, scopePath: { startsWith: scope.scopePath } } });
-  if (!row) throw new Error(`Asset not found: ${type}/${assetId}`);
+  const row = await prisma.designAsset.findUnique({ where });
+  if (!row || normalizeAssetType(row.type) !== type) throw new Error(`Asset not found: ${type}/${assetId}`);
   return JSON.parse(row.payload) as Asset;
 }
 
@@ -557,8 +601,8 @@ function rowToContextPack(row: {
   instructions: string;
   generatedMarkdown: string;
   payload: string | null;
-  applicationServiceId: string | null;
-  scopePath: string | null;
+  applicationServiceId: string;
+  scopePath: string;
   createdAt: Date;
 }): ContextPack {
   const payloadPack = parseContextPackPayload(row.payload);
@@ -577,10 +621,7 @@ function rowToContextPack(row: {
     instructions: JSON.parse(row.instructions),
     generatedMarkdown: row.generatedMarkdown,
     createdAt: row.createdAt.toISOString(),
-    architectureScope:
-      row.applicationServiceId && row.scopePath
-        ? { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }
-        : undefined
+    architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }
   };
   legacyPack[legacyContextPackFallbackSymbol] = true;
   return legacyPack;

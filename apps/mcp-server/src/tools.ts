@@ -12,7 +12,7 @@ import type { Permission } from "@specforge/core";
 import { z } from "zod";
 import { auditToolCall } from "./audit";
 import { allowAllPolicy, getDefaultActor } from "./auth";
-import { deletePersistedDesignData, getPersistedAsset, listPersistedContextPacks, renderPersistedAssetAsMarkdown, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
+import { deletePersistedDesignData, getPersistedAsset, isSeedMode, listPersistedContextPacks, renderPersistedAssetAsMarkdown, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
 
 type ToolHandler<T> = (input: T) => Promise<unknown>;
 
@@ -56,6 +56,7 @@ function registerJsonTool<T extends z.ZodRawShape>(
     permissions: Permission[];
     readOnly: boolean;
     destructive?: boolean;
+    seedOnly?: boolean;
   },
   handler: ToolHandler<z.output<z.ZodObject<T>>>
 ) {
@@ -75,9 +76,12 @@ function registerJsonTool<T extends z.ZodRawShape>(
       _meta: { permissions: config.permissions, write: !config.readOnly }
     } as Parameters<McpServer["registerTool"]>[1],
     async (input: unknown) => {
-      const actor = getDefaultActor();
+      const actor = isSeedMode()
+        ? { actorType: "system" as const, actorId: "specforge-seed" }
+        : getDefaultActor();
       const target = targetFor(name, input as Record<string, unknown>);
       try {
+        if (config.seedOnly && !isSeedMode()) throw new Error("Seed cleanup is not enabled.");
         await allowAllPolicy.authorize(actor, config.permissions);
         const output = await handler(input as z.output<z.ZodObject<T>>);
         auditToolCall({ actor, action: name, ...target, toolInput: input, output, status: "success" });
@@ -104,7 +108,7 @@ const architectureScopeSchema = z.object({
 });
 
 export function registerTools(server: McpServer): void {
-  registerJsonTool(
+  if (isSeedMode()) registerJsonTool(
     server,
     "delete_seed_design_data",
     {
@@ -118,7 +122,8 @@ export function registerTools(server: McpServer): void {
       },
       permissions: ["asset:write", "proposal:write"],
       readOnly: false,
-      destructive: true
+      destructive: true,
+      seedOnly: true
     },
     deletePersistedDesignData
   );
