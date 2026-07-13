@@ -1,6 +1,7 @@
 import { defaultHuaweiActor, type ApiContract, type ContextPack, type Proposal } from "@specforge/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  deletePersistedDesignData,
   getPersistedAsset,
   prisma,
   renderPersistedAssetAsMarkdown,
@@ -156,6 +157,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  delete process.env.SPECFORGE_MCP_SEED;
   vi.restoreAllMocks();
 });
 
@@ -207,6 +209,61 @@ describe("resolveWritableScope", () => {
       assetId: "api-upsert-design-asset",
       path: "localizedContent.zh"
     });
+  });
+});
+
+describe("scoped seed cleanup", () => {
+  it("rejects cleanup outside the seed actor's authorized application services before database access", async () => {
+    const executeSpy = vi.spyOn(prisma, "$executeRawUnsafe");
+
+    await expect(
+      deletePersistedDesignData({
+        architectureScope: {
+          applicationServiceId: "com.huawei.unauthorized",
+          scopePath: "pf-huawei/unauthorized/com.huawei.unauthorized"
+        },
+        assetIds: ["shared-id"]
+      })
+    ).rejects.toThrow("Scope write is not authorized.");
+
+    expect(executeSpy).not.toHaveBeenCalled();
+  });
+
+  it("deletes matching ids only inside the authorized application service scope", async () => {
+    process.env.SPECFORGE_MCP_SEED = "1";
+    mockSchemaSetup();
+    const contextDelete = vi.spyOn(prisma.contextPack, "deleteMany").mockResolvedValue({ count: 1 });
+    const proposalDelete = vi.spyOn(prisma.proposal, "deleteMany").mockResolvedValue({ count: 1 });
+    const assetDelete = vi.spyOn(prisma.designAsset, "deleteMany").mockResolvedValue({ count: 1 });
+
+    await deletePersistedDesignData({
+      architectureScope: writableScope,
+      assetIds: ["shared-id"],
+      proposalIds: ["shared-proposal"],
+      contextPackIds: ["shared-pack"]
+    });
+
+    const scopedWhere = {
+      applicationServiceId: writableScope.applicationServiceId,
+      scopePath: { startsWith: writableScope.scopePath }
+    };
+    expect(assetDelete).toHaveBeenCalledWith({
+      where: { ...scopedWhere, id: { in: ["shared-id"] } }
+    });
+    expect(proposalDelete).toHaveBeenCalledWith({
+      where: { ...scopedWhere, id: { in: ["shared-proposal"] } }
+    });
+    expect(contextDelete).toHaveBeenCalledWith({
+      where: { ...scopedWhere, id: { in: ["shared-pack"] } }
+    });
+
+    const linkDeleteCall = vi.mocked(prisma.$executeRawUnsafe).mock.calls.at(-1);
+    expect(linkDeleteCall?.[0]).toContain('"applicationServiceId" = $1');
+    expect(linkDeleteCall?.[0]).toContain('"scopePath" LIKE $2');
+    expect(linkDeleteCall?.slice(1, 3)).toEqual([
+      writableScope.applicationServiceId,
+      `${writableScope.scopePath}%`
+    ]);
   });
 });
 

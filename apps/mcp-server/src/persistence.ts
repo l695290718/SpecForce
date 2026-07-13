@@ -25,6 +25,7 @@ export interface UpsertContextPackInput {
 }
 
 export interface DeletePersistedDesignDataInput {
+  architectureScope: ArchitectureScopeRef;
   assetIds?: string[];
   proposalIds?: string[];
   contextPackIds?: string[];
@@ -311,20 +312,30 @@ export async function upsertContextPack(input: UpsertContextPackInput) {
 }
 
 export async function deletePersistedDesignData(input: DeletePersistedDesignDataInput) {
+  const scope = resolveWritableScope(writableActor(), input.architectureScope);
   await ensureMcpPersistenceSchema();
   const assetIds = input.assetIds ?? [];
   const proposalIds = input.proposalIds ?? [];
   const contextPackIds = input.contextPackIds ?? [];
 
-  await prisma.contextPack.deleteMany({ where: { id: { in: contextPackIds } } });
-  await prisma.proposal.deleteMany({ where: { id: { in: proposalIds } } });
-  await prisma.designAsset.deleteMany({ where: { id: { in: assetIds } } });
+  const scopedWhere = {
+    applicationServiceId: scope.applicationServiceId,
+    scopePath: { startsWith: scope.scopePath }
+  };
+  await prisma.contextPack.deleteMany({ where: { ...scopedWhere, id: { in: contextPackIds } } });
+  await prisma.proposal.deleteMany({ where: { ...scopedWhere, id: { in: proposalIds } } });
+  await prisma.designAsset.deleteMany({ where: { ...scopedWhere, id: { in: assetIds } } });
   if (assetIds.length || proposalIds.length || contextPackIds.length) {
     const ids = [...assetIds, ...proposalIds, ...contextPackIds];
-    const sourcePlaceholders = ids.map((_, index) => `$${index + 1}`).join(",");
-    const targetPlaceholders = ids.map((_, index) => `$${ids.length + index + 1}`).join(",");
+    const sourcePlaceholders = ids.map((_, index) => `$${index + 3}`).join(",");
+    const targetPlaceholders = ids.map((_, index) => `$${ids.length + index + 3}`).join(",");
     await prisma.$executeRawUnsafe(
-      `DELETE FROM "AssetLink" WHERE "sourceId" IN (${sourcePlaceholders}) OR "targetId" IN (${targetPlaceholders})`,
+      `DELETE FROM "AssetLink"
+       WHERE "applicationServiceId" = $1
+         AND "scopePath" LIKE $2
+         AND ("sourceId" IN (${sourcePlaceholders}) OR "targetId" IN (${targetPlaceholders}))`,
+      scope.applicationServiceId,
+      `${scope.scopePath}%`,
       ...ids,
       ...ids
     );
@@ -334,6 +345,7 @@ export async function deletePersistedDesignData(input: DeletePersistedDesignData
     deletedAssetIds: assetIds,
     deletedProposalIds: proposalIds,
     deletedContextPackIds: contextPackIds,
+    applicationServiceId: scope.applicationServiceId,
     status: "deleted"
   };
 }

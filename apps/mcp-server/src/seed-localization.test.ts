@@ -1,4 +1,4 @@
-import { validateAssetLocalization } from "@specforge/core";
+import { validateAssetLocalization, type ApiContract, type BusinessRule, type DataModel, type EventContract } from "@specforge/core";
 import { describe, expect, it } from "vitest";
 import {
   buildSeedAssetInventory,
@@ -45,6 +45,73 @@ describe("MCP bilingual multi-scope seed", () => {
         expect(asset.localizedContent?.zh?.description).not.toBe(asset.description);
       }
     }
+  });
+
+  it("uses independent domain and data structures for Spec Studio", () => {
+    const specStudio = mockServiceSeeds.find(
+      (service) => service.scope.applicationServiceId === "com.huawei.celon.specstudio"
+    );
+    expect(specStudio).toBeDefined();
+    expect(specStudio!.domain).toMatchObject({
+      code: "SPECIFICATION_WORKSPACE",
+      boundedContext: "SpecificationWorkspace",
+      entities: ["SpecificationDocument", "SpecificationVersion", "ReviewThread"]
+    });
+
+    const document = specStudio!.assets[0]![1] as DataModel;
+    expect(document).toMatchObject({
+      code: "SPECIFICATION_DOCUMENT",
+      tables: ["specification_documents", "specification_versions", "review_threads"],
+      entities: ["SpecificationDocument", "SpecificationVersion", "ReviewThread"]
+    });
+    expect(document.tables).not.toContain("design_assets");
+    expect(document.fields.map((field) => field.fieldName)).toEqual([
+      "document_id",
+      "current_version",
+      "content_markdown",
+      "review_status"
+    ]);
+    expect(document.localizedContent?.zh?.fields.content_markdown?.meaning).toContain("Markdown");
+  });
+
+  it("uses independent policy and integration contracts for sibling services", () => {
+    const policyHub = mockServiceSeeds.find(
+      (service) => service.scope.applicationServiceId === "com.huawei.celon.policyhub"
+    );
+    expect(policyHub?.domain).toMatchObject({
+      code: "ARCHITECTURE_POLICY",
+      entities: ["PolicyDefinition", "PolicyEvaluation", "PolicyViolation"]
+    });
+    const policyRule = policyHub?.assets[0]?.[1] as BusinessRule | undefined;
+    expect(policyRule).toMatchObject({
+      code: "POLICY_SCOPE_ISOLATION",
+      ruleType: "permission",
+      domainId: "domain-policyhub"
+    });
+
+    const gateway = mockServiceSeeds.find(
+      (service) => service.scope.applicationServiceId === "com.huawei.celon.integrationgateway"
+    );
+    expect(gateway?.domain).toMatchObject({
+      code: "INTEGRATION_GATEWAY",
+      entities: ["IntegrationContract", "ContractVersion", "Publication"]
+    });
+    const api = gateway?.assets.find(([type]) => type === "api")?.[1] as ApiContract | undefined;
+    expect(api).toMatchObject({
+      path: "/integration-contracts/{contractId}/versions",
+      providerSystem: "Celon Integration Gateway",
+      requestSchema: expect.objectContaining({ contractId: "string", version: "string" })
+    });
+    expect(api?.path).not.toContain("context-packs");
+
+    const event = gateway?.assets.find(([type]) => type === "event")?.[1] as EventContract | undefined;
+    expect(event).toMatchObject({
+      topic: "celon.integration.contract-published.v1",
+      eventType: "IntegrationContractPublished",
+      producer: "Celon Integration Gateway",
+      schema: expect.objectContaining({ contractId: "string", version: "string" })
+    });
+    expect(event?.topic).not.toContain("context-pack");
   });
 
   it("reports scope, type, id, code, and path for incomplete localization", () => {

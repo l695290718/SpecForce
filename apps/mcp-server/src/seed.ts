@@ -2,7 +2,6 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { deletePersistedDesignData } from "./persistence";
 import {
   architectureChangeProposals,
   selfDesignAdrs,
@@ -62,12 +61,6 @@ async function main() {
   console.info(`Validated ${localizationReport.totalAssets} bilingual seed assets.`);
 
   process.env.SPECFORGE_MCP_SEED = "1";
-  await deletePersistedDesignData({
-    assetIds: legacyDemoAssetIds,
-    proposalIds: ["proposal-partial-refund"],
-    contextPackIds: ["ctx-partial-refund"]
-  });
-
   const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
   const command = resolve(repoRoot, "node_modules", ".bin", process.platform === "win32" ? "tsx.cmd" : "tsx");
   const transport = new StdioClientTransport({
@@ -83,6 +76,13 @@ async function main() {
   const client = new Client({ name: "specforge-seed", version: "0.1.0" }, { capabilities: {} });
 
   await client.connect(transport);
+
+  await callToolOrThrow(client, "delete_seed_design_data", {
+    architectureScope: defaultArchitectureScope,
+    assetIds: legacyDemoAssetIds,
+    proposalIds: ["proposal-partial-refund"],
+    contextPackIds: ["ctx-partial-refund"]
+  });
 
   for (const [assetType, assets] of seedConfiguration.designerAssetGroups) {
     for (const asset of assets) {

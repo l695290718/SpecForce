@@ -12,7 +12,7 @@ import type { Permission } from "@specforge/core";
 import { z } from "zod";
 import { auditToolCall } from "./audit";
 import { allowAllPolicy, getDefaultActor } from "./auth";
-import { getPersistedAsset, listPersistedContextPacks, renderPersistedAssetAsMarkdown, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
+import { deletePersistedDesignData, getPersistedAsset, listPersistedContextPacks, renderPersistedAssetAsMarkdown, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
 
 type ToolHandler<T> = (input: T) => Promise<unknown>;
 
@@ -55,6 +55,7 @@ function registerJsonTool<T extends z.ZodRawShape>(
     inputSchema: T;
     permissions: Permission[];
     readOnly: boolean;
+    destructive?: boolean;
   },
   handler: ToolHandler<z.output<z.ZodObject<T>>>
 ) {
@@ -67,7 +68,7 @@ function registerJsonTool<T extends z.ZodRawShape>(
       annotations: {
         title: config.title,
         readOnlyHint: config.readOnly,
-        destructiveHint: false,
+        destructiveHint: config.destructive ?? false,
         idempotentHint: config.readOnly,
         openWorldHint: false
       },
@@ -103,6 +104,25 @@ const architectureScopeSchema = z.object({
 });
 
 export function registerTools(server: McpServer): void {
+  registerJsonTool(
+    server,
+    "delete_seed_design_data",
+    {
+      title: "Delete scoped seed design data",
+      description: "Deletes explicitly named legacy seed records inside one authorized application-service scope. It cannot delete records from sibling scopes.",
+      inputSchema: {
+        architectureScope: architectureScopeSchema,
+        assetIds: z.array(z.string()).optional(),
+        proposalIds: z.array(z.string()).optional(),
+        contextPackIds: z.array(z.string()).optional()
+      },
+      permissions: ["asset:write", "proposal:write"],
+      readOnly: false,
+      destructive: true
+    },
+    deletePersistedDesignData
+  );
+
   registerJsonTool(
     server,
     "upsert_design_asset",
