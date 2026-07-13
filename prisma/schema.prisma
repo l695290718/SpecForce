@@ -14,12 +14,16 @@ model DesignAsset {
   code        String?
   description String
   domainId    String?
+  applicationServiceId String?
+  scopePath   String?
   payload     String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([type])
   @@index([domainId])
+  @@index([applicationServiceId])
+  @@index([scopePath])
 }
 
 model Proposal {
@@ -28,9 +32,14 @@ model Proposal {
   description String
   status      String
   domainId    String?
+  applicationServiceId String?
+  scopePath   String?
   payload     String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([applicationServiceId])
+  @@index([scopePath])
 }
 
 model ContextPack {
@@ -43,9 +52,13 @@ model ContextPack {
   constraints       String
   instructions      String
   generatedMarkdown String
+  applicationServiceId String?
+  scopePath           String?
   createdAt         DateTime @default(now())
 
   @@index([proposalId])
+  @@index([applicationServiceId])
+  @@index([scopePath])
 }
 
 model GovernanceCheckSnapshot {
@@ -66,11 +79,43 @@ model AssetLink {
   targetId     String
   relationType String
   description  String?
+  applicationServiceId String?
+  scopePath   String?
   createdAt    DateTime @default(now())
 
   @@index([sourceType, sourceId])
   @@index([targetType, targetId])
   @@index([relationType])
+  @@index([applicationServiceId])
+  @@index([scopePath])
+}
+
+model ArchitectureScope {
+  id          String   @id
+  code        String   @unique
+  name        String
+  description String
+  owner       String
+  level       String
+  parentId    String?
+  scopePath   String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([parentId])
+  @@index([level])
+}
+
+model ActorScopeGrant {
+  id        String   @id @default(cuid())
+  actorType String
+  actorId   String
+  scopeId   String
+  action    String
+  createdAt DateTime @default(now())
+
+  @@unique([actorType, actorId, scopeId, action])
+  @@index([actorType, actorId])
 }
 
 model AuditLog {
