@@ -78,3 +78,48 @@ Results:
 ## Notes
 
 - To preserve current seed-backed behavior and avoid changing unrelated task surfaces, `ASSET_BILINGUAL_COMPLETENESS` is emitted when an asset includes `localizedContent`. This still allows all 12 asset types to participate once bilingual payloads are present.
+
+## Review Follow-Up
+
+Review findings required two corrections:
+
+- Remove the guard that skipped `ASSET_BILINGUAL_COMPLETENESS` when `localizedContent` was absent
+- Prove the check is present for every asset type, not only localized fixtures
+
+### Follow-Up RED
+
+Command:
+
+```bash
+pnpm --filter @specforge/core test -- governance-localization
+```
+
+Observed failing behavior before the fix:
+
+- `ASSET_BILINGUAL_COMPLETENESS` was `undefined` for `api-create-refund` when `localizedContent` was absent
+- The table-driven asset-type assertion failed on `domain-order` because no completeness result was emitted
+
+This confirmed the root cause was the early return in `maybeCheckAssetLocalization`.
+
+### Follow-Up GREEN
+
+Commands:
+
+```bash
+pnpm --filter @specforge/core test -- governance-localization
+pnpm --filter @specforge/core test
+pnpm --filter @specforge/core typecheck
+```
+
+Results:
+
+- Focused governance regression suite passed: `7` files, `46` tests
+- Full core suite passed: `7` files, `46` tests
+- Core typecheck passed with no errors
+
+### Follow-Up Changes
+
+- Removed the `localizedContent` guard from `maybeCheckAssetLocalization` so every asset runs through Task 1 validation
+- Added a regression test for an asset with no `localizedContent`, expecting `ASSET_TRANSLATION_REQUIRED at localizedContent.zh`
+- Added a table-driven seeded-asset assertion covering all `12` asset types
+- Tightened the older API governance test so it still verifies the original API rule calculations without masking the new completeness failure

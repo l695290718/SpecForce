@@ -2,7 +2,22 @@ import { afterEach, describe, expect, it } from "vitest";
 import { getStore, localizeGovernanceResult, runGovernanceChecks, type GovernanceCheckResult, type StateMachine } from "../index";
 
 const stateMachines = getStore().stateMachines;
+const store = getStore();
 const now = "2026-07-13T00:00:00.000Z";
+const seededAssetsByType = [
+  ["domain", store.domains[0]?.id],
+  ["dataModel", store.dataModels[0]?.id],
+  ["api", store.apis[0]?.id],
+  ["event", store.events[0]?.id],
+  ["businessRule", store.businessRules[0]?.id],
+  ["stateMachine", store.stateMachines[0]?.id],
+  ["integration", store.integrations[0]?.id],
+  ["quality", store.qualityRequirements[0]?.id],
+  ["observability", store.observabilityDesigns[0]?.id],
+  ["adr", store.adrs[0]?.id],
+  ["proposal", store.proposals[0]?.id],
+  ["contextPack", store.contextPacks[0]?.id]
+] as const;
 
 function createGovernanceResult(overrides: Partial<GovernanceCheckResult> = {}): GovernanceCheckResult {
   return {
@@ -152,5 +167,28 @@ describe("governance localization", () => {
     expect(results.find((result) => result.ruleCode === "GOVERNANCE_NOT_CONFIGURED")).toMatchObject({
       status: "pass"
     });
+  });
+
+  it("fails bilingual completeness when localizedContent is absent", async () => {
+    const results = await runGovernanceChecks("api", "api-create-refund");
+
+    expect(results.find((result) => result.ruleCode === "ASSET_BILINGUAL_COMPLETENESS")).toMatchObject({
+      severity: "error",
+      status: "fail",
+      reason: "ASSET_TRANSLATION_REQUIRED at localizedContent.zh"
+    });
+  });
+
+  it("emits bilingual completeness checks for every seeded asset type", async () => {
+    for (const [assetType, assetId] of seededAssetsByType) {
+      expect(assetId, `expected seeded fixture for ${assetType}`).toBeTruthy();
+
+      const results = await runGovernanceChecks(assetType, assetId!);
+      expect(results.find((result) => result.ruleCode === "ASSET_BILINGUAL_COMPLETENESS")).toMatchObject({
+        assetType,
+        assetId,
+        severity: "error"
+      });
+    }
   });
 });

@@ -49,9 +49,6 @@ function maybeCheckAssetLocalization(assetType: string, assetId: string): Govern
   }
 
   const asset = getAsset(assetType as AssetType, assetId) as Asset;
-  if (!asset.localizedContent) {
-    return [];
-  }
 
   try {
     validateAssetLocalization(assetType as AssetType, asset);
