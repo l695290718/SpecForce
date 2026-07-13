@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { LanguageSwitcher, T } from "./language-provider";
+import { ArchitectureScopeSwitcher } from "./architecture-scope-switcher";
 import type { MessageKey } from "../lib/i18n";
 
 const assetLinks = [
@@ -60,7 +61,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="sf-pulse h-2 w-2 rounded-sm bg-rule" />
               <T k="app.name" />
             </div>
-            <div className="font-mono text-[11px] uppercase text-muted"><T k="app.topline" /></div>
+            <div className="flex min-w-0 items-center gap-3">
+              <ArchitectureScopeSwitcher />
+              <div className="hidden font-mono text-[11px] uppercase text-muted md:block"><T k="app.topline" /></div>
+            </div>
           </div>
         </div>
         <div className="mx-auto max-w-7xl px-5 py-6 lg:px-8">{children}</div>
