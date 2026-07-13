@@ -4,6 +4,7 @@ import {
   type Adr,
   type ApiContract,
   type Asset,
+  type AssetLocalizedContentMap,
   type AssetType,
   AssetLocalizationError,
   type BusinessRule,
@@ -36,13 +37,13 @@ const domain: DomainModel = {
   updatedAt: now,
   localizedContent: {
     zh: {
-      name: "计费领域",
-      description: "负责计费工作流。",
-      entities: ["发票"],
-      valueObjects: ["金额"],
-      domainServices: ["发票服务"],
-      businessCapabilities: ["发票开具"],
-      glossaryTerms: ["未结余额"]
+      name: "zh billing domain",
+      description: "zh billing workflow description",
+      entities: ["zh invoice"],
+      valueObjects: ["zh money"],
+      domainServices: ["zh invoice service"],
+      businessCapabilities: ["zh invoice issuance"],
+      glossaryTerms: ["zh outstanding balance"]
     }
   }
 };
@@ -76,17 +77,17 @@ const dataModel: DataModel = {
   updatedAt: now,
   localizedContent: {
     zh: {
-      name: "发票数据模型",
-      description: "存储发票。",
-      relationships: ["发票归属于客户"],
-      constraints: ["invoice_id 必须唯一"],
-      lifecycle: "90 天热数据",
-      lineage: "计费服务写模型",
+      name: "zh invoice data model",
+      description: "zh stores invoices",
+      relationships: ["zh invoice belongs to customer"],
+      constraints: ["zh invoice id unique"],
+      lifecycle: "zh hot for 90 days",
+      lineage: "zh billing service write model",
       fields: {
         invoice_id: {
-          displayName: "发票编号",
-          meaning: "发票唯一标识。",
-          constraint: "主键"
+          displayName: "zh invoice id",
+          meaning: "zh unique invoice identifier",
+          constraint: "zh primary key"
         }
       }
     }
@@ -116,13 +117,13 @@ const api: ApiContract = {
   updatedAt: now,
   localizedContent: {
     zh: {
-      name: "设计资产写入接口",
-      description: "用于写入设计资产。",
-      authType: "Bearer 令牌",
-      idempotency: "使用资产标识作为幂等键。",
-      rateLimit: "每分钟 60 次",
-      timeout: "2 秒",
-      compatibilityPolicy: "仅允许向后兼容的新增。"
+      name: "zh design asset write api",
+      description: "zh writes design assets",
+      authType: "zh bearer token",
+      idempotency: "zh uses asset id as idempotency key",
+      rateLimit: "zh 60 rpm",
+      timeout: "zh 2 seconds",
+      compatibilityPolicy: "zh additive changes only"
     }
   }
 };
@@ -147,13 +148,13 @@ const eventContract: EventContract = {
   updatedAt: now,
   localizedContent: {
     zh: {
-      name: "发票开具事件",
-      description: "发票开具后发出。",
-      triggerTiming: "发票提交后",
-      orderingRequirement: "按 customerId 排序",
-      retryPolicy: "重试 1 小时",
-      deadLetterPolicy: "投递到死信队列",
-      compatibilityPolicy: "v1 不允许移除字段"
+      name: "zh invoice issued event",
+      description: "zh emitted after invoice issuance",
+      triggerTiming: "zh after invoice commit",
+      orderingRequirement: "zh ordered by customerId",
+      retryPolicy: "zh retry for 1 hour",
+      deadLetterPolicy: "zh route to dlq",
+      compatibilityPolicy: "zh no removals in v1"
     }
   }
 };
@@ -175,12 +176,12 @@ const businessRule: BusinessRule = {
   updatedAt: now,
   localizedContent: {
     zh: {
-      name: "发票金额上限",
-      description: "超过授信上限的发票会被拒绝。",
-      condition: "invoice.amount <= customer.creditLimit",
-      action: "允许创建发票。",
-      exception: "返回 CREDIT_LIMIT_EXCEEDED。",
-      examples: ["10 美元发票可以通过。"]
+      name: "zh invoice amount limit",
+      description: "zh reject invoices above the credit ceiling",
+      condition: "zh invoice.amount <= customer.creditLimit",
+      action: "zh allow invoice creation",
+      exception: "zh reject with CREDIT_LIMIT_EXCEEDED",
+      examples: ["zh ten dollar invoice passes"]
     }
   }
 };
@@ -212,23 +213,23 @@ const stateMachine: StateMachine = {
   updatedAt: now,
   localizedContent: {
     zh: {
-      name: "发票生命周期",
-      description: "跟踪发票状态。",
+      name: "zh invoice lifecycle",
+      description: "zh tracks invoice states",
       states: {
-        DRAFT: "草稿",
-        SENT: "已发送",
-        PAID: "已支付"
+        DRAFT: "zh draft",
+        SENT: "zh sent",
+        PAID: "zh paid"
       },
       events: {
-        InvoiceSent: "发票已发送"
+        InvoiceSent: "zh invoice sent"
       },
-      guards: ["发票已审批"],
-      actions: ["发送发票"],
+      guards: ["zh invoice approved"],
+      actions: ["zh send invoice"],
       transitions: {
         "DRAFT::SENT::InvoiceSent": {
-          condition: "发票已审批",
-          action: "发送发票",
-          failureHandling: "重试发送"
+          condition: "zh invoice approved",
+          action: "zh send invoice",
+          failureHandling: "zh retry send"
         }
       }
     }
@@ -255,15 +256,15 @@ const integration: IntegrationContract = {
   updatedAt: now,
   localizedContent: {
     zh: {
-      name: "总账同步",
-      description: "将发票发送到总账。",
-      dataMapping: "invoiceId -> ledgerInvoiceId",
-      errorMapping: "409 表示重复发票",
-      sla: "p95 小于 1 秒",
-      timeout: "1 秒",
-      retryStrategy: "重试 3 次",
-      fallbackStrategy: "排队重试",
-      circuitBreaker: "失败率超过 50% 时打开"
+      name: "zh ledger sync",
+      description: "zh sends invoices to the ledger",
+      dataMapping: "zh invoiceId maps to ledgerInvoiceId",
+      errorMapping: "zh 409 means duplicate invoice",
+      sla: "zh p95 less than 1s",
+      timeout: "zh 1s",
+      retryStrategy: "zh 3 retries",
+      fallbackStrategy: "zh queue for retry",
+      circuitBreaker: "zh open after 50 percent failures"
     }
   }
 };
@@ -284,11 +285,11 @@ const qualityRequirement: QualityRequirement = {
   updatedAt: now,
   localizedContent: {
     zh: {
-      name: "发票延迟目标",
-      description: "发票写入需要保持快速。",
-      target: "p95 小于等于 200 毫秒",
-      measurement: "API 直方图",
-      verificationMethod: "压测"
+      name: "zh invoice latency target",
+      description: "zh invoice writes should stay fast",
+      target: "zh p95 less than or equal to 200ms",
+      measurement: "zh api histogram",
+      verificationMethod: "zh load test"
     }
   }
 };
@@ -311,12 +312,12 @@ const observabilityDesign: ObservabilityDesign = {
   updatedAt: now,
   localizedContent: {
     zh: {
-      name: "发票可观测性",
-      description: "观察发票投递。",
-      alerts: ["发票错误率大于 5%"],
-      dashboards: ["计费看板"],
-      runbook: "检查队列并重试失败项。",
-      slo: "99% 在 5 分钟内完成。"
+      name: "zh invoice observability",
+      description: "zh observes invoice delivery",
+      alerts: ["zh invoice errors greater than 5 percent"],
+      dashboards: ["zh billing dashboard"],
+      runbook: "zh check queue and retry failures",
+      slo: "zh 99 percent complete in 5 minutes"
     }
   }
 };
@@ -339,14 +340,14 @@ const adr: Adr = {
   updatedAt: now,
   localizedContent: {
     zh: {
-      name: "规范英文资产",
-      title: "规范英文资产",
-      description: "保持单一规范资产负载。",
-      context: "系统需要单一规范负载。",
-      decision: "将英文保留在顶层。",
-      alternatives: ["为每种语言复制资产"],
-      consequences: ["本地化在读取时合并。"],
-      constraints: ["不要翻译标识符。"]
+      name: "zh canonical english assets",
+      title: "zh canonical english assets",
+      description: "zh keep one canonical payload",
+      context: "zh single canonical payload is required",
+      decision: "zh keep english at the top level",
+      alternatives: ["zh duplicate assets per locale"],
+      consequences: ["zh localization merges at read time"],
+      constraints: ["zh do not translate ids"]
     }
   }
 };
@@ -370,17 +371,17 @@ const proposal: Proposal = {
   updatedAt: now,
   localizedContent: {
     zh: {
-      name: "双语资产提案",
-      title: "双语资产提案",
-      description: "增加双语资产。",
-      background: "读取方需要英文和中文。",
-      goal: "通过单一资产渲染两种语言。",
-      nonGoal: "不要复制记录。",
-      scope: "核心本地化",
-      specChanges: ["增加本地化注册表"],
-      risks: ["错误的合并可能隐藏字段。"],
-      rolloutPlan: "先交付核心。",
-      rollbackPlan: "关闭本地化读取。"
+      name: "zh bilingual assets proposal",
+      title: "zh bilingual assets proposal",
+      description: "zh adds bilingual assets",
+      background: "zh readers need english and chinese",
+      goal: "zh render both languages from one asset",
+      nonGoal: "zh do not duplicate records",
+      scope: "zh core localization",
+      specChanges: ["zh add localization registry"],
+      risks: ["zh incorrect merges could hide fields"],
+      rolloutPlan: "zh ship core first",
+      rollbackPlan: "zh disable localized reads"
     }
   }
 };
@@ -398,11 +399,11 @@ const contextPack: ContextPack = {
   createdAt: now,
   localizedContent: {
     zh: {
-      name: "双语资产上下文包",
-      summary: "实现双语资产。",
-      constraints: ["保持标识稳定。"],
-      instructions: ["先实现任务 1。"],
-      generatedMarkdown: "# 上下文"
+      name: "zh bilingual assets context pack",
+      summary: "zh implements bilingual assets",
+      constraints: ["zh keep ids stable"],
+      instructions: ["zh implement task 1 first"],
+      generatedMarkdown: "# zh context"
     }
   }
 };
@@ -434,19 +435,16 @@ describe("asset localization", () => {
   it("merges the Chinese overlay into localizable API fields only", () => {
     const localized = localizeAsset("api", api, "zh");
 
-    expect(localized.name).toBe("设计资产写入接口");
-    expect(localized.description).toBe("用于写入设计资产。");
-    expect(localized.authType).toBe("Bearer 令牌");
+    expect(localized.name).toBe("zh design asset write api");
+    expect(localized.description).toBe("zh writes design assets");
+    expect(localized.authType).toBe("zh bearer token");
     expect(localized.path).toBe("/api/assets/upsert");
     expect(localized.method).toBe("POST");
   });
 
   it("rejects assets that omit the required Chinese overlay", () => {
     expect(() =>
-      localizeAsset("api", {
-        ...api,
-        localizedContent: undefined
-      }, "zh")
+      localizeAsset("api", { ...api, localizedContent: undefined }, "zh")
     ).toThrowError(
       expect.objectContaining({
         code: "ASSET_TRANSLATION_REQUIRED",
@@ -457,7 +455,7 @@ describe("asset localization", () => {
     );
   });
 
-  it("rejects forbidden technical translation fields", () => {
+  it("rejects known technical-field translation attempts with a technical-mutation code", () => {
     expect(() =>
       localizeAsset("api", {
         ...api,
@@ -477,6 +475,20 @@ describe("asset localization", () => {
           zh: {
             ...api.localizedContent?.zh,
             path: "/translated"
+          }
+        }
+      }, "zh")
+    ).toThrowError(/TRANSLATION_TECHNICAL_FIELD_MUTATION/);
+  });
+
+  it("keeps unknown overlay keys on the generic invalid-field code path", () => {
+    expect(() =>
+      localizeAsset("api", {
+        ...api,
+        localizedContent: {
+          zh: {
+            ...api.localizedContent?.zh,
+            unexpectedNarrative: "not in the registry"
           }
         }
       }, "zh")
@@ -501,19 +513,26 @@ describe("asset localization", () => {
     const localized = localizeAsset("dataModel", dataModel, "zh");
 
     expect(localized.fields[0]?.fieldName).toBe("invoice_id");
-    expect(localized.fields[0]?.displayName).toBe("发票编号");
-    expect(localized.fields[0]?.meaning).toBe("发票唯一标识。");
+    expect(localized.fields[0]?.displayName).toBe("zh invoice id");
+    expect(localized.fields[0]?.meaning).toBe("zh unique invoice identifier");
     expect(localized.fields[0]?.dataType).toBe("uuid");
   });
 
-  it("matches state labels and transition narratives by stable technical keys", () => {
+  it("preserves canonical state and event identifiers while keeping translated labels as metadata", () => {
     const localized = localizeAsset("stateMachine", stateMachine, "zh");
 
-    expect(localized.states).toEqual(["草稿", "已发送", "已支付"]);
-    expect(localized.events).toEqual(["发票已发送"]);
+    expect(localized.states).toEqual(["DRAFT", "SENT", "PAID"]);
+    expect(localized.events).toEqual(["InvoiceSent"]);
+    expect(localized.initialState).toBe("DRAFT");
+    expect(localized.terminalStates).toEqual(["PAID"]);
     expect(localized.transitions[0]?.from).toBe("DRAFT");
-    expect(localized.transitions[0]?.condition).toBe("发票已审批");
-    expect(localized.transitions[0]?.failureHandling).toBe("重试发送");
+    expect(localized.transitions[0]?.to).toBe("SENT");
+    expect(localized.transitions[0]?.trigger).toBe("InvoiceSent");
+    expect(localized.transitions[0]?.emitsEvent).toBe("InvoiceSent");
+    expect(localized.transitions[0]?.condition).toBe("zh invoice approved");
+    expect(localized.transitions[0]?.failureHandling).toBe("zh retry send");
+    expect(localized.localizedContent?.zh.states.DRAFT).toBe("zh draft");
+    expect(localized.localizedContent?.zh.events.InvoiceSent).toBe("zh invoice sent");
   });
 
   it("keeps legacy proposal English overlays readable through the shared localizer", () => {
@@ -560,5 +579,17 @@ describe("asset localization", () => {
     for (const [assetType, asset] of allAssets) {
       expect(() => localizeAsset(assetType, asset, "zh")).not.toThrow();
     }
+  });
+
+  it("exposes typed localized overlays for later consumers", () => {
+    const overlayMap: AssetLocalizedContentMap = {
+      stateMachine: stateMachine.localizedContent!,
+      api: api.localizedContent!,
+      proposal: proposal.localizedContent!
+    };
+
+    expect(overlayMap.stateMachine.zh.states.DRAFT).toBe("zh draft");
+    expect(overlayMap.api.zh.name).toBe("zh design asset write api");
+    expect(overlayMap.proposal.zh.title).toBe("zh bilingual assets proposal");
   });
 });
