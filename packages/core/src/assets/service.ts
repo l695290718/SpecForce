@@ -92,7 +92,7 @@ function assetName(asset: Asset): string {
 }
 
 function searchableText(asset: Asset): string {
-  return JSON.stringify(asset).toLowerCase();
+  return JSON.stringify({ canonical: asset, zh: asset.localizedContent?.zh }).toLowerCase();
 }
 
 function scoreAsset(asset: Asset, queryTerms: string[]): number {
@@ -109,25 +109,32 @@ export async function searchDesignAssets(input: SearchDesignAssetsInput, options
   const requestedTypes = input.assetTypes?.length ? input.assetTypes.map(normalizeAssetType) : listAllAssetTypes();
   const limit = Math.max(1, Math.min(input.limit ?? 10, 50));
   const locale = options.locale ?? "en";
-  const candidates = requestedTypes.flatMap((type) => listAssets(type, options.catalog).map((asset) => ({
-    type,
-    asset: localizeCatalogAsset(type, asset, locale, options.catalog) as Asset
-  })));
+  const candidates = requestedTypes.flatMap((type) => listAssets(type, options.catalog).map((asset) => ({ type, asset })));
 
   const scored = candidates
     .filter(({ asset }) => !input.domainId || !("domainId" in asset) || asset.domainId === input.domainId || asset.id === input.domainId)
-    .map(({ type, asset }) => ({ type, asset, score: scoreAsset(asset, queryTerms) }))
+    .map(({ type, asset }) => ({ type, canonical: asset, score: scoreAsset(asset, queryTerms) }))
     .filter((item) => item.score > 0 || queryTerms.length === 0)
-    .sort((a, b) => b.score - a.score || assetName(a.asset).localeCompare(assetName(b.asset)));
+    .sort((a, b) => b.score - a.score || assetName(a.canonical).localeCompare(assetName(b.canonical)));
 
   const results = await Promise.all(
-    scored.slice(0, limit).map(async ({ type, asset, score }) => ({
-      id: asset.id,
-      type,
-      name: assetName(asset),
-      summary: await renderAssetSummary(type, asset.id, options),
-      relevanceReason: score > 0 ? `Matched ${score} query term(s) in ${assetLabel(type, locale)} metadata.` : `Included from ${assetLabel(type, locale)} catalog.`
-    }))
+    scored.slice(0, limit).map(async ({ type, canonical, score }) => {
+      const asset = localizeCatalogAsset(type, canonical, locale, options.catalog) as Asset;
+      const relevanceReason = locale === "zh"
+        ? score > 0
+          ? `在${assetLabel(type, locale)}元数据中匹配 ${score} 个查询词。`
+          : `来自${assetLabel(type, locale)}目录。`
+        : score > 0
+          ? `Matched ${score} query term(s) in ${assetLabel(type, locale)} metadata.`
+          : `Included from ${assetLabel(type, locale)} catalog.`;
+      return {
+        id: asset.id,
+        type,
+        name: assetName(asset),
+        summary: await renderAssetSummary(type, asset.id, options),
+        relevanceReason
+      };
+    })
   );
 
   return { results };

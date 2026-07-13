@@ -16,6 +16,12 @@
 
 ## Verification
 
-- `pnpm --filter @specforge/core test` -> 8 files, 53 tests passed.
+- `pnpm --filter @specforge/core test` -> 8 files, 58 tests passed.
 - `pnpm --filter @specforge/core typecheck` -> passed.
 - `git diff --check -- packages/core` -> passed (line-ending warnings only).
+
+## Review Follow-up
+
+- Mixed-scope graphs now retain `logicalId` while assigning unique scoped node IDs only when logical IDs collide. Nodes and edges carry `applicationServiceId`/`architectureScope`, and edge endpoints resolve within the relation owner's scope.
+- Search now scores the canonical English asset and Chinese overlay together before applying the requested display locale. Relevance copy is localized after scoring.
+- Added regression coverage for duplicate IDs and scoped links, cross-language search, strict explicit-catalog behavior, English-canonical and Chinese Context Pack views, representative localized governance reason/suggestion copy, and technical invariants.

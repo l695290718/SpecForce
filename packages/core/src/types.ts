@@ -402,17 +402,24 @@ export interface GovernanceCheckResult {
 
 export interface AssetGraphNode {
   id: string;
+  logicalId?: string;
   label: string;
   type: AssetType;
   domainId?: string;
   summary: string;
+  applicationServiceId?: string;
+  architectureScope?: ArchitectureScopeRef;
 }
 
 export interface AssetGraphEdge {
   id: string;
   source: string;
   target: string;
+  sourceLogicalId?: string;
+  targetLogicalId?: string;
   label: string;
+  applicationServiceId?: string;
+  architectureScope?: ArchitectureScopeRef;
 }
 
 export interface AssetGraph {

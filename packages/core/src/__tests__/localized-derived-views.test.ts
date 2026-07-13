@@ -6,6 +6,7 @@ import {
   renderAssetAsMarkdown,
   renderAssetSummary,
   runGovernanceChecks,
+  searchDesignAssets,
   seedData,
   type ApiContract,
   type ContextPack,
@@ -23,6 +24,14 @@ function scopedCatalog(scope: "alpha" | "beta"): SpecForgeDataStore {
   const proposal = catalog.proposals.find((asset) => asset.id === "proposal-partial-refund") as Proposal;
   const event = catalog.events.find((asset) => asset.id === "event-refund-created") as EventContract;
   const stateMachine = catalog.stateMachines.find((asset) => asset.id === "sm-refund") as StateMachine;
+  const applicationServiceId = `com.example.${scope}`;
+  const architectureScope = { applicationServiceId, scopePath: `/family/product/${applicationServiceId}` };
+
+  domain.architectureScope = architectureScope;
+  api.architectureScope = architectureScope;
+  proposal.architectureScope = architectureScope;
+  event.architectureScope = architectureScope;
+  stateMachine.architectureScope = architectureScope;
 
   domain.name = `${scope} Order Domain`;
   domain.description = `${scope} canonical domain description`;
@@ -39,7 +48,7 @@ function scopedCatalog(scope: "alpha" | "beta"): SpecForgeDataStore {
   };
 
   api.name = `${scope} Create Refund API`;
-  api.description = `${scope} canonical API description`;
+  api.description = `${scope} canonicalmarker API description`;
   api.localizedContent = {
     zh: {
       name: `${scope} 创建退款接口`,
@@ -119,6 +128,25 @@ function scopedCatalog(scope: "alpha" | "beta"): SpecForgeDataStore {
   return catalog;
 }
 
+function mixedScopeCatalog(): SpecForgeDataStore {
+  const alpha = scopedCatalog("alpha");
+  const beta = scopedCatalog("beta");
+  return {
+    domains: [...alpha.domains, ...beta.domains],
+    dataModels: [],
+    apis: [...alpha.apis, ...beta.apis],
+    events: [...alpha.events, ...beta.events],
+    businessRules: [],
+    stateMachines: [...alpha.stateMachines, ...beta.stateMachines],
+    integrations: [],
+    qualityRequirements: [],
+    observabilityDesigns: [],
+    adrs: [],
+    proposals: [...alpha.proposals, ...beta.proposals],
+    contextPacks: []
+  };
+}
+
 describe("scoped localized derived views", () => {
   it("renders summaries from the supplied catalog in either locale without changing technical values", async () => {
     const alpha = scopedCatalog("alpha");
@@ -161,6 +189,47 @@ describe("scoped localized derived views", () => {
     expect(englishApi?.summary).toBe("POST /api/orders/{orderId}/refunds");
     expect(chineseApi?.summary).toBe("POST /api/orders/{orderId}/refunds");
     expect(chinese.edges.find((item) => item.target === "api-create-refund")?.label).toBe("provides api");
+  });
+
+  it("assigns unique scoped graph identities to duplicate logical IDs and keeps links in scope", async () => {
+    const graph = await buildAssetGraph("domain-order", "api", { catalog: mixedScopeCatalog(), locale: "en" });
+    const apiNodes = graph.nodes.filter((node) => node.logicalId === "api-create-refund");
+    const domainNodes = graph.nodes.filter((node) => node.logicalId === "domain-order");
+
+    expect(apiNodes).toHaveLength(2);
+    expect(domainNodes).toHaveLength(2);
+    expect(new Set(apiNodes.map((node) => node.id)).size).toBe(2);
+    expect(apiNodes.map((node) => node.applicationServiceId).sort()).toEqual(["com.example.alpha", "com.example.beta"]);
+
+    for (const apiNode of apiNodes) {
+      const owningEdge = graph.edges.find((edge) => edge.target === apiNode.id && edge.label === "provides api");
+      const domainNode = graph.nodes.find((node) => node.id === owningEdge?.source);
+      expect(owningEdge?.applicationServiceId).toBe(apiNode.applicationServiceId);
+      expect(domainNode?.applicationServiceId).toBe(apiNode.applicationServiceId);
+      expect(owningEdge?.sourceLogicalId).toBe("domain-order");
+      expect(owningEdge?.targetLogicalId).toBe("api-create-refund");
+    }
+  });
+
+  it("indexes canonical English and Chinese overlay before localizing search results", async () => {
+    const beta = scopedCatalog("beta");
+
+    const englishDisplay = await searchDesignAssets({ query: "创建退款", assetTypes: ["api"] }, { catalog: beta, locale: "en" });
+    const chineseDisplay = await searchDesignAssets({ query: "canonicalmarker", assetTypes: ["api"] }, { catalog: beta, locale: "zh" });
+
+    expect(englishDisplay.results[0]?.name).toBe("beta Create Refund API");
+    expect(englishDisplay.results[0]?.relevanceReason).toContain("Matched");
+    expect(chineseDisplay.results[0]?.name).toBe("beta 创建退款接口");
+    expect(chineseDisplay.results[0]?.relevanceReason).toContain("匹配");
+    expect(chineseDisplay.results[0]?.relevanceReason).not.toContain("Matched");
+  });
+
+  it("never falls back to the global seed for an explicit incomplete catalog", async () => {
+    const incomplete = scopedCatalog("beta");
+    incomplete.apis[0]!.localizedContent = undefined;
+
+    await expect(renderAssetSummary("api", "api-create-refund", { catalog: incomplete, locale: "zh" }))
+      .rejects.toMatchObject({ code: "ASSET_TRANSLATION_REQUIRED", path: "localizedContent.zh" });
   });
 
   it("keeps schemas, topics, state codes, transition codes, and relation codes canonical", async () => {
@@ -212,6 +281,44 @@ describe("scoped localized derived views", () => {
     expect(pack.includedAssets.find((ref) => ref.id === "api-create-refund")?.label).toBe("beta 创建退款接口");
     expect(pack.proposalId).toBe("proposal-partial-refund");
     expect(pack.targetAgent).toBe("codex");
+  });
+
+  it("returns English canonical and Chinese Context Pack views with identical technical identity", async () => {
+    const beta = scopedCatalog("beta");
+
+    const english = await generateContextPack("proposal-partial-refund", { catalog: beta, locale: "en" });
+    const chinese = await generateContextPack("proposal-partial-refund", { catalog: beta, locale: "zh" });
+
+    expect(english.name).toContain("beta Partial Refund");
+    expect(english.generatedMarkdown).toContain("# Agent Context Pack");
+    expect(english.localizedContent?.zh?.generatedMarkdown).toContain("# Agent 上下文包");
+    expect(chinese.name).toContain("beta 部分退款");
+    expect(chinese.generatedMarkdown).toContain("# Agent 上下文包");
+    expect(chinese.id).toBe(english.id);
+    expect(chinese.proposalId).toBe(english.proposalId);
+    expect(chinese.includedAssets.map(({ type, id }) => ({ type, id }))).toEqual(
+      english.includedAssets.map(({ type, id }) => ({ type, id }))
+    );
+    expect(chinese.generatedMarkdown).toContain("POST /api/orders/{orderId}/refunds");
+  });
+
+  it("localizes governance reason and suggestion for representative contract types", async () => {
+    const beta = scopedCatalog("beta");
+
+    const apiEnglish = await runGovernanceChecks("api", "api-create-refund", { catalog: beta, locale: "en" });
+    const apiChinese = await runGovernanceChecks("api", "api-create-refund", { catalog: beta, locale: "zh" });
+    const eventEnglish = await runGovernanceChecks("event", "event-refund-created", { catalog: beta, locale: "en" });
+    const eventChinese = await runGovernanceChecks("event", "event-refund-created", { catalog: beta, locale: "zh" });
+
+    for (const [english, chinese] of [
+      [apiEnglish.find((item) => item.ruleCode === "API_IDEMPOTENCY"), apiChinese.find((item) => item.ruleCode === "API_IDEMPOTENCY")],
+      [eventEnglish.find((item) => item.ruleCode === "EVENT_ENVELOPE"), eventChinese.find((item) => item.ruleCode === "EVENT_ENVELOPE")]
+    ]) {
+      expect(chinese?.reason).not.toBe(english?.reason);
+      expect(chinese?.suggestion).not.toBe(english?.suggestion);
+      expect(chinese?.ruleCode).toBe(english?.ruleCode);
+      expect(chinese?.assetId).toBe(english?.assetId);
+    }
   });
 
   it("checks proposal Context Pack presence against the supplied catalog", async () => {
