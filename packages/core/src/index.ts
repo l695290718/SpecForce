@@ -1,4 +1,5 @@
 export * from "./types";
+export * from "./localization/assets";
 export * from "./repository";
 export * from "./data/seed-data";
 export * from "./rules/governance";
@@ -12,6 +13,7 @@ export * from "./audit/log";
 export * from "./proposals/service";
 export * from "./proposals/localization";
 export * from "./governance/service";
+export * from "./governance/localization";
 export * from "./architecture/types";
 export * from "./architecture/mock";
 export * from "./architecture/service";

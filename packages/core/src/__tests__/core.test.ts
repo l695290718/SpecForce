@@ -19,11 +19,12 @@ describe("SpecForge core services", () => {
 
   it("runs API governance checks for idempotency, auth, errors, and compatibility", async () => {
     const results = await runGovernanceChecks("api", "api-create-refund");
+    const apiRuleResults = results.filter((result) => result.ruleCode !== "ASSET_BILINGUAL_COMPLETENESS");
 
-    expect(results.map((result) => result.ruleCode)).toEqual(
+    expect(apiRuleResults.map((result) => result.ruleCode)).toEqual(
       expect.arrayContaining(["API_IDEMPOTENCY", "API_AUTH", "API_ERROR_CODES", "API_COMPATIBILITY"])
     );
-    expect(results.every((result) => result.status === "pass")).toBe(true);
+    expect(apiRuleResults.every((result) => result.status === "pass")).toBe(true);
   });
 
   it("builds a graph filtered by domain", async () => {

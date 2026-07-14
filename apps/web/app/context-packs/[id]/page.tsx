@@ -3,11 +3,13 @@ import { Card, DataTable, PageHeader } from "../../../components/ui";
 import { T } from "../../../components/language-provider";
 import { CopyMarkdownButton } from "../../../components/copy-markdown-button";
 import { getContextPackWithDatabase } from "../../../lib/assets";
+import { getRequestLocale } from "../../../lib/locale";
 
 export default async function ContextPackDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ scope?: string }> }) {
   const { id } = await params;
   const { scope = "" } = await searchParams;
-  const pack = await getContextPackWithDatabase(id, scope);
+  const locale = await getRequestLocale();
+  const pack = await getContextPackWithDatabase(id, scope, locale);
 
   return (
     <>
@@ -23,7 +25,7 @@ export default async function ContextPackDetailPage({ params, searchParams }: { 
         </Card>
       </div>
       <Card className="mt-6">
-        <h2 className="mb-3 text-base font-semibold">Constraints</h2>
+        <h2 className="mb-3 text-base font-semibold">{locale === "zh" ? "约束" : "Constraints"}</h2>
         <ul className="list-disc space-y-2 pl-5 text-sm">{pack.constraints.map((item) => <li key={item}>{item}</li>)}</ul>
       </Card>
       <Card className="mt-6">

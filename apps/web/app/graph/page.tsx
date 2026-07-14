@@ -3,11 +3,13 @@ import { AssetGraphView } from "../../components/asset-graph";
 import { Card, PageHeader } from "../../components/ui";
 import { T } from "../../components/language-provider";
 import { getAssetGraphWithDatabase, getDomainsWithDatabase } from "../../lib/assets";
+import { getRequestLocale } from "../../lib/locale";
 
 export default async function GraphPage({ searchParams }: { searchParams: Promise<{ domainId?: string; assetType?: AssetType; scope?: string }> }) {
   const { domainId, assetType, scope = "" } = await searchParams;
-  const graph = await getAssetGraphWithDatabase(scope, domainId, assetType);
-  const domains = await getDomainsWithDatabase(scope);
+  const locale = await getRequestLocale();
+  const graph = await getAssetGraphWithDatabase(scope, domainId, assetType, locale);
+  const domains = await getDomainsWithDatabase(scope, locale);
   const assetTypes: AssetType[] = ["dataModel", "api", "event", "businessRule", "stateMachine", "integration", "quality", "observability", "adr", "proposal"];
 
   return (
@@ -29,7 +31,7 @@ export default async function GraphPage({ searchParams }: { searchParams: Promis
           <button className="h-9 rounded-md bg-accent px-3 text-sm font-medium text-white"><T k="graph.filter" /></button>
         </form>
       </Card>
-      <AssetGraphView graph={graph} />
+      <AssetGraphView graph={graph} scope={scope} />
     </>
   );
 }

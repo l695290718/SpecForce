@@ -1,8 +1,9 @@
 import { PrismaClient } from "@prisma/client";
-import { assertWritableApplicationService, assetLabel, defaultHuaweiActor, hasScopeAccess, huaweiArchitectureScopes, normalizeAssetType, scopeById, seedHuaweiActor } from "@specforge/core";
-import type { ArchitectureScopeRef, Asset, AssetType, ContextPack, Proposal, ScopedActor } from "@specforge/core";
+import { assertWritableApplicationService, assetLabel, defaultHuaweiActor, hasScopeAccess, huaweiArchitectureScopes, localizeAsset, normalizeAssetType, scopeById, seedHuaweiActor, validateAssetLocalization } from "@specforge/core";
+import type { ArchitectureScopeRef, Asset, AssetLocale, AssetType, ContextPack, Proposal, ScopedActor } from "@specforge/core";
 
 const globalForPrisma = globalThis as unknown as { specforgeMcpPrisma?: PrismaClient };
+const legacyContextPackFallbackSymbol = Symbol("legacyContextPackFallback");
 
 export const prisma = globalForPrisma.specforgeMcpPrisma ?? new PrismaClient();
 
@@ -24,6 +25,7 @@ export interface UpsertContextPackInput {
 }
 
 export interface DeletePersistedDesignDataInput {
+  architectureScope: ArchitectureScopeRef;
   assetIds?: string[];
   proposalIds?: string[];
   contextPackIds?: string[];
@@ -53,6 +55,10 @@ export function resolveWritableScope(actor: ScopedActor, scope: ArchitectureScop
 
 function writableActor(): ScopedActor {
   return process.env.SPECFORGE_MCP_SEED === "1" ? seedHuaweiActor : defaultHuaweiActor;
+}
+
+export function isSeedMode(): boolean {
+  return process.env.SPECFORGE_MCP_SEED === "1";
 }
 
 function readableScope(applicationServiceId: string): ArchitectureScopeRef {
@@ -109,34 +115,43 @@ export async function ensureMcpPersistenceSchema() {
   )`);
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "DesignAsset" (
-      id TEXT PRIMARY KEY NOT NULL,
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
       type TEXT NOT NULL,
       name TEXT NOT NULL,
       code TEXT,
       description TEXT NOT NULL,
       "domainId" TEXT,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
       payload TEXT NOT NULL,
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id)
     )
   `);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DesignAsset_type_idx" ON "DesignAsset"(type)`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DesignAsset_domainId_idx" ON "DesignAsset"("domainId")`);
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Proposal" (
-      id TEXT PRIMARY KEY NOT NULL,
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
       title TEXT NOT NULL,
       description TEXT NOT NULL,
       status TEXT NOT NULL,
       "domainId" TEXT,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
       payload TEXT NOT NULL,
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id)
     )
   `);
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "ContextPack" (
-      id TEXT PRIMARY KEY NOT NULL,
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
       name TEXT NOT NULL,
       "proposalId" TEXT NOT NULL,
       "targetAgent" TEXT NOT NULL,
@@ -145,7 +160,11 @@ export async function ensureMcpPersistenceSchema() {
       constraints TEXT NOT NULL,
       instructions TEXT NOT NULL,
       "generatedMarkdown" TEXT NOT NULL,
-      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      payload TEXT,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id)
     )
   `);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ContextPack_proposalId_idx" ON "ContextPack"("proposalId")`);
@@ -161,159 +180,270 @@ export async function ensureMcpPersistenceSchema() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "GovernanceCheckSnapshot_assetType_assetId_idx" ON "GovernanceCheckSnapshot"("assetType", "assetId")`);
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "AssetLink" (
-      id TEXT PRIMARY KEY NOT NULL,
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
       "sourceType" TEXT NOT NULL,
       "sourceId" TEXT NOT NULL,
       "targetType" TEXT NOT NULL,
       "targetId" TEXT NOT NULL,
       "relationType" TEXT NOT NULL,
       description TEXT,
-      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id)
     )
   `);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_source_idx" ON "AssetLink"("sourceType", "sourceId")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_target_idx" ON "AssetLink"("targetType", "targetId")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_relationType_idx" ON "AssetLink"("relationType")`);
+  await upgradeLegacyPersistedIdentitySchema();
   for (const table of ["DesignAsset", "Proposal", "ContextPack", "AssetLink"]) {
-    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "applicationServiceId" TEXT`);
-    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "scopePath" TEXT`);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "${table}_applicationServiceId_idx" ON "${table}"("applicationServiceId")`);
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "${table}_scopePath_idx" ON "${table}"("scopePath")`);
   }
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ContextPack" ADD COLUMN IF NOT EXISTS "payload" TEXT`);
   await ensureArchitectureScopes();
 }
 
+export async function upgradeLegacyPersistedIdentitySchema() {
+  const fallbackScope = scopeById("com.huawei.celon.desiner");
+  if (!fallbackScope) throw new Error("Default application-service scope is unavailable.");
+
+  for (const table of ["DesignAsset", "Proposal", "ContextPack", "AssetLink"]) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "dbId" UUID`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "applicationServiceId" TEXT`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "scopePath" TEXT`);
+    await prisma.$executeRawUnsafe(
+      `UPDATE "${table}"
+       SET "dbId" = COALESCE("dbId", gen_random_uuid()),
+           "applicationServiceId" = COALESCE(NULLIF("applicationServiceId", ''), $1),
+           "scopePath" = COALESCE(NULLIF("scopePath", ''), $2)
+       WHERE "dbId" IS NULL OR "applicationServiceId" IS NULL OR "applicationServiceId" = '' OR "scopePath" IS NULL OR "scopePath" = ''`,
+      fallbackScope.id,
+      fallbackScope.scopePath
+    );
+    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ALTER COLUMN "dbId" SET DEFAULT gen_random_uuid()`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ALTER COLUMN "dbId" SET NOT NULL`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ALTER COLUMN "applicationServiceId" SET NOT NULL`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ALTER COLUMN "scopePath" SET NOT NULL`);
+    await prisma.$executeRawUnsafe(scopedIdentityConstraintUpgradeSql(table));
+  }
+}
+
+function scopedIdentityConstraintUpgradeSql(table: string): string {
+  const compositeConstraint = `${table}_applicationServiceId_scopePath_id_key`;
+  return `DO $$
+  DECLARE
+    legacy_constraint RECORD;
+    legacy_index RECORD;
+  BEGIN
+    FOR legacy_constraint IN
+      SELECT conname
+      FROM pg_constraint
+      WHERE conrelid = '"${table}"'::regclass
+        AND ((contype = 'p' AND pg_get_constraintdef(oid) ~ '^PRIMARY KEY \\(\"?id\"?\\)$')
+          OR (contype = 'u' AND pg_get_constraintdef(oid) ~ '^UNIQUE \\(\"?id\"?\\)$'))
+    LOOP
+      EXECUTE format('ALTER TABLE %I DROP CONSTRAINT %I', '${table}', legacy_constraint.conname);
+    END LOOP;
+
+    FOR legacy_index IN
+      SELECT indexname
+      FROM pg_indexes
+      WHERE schemaname = current_schema()
+        AND tablename = '${table}'
+        AND indexdef ~ '^CREATE UNIQUE INDEX .* \\(\"?id\"?\\)$'
+    LOOP
+      EXECUTE format('DROP INDEX IF EXISTS %I.%I', current_schema(), legacy_index.indexname);
+    END LOOP;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conrelid = '"${table}"'::regclass AND contype = 'p'
+    ) THEN
+      ALTER TABLE "${table}" ADD CONSTRAINT "${table}_pkey" PRIMARY KEY ("dbId");
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conrelid = '"${table}"'::regclass AND conname = '${compositeConstraint}'
+    ) AND to_regclass(format('%I.%I', current_schema(), '${compositeConstraint}')) IS NULL THEN
+      ALTER TABLE "${table}" ADD CONSTRAINT "${compositeConstraint}"
+        UNIQUE ("applicationServiceId", "scopePath", id);
+    END IF;
+  END $$`;
+}
+
 export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
-  await ensureMcpPersistenceSchema();
   const asset = input.asset as unknown as Record<string, unknown>;
   const scope = resolveWritableScope(writableActor(), asset.architectureScope as ArchitectureScopeRef | undefined);
-  asset.architectureScope = scope;
-  assertString(asset.id, "asset.id");
-  assertString(asset.name ?? asset.title, "asset.name");
+  const localizedAsset = { ...asset, architectureScope: scope } as Asset;
+  validateAssetLocalization(input.assetType, localizedAsset);
+  const canonicalAsset = localizeAsset(input.assetType, localizedAsset, "en") as unknown as Record<string, unknown>;
+  assertString(canonicalAsset.id, "asset.id");
+  assertString(canonicalAsset.name ?? canonicalAsset.title, "asset.name");
+  await ensureMcpPersistenceSchema();
 
   await prisma.designAsset.upsert({
-    where: { id: asset.id },
+    where: {
+      applicationServiceId_scopePath_id: {
+        applicationServiceId: scope.applicationServiceId,
+        scopePath: scope.scopePath,
+        id: String(canonicalAsset.id)
+      }
+    },
     create: {
-      id: asset.id,
+      id: canonicalAsset.id,
       type: input.assetType,
-      name: String(asset.name ?? asset.title ?? asset.id),
-      code: optionalString(asset.code),
-      description: optionalString(asset.description) ?? "",
-      domainId: optionalString(asset.domainId),
+      name: String(canonicalAsset.name ?? canonicalAsset.title ?? canonicalAsset.id),
+      code: optionalString(canonicalAsset.code),
+      description: optionalString(canonicalAsset.description) ?? "",
+      domainId: optionalString(canonicalAsset.domainId),
       applicationServiceId: scope.applicationServiceId,
       scopePath: scope.scopePath,
-      payload: JSON.stringify(asset),
-      createdAt: optionalDate(asset.createdAt),
-      updatedAt: optionalDate(asset.updatedAt)
+      payload: JSON.stringify(canonicalAsset),
+      createdAt: optionalDate(canonicalAsset.createdAt),
+      updatedAt: optionalDate(canonicalAsset.updatedAt)
     },
     update: {
       type: input.assetType,
-      name: String(asset.name ?? asset.title ?? asset.id),
-      code: optionalString(asset.code),
-      description: optionalString(asset.description) ?? "",
-      domainId: optionalString(asset.domainId),
+      name: String(canonicalAsset.name ?? canonicalAsset.title ?? canonicalAsset.id),
+      code: optionalString(canonicalAsset.code),
+      description: optionalString(canonicalAsset.description) ?? "",
+      domainId: optionalString(canonicalAsset.domainId),
       applicationServiceId: scope.applicationServiceId,
       scopePath: scope.scopePath,
-      payload: JSON.stringify(asset),
-      updatedAt: optionalDate(asset.updatedAt)
+      payload: JSON.stringify(canonicalAsset),
+      updatedAt: optionalDate(canonicalAsset.updatedAt)
     }
   });
 
-  return { id: asset.id, type: input.assetType, status: "upserted" };
+  return { id: canonicalAsset.id, type: input.assetType, status: "upserted" };
 }
 
 export async function upsertProposal(input: UpsertProposalInput) {
-  await ensureMcpPersistenceSchema();
-  const proposal = input.proposal;
+  const proposal = input.proposal as Proposal;
   const scope = resolveWritableScope(writableActor(), proposal.architectureScope);
-  proposal.architectureScope = scope;
+  const localizedProposal = { ...proposal, architectureScope: scope } as Proposal;
+  validateAssetLocalization("proposal", localizedProposal);
+  const canonicalProposal = localizeAsset("proposal", localizedProposal, "en");
   assertString(proposal.id, "proposal.id");
-  assertString(proposal.title, "proposal.title");
+  assertString(canonicalProposal.title, "proposal.title");
+  await ensureMcpPersistenceSchema();
 
   await prisma.proposal.upsert({
-    where: { id: proposal.id },
+    where: {
+      applicationServiceId_scopePath_id: {
+        applicationServiceId: scope.applicationServiceId,
+        scopePath: scope.scopePath,
+        id: canonicalProposal.id
+      }
+    },
     create: {
-      id: proposal.id,
-      title: proposal.title,
-      description: proposal.description,
-      status: proposal.status,
-      domainId: proposal.domainId,
+      id: canonicalProposal.id,
+      title: canonicalProposal.title,
+      description: canonicalProposal.description,
+      status: canonicalProposal.status,
+      domainId: canonicalProposal.domainId,
       applicationServiceId: scope.applicationServiceId,
       scopePath: scope.scopePath,
-      payload: JSON.stringify(proposal),
-      createdAt: new Date(proposal.createdAt),
-      updatedAt: new Date(proposal.updatedAt)
+      payload: JSON.stringify(canonicalProposal),
+      createdAt: new Date(canonicalProposal.createdAt),
+      updatedAt: new Date(canonicalProposal.updatedAt)
     },
     update: {
-      title: proposal.title,
-      description: proposal.description,
-      status: proposal.status,
-      domainId: proposal.domainId,
+      title: canonicalProposal.title,
+      description: canonicalProposal.description,
+      status: canonicalProposal.status,
+      domainId: canonicalProposal.domainId,
       applicationServiceId: scope.applicationServiceId,
       scopePath: scope.scopePath,
-      payload: JSON.stringify(proposal),
-      updatedAt: new Date(proposal.updatedAt)
+      payload: JSON.stringify(canonicalProposal),
+      updatedAt: new Date(canonicalProposal.updatedAt)
     }
   });
 
-  return { id: proposal.id, status: "upserted" };
+  return { id: canonicalProposal.id, status: "upserted" };
 }
 
 export async function upsertContextPack(input: UpsertContextPackInput) {
-  await ensureMcpPersistenceSchema();
   const pack = input.contextPack;
+  validateAssetLocalization("contextPack", pack);
   const scope = resolveWritableScope(writableActor(), pack.architectureScope);
-  pack.architectureScope = scope;
+  const localizedPack = { ...pack, architectureScope: scope };
+  const canonicalPack = localizeAsset("contextPack", localizedPack, "en") as ContextPack;
   assertString(pack.id, "contextPack.id");
   assertString(pack.proposalId, "contextPack.proposalId");
+  await ensureMcpPersistenceSchema();
 
   await prisma.contextPack.upsert({
-    where: { id: pack.id },
+    where: {
+      applicationServiceId_scopePath_id: {
+        applicationServiceId: scope.applicationServiceId,
+        scopePath: scope.scopePath,
+        id: canonicalPack.id
+      }
+    },
     create: {
-      id: pack.id,
-      name: pack.name,
-      proposalId: pack.proposalId,
-      targetAgent: pack.targetAgent,
-      summary: pack.summary,
-      includedAssets: JSON.stringify(pack.includedAssets),
-      constraints: JSON.stringify(pack.constraints),
-      instructions: JSON.stringify(pack.instructions),
-      generatedMarkdown: pack.generatedMarkdown,
+      id: canonicalPack.id,
+      name: canonicalPack.name,
+      proposalId: canonicalPack.proposalId,
+      targetAgent: canonicalPack.targetAgent,
+      summary: canonicalPack.summary,
+      includedAssets: JSON.stringify(canonicalPack.includedAssets),
+      constraints: JSON.stringify(canonicalPack.constraints),
+      instructions: JSON.stringify(canonicalPack.instructions),
+      generatedMarkdown: canonicalPack.generatedMarkdown,
+      payload: JSON.stringify(canonicalPack),
       applicationServiceId: scope.applicationServiceId,
       scopePath: scope.scopePath,
-      createdAt: new Date(pack.createdAt)
+      createdAt: new Date(canonicalPack.createdAt)
     },
     update: {
-      name: pack.name,
-      targetAgent: pack.targetAgent,
-      summary: pack.summary,
-      includedAssets: JSON.stringify(pack.includedAssets),
-      constraints: JSON.stringify(pack.constraints),
-      instructions: JSON.stringify(pack.instructions),
-      generatedMarkdown: pack.generatedMarkdown,
+      proposalId: canonicalPack.proposalId,
+      name: canonicalPack.name,
+      targetAgent: canonicalPack.targetAgent,
+      summary: canonicalPack.summary,
+      includedAssets: JSON.stringify(canonicalPack.includedAssets),
+      constraints: JSON.stringify(canonicalPack.constraints),
+      instructions: JSON.stringify(canonicalPack.instructions),
+      generatedMarkdown: canonicalPack.generatedMarkdown,
+      payload: JSON.stringify(canonicalPack),
       applicationServiceId: scope.applicationServiceId,
       scopePath: scope.scopePath
     }
   });
 
-  return { id: pack.id, proposalId: pack.proposalId, status: "upserted" };
+  return { id: canonicalPack.id, proposalId: canonicalPack.proposalId, status: "upserted" };
 }
 
 export async function deletePersistedDesignData(input: DeletePersistedDesignDataInput) {
+  if (!isSeedMode()) throw new Error("Seed cleanup is not enabled.");
+  const scope = resolveWritableScope(writableActor(), input.architectureScope);
   await ensureMcpPersistenceSchema();
   const assetIds = input.assetIds ?? [];
   const proposalIds = input.proposalIds ?? [];
   const contextPackIds = input.contextPackIds ?? [];
 
-  await prisma.contextPack.deleteMany({ where: { id: { in: contextPackIds } } });
-  await prisma.proposal.deleteMany({ where: { id: { in: proposalIds } } });
-  await prisma.designAsset.deleteMany({ where: { id: { in: assetIds } } });
+  const scopedWhere = {
+    applicationServiceId: scope.applicationServiceId,
+    scopePath: scope.scopePath
+  };
+  await prisma.contextPack.deleteMany({ where: { ...scopedWhere, id: { in: contextPackIds } } });
+  await prisma.proposal.deleteMany({ where: { ...scopedWhere, id: { in: proposalIds } } });
+  await prisma.designAsset.deleteMany({ where: { ...scopedWhere, id: { in: assetIds } } });
   if (assetIds.length || proposalIds.length || contextPackIds.length) {
     const ids = [...assetIds, ...proposalIds, ...contextPackIds];
-    const sourcePlaceholders = ids.map((_, index) => `$${index + 1}`).join(",");
-    const targetPlaceholders = ids.map((_, index) => `$${ids.length + index + 1}`).join(",");
+    const sourcePlaceholders = ids.map((_, index) => `$${index + 3}`).join(",");
+    const targetPlaceholders = ids.map((_, index) => `$${ids.length + index + 3}`).join(",");
     await prisma.$executeRawUnsafe(
-      `DELETE FROM "AssetLink" WHERE "sourceId" IN (${sourcePlaceholders}) OR "targetId" IN (${targetPlaceholders})`,
+      `DELETE FROM "AssetLink"
+       WHERE "applicationServiceId" = $1
+         AND "scopePath" = $2
+         AND ("sourceId" IN (${sourcePlaceholders}) OR "targetId" IN (${targetPlaceholders}))`,
+      scope.applicationServiceId,
+      scope.scopePath,
       ...ids,
       ...ids
     );
@@ -323,12 +453,12 @@ export async function deletePersistedDesignData(input: DeletePersistedDesignData
     deletedAssetIds: assetIds,
     deletedProposalIds: proposalIds,
     deletedContextPackIds: contextPackIds,
+    applicationServiceId: scope.applicationServiceId,
     status: "deleted"
   };
 }
 
 export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedAssetLink> {
-  await ensureMcpPersistenceSchema();
   const scope = resolveWritableScope(writableActor(), input.architectureScope);
   const sourceType = normalizeAssetType(input.sourceType);
   const targetType = normalizeAssetType(input.targetType);
@@ -336,29 +466,35 @@ export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedA
   assertString(input.targetId, "targetId");
   assertString(input.relationType, "relationType");
   const id = assetLinkId({ ...input, sourceType, targetType });
-
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO "AssetLink" (id, "sourceType", "sourceId", "targetType", "targetId", "relationType", description, "applicationServiceId", "scopePath")
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-     ON CONFLICT(id) DO UPDATE SET
-       "sourceType" = excluded."sourceType",
-       "sourceId" = excluded."sourceId",
-       "targetType" = excluded."targetType",
-       "targetId" = excluded."targetId",
-       "relationType" = excluded."relationType",
-       description = excluded.description,
-       "applicationServiceId" = excluded."applicationServiceId",
-       "scopePath" = excluded."scopePath"`,
-    id,
-    sourceType,
-    input.sourceId,
-    targetType,
-    input.targetId,
-    input.relationType,
-    input.description ?? null,
-    scope.applicationServiceId,
-    scope.scopePath
-  );
+  await ensureMcpPersistenceSchema();
+  await prisma.assetLink.upsert({
+    where: {
+      applicationServiceId_scopePath_id: {
+        applicationServiceId: scope.applicationServiceId,
+        scopePath: scope.scopePath,
+        id
+      }
+    },
+    create: {
+      id,
+      sourceType,
+      sourceId: input.sourceId,
+      targetType,
+      targetId: input.targetId,
+      relationType: input.relationType,
+      description: input.description,
+      applicationServiceId: scope.applicationServiceId,
+      scopePath: scope.scopePath
+    },
+    update: {
+      sourceType,
+      sourceId: input.sourceId,
+      targetType,
+      targetId: input.targetId,
+      relationType: input.relationType,
+      description: input.description
+    }
+  });
 
   return {
     id,
@@ -376,16 +512,10 @@ export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedA
 export async function listPersistedAssetLinks(applicationServiceId: string): Promise<PersistedAssetLink[]> {
   await ensureMcpPersistenceSchema();
   const scope = readableScope(applicationServiceId);
-  const rows = await prisma.$queryRawUnsafe<Array<{
-    id: string;
-    sourceType: string;
-    sourceId: string;
-    targetType: string;
-    targetId: string;
-    relationType: string;
-    description: string | null;
-    createdAt: Date | string;
-  }>>(`SELECT id, "sourceType", "sourceId", "targetType", "targetId", "relationType", description, "createdAt" FROM "AssetLink" WHERE "applicationServiceId" = '${scope.applicationServiceId}' AND "scopePath" LIKE '${scope.scopePath}%' ORDER BY "createdAt" ASC`);
+  const rows = await prisma.assetLink.findMany({
+    where: { applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath },
+    orderBy: { createdAt: "asc" }
+  });
   return rows.map((row) => ({
     id: row.id,
     sourceType: row.sourceType,
@@ -394,7 +524,8 @@ export async function listPersistedAssetLinks(applicationServiceId: string): Pro
     targetId: row.targetId,
     relationType: row.relationType,
     description: row.description ?? undefined,
-    createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt)
+    architectureScope: scope,
+    createdAt: row.createdAt.toISOString()
   }));
 }
 
@@ -402,7 +533,7 @@ export async function listPersistedAssets(applicationServiceId: string, assetTyp
   await ensureMcpPersistenceSchema();
   const scope = readableScope(applicationServiceId);
   const rows = await prisma.designAsset.findMany({
-    where: { ...(assetType ? { type: assetType } : {}), applicationServiceId: scope.applicationServiceId, scopePath: { startsWith: scope.scopePath } },
+    where: { ...(assetType ? { type: assetType } : {}), applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath },
     orderBy: { createdAt: "asc" }
   });
   return rows.map((row) => ({ type: normalizeAssetType(row.type), asset: JSON.parse(row.payload) as Asset }));
@@ -411,14 +542,14 @@ export async function listPersistedAssets(applicationServiceId: string, assetTyp
 export async function listPersistedProposals(applicationServiceId: string): Promise<Proposal[]> {
   await ensureMcpPersistenceSchema();
   const scope = readableScope(applicationServiceId);
-  const rows = await prisma.proposal.findMany({ where: { applicationServiceId: scope.applicationServiceId, scopePath: { startsWith: scope.scopePath } }, orderBy: { createdAt: "asc" } });
+  const rows = await prisma.proposal.findMany({ where: { applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath }, orderBy: { createdAt: "asc" } });
   return rows.map((row) => JSON.parse(row.payload) as Proposal);
 }
 
 export async function listPersistedContextPacks(applicationServiceId: string): Promise<ContextPack[]> {
   await ensureMcpPersistenceSchema();
   const scope = readableScope(applicationServiceId);
-  const rows = await prisma.contextPack.findMany({ where: { applicationServiceId: scope.applicationServiceId, scopePath: { startsWith: scope.scopePath } }, orderBy: { createdAt: "asc" } });
+  const rows = await prisma.contextPack.findMany({ where: { applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath }, orderBy: { createdAt: "asc" } });
   return rows.map(rowToContextPack);
 }
 
@@ -426,18 +557,25 @@ export async function getPersistedAsset(assetType: string, assetId: string, appl
   await ensureMcpPersistenceSchema();
   const scope = readableScope(applicationServiceId);
   const type = normalizeAssetType(assetType);
+  const where = {
+    applicationServiceId_scopePath_id: {
+      applicationServiceId: scope.applicationServiceId,
+      scopePath: scope.scopePath,
+      id: assetId
+    }
+  };
   if (type === "proposal") {
-    const proposal = (await listPersistedProposals(applicationServiceId)).find((item) => item.id === assetId);
-    if (!proposal) throw new Error(`Asset not found: ${type}/${assetId}`);
-    return proposal;
+    const row = await prisma.proposal.findUnique({ where });
+    if (!row) throw new Error(`Asset not found: ${type}/${assetId}`);
+    return JSON.parse(row.payload) as Proposal;
   }
   if (type === "contextPack") {
-    const pack = (await listPersistedContextPacks(applicationServiceId)).find((item) => item.id === assetId);
-    if (!pack) throw new Error(`Asset not found: ${type}/${assetId}`);
-    return pack;
+    const row = await prisma.contextPack.findUnique({ where });
+    if (!row) throw new Error(`Asset not found: ${type}/${assetId}`);
+    return rowToContextPack(row);
   }
-  const row = await prisma.designAsset.findFirst({ where: { id: assetId, type, applicationServiceId: scope.applicationServiceId, scopePath: { startsWith: scope.scopePath } } });
-  if (!row) throw new Error(`Asset not found: ${type}/${assetId}`);
+  const row = await prisma.designAsset.findUnique({ where });
+  if (!row || normalizeAssetType(row.type) !== type) throw new Error(`Asset not found: ${type}/${assetId}`);
   return JSON.parse(row.payload) as Asset;
 }
 
@@ -447,9 +585,10 @@ export async function listPersistedCollectionAsMarkdown(assetType: string, appli
   return [`# ${assetLabel(type)} Catalog`, "", ...assets.map((asset) => `- ${assetName(asset)} (${type}/${asset.id})`)].join("\n");
 }
 
-export async function renderPersistedAssetAsMarkdown(assetType: string, assetId: string, applicationServiceId: string): Promise<string> {
+export async function renderPersistedAssetAsMarkdown(assetType: string, assetId: string, applicationServiceId: string, locale: AssetLocale = "en"): Promise<string> {
   const type = normalizeAssetType(assetType);
-  const asset = await getPersistedAsset(type, assetId, applicationServiceId);
+  const canonicalAsset = await getPersistedAsset(type, assetId, applicationServiceId);
+  const asset = localizeAsset(type, canonicalAsset, locale);
   return [
     `# ${assetName(asset)}`,
     "",
@@ -462,16 +601,17 @@ export async function renderPersistedAssetAsMarkdown(assetType: string, assetId:
     "",
     "## Source JSON",
     "```json",
-    JSON.stringify(asset, null, 2),
+    JSON.stringify(canonicalAsset, null, 2),
     "```"
   ]
     .filter((line): line is string => line !== undefined)
     .join("\n");
 }
 
-export async function searchPersistedDesignAssets(input: { applicationServiceId: string; query: string; assetTypes?: string[]; domainId?: string; limit?: number }) {
+export async function searchPersistedDesignAssets(input: { applicationServiceId: string; query: string; assetTypes?: string[]; domainId?: string; limit?: number; locale?: AssetLocale }) {
   const terms = input.query.toLowerCase().split(/\s+/).map((term) => term.trim()).filter(Boolean);
   const types = input.assetTypes?.length ? input.assetTypes.map(normalizeAssetType) : undefined;
+  const locale = input.locale ?? "en";
   const candidates = types
     ? (await Promise.all(types.map((type) => listPersistedAssets(input.applicationServiceId, type)))).flat()
     : [
@@ -481,17 +621,17 @@ export async function searchPersistedDesignAssets(input: { applicationServiceId:
       ];
   const scored = candidates
     .filter(({ asset }) => !input.domainId || !("domainId" in asset) || asset.domainId === input.domainId || asset.id === input.domainId)
-    .map(({ type, asset }) => ({ type, asset, score: scoreAsset(asset, terms) }))
+    .map(({ type, asset }) => ({ type, asset, localized: localizePersistedAssetForRead(type, asset, locale), score: scoreAsset(asset, terms) }))
     .filter((item) => item.score > 0 || terms.length === 0)
-    .sort((a, b) => b.score - a.score || assetName(a.asset).localeCompare(assetName(b.asset)))
+    .sort((a, b) => b.score - a.score || assetName(a.localized).localeCompare(assetName(b.localized)))
     .slice(0, Math.max(1, Math.min(input.limit ?? 10, 50)));
 
   return {
-    results: scored.map(({ type, asset, score }) => ({
-      id: asset.id,
+    results: scored.map(({ type, asset, localized, score }) => ({
+      id: localized.id,
       type,
-      name: assetName(asset),
-      summary: assetSummary(asset),
+      name: assetName(localized),
+      summary: assetSummary(localized),
       relevanceReason: score > 0 ? `Matched ${score} query term(s) in persisted ${assetLabel(type)} metadata.` : `Included from persisted ${assetLabel(type)} catalog.`
     }))
   };
@@ -531,9 +671,17 @@ function rowToContextPack(row: {
   constraints: string;
   instructions: string;
   generatedMarkdown: string;
+  payload: string | null;
+  applicationServiceId: string;
+  scopePath: string;
   createdAt: Date;
 }): ContextPack {
-  return {
+  const payloadPack = parseContextPackPayload(row.payload);
+  if (payloadPack) {
+    return payloadPack;
+  }
+
+  const legacyPack: ContextPack & { [legacyContextPackFallbackSymbol]?: true } = {
     id: row.id,
     name: row.name,
     proposalId: row.proposalId,
@@ -543,8 +691,80 @@ function rowToContextPack(row: {
     constraints: JSON.parse(row.constraints),
     instructions: JSON.parse(row.instructions),
     generatedMarkdown: row.generatedMarkdown,
-    createdAt: row.createdAt.toISOString()
+    createdAt: row.createdAt.toISOString(),
+    architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }
   };
+  legacyPack[legacyContextPackFallbackSymbol] = true;
+  return legacyPack;
+}
+
+function parseContextPackPayload(payload: string | null): ContextPack | null {
+  if (!payload) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(payload);
+    if (!isValidPersistedContextPackPayload(parsed)) {
+      return null;
+    }
+
+    validateAssetLocalization("contextPack", parsed);
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function isValidPersistedContextPackPayload(value: unknown): value is ContextPack {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const pack = value as Record<string, unknown>;
+  return (
+    typeof pack.id === "string" &&
+    typeof pack.name === "string" &&
+    typeof pack.proposalId === "string" &&
+    typeof pack.targetAgent === "string" &&
+    typeof pack.summary === "string" &&
+    Array.isArray(pack.includedAssets) &&
+    pack.includedAssets.every(isValidAssetRef) &&
+    Array.isArray(pack.constraints) &&
+    pack.constraints.every((item) => typeof item === "string") &&
+    Array.isArray(pack.instructions) &&
+    pack.instructions.every((item) => typeof item === "string") &&
+    typeof pack.generatedMarkdown === "string" &&
+    typeof pack.createdAt === "string" &&
+    !!pack.localizedContent &&
+    typeof pack.localizedContent === "object" &&
+    !Array.isArray(pack.localizedContent)
+  );
+}
+
+function isValidAssetRef(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const ref = value as Record<string, unknown>;
+  return typeof ref.type === "string" && typeof ref.id === "string" && typeof ref.label === "string";
+}
+
+function localizePersistedAssetForRead<T extends Asset>(assetType: AssetType, asset: T, locale: AssetLocale): T {
+  if (assetType === "contextPack" && locale !== "en" && isLegacyContextPackFallback(asset) && !asset.localizedContent?.[locale]) {
+    return asset;
+  }
+
+  return localizeAsset(assetType, asset, locale) as T;
+}
+
+function isLegacyContextPackFallback(asset: Asset): asset is ContextPack & { [legacyContextPackFallbackSymbol]?: true } {
+  return assetTypeLooksLikeContextPack(asset) && Boolean((asset as ContextPack & { [legacyContextPackFallbackSymbol]?: true })[legacyContextPackFallbackSymbol]);
+}
+
+function assetTypeLooksLikeContextPack(asset: Asset): asset is ContextPack {
+  return "proposalId" in asset && "targetAgent" in asset && "includedAssets" in asset && "generatedMarkdown" in asset;
 }
 
 function assetName(asset: Asset): string {

@@ -1,12 +1,14 @@
 import { inferAssetType, normalizeAssetType } from "../assets/service";
+import { localizeGovernanceResult } from "./localization";
 import { runGovernanceChecks } from "../rules/governance";
-import type { GovernanceCheckResult } from "../types";
+import type { AssetLocale, GovernanceCheckResult } from "../types";
 
 export interface RunGovernanceChecksInput {
   targetType: "asset" | "proposal" | "context-pack";
   targetId: string;
   assetType?: string;
   checks?: string[];
+  locale?: AssetLocale;
 }
 
 export interface GovernanceChecksResult {
@@ -37,10 +39,11 @@ export async function runGovernanceChecksForTarget(input: RunGovernanceChecksInp
           : inferAssetType(input.targetId);
   const rawResults = await runGovernanceChecks(assetType, input.targetId);
   const filtered = input.checks?.length ? rawResults.filter((result) => input.checks?.includes(result.ruleCode)) : rawResults;
+  const localized = input.locale ? filtered.map((result) => localizeGovernanceResult(result, input.locale!)) : filtered;
 
   return {
     status: statusFromResults(filtered),
-    results: filtered.map((result) => ({
+    results: localized.map((result) => ({
       ruleId: result.ruleCode,
       ruleName: result.ruleName,
       severity: result.severity,

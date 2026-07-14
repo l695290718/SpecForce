@@ -1,7 +1,9 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { defaultLocale, translate, type Locale, type MessageKey } from "../lib/i18n";
+import { useRouter } from "next/navigation";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { translate, type Locale, type MessageKey } from "../lib/i18n";
+import { applyClientLocale } from "../lib/locale-client";
 
 interface LanguageContextValue {
   locale: Locale;
@@ -11,22 +13,23 @@ interface LanguageContextValue {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(defaultLocale);
+export function LanguageProvider({ children, initialLocale }: { children: ReactNode; initialLocale: Locale }) {
+  const router = useRouter();
+  const [locale, setLocaleState] = useState<Locale>(initialLocale);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("specforge-locale");
-    if (saved === "zh" || saved === "en") {
-      setLocaleState(saved);
-      document.documentElement.lang = saved === "zh" ? "zh-CN" : "en";
-    }
-  }, []);
+    document.documentElement.lang = initialLocale === "zh" ? "zh-CN" : "en";
+  }, [initialLocale]);
 
-  const setLocale = (nextLocale: Locale) => {
+  const setLocale = useCallback((nextLocale: Locale) => {
     setLocaleState(nextLocale);
-    window.localStorage.setItem("specforge-locale", nextLocale);
-    document.documentElement.lang = nextLocale === "zh" ? "zh-CN" : "en";
-  };
+    applyClientLocale(nextLocale, {
+      writeCookie: (value) => { document.cookie = value; },
+      writeStorage: (value) => window.localStorage.setItem("specforge-locale", value),
+      setDocumentLanguage: (value) => { document.documentElement.lang = value; },
+      refresh: () => router.refresh()
+    });
+  }, [router]);
 
   const value = useMemo(
     () => ({
@@ -34,7 +37,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       setLocale,
       t: (key: MessageKey) => translate(locale, key)
     }),
-    [locale]
+    [locale, setLocale]
   );
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;

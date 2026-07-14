@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { runGovernanceChecks } from "@specforge/core";
-import { getGovernanceTargetsWithDatabase } from "../../../../lib/assets";
+import { getScopedGovernanceOverview } from "../../../../lib/assets";
+import { getApiRequestLocale } from "../../../../lib/locale";
 
 export async function GET(request: Request) {
-  const targets = await getGovernanceTargetsWithDatabase(new URL(request.url).searchParams.get("scope") ?? "");
-  return NextResponse.json((await Promise.all(targets.map((target) => runGovernanceChecks(target.type, target.id)))).flat());
+  const scope = new URL(request.url).searchParams.get("scope") ?? "";
+  return NextResponse.json(await getScopedGovernanceOverview(scope, getApiRequestLocale(request)));
 }

@@ -1,346 +1,299 @@
 # SpecForge Design Center Specification
 
+**Product:** SpecForge Design Center / 智设中枢
+
+**Architecture:** MCP-first, application-service scoped, English-canonical bilingual design center
+
+**Bilingual contract:** [SpecForge Bilingual Design Assets Design](superpowers/specs/2026-07-13-bilingual-design-assets-design.md)
+
 ## 1. Product Positioning
 
-SpecForge Design Center is an MCP-native AI design center for spec-driven software development.
+SpecForge centralizes product, domain, data, API, event, business-rule, state-machine, integration, quality, observability, ADR, Proposal, and Agent Context Pack knowledge as structured design assets.
 
-Its purpose is to keep product, architecture, API, event, data, rule, state-machine, quality, observability, and ADR knowledge in one structured design center. Human users manage and inspect that knowledge through the Web Console. AI Coding Agents consume and operate on that knowledge through the MCP Server.
+- Humans use a read-oriented Web Console to inspect one authorized application service at a time.
+- AI Coding Agents use MCP as the primary design read/write protocol.
+- PostgreSQL is the durable, scope-aware source for runtime content.
+- `@specforge/core` supplies shared localization, governance, graph, impact, Context Pack, authorization, and AI Provider contracts.
 
-Chinese name: 智设中枢.
+The Web Console is not a parallel authoring channel. Browser create/edit routes redirect to read views; durable design changes go through validated MCP operations.
 
 ## 2. Goals
 
-- Provide a human-facing Web Console for browsing, editing, validating, and exporting design assets.
-- Provide an MCP-first agent interface for Codex, Claude Code, Cursor, Copilot, and other AI Coding Agents.
-- Reuse one shared `@specforge/core` service layer across Web and MCP.
-- Generate Agent Context Packs from proposals.
-- Run design governance checks before implementation.
-- Preserve audit logs for MCP tool calls.
-- Keep the MVP runnable locally with seed data.
+- Make the application service the minimum writable architecture unit.
+- Keep every normal dashboard, list, detail, search, graph, and derived result isolated to one exact application-service Scope.
+- Allow an Agent to read or write a service only when its inherited Scope grants permit it.
+- Require canonical English and complete Chinese human-facing content for every new or updated asset.
+- Keep technical identifiers and executable contract structures language-neutral.
+- Generate scoped governance, impact analysis, and Context Packs without global seed fallback.
+- Persist deterministic self-design and sibling-service fixtures through MCP.
+- Keep the MVP locally runnable with PostgreSQL and stdio MCP.
 
 ## 3. Non-Goals
 
-- Full OAuth login is not implemented in the MVP.
-- Streamable HTTP MCP transport is reserved but not enabled.
-- Persistent write-through for all mutations is not complete; the MVP uses seed-backed in-memory services.
-- No delete tools are exposed.
-- No arbitrary code execution is exposed through MCP.
-- No raw database connection capability is exposed through MCP.
+- Browser-based asset authoring is not supported in this phase.
+- An aggregate or comparison dashboard spanning multiple application services is not implemented.
+- Streamable HTTP transport, OAuth, production RBAC, and multi-tenant deployment are not implemented.
+- `OpenAIProvider` does not call a real model.
+- Raw database access and arbitrary code execution are not exposed through MCP.
+- General delete operations are not exposed. Seed cleanup is process-gated and exact-scope only.
+- The MVP does not translate technical identifiers, schemas, relation codes, paths, or protocol structures.
 
-## 4. Architecture
+## 4. System Architecture
 
-```txt
-specforge-design-center/
-├── apps/
-│   ├── web/          Next.js Web Console
-│   └── mcp-server/   MCP Server over stdio
-├── packages/
-│   └── core/         Shared domain, governance, context, graph, audit, and AI provider services
-├── prisma/           Database schema and seed script
-└── docs/             Product and architecture specifications
+```text
+AI Agent -> MCP stdio -> apps/mcp-server -> packages/core -> PostgreSQL
+Human    -> Next.js   -> apps/web --------------------------^
 ```
 
-The key architectural rule is:
+| Layer       | Contract                                                      |
+| ----------- | ------------------------------------------------------------- |
+| Web         | Read-oriented, locale-aware, one selected application service |
+| MCP         | Agent protocol, validation and persistent mutation boundary   |
+| Core        | Pure/shared asset localization and derived-view services      |
+| Persistence | Exact Scope predicates and scope-aware logical identity       |
 
-```txt
-Web UI -> @specforge/core <- MCP Server
+App layers may compose Core services but must not duplicate asset merge rules or silently use global fixture data for scoped requests.
+
+## 5. Huawei Architecture Scope
+
+The mock hierarchy contains:
+
+| Level               | Count | Current nodes                                                   |
+| ------------------- | ----: | --------------------------------------------------------------- |
+| Product family      |     1 | Huawei                                                          |
+| Product             |     1 | Celon                                                           |
+| Sub-product         |     1 | Celon Platform                                                  |
+| Module              |     2 | Celon Designer, Celon Runtime                                   |
+| Application service |     5 | Designer, Spec Studio, Policy Hub, Integration Gateway, Runtime |
+
+The current service ID supplied by the product owner remains `com.huawei.celon.desiner` (including the existing spelling). Its canonical Scope path is:
+
+```text
+pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner
 ```
 
-Business rules and asset operations must live in `packages/core`. App layers should compose and present core capabilities, not duplicate them.
+The same path pattern applies to the three sibling services in the Designer module. `com.huawei.celon.runtime` is under a separate module and is present to verify access boundaries.
 
-## 5. Core Service Contract
+## 6. Scope Isolation And Identity
 
-`packages/core` owns the shared service API:
+All persisted `DesignAsset`, `Proposal`, `ContextPack`, and `AssetLink` operations require exact equality on both:
 
-- `searchDesignAssets()`
-- `getAssetDetail()`
-- `renderAssetAsMarkdown()`
-- `analyzeProposalImpact()`
-- `generateContextPack()`
-- `runGovernanceChecks()`
-- `runGovernanceChecksForTarget()`
-- `createProposal()`
-- `updateProposal()`
-- `createAdr()`
-- `linkAssets()`
-- `buildAssetGraph()`
-- `recordAuditLog()`
-- `listAuditLogs()`
+```text
+applicationServiceId + scopePath
+```
 
-These services are the only business logic surface used by both `apps/web` and `apps/mcp-server`.
+Each table uses an internal UUID `dbId` as the primary key and a unique logical identity:
 
-## 6. Web Console
+```text
+(applicationServiceId, scopePath, id)
+```
+
+Consequences:
+
+- two services may store the same logical `id` without collision;
+- a near-prefix `scopePath` is not readable or deletable as the selected Scope;
+- payload Scope metadata is checked against trusted row columns;
+- links, graph nodes, and graph edges preserve service identity;
+- metrics and derived output are computed from the selected service catalog only.
+
+The checked-in PostgreSQL migration upgrades legacy globally keyed tables without discarding historical rows. Legacy empty Scope values are assigned to the Designer service before exact composite constraints are applied.
+
+## 7. Agent Permission Model
+
+Architecture authorization uses explicit read/write grants on hierarchy nodes. A grant is inherited only by descendants and does not imply the other action.
+
+The default mock Agent has:
+
+- Designer-module read access, covering Designer, Spec Studio, Policy Hub, and Integration Gateway;
+- application-service write access only to `com.huawei.celon.desiner`; and
+- no grant for the Runtime module.
+
+The seed actor has module-level read/write access only while `SPECFORGE_MCP_SEED=1` in the MCP seed child. The cleanup tool is not registered for normal MCP clients.
+
+MCP tool metadata declares capability permissions such as `asset:read`, `asset:write`, `proposal:read`, `proposal:write`, `context-pack:generate`, `governance:run`, `adr:write`, and `graph:read`. The MVP capability policy is currently permissive; architecture Scope grants are the enforced data boundary. OAuth/RBAC remains future work.
+
+An Agent may read multiple services if authorized, but there is currently no combined view. The deferred **authorized multi-service comparison** feature must filter each participating service by the Agent's grants and must never turn the default dashboard into a global aggregate.
+
+## 8. Bilingual Asset Model
+
+English root fields are canonical and required. Chinese human-facing content is a typed overlay:
+
+```ts
+type LocalizedContent<TZh> = {
+  zh: TZh;
+};
+```
+
+The concrete overlay type differs by asset type. Examples include descriptions and glossary values for domains, field display metadata for data models, narrative policy text for APIs/events, state and transition labels for state machines, and full human-facing sections for Proposals and Context Packs.
+
+Technical invariants include IDs, codes, Scope, domain links, table/schema keys, HTTP methods and paths, topics, event types, enum values, state/event codes, relationship types, timestamps, and structured protocol values. These are neither duplicated nor translated.
+
+### Validation Errors
+
+Every MCP write validates localization before database mutation. Failures expose stable machine-readable fields: `code`, `assetType`, `assetId`, and `path`.
+
+| Code                                   | Contract                                               |
+| -------------------------------------- | ------------------------------------------------------ |
+| `ASSET_TRANSLATION_REQUIRED`           | Required `localizedContent.zh` content is absent       |
+| `CANONICAL_CONTENT_REQUIRED`           | Required English canonical content is absent           |
+| `TRANSLATION_FIELD_NOT_ALLOWED`        | Overlay attempts to provide a non-localizable field    |
+| `TRANSLATION_STRUCTURE_MISMATCH`       | Overlay keys/shape do not match canonical content      |
+| `TRANSLATION_TECHNICAL_FIELD_MUTATION` | Translation changes a language-neutral technical value |
+
+Governance rule `ASSET_BILINGUAL_COMPLETENESS` reports these errors using localized reason and suggestion text while preserving the stable code and field path.
+
+## 9. Locale Resolution
+
+The request locale is `en` or `zh`; invalid or missing values resolve to `en`.
+
+- The Web language switch writes the `specforge-locale` cookie for one year with `Path=/` and `SameSite=Lax`.
+- It mirrors the value to local storage, updates the HTML language, then refreshes the router so server-rendered content changes with client UI text.
+- Server pages read the locale cookie.
+- API routes accept an explicit `locale` query parameter, otherwise they read the cookie.
+- Application-service selection and locale selection are independent and preserved separately.
+
+Localization composes a presentation view. It does not mutate canonical stored content.
+
+## 10. Web Console Contract
 
 The Web Console provides:
 
-- Dashboard with asset metrics, proposal status, governance alerts, quick links, and animated status panels.
-- Asset catalog pages for domains, data models, APIs, events, business rules, state machines, integrations, quality, observability, and ADRs.
-- Asset detail pages with summary, structured JSON, governance results, and specialized sections.
-- Proposal list, detail, and draft creation screens.
-- Context Pack list and Markdown export/copy screens.
-- Governance rule and governance check views.
-- Asset graph filtering by domain and asset type.
-- Settings page for future environment and policy controls.
-- Chinese / English internationalization through `LanguageProvider` and `apps/web/lib/i18n.ts`.
+- a per-Agent, per-application-service dashboard;
+- scoped asset, Proposal, and Context Pack lists/details;
+- bilingual search across English canonical text and Chinese overlays;
+- governance results and remediation details;
+- relationship graph filtering with scope-aware links;
+- proposal impact and Context Pack views; and
+- a global Chinese/English switch.
 
-## 7. MCP Server
+Create/edit/new Proposal URLs redirect to their scoped read destinations and preserve query parameters. The browser does not expose persistent asset authoring forms. Read APIs resolve exact Scope and locale before accessing PostgreSQL.
 
-`apps/mcp-server` uses the official `@modelcontextprotocol/sdk` TypeScript SDK.
+## 11. Scoped Derived Services
 
-Current transport:
+Derived services receive an explicit scoped catalog instead of reading the built-in seed store:
 
-- stdio transport for local MCP clients.
+- **Search:** matches both English and Chinese semantic content, then localizes display output.
+- **Graph:** uses scoped node identities so duplicate logical IDs across services do not merge; relationship codes remain canonical.
+- **Governance:** validates selected persisted content and localizes rule names, reasons, and suggestions.
+- **Impact:** derives impacted assets, implementation tasks, risks, rollout, and rollback from the selected scoped Proposal.
+- **Context Pack:** generates canonical English plus a validated Chinese overlay, binds the exact Scope, and persists through MCP.
+- **Markdown/JSON:** localizes human-facing narratives without changing technical blocks.
 
-Reserved transport:
+Missing or malformed localized content is an error. Explicit scoped catalogs do not fall back to unrelated seed assets.
 
-- Streamable HTTP transport for future remote deployments.
+## 12. MCP Contract
 
-Run command:
+Current transport: stdio using the official TypeScript MCP SDK.
 
-```bash
-pnpm mcp:dev
+Read operations require `applicationServiceId`; locale-aware operations accept `en` or `zh`. Persistent writes require an exact `architectureScope` and complete bilingual payload.
+
+Principal tools:
+
+- `upsert_design_asset`, `upsert_proposal`, `upsert_context_pack`, `link_assets`;
+- `search_design_assets`, `get_asset_detail`, `get_asset_graph`;
+- `analyze_proposal_impact`, `run_governance_checks`;
+- `generate_context_pack`, `export_context_pack`; and
+- scoped `create_proposal`, `update_proposal`, and `create_adr` workflow tools.
+
+Scoped resources:
+
+```text
+specforge://scopes/{applicationServiceId}/{locale}/assets/{assetType}
+specforge://scopes/{applicationServiceId}/{locale}/assets/{assetType}/{id}
+specforge://scopes/{applicationServiceId}/{locale}/graph
 ```
 
-Smoke test:
+Legacy static resource names remain compatibility entry points, but scoped tools/templates are the authoritative runtime path.
 
-```bash
-pnpm --filter @specforge/mcp-server smoke
+## 13. MCP-native Seed Inventory
+
+Before opening the MCP child, the seed validates every canonical/Chinese payload and prints deterministic counts. It then performs exact-scope, idempotent upserts through MCP and fails on any tool error.
+
+| Service             | Assets / records                                        |
+| ------------------- | ------------------------------------------------------- |
+| Designer            | 32 design assets, 5 Proposals, 1 Context Pack, 53 links |
+| Spec Studio         | Domain + data model                                     |
+| Policy Hub          | Domain + business rule                                  |
+| Integration Gateway | Domain + API + event                                    |
+| Runtime             | No content fixture                                      |
+
+The bilingual inventory contains 45 payloads across four services. The seed removes legacy partial-refund IDs only through its process-gated cleanup tool and only within the exact Designer Scope.
+
+The self-design content includes the implemented strict-isolation, Agent workspace, MCP-native seed, and bilingual-assets Proposals; MCP-first and English-canonical ADRs; bilingual governance rules; API/data/event/state-machine contracts; and their relationship graph.
+
+## 14. PostgreSQL Operations
+
+Local connection example:
+
+```env
+DATABASE_URL="postgresql://admin:admin@localhost:5432/specforge?schema=public"
 ```
 
-## 8. MCP Resources
-
-Resources return agent-readable Markdown, with JSON code blocks when precise structure is useful.
-
-- `specforge://domains`
-- `specforge://domains/{id}`
-- `specforge://data-models`
-- `specforge://data-models/{id}`
-- `specforge://apis`
-- `specforge://apis/{id}`
-- `specforge://events`
-- `specforge://events/{id}`
-- `specforge://business-rules`
-- `specforge://business-rules/{id}`
-- `specforge://state-machines`
-- `specforge://state-machines/{id}`
-- `specforge://integrations`
-- `specforge://integrations/{id}`
-- `specforge://adrs`
-- `specforge://adrs/{id}`
-- `specforge://proposals`
-- `specforge://proposals/{id}`
-- `specforge://context-packs`
-- `specforge://context-packs/{id}`
-- `specforge://graph`
-- `specforge://graph/{domainId}`
-
-## 9. MCP Tools
-
-### `search_design_assets`
-
-Searches design assets by query, asset type, and domain.
-
-Permissions:
-
-- `asset:read`
-
-### `get_asset_detail`
-
-Reads one asset as Markdown or JSON.
-
-Permissions:
-
-- `asset:read`
-
-### `analyze_proposal_impact`
-
-Analyzes proposal impact across domains, assets, risks, checks, and implementation tasks.
-
-Permissions:
-
-- `proposal:read`
-- `asset:read`
-- `graph:read`
-
-### `generate_context_pack`
-
-Generates an Agent Context Pack for a proposal, including implementation guidance and explicit Do-not Rules.
-
-Permissions:
-
-- `context-pack:generate`
-- `proposal:read`
-- `asset:read`
-
-### `run_governance_checks`
-
-Runs built-in governance checks for assets, proposals, or context packs.
-
-Permissions:
-
-- `governance:run`
-
-### `create_proposal`
-
-Creates a validated proposal.
-
-Permissions:
-
-- `proposal:write`
-
-### `update_proposal`
-
-Updates allowed proposal fields.
-
-Permissions:
-
-- `proposal:write`
-
-### `create_adr`
-
-Creates an Architecture Decision Record.
-
-Permissions:
-
-- `adr:write`
-
-### `link_assets`
-
-Creates a relationship between two design assets.
-
-Permissions:
-
-- `asset:write`
-
-### `export_context_pack`
-
-Exports a context pack as Markdown or JSON.
-
-Permissions:
-
-- `asset:read`
-
-## 10. MCP Prompts
-
-- `design_feature`: guides agents from natural-language feature request to proposal, impact analysis, context pack, and governance checks.
-- `review_design_proposal`: reviews a proposal for gaps, risks, and missing design assets.
-- `generate_api_contract`: drafts API contracts from a proposal.
-- `generate_event_contract`: drafts event contracts from a proposal.
-- `model_data`: generates or improves data models.
-- `generate_test_plan`: generates implementation test suggestions.
-- `generate_coding_context`: generates Codex-ready implementation context.
-
-## 11. Audit Model
-
-Audit logs record MCP tool usage and are represented by `AuditLog`:
-
-- `id`
-- `actorType`: `user` / `agent` / `system`
-- `actorId`
-- `channel`: `web` / `mcp` / `api`
-- `action`
-- `targetType`
-- `targetId`
-- `inputSummary`
-- `outputSummary`
-- `status`: `success` / `failed`
-- `errorMessage`
-- `createdAt`
-
-The Prisma schema includes `AuditLog`. The MVP core audit service stores entries in the shared seed-backed store; persistence can later be routed through Prisma without changing MCP contracts.
-
-## 12. Permission Model
-
-The MVP defines the following permission vocabulary:
-
-```ts
-type Permission =
-  | "asset:read"
-  | "asset:write"
-  | "proposal:read"
-  | "proposal:write"
-  | "context-pack:generate"
-  | "governance:run"
-  | "adr:write"
-  | "graph:read";
-```
-
-`allowAllPolicy` is used for the MVP. The policy boundary is isolated in `apps/mcp-server/src/auth.ts` so RBAC or OAuth can replace it later.
-
-## 13. Security Rules
-
-- Validate all MCP write inputs with Zod.
-- Audit all MCP tool calls.
-- Sanitize MCP tool errors before returning them to clients.
-- Include explicit Do-not Rules in generated Context Packs.
-- Do not expose delete tools by default.
-- Do not expose raw database connections.
-- Do not execute arbitrary code.
-- Keep MCP tool descriptions clear about capability boundaries.
-
-## 14. Seed Scenario
-
-The default seed scenario is "订单部分退款" / "partial order refund".
-
-It includes:
-
-- Order domain model.
-- Order and refund data models.
-- CreateRefund API contract.
-- RefundCreated and RefundSucceeded event contracts.
-- Refund amount business rule.
-- Refund state machine.
-- Payment refund integration contract.
-- Refund latency quality requirement.
-- Refund success-rate observability design.
-- ADR preventing synchronous order-to-inventory coupling.
-- Partial refund proposal.
-- Agent Context Pack.
-
-SpecForge also seeds its own MCP-first design into the database through `prisma/seed.ts` and `prisma/data/specforge-self-design.ts`. That self-design dataset is database-managed design content, not runtime core business logic. It includes the SpecForge platform domain, MCP tool contracts, audit data model, governance rules, lifecycle state machines, MCP-first ADR, self-design proposal, and self-design Context Pack.
-
-## 15. Verification
-
-Primary verification commands:
+Fresh schema:
 
 ```bash
 pnpm install
-pnpm typecheck
-pnpm test
-pnpm lint
-pnpm --filter @specforge/mcp-server smoke
-pnpm exec prisma validate
+pnpm db:generate
+pnpm db:push
+pnpm db:seed
 ```
 
-Runtime checks:
+Legacy schema migration:
+
+```bash
+pnpm db:generate
+pnpm exec prisma migrate deploy
+pnpm db:seed
+```
+
+`pnpm db:seed` is MCP-native; it does not directly upsert design content with Prisma. Re-running it is expected to preserve counts through stable scoped identities.
+
+## 15. AI Provider Boundary
+
+`AIProvider` supports five draft-generation capabilities:
+
+- Proposal;
+- ADR;
+- business rule;
+- test suggestions; and
+- Agent Context Pack.
+
+`MockAIProvider` returns deterministic local output and is the usable MVP provider. `OpenAIProvider` reserves the interface for a future real integration and currently performs no network/model request. Provider output must still pass the same localization, Scope, MCP persistence, and governance contracts before becoming design-center data.
+
+## 16. Audit And Security
+
+- MCP inputs are validated with Zod and localization validators.
+- Architecture Scope grants are checked independently from tool capability metadata.
+- Client errors are sanitized; seed calls fail fast on `isError`.
+- Raw database access and arbitrary code execution are not MCP capabilities.
+- Seed elevation is process-local; seed cleanup is unavailable to normal clients.
+- MCP calls pass through the audit wrapper. Durable audit persistence remains an extension point and must not be described as complete production auditing.
+
+## 17. Start And Verification
 
 ```bash
 pnpm dev
 pnpm mcp:dev
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm lint
+pnpm exec prisma validate
+pnpm --filter @specforge/mcp-server smoke
 ```
 
-Expected MCP smoke result:
+PostgreSQL verification can additionally group rows by `applicationServiceId` and confirm that the same logical ID can be stored independently under two exact Scope identities.
 
-- tools are listed.
-- resources are listed.
-- prompts are listed.
-- `search_design_assets` finds `proposal-partial-refund`.
-- `generate_context_pack` returns `# Agent Context Pack`.
-- `run_governance_checks` returns check results.
+The MCP smoke covers scoped resources/tools, localized graph output, export, missing Scope rejection, and unauthorized Scope rejection. Browser verification should switch both service and locale and confirm independent dashboard counts, assets, governance, graph, Proposal, and Context Pack output.
 
-## 16. Roadmap
+## 18. Roadmap
 
-Near-term:
+Near-term but not implemented:
 
-- Persist proposal, ADR, link, and audit writes through Prisma.
-- Add richer Context Pack templates per target agent.
-- Add visual graph filtering and relationship type controls.
-- Add governance detail drill-down and remediation guidance.
-
-Later:
-
-- Enable Streamable HTTP MCP transport.
-- Replace `allowAllPolicy` with RBAC / OAuth.
-- Add multi-tenant asset stores.
-- Add import pipelines from OpenAPI, AsyncAPI, Prisma schema, and source repositories.
-- Add CI integration for governance checks.
+- authorized multi-service comparison and impact views;
+- production OAuth/RBAC replacing the permissive capability policy;
+- durable audit-log persistence and operational retention policy;
+- Streamable HTTP transport;
+- real OpenAI Provider integration;
+- richer import pipelines for OpenAPI, AsyncAPI, database schemas, and repositories; and
+- CI governance gates.

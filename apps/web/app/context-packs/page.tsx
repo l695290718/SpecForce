@@ -3,10 +3,12 @@ import { DataTable, PageHeader } from "../../components/ui";
 import { T } from "../../components/language-provider";
 import { getContextPacksWithDatabase } from "../../lib/assets";
 import { buildScopedHref } from "../../lib/scope";
+import { getRequestLocale } from "../../lib/locale";
 
 export default async function ContextPacksPage({ searchParams }: { searchParams: Promise<{ scope?: string }> }) {
   const { scope = "" } = await searchParams;
-  const packs = await getContextPacksWithDatabase(scope);
+  const locale = await getRequestLocale();
+  const packs = await getContextPacksWithDatabase(scope, locale);
   return (
     <>
       <PageHeader title={<T k="contextPacks.title" />} description={<T k="contextPacks.description" />} />

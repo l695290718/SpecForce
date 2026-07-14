@@ -1,6 +1,6 @@
-import { assetCollections, assetLabel, findAsset, getAsset, getStore, listAssets } from "../repository";
+import { assetCollections, assetLabel, findAsset, getAsset, getStore, listAssets, localizeCatalogAsset } from "../repository";
 import { renderAssetSummary } from "../summary/render";
-import type { Asset, AssetRef, AssetType } from "../types";
+import type { Asset, AssetRef, AssetType, DerivedViewOptions } from "../types";
 
 export interface SearchDesignAssetsInput {
   query: string;
@@ -92,7 +92,7 @@ function assetName(asset: Asset): string {
 }
 
 function searchableText(asset: Asset): string {
-  return JSON.stringify(asset).toLowerCase();
+  return JSON.stringify({ canonical: asset, zh: asset.localizedContent?.zh }).toLowerCase();
 }
 
 function scoreAsset(asset: Asset, queryTerms: string[]): number {
@@ -100,7 +100,7 @@ function scoreAsset(asset: Asset, queryTerms: string[]): number {
   return queryTerms.reduce((score, term) => score + (text.includes(term) ? 1 : 0), 0);
 }
 
-export async function searchDesignAssets(input: SearchDesignAssetsInput): Promise<SearchDesignAssetsResult> {
+export async function searchDesignAssets(input: SearchDesignAssetsInput, options: DerivedViewOptions = {}): Promise<SearchDesignAssetsResult> {
   const queryTerms = input.query
     .toLowerCase()
     .split(/\s+/)
@@ -108,42 +108,57 @@ export async function searchDesignAssets(input: SearchDesignAssetsInput): Promis
     .filter(Boolean);
   const requestedTypes = input.assetTypes?.length ? input.assetTypes.map(normalizeAssetType) : listAllAssetTypes();
   const limit = Math.max(1, Math.min(input.limit ?? 10, 50));
-  const candidates = requestedTypes.flatMap((type) => listAssets(type).map((asset) => ({ type, asset })));
+  const locale = options.locale ?? "en";
+  const candidates = requestedTypes.flatMap((type) => listAssets(type, options.catalog).map((asset) => ({ type, asset })));
 
   const scored = candidates
     .filter(({ asset }) => !input.domainId || !("domainId" in asset) || asset.domainId === input.domainId || asset.id === input.domainId)
-    .map(({ type, asset }) => ({ type, asset, score: scoreAsset(asset, queryTerms) }))
+    .map(({ type, asset }) => ({ type, canonical: asset, score: scoreAsset(asset, queryTerms) }))
     .filter((item) => item.score > 0 || queryTerms.length === 0)
-    .sort((a, b) => b.score - a.score || assetName(a.asset).localeCompare(assetName(b.asset)));
+    .sort((a, b) => b.score - a.score || assetName(a.canonical).localeCompare(assetName(b.canonical)));
 
   const results = await Promise.all(
-    scored.slice(0, limit).map(async ({ type, asset, score }) => ({
-      id: asset.id,
-      type,
-      name: assetName(asset),
-      summary: await renderAssetSummary(type, asset.id),
-      relevanceReason: score > 0 ? `Matched ${score} query term(s) in ${assetLabel(type)} metadata.` : `Included from ${assetLabel(type)} catalog.`
-    }))
+    scored.slice(0, limit).map(async ({ type, canonical, score }) => {
+      const asset = localizeCatalogAsset(type, canonical, locale, options.catalog) as Asset;
+      const relevanceReason = locale === "zh"
+        ? score > 0
+          ? `在${assetLabel(type, locale)}元数据中匹配 ${score} 个查询词。`
+          : `来自${assetLabel(type, locale)}目录。`
+        : score > 0
+          ? `Matched ${score} query term(s) in ${assetLabel(type, locale)} metadata.`
+          : `Included from ${assetLabel(type, locale)} catalog.`;
+      return {
+        id: asset.id,
+        type,
+        name: assetName(asset),
+        summary: await renderAssetSummary(type, asset.id, options),
+        relevanceReason
+      };
+    })
   );
 
   return { results };
 }
 
-export async function renderAssetAsMarkdown(assetType: string, assetId: string): Promise<string> {
+export async function renderAssetAsMarkdown(assetType: string, assetId: string, options: DerivedViewOptions = {}): Promise<string> {
   const normalizedType = normalizeAssetType(assetType);
-  const asset = getAsset(normalizedType, assetId) as Asset;
-  const summary = await renderAssetSummary(normalizedType, assetId);
+  const locale = options.locale ?? "en";
+  const asset = localizeCatalogAsset(normalizedType, getAsset(normalizedType, assetId, options.catalog), locale, options.catalog) as Asset;
+  const summary = await renderAssetSummary(normalizedType, assetId, options);
+  const copy = locale === "zh"
+    ? { type: "类型", domain: "领域", summary: "Agent 摘要", source: "源 JSON" }
+    : { type: "Type", domain: "Domain", summary: "Agent Summary", source: "Source JSON" };
   return [
     `# ${assetName(asset)}`,
     "",
     `- ID: ${asset.id}`,
-    `- Type: ${assetLabel(normalizedType)}`,
-    "domainId" in asset && asset.domainId ? `- Domain: ${asset.domainId}` : undefined,
+    `- ${copy.type}: ${assetLabel(normalizedType, locale)}`,
+    "domainId" in asset && asset.domainId ? `- ${copy.domain}: ${asset.domainId}` : undefined,
     "",
-    "## Agent Summary",
+    `## ${copy.summary}`,
     summary,
     "",
-    "## Source JSON",
+    `## ${copy.source}`,
     "```json",
     JSON.stringify(asset, null, 2),
     "```"
@@ -152,12 +167,13 @@ export async function renderAssetAsMarkdown(assetType: string, assetId: string):
     .join("\n");
 }
 
-export async function getAssetDetail(input: GetAssetDetailInput): Promise<AssetDetailResult> {
+export async function getAssetDetail(input: GetAssetDetailInput, options: DerivedViewOptions = {}): Promise<AssetDetailResult> {
   const normalizedType = normalizeAssetType(input.assetType);
   if (input.format === "json") {
-    return { format: "json", asset: getAsset(normalizedType, input.assetId) as Asset };
+    const asset = getAsset(normalizedType, input.assetId, options.catalog);
+    return { format: "json", asset: localizeCatalogAsset(normalizedType, asset, options.locale ?? "en", options.catalog) as Asset };
   }
-  return { format: "markdown", content: await renderAssetAsMarkdown(normalizedType, input.assetId) };
+  return { format: "markdown", content: await renderAssetAsMarkdown(normalizedType, input.assetId, options) };
 }
 
 export function assetRefFromInput(assetType: string, assetId: string): AssetRef {

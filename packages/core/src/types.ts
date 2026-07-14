@@ -14,8 +14,155 @@ export type AssetType =
   | "proposal"
   | "contextPack";
 
+export type AssetLocale = "zh" | "en";
+
+export interface DerivedViewOptions {
+  catalog?: SpecForgeDataStore;
+  locale?: AssetLocale;
+}
+
+export interface LocalizedContent<TZh extends object, TEn extends object = TZh> {
+  zh?: TZh;
+  en?: TEn;
+}
+
+export interface BaseAssetLocalizedFields {
+  name: string;
+  description: string;
+}
+
+export interface DomainModelLocalizedFields extends BaseAssetLocalizedFields {
+  entities: string[];
+  valueObjects: string[];
+  domainServices: string[];
+  businessCapabilities: string[];
+  glossaryTerms: string[];
+}
+
+export interface DataFieldLocalizedFields {
+  displayName: string;
+  meaning?: string;
+  constraint?: string;
+  classification?: string;
+  example?: string;
+}
+
+export interface DataModelLocalizedFields extends BaseAssetLocalizedFields {
+  relationships: string[];
+  constraints: string[];
+  lifecycle: string;
+  lineage: string;
+  fields: Record<string, DataFieldLocalizedFields>;
+}
+
+export interface ApiContractLocalizedFields extends BaseAssetLocalizedFields {
+  authType?: string;
+  idempotency?: string;
+  rateLimit?: string;
+  timeout?: string;
+  compatibilityPolicy?: string;
+}
+
+export interface EventContractLocalizedFields extends BaseAssetLocalizedFields {
+  triggerTiming: string;
+  orderingRequirement?: string;
+  retryPolicy?: string;
+  deadLetterPolicy?: string;
+  compatibilityPolicy?: string;
+}
+
+export interface BusinessRuleLocalizedFields extends BaseAssetLocalizedFields {
+  condition?: string;
+  action: string;
+  exception?: string;
+  examples: string[];
+}
+
+export interface StateTransitionLocalizedFields {
+  condition?: string;
+  action?: string;
+  failureHandling?: string;
+}
+
+export interface StateMachineLocalizedFields extends BaseAssetLocalizedFields {
+  states: Record<string, string>;
+  events: Record<string, string>;
+  guards: string[];
+  actions: string[];
+  transitions: Record<string, StateTransitionLocalizedFields>;
+}
+
+export interface IntegrationContractLocalizedFields extends BaseAssetLocalizedFields {
+  dataMapping: string;
+  errorMapping: string;
+  sla: string;
+  timeout: string;
+  retryStrategy: string;
+  fallbackStrategy: string;
+  circuitBreaker: string;
+}
+
+export interface QualityRequirementLocalizedFields extends BaseAssetLocalizedFields {
+  target: string;
+  measurement: string;
+  verificationMethod: string;
+}
+
+export interface ObservabilityDesignLocalizedFields extends BaseAssetLocalizedFields {
+  alerts: string[];
+  dashboards: string[];
+  runbook: string;
+  slo: string;
+}
+
+export interface AdrLocalizedFields extends BaseAssetLocalizedFields {
+  title: string;
+  context: string;
+  decision: string;
+  alternatives: string[];
+  consequences: string[];
+  constraints: string[];
+}
+
+export interface ProposalLocalizedFields extends BaseAssetLocalizedFields {
+  title: string;
+  background: string;
+  goal: string;
+  nonGoal: string;
+  scope: string;
+  specChanges: string[];
+  risks: string[];
+  rolloutPlan: string;
+  rollbackPlan?: string;
+}
+
+export interface ContextPackLocalizedFields {
+  name: string;
+  summary: string;
+  constraints: string[];
+  instructions: string[];
+  generatedMarkdown: string;
+}
+
+export interface AssetLocalizedContentMap {
+  domain: LocalizedContent<DomainModelLocalizedFields>;
+  dataModel: LocalizedContent<DataModelLocalizedFields>;
+  api: LocalizedContent<ApiContractLocalizedFields>;
+  event: LocalizedContent<EventContractLocalizedFields>;
+  businessRule: LocalizedContent<BusinessRuleLocalizedFields>;
+  stateMachine: LocalizedContent<StateMachineLocalizedFields>;
+  integration: LocalizedContent<IntegrationContractLocalizedFields>;
+  quality: LocalizedContent<QualityRequirementLocalizedFields>;
+  observability: LocalizedContent<ObservabilityDesignLocalizedFields>;
+  adr: LocalizedContent<AdrLocalizedFields>;
+  proposal: LocalizedContent<ProposalLocalizedFields>;
+  contextPack: LocalizedContent<ContextPackLocalizedFields>;
+}
+
 export type GovernanceSeverity = "info" | "warning" | "error";
 export type GovernanceStatus = "pass" | "fail";
+export type GovernanceMessageParamValue = string | string[];
+export type GovernanceMessageParams = Record<string, GovernanceMessageParamValue>;
 export type AuditActorType = "user" | "agent" | "system";
 export type AuditChannel = "web" | "mcp" | "api";
 export type AuditStatus = "success" | "failed";
@@ -29,7 +176,7 @@ export type Permission =
   | "adr:write"
   | "graph:read";
 
-export interface BaseAsset {
+export interface BaseAsset<TLocalizedFields extends object = BaseAssetLocalizedFields> {
   id: string;
   name: string;
   description: string;
@@ -37,9 +184,10 @@ export interface BaseAsset {
   createdAt: string;
   updatedAt: string;
   architectureScope?: ArchitectureScopeRef;
+  localizedContent?: LocalizedContent<TLocalizedFields>;
 }
 
-export interface DomainModel extends BaseAsset {
+export interface DomainModel extends BaseAsset<DomainModelLocalizedFields> {
   code: string;
   boundedContext: string;
   owner: string;
@@ -64,7 +212,7 @@ export interface DataField {
   owner: string;
 }
 
-export interface DataModel extends BaseAsset {
+export interface DataModel extends BaseAsset<DataModelLocalizedFields> {
   code: string;
   modelType: "conceptual" | "logical" | "physical";
   domainId: string;
@@ -78,7 +226,7 @@ export interface DataModel extends BaseAsset {
   lineage: string;
 }
 
-export interface ApiContract extends BaseAsset {
+export interface ApiContract extends BaseAsset<ApiContractLocalizedFields> {
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   path: string;
   domainId: string;
@@ -96,7 +244,7 @@ export interface ApiContract extends BaseAsset {
   exposure: "internal" | "external";
 }
 
-export interface EventContract extends BaseAsset {
+export interface EventContract extends BaseAsset<EventContractLocalizedFields> {
   topic: string;
   eventType: string;
   domainId: string;
@@ -111,7 +259,7 @@ export interface EventContract extends BaseAsset {
   compatibilityPolicy?: string;
 }
 
-export interface BusinessRule extends BaseAsset {
+export interface BusinessRule extends BaseAsset<BusinessRuleLocalizedFields> {
   code: string;
   domainId: string;
   ruleType: "calculation" | "validation" | "permission" | "state-transition" | "amount" | "time" | "exception";
@@ -134,7 +282,7 @@ export interface StateTransition {
   failureHandling?: string;
 }
 
-export interface StateMachine extends BaseAsset {
+export interface StateMachine extends BaseAsset<StateMachineLocalizedFields> {
   domainId: string;
   states: string[];
   transitions: StateTransition[];
@@ -145,7 +293,7 @@ export interface StateMachine extends BaseAsset {
   actions: string[];
 }
 
-export interface IntegrationContract extends BaseAsset {
+export interface IntegrationContract extends BaseAsset<IntegrationContractLocalizedFields> {
   sourceSystem: string;
   targetSystem: string;
   protocol: string;
@@ -159,7 +307,7 @@ export interface IntegrationContract extends BaseAsset {
   owner: string;
 }
 
-export interface QualityRequirement extends BaseAsset {
+export interface QualityRequirement extends BaseAsset<QualityRequirementLocalizedFields> {
   assetType: AssetType;
   assetId: string;
   category: "performance" | "availability" | "security" | "privacy" | "observability" | "compliance" | "scalability" | "reliability";
@@ -169,7 +317,7 @@ export interface QualityRequirement extends BaseAsset {
   verificationMethod: string;
 }
 
-export interface ObservabilityDesign extends BaseAsset {
+export interface ObservabilityDesign extends BaseAsset<ObservabilityDesignLocalizedFields> {
   assetType: AssetType;
   assetId: string;
   metrics: string[];
@@ -181,7 +329,7 @@ export interface ObservabilityDesign extends BaseAsset {
   slo: string;
 }
 
-export interface Adr extends BaseAsset {
+export interface Adr extends BaseAsset<AdrLocalizedFields> {
   title: string;
   status: "proposed" | "accepted" | "deprecated" | "superseded";
   context: string;
@@ -193,7 +341,7 @@ export interface Adr extends BaseAsset {
   owner: string;
 }
 
-export interface Proposal extends BaseAsset {
+export interface Proposal extends BaseAsset<ProposalLocalizedFields> {
   title: string;
   background: string;
   goal: string;
@@ -205,7 +353,6 @@ export interface Proposal extends BaseAsset {
   rolloutPlan: string;
   rollbackPlan?: string;
   status: "draft" | "reviewing" | "approved" | "implemented" | "archived";
-  localizedContent?: Partial<Record<"zh" | "en", Partial<Pick<Proposal, "name" | "title" | "description" | "background" | "goal" | "nonGoal" | "scope" | "specChanges" | "risks" | "rolloutPlan" | "rollbackPlan">>>>;
 }
 
 export interface ContextPack {
@@ -220,6 +367,7 @@ export interface ContextPack {
   generatedMarkdown: string;
   createdAt: string;
   architectureScope?: ArchitectureScopeRef;
+  localizedContent?: LocalizedContent<ContextPackLocalizedFields>;
 }
 
 export interface AssetRef {
@@ -249,21 +397,29 @@ export interface GovernanceCheckResult {
   assetId: string;
   reason: string;
   suggestion: string;
+  messageParams?: GovernanceMessageParams;
 }
 
 export interface AssetGraphNode {
   id: string;
+  logicalId?: string;
   label: string;
   type: AssetType;
   domainId?: string;
   summary: string;
+  applicationServiceId?: string;
+  architectureScope?: ArchitectureScopeRef;
 }
 
 export interface AssetGraphEdge {
   id: string;
   source: string;
   target: string;
+  sourceLogicalId?: string;
+  targetLogicalId?: string;
   label: string;
+  applicationServiceId?: string;
+  architectureScope?: ArchitectureScopeRef;
 }
 
 export interface AssetGraph {
@@ -314,16 +470,19 @@ export interface SpecForgeDataStore {
   auditLogs?: AuditLog[];
 }
 
-export type Asset =
-  | DomainModel
-  | DataModel
-  | ApiContract
-  | EventContract
-  | BusinessRule
-  | StateMachine
-  | IntegrationContract
-  | QualityRequirement
-  | ObservabilityDesign
-  | Adr
-  | Proposal
-  | ContextPack;
+export interface AssetTypeMap {
+  domain: DomainModel;
+  dataModel: DataModel;
+  api: ApiContract;
+  event: EventContract;
+  businessRule: BusinessRule;
+  stateMachine: StateMachine;
+  integration: IntegrationContract;
+  quality: QualityRequirement;
+  observability: ObservabilityDesign;
+  adr: Adr;
+  proposal: Proposal;
+  contextPack: ContextPack;
+}
+
+export type Asset = AssetTypeMap[AssetType];
