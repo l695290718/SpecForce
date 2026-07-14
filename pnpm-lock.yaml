@@ -34,6 +34,22 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)
 
+  apps/impact-worker:
+    dependencies:
+      '@prisma/client':
+        specifier: ^6.1.0
+        version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
+      '@specforge/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@specforge/graph-store':
+        specifier: workspace:*
+        version: link:../../packages/graph-store
+    devDependencies:
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)
+
   apps/mcp-server:
     dependencies:
       '@modelcontextprotocol/sdk':
