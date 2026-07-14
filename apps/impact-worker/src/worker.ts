@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Prisma, PrismaClient } from "@prisma/client";
 import {
   analyzeTransitiveProposalImpact,
@@ -21,9 +22,12 @@ export type ImpactAnalysisRunStatus =
   | "CANCELLED"
   | "CANCELLATION_REQUESTED";
 
-export interface ImpactAnalysisRunRecord extends ArchitectureScopeRef {
+export interface ImpactAnalysisRunRef extends ArchitectureScopeRef {
   id: string;
   enterpriseId: string;
+}
+
+export interface ImpactAnalysisRunRecord extends ImpactAnalysisRunRef {
   proposalId: string;
   status: ImpactAnalysisRunStatus;
   stopReason?: string | null;
@@ -36,6 +40,9 @@ export interface ImpactAnalysisRunRecord extends ArchitectureScopeRef {
   budgets: unknown;
   summary: Record<string, unknown>;
   unexploredFrontierCount?: number;
+  leaseOwner?: string | null;
+  leaseExpiresAt?: Date | null;
+  heartbeatAt?: Date | null;
   completedAt?: Date | null;
 }
 
@@ -55,12 +62,16 @@ export interface PersistedImpactAnalysis {
 }
 
 export interface ImpactWorkerRepository {
-  claim(runId: string): Promise<ImpactAnalysisRunRecord | null>;
-  find(runId: string): Promise<ImpactAnalysisRunRecord | null>;
-  updateRun(runId: string, patch: Partial<ImpactAnalysisRunRecord>): Promise<ImpactAnalysisRunRecord>;
+  claim(run: ImpactAnalysisRunRef, leaseOwner: string, leaseExpiresAt: Date): Promise<ImpactAnalysisRunRecord | null>;
+  find(run: ImpactAnalysisRunRef): Promise<ImpactAnalysisRunRecord | null>;
+  updateRun(run: ImpactAnalysisRunRef, patch: Partial<ImpactAnalysisRunRecord>): Promise<ImpactAnalysisRunRecord>;
+  projectionCheckpoint(run: ImpactAnalysisRunRef): Promise<bigint>;
+  heartbeat(run: ImpactAnalysisRunRef, leaseOwner: string, leaseExpiresAt: Date): Promise<ImpactAnalysisRunRecord | null>;
   loadExecution(run: ImpactAnalysisRunRecord): Promise<ImpactAnalysisExecution>;
-  persistAnalysis(runId: string, analysis: PersistedImpactAnalysis): Promise<void>;
-  isCancellationRequested(runId: string): Promise<boolean>;
+  complete(run: ImpactAnalysisRunRef, leaseOwner: string, analysis: PersistedImpactAnalysis): Promise<ImpactAnalysisRunRecord | null>;
+  fail(run: ImpactAnalysisRunRef, leaseOwner: string, stopReason: string): Promise<ImpactAnalysisRunRecord | null>;
+  cancel(run: ImpactAnalysisRunRef): Promise<ImpactAnalysisRunRecord | null>;
+  isCancellationRequested(run: ImpactAnalysisRunRef): Promise<boolean>;
 }
 
 export interface ImpactWorkerRunResult {
@@ -70,72 +81,80 @@ export interface ImpactWorkerRunResult {
   resumedFromFrontier?: boolean;
 }
 
+export interface ImpactAnalysisWorkerOptions {
+  workerId?: string;
+  leaseDurationMs?: number;
+  heartbeatIntervalMs?: number;
+  now?: () => Date;
+}
+
 export class ImpactAnalysisWorker {
+  private readonly workerId: string;
+  private readonly leaseDurationMs: number;
+  private readonly heartbeatIntervalMs: number;
+  private readonly now: () => Date;
+
   constructor(
     private readonly repository: ImpactWorkerRepository,
-    private readonly graphStore: Pick<GraphStore, "checkpoint" | "traverse">
-  ) {}
-
-  async claim(runId: string): Promise<ImpactAnalysisRunRecord | null> {
-    return this.repository.claim(runId);
+    private readonly graphStore: Pick<GraphStore, "traverse">,
+    options: ImpactAnalysisWorkerOptions = {}
+  ) {
+    this.workerId = options.workerId ?? `impact-worker:${randomUUID()}`;
+    this.leaseDurationMs = options.leaseDurationMs ?? 30_000;
+    this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? 10_000;
+    this.now = options.now ?? (() => new Date());
   }
 
-  async run(runId: string): Promise<ImpactWorkerRunResult> {
-    const existing = await this.repository.find(runId);
-    if (!existing) throw new Error("IMPACT_ANALYSIS_RUN_NOT_FOUND");
+  async claim(run: ImpactAnalysisRunRef): Promise<ImpactAnalysisRunRecord | null> {
+    return this.repository.claim(run, this.workerId, this.nextLeaseExpiry());
+  }
 
-    if (await this.repository.isCancellationRequested(runId)) {
-      return this.cancel(existing);
-    }
+  async run(run: ImpactAnalysisRunRef): Promise<ImpactWorkerRunResult> {
+    const existing = await this.requireRun(run);
+    if (await this.repository.isCancellationRequested(run)) return this.cancel(run, existing);
 
-    const claimed = await this.claim(runId);
-    if (!claimed) return toResult(await this.repository.find(runId) ?? existing);
+    const claimed = await this.claim(run);
+    if (!claimed) return toResult(await this.requireRun(run));
     return this.execute(claimed, false);
   }
 
-  async resume(runId: string): Promise<ImpactWorkerRunResult> {
-    const run = await this.repository.find(runId);
-    if (!run) throw new Error("IMPACT_ANALYSIS_RUN_NOT_FOUND");
-    if (run.status !== "PARTIAL") throw new Error("IMPACT_ANALYSIS_RUN_NOT_PARTIAL");
-    if (readFrontier(run.summary).length === 0) throw new Error("IMPACT_ANALYSIS_FRONTIER_REQUIRED");
+  async resume(run: ImpactAnalysisRunRef): Promise<ImpactWorkerRunResult> {
+    const existing = await this.requireRun(run);
+    if (existing.status !== "PARTIAL") throw new Error("IMPACT_ANALYSIS_RUN_NOT_PARTIAL");
 
-    await this.repository.updateRun(runId, { status: "QUEUED", stopReason: null, completedAt: null });
-    const queued = await this.repository.find(runId);
-    if (!queued) throw new Error("IMPACT_ANALYSIS_RUN_NOT_FOUND");
-    if (await this.repository.isCancellationRequested(runId)) return this.cancel(queued);
-    const claimed = await this.claim(runId);
-    if (!claimed) return toResult(await this.repository.find(runId) ?? queued, true);
+    // Rebuild from original roots in one terminal transaction so prior partial paths cannot mix with resumed paths.
+    await this.repository.updateRun(run, { status: "QUEUED", stopReason: null, completedAt: null });
+    const claimed = await this.claim(run);
+    if (!claimed) return toResult(await this.requireRun(run), true);
     return this.execute(claimed, true);
   }
 
-  async retry(runId: string): Promise<ImpactWorkerRunResult> {
-    const run = await this.repository.find(runId);
-    if (!run) throw new Error("IMPACT_ANALYSIS_RUN_NOT_FOUND");
-    if (run.status !== "FAILED") throw new Error("IMPACT_ANALYSIS_RUN_NOT_FAILED");
-
-    await this.repository.updateRun(runId, { status: "QUEUED", stopReason: null, completedAt: null });
-    return this.run(runId);
+  async retry(run: ImpactAnalysisRunRef): Promise<ImpactWorkerRunResult> {
+    const existing = await this.requireRun(run);
+    if (existing.status !== "FAILED") throw new Error("IMPACT_ANALYSIS_RUN_NOT_FAILED");
+    await this.repository.updateRun(run, { status: "QUEUED", stopReason: null, completedAt: null });
+    return this.run(run);
   }
 
-  private async execute(run: ImpactAnalysisRunRecord, resumedFromFrontier: boolean): Promise<ImpactWorkerRunResult> {
+  private async execute(run: ImpactAnalysisRunRecord, resumed: boolean): Promise<ImpactWorkerRunResult> {
+    const heartbeat = this.startHeartbeat(run);
     try {
-      const checkpoint = await this.graphStore.checkpoint(scopeOf(run));
-      await this.repository.updateRun(run.id, { actualGraphCheckpoint: checkpoint });
+      const checkpoint = await this.repository.projectionCheckpoint(run);
+      await this.repository.updateRun(run, { actualGraphCheckpoint: checkpoint });
       if (checkpoint < run.requiredGraphVersion) {
-        const waiting = await this.repository.updateRun(run.id, { status: "WAITING_FOR_PROJECTION", actualGraphCheckpoint: checkpoint });
-        return toResult(waiting, resumedFromFrontier);
+        const waiting = await this.repository.updateRun(run, { status: "WAITING_FOR_PROJECTION", actualGraphCheckpoint: checkpoint });
+        return toResult(waiting, resumed);
       }
 
-      if (await this.repository.isCancellationRequested(run.id)) return this.cancel(run);
+      if (await this.repository.isCancellationRequested(run)) return this.cancel(run, run);
       const authorization = readAuthorization(run.authorizationSnapshot, scopeOf(run));
       const execution = await this.repository.loadExecution(run);
-      const roots = resumedFromFrontier ? readFrontier(run.summary) : execution.roots;
-      if (roots.length === 0) throw new Error("IMPACT_ANALYSIS_ROOTS_REQUIRED");
+      if (execution.roots.length === 0) throw new Error("IMPACT_ANALYSIS_ROOTS_REQUIRED");
 
       const budgets = readBudgets(run.budgets);
       const analysis = await analyzeTransitiveProposalImpact({
         proposal: execution.proposal,
-        roots,
+        roots: execution.roots,
         authorization,
         maxDepth: budgets.maxDepth,
         maxNodes: budgets.maxNodes,
@@ -144,68 +163,85 @@ export class ImpactAnalysisWorker {
         graphVersion: checkpoint
       }, { graphStore: this.graphStore });
 
-      if (await this.repository.isCancellationRequested(run.id)) return this.cancel(run);
-      const persisted = toPersistedAnalysis(run, analysis, checkpoint);
-      await this.repository.persistAnalysis(run.id, persisted);
-      const terminal = await this.repository.updateRun(run.id, {
-        status: persisted.status,
-        stopReason: persisted.stopReason ?? null,
-        actualGraphCheckpoint: checkpoint,
-        summary: persisted.summary,
-        unexploredFrontierCount: persisted.frontier.length,
-        completedAt: new Date()
-      });
-      return toResult(terminal, resumedFromFrontier);
+      if (await this.repository.isCancellationRequested(run)) return this.cancel(run, run);
+      const completed = await this.repository.complete(run, this.workerId, toPersistedAnalysis(run, analysis, checkpoint));
+      if (completed) return toResult(completed, resumed);
+
+      const current = await this.requireRun(run);
+      return await this.repository.isCancellationRequested(run) ? this.cancel(run, current) : toResult(current, resumed);
     } catch (error) {
-      const current = await this.repository.find(run.id);
-      if (current && await this.repository.isCancellationRequested(run.id)) return this.cancel(current);
-      const failed = await this.repository.updateRun(run.id, {
-        status: "FAILED",
-        stopReason: errorCode(error),
-        completedAt: new Date()
-      });
-      return toResult(failed, resumedFromFrontier);
+      const failed = await this.repository.fail(run, this.workerId, errorCode(error));
+      if (failed) return toResult(failed, resumed);
+      const current = await this.requireRun(run);
+      return await this.repository.isCancellationRequested(run) ? this.cancel(run, current) : toResult(current, resumed);
+    } finally {
+      clearInterval(heartbeat);
     }
   }
 
-  private async cancel(run: ImpactAnalysisRunRecord): Promise<ImpactWorkerRunResult> {
-    const cancelled = await this.repository.updateRun(run.id, {
-      status: "CANCELLED",
-      stopReason: "CANCELLED",
-      completedAt: new Date()
-    });
-    return toResult(cancelled);
+  private startHeartbeat(run: ImpactAnalysisRunRecord): ReturnType<typeof setInterval> {
+    return setInterval(() => {
+      void this.repository.heartbeat(run, this.workerId, this.nextLeaseExpiry());
+    }, this.heartbeatIntervalMs);
+  }
+
+  private nextLeaseExpiry(): Date {
+    return new Date(this.now().getTime() + this.leaseDurationMs);
+  }
+
+  private async cancel(run: ImpactAnalysisRunRef, fallback: ImpactAnalysisRunRecord): Promise<ImpactWorkerRunResult> {
+    const cancelled = await this.repository.cancel(run);
+    return toResult(cancelled ?? fallback);
+  }
+
+  private async requireRun(run: ImpactAnalysisRunRef): Promise<ImpactAnalysisRunRecord> {
+    const found = await this.repository.find(run);
+    if (!found) throw new Error("IMPACT_ANALYSIS_RUN_NOT_FOUND");
+    return found;
   }
 }
 
 export class PrismaImpactWorkerRepository implements ImpactWorkerRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async claim(runId: string): Promise<ImpactAnalysisRunRecord | null> {
+  async claim(run: ImpactAnalysisRunRef, leaseOwner: string, leaseExpiresAt: Date): Promise<ImpactAnalysisRunRecord | null> {
     const rows = await this.prisma.$queryRaw<PrismaImpactRun[]>`
       WITH candidate AS (
         SELECT "dbId"
         FROM "ImpactAnalysisRun"
-        WHERE "dbId" = ${runId}
-          AND status IN ('QUEUED', 'WAITING_FOR_PROJECTION')
+        WHERE "dbId" = ${run.id}
+          AND "enterpriseId" = ${run.enterpriseId}
+          AND "applicationServiceId" = ${run.applicationServiceId}
+          AND "scopePath" = ${run.scopePath}
+          AND (
+            status IN ('QUEUED', 'WAITING_FOR_PROJECTION')
+            OR (status = 'RUNNING' AND ("leaseExpiresAt" IS NULL OR "leaseExpiresAt" < CURRENT_TIMESTAMP))
+          )
         FOR UPDATE SKIP LOCKED
       )
-      UPDATE "ImpactAnalysisRun" AS run
-      SET status = 'RUNNING', "updatedAt" = CURRENT_TIMESTAMP
+      UPDATE "ImpactAnalysisRun" AS analysis_run
+      SET status = 'RUNNING',
+          "leaseOwner" = ${leaseOwner},
+          "leaseExpiresAt" = ${leaseExpiresAt},
+          "heartbeatAt" = CURRENT_TIMESTAMP,
+          "updatedAt" = CURRENT_TIMESTAMP
       FROM candidate
-      WHERE run."dbId" = candidate."dbId"
-      RETURNING run.*
+      WHERE analysis_run."dbId" = candidate."dbId"
+        AND analysis_run."enterpriseId" = ${run.enterpriseId}
+        AND analysis_run."applicationServiceId" = ${run.applicationServiceId}
+        AND analysis_run."scopePath" = ${run.scopePath}
+      RETURNING analysis_run.*
     `;
     return rows[0] ? toRunRecord(rows[0]) : null;
   }
 
-  async find(runId: string): Promise<ImpactAnalysisRunRecord | null> {
-    const run = await this.prisma.impactAnalysisRun.findUnique({ where: { dbId: runId } });
-    return run ? toRunRecord(run) : null;
+  async find(run: ImpactAnalysisRunRef): Promise<ImpactAnalysisRunRecord | null> {
+    const row = await this.prisma.impactAnalysisRun.findFirst({ where: runWhere(run) });
+    return row ? toRunRecord(row) : null;
   }
 
-  async updateRun(runId: string, patch: Partial<ImpactAnalysisRunRecord>): Promise<ImpactAnalysisRunRecord> {
-    const data: Prisma.ImpactAnalysisRunUpdateInput = {};
+  async updateRun(run: ImpactAnalysisRunRef, patch: Partial<ImpactAnalysisRunRecord>): Promise<ImpactAnalysisRunRecord> {
+    const data: Prisma.ImpactAnalysisRunUpdateManyMutationInput = {};
     if (patch.status !== undefined) data.status = patch.status;
     if (patch.stopReason !== undefined) data.stopReason = patch.stopReason;
     if (patch.actualGraphCheckpoint !== undefined) data.actualGraphCheckpoint = patch.actualGraphCheckpoint;
@@ -214,8 +250,26 @@ export class PrismaImpactWorkerRepository implements ImpactWorkerRepository {
     if (patch.summary !== undefined) data.summary = jsonInput(patch.summary);
     if (patch.unexploredFrontierCount !== undefined) data.unexploredFrontierCount = patch.unexploredFrontierCount;
     if (patch.completedAt !== undefined) data.completedAt = patch.completedAt;
-    const run = await this.prisma.impactAnalysisRun.update({ where: { dbId: runId }, data });
-    return toRunRecord(run);
+    const updated = await this.prisma.impactAnalysisRun.updateMany({ where: runWhere(run), data });
+    if (updated.count !== 1) throw new Error("IMPACT_ANALYSIS_RUN_NOT_FOUND");
+    return this.requireRun(run);
+  }
+
+  async projectionCheckpoint(run: ImpactAnalysisRunRef): Promise<bigint> {
+    const checkpoints = await this.prisma.projectionCheckpoint.findMany({
+      where: scopeWhere(run),
+      select: { projectionVersion: true }
+    });
+    if (checkpoints.length === 0) return 0n;
+    return checkpoints.reduce((minimum, checkpoint) => checkpoint.projectionVersion < minimum ? checkpoint.projectionVersion : minimum, checkpoints[0]!.projectionVersion);
+  }
+
+  async heartbeat(run: ImpactAnalysisRunRef, leaseOwner: string, leaseExpiresAt: Date): Promise<ImpactAnalysisRunRecord | null> {
+    const updated = await this.prisma.impactAnalysisRun.updateMany({
+      where: { ...runWhere(run), status: "RUNNING", leaseOwner },
+      data: { heartbeatAt: new Date(), leaseExpiresAt }
+    });
+    return updated.count === 1 ? this.requireRun(run) : null;
   }
 
   async loadExecution(run: ImpactAnalysisRunRecord): Promise<ImpactAnalysisExecution> {
@@ -232,9 +286,7 @@ export class PrismaImpactWorkerRepository implements ImpactWorkerRepository {
     const proposal = JSON.parse(proposalRow.payload) as Proposal;
     const roots = await this.prisma.assetNode.findMany({
       where: {
-        enterpriseId: run.enterpriseId,
-        applicationServiceId: run.applicationServiceId,
-        scopePath: run.scopePath,
+        ...scopeWhere(run),
         OR: proposal.impactedAssets.map((asset) => ({ rootAssetType: asset.type, rootAssetId: asset.id }))
       },
       orderBy: [{ rootAssetType: "asc" }, { rootAssetId: "asc" }, { logicalId: "asc" }]
@@ -242,47 +294,51 @@ export class PrismaImpactWorkerRepository implements ImpactWorkerRepository {
     return { proposal, roots: roots.map(toIdentity) };
   }
 
-  async persistAnalysis(runId: string, analysis: PersistedImpactAnalysis): Promise<void> {
-    const run = await this.find(runId);
-    if (!run) throw new Error("IMPACT_ANALYSIS_RUN_NOT_FOUND");
-    const identities = uniqueIdentities([
-      ...analysis.nodes.map((node) => node.node),
-      ...analysis.paths.flatMap((path) => path.path.nodes)
-    ]);
-    const records = await this.prisma.assetNode.findMany({
-      where: {
-        enterpriseId: run.enterpriseId,
-        applicationServiceId: run.applicationServiceId,
-        scopePath: run.scopePath,
-        OR: identities.map((identity) => ({ nodeType: identity.nodeType, logicalId: identity.logicalId }))
-      }
-    });
-    const ids = new Map(records.map((node) => [identityKey(toIdentity(node)), node.dbId]));
-    if (identities.some((identity) => !ids.has(identityKey(identity)))) throw new Error("IMPACT_ANALYSIS_RESULT_NODE_NOT_FOUND");
+  async complete(run: ImpactAnalysisRunRef, leaseOwner: string, analysis: PersistedImpactAnalysis): Promise<ImpactAnalysisRunRecord | null> {
+    return this.prisma.$transaction(async (transaction) => {
+      const locked = await transaction.$queryRaw<Array<{ dbId: string }>>`
+        SELECT "dbId"
+        FROM "ImpactAnalysisRun"
+        WHERE "dbId" = ${run.id}
+          AND "enterpriseId" = ${run.enterpriseId}
+          AND "applicationServiceId" = ${run.applicationServiceId}
+          AND "scopePath" = ${run.scopePath}
+          AND status = 'RUNNING'
+          AND "leaseOwner" = ${leaseOwner}
+        FOR UPDATE
+      `;
+      if (locked.length !== 1) return null;
 
-    await this.prisma.$transaction(async (transaction) => {
+      const identities = uniqueIdentities([
+        ...analysis.nodes.map((node) => node.node),
+        ...analysis.paths.flatMap((path) => path.path.nodes)
+      ]);
+      const assetNodes = await transaction.assetNode.findMany({
+        where: {
+          ...scopeWhere(run),
+          OR: identities.map((identity) => ({ nodeType: identity.nodeType, logicalId: identity.logicalId }))
+        }
+      });
+      const nodeIds = new Map(assetNodes.map((node) => [identityKey(toIdentity(node)), node.dbId]));
+      if (identities.some((identity) => !nodeIds.has(identityKey(identity)))) throw new Error("IMPACT_ANALYSIS_RESULT_NODE_NOT_FOUND");
+
+      const prior = await transaction.impactResultNode.findMany({
+        where: { ...scopeWhere(run), impactAnalysisRunId: run.id },
+        select: { dbId: true }
+      });
+      if (prior.length > 0) {
+        await transaction.impactResultPath.deleteMany({ where: { ...scopeWhere(run), impactResultNodeId: { in: prior.map((node) => node.dbId) } } });
+      }
+      await transaction.impactResultNode.deleteMany({ where: { ...scopeWhere(run), impactAnalysisRunId: run.id } });
+
       for (const node of analysis.nodes) {
-        const nodeId = ids.get(identityKey(node.node));
+        const nodeId = nodeIds.get(identityKey(node.node));
         if (!nodeId) throw new Error("IMPACT_ANALYSIS_RESULT_NODE_NOT_FOUND");
-        const stored = await transaction.impactResultNode.upsert({
-          where: { impactAnalysisRunId_nodeId: { impactAnalysisRunId: runId, nodeId } },
-          create: {
-            enterpriseId: run.enterpriseId,
-            applicationServiceId: run.applicationServiceId,
-            scopePath: run.scopePath,
-            impactAnalysisRunId: runId,
+        const stored = await transaction.impactResultNode.create({
+          data: {
+            ...scopeWhere(run),
+            impactAnalysisRunId: run.id,
             nodeId,
-            impactLevel: node.impactLevel,
-            certainty: node.certainty,
-            depth: node.depth,
-            confidence: node.confidence,
-            primaryPath: jsonInput(node.primaryPath),
-            alternativePaths: jsonInput(node.alternativePaths),
-            matchedRules: jsonInput(node.matchedRules),
-            recommendedActions: jsonInput(node.recommendedActions),
-            snapshot: jsonInput(node)
-          },
-          update: {
             impactLevel: node.impactLevel,
             certainty: node.certainty,
             depth: node.depth,
@@ -294,19 +350,16 @@ export class PrismaImpactWorkerRepository implements ImpactWorkerRepository {
             snapshot: jsonInput(node)
           }
         });
-        await transaction.impactResultPath.deleteMany({ where: { impactResultNodeId: stored.dbId } });
         for (const path of analysis.paths.filter((candidate) => identityKey(candidate.node) === identityKey(node.node))) {
           const start = path.path.nodes[0];
           const end = path.path.nodes.at(-1);
           if (!start || !end) continue;
-          const startNodeId = ids.get(identityKey(start));
-          const endNodeId = ids.get(identityKey(end));
+          const startNodeId = nodeIds.get(identityKey(start));
+          const endNodeId = nodeIds.get(identityKey(end));
           if (!startNodeId || !endNodeId) throw new Error("IMPACT_ANALYSIS_PATH_NODE_NOT_FOUND");
           await transaction.impactResultPath.create({
             data: {
-              enterpriseId: run.enterpriseId,
-              applicationServiceId: run.applicationServiceId,
-              scopePath: run.scopePath,
+              ...scopeWhere(run),
               impactResultNodeId: stored.dbId,
               startNodeId,
               endNodeId,
@@ -318,12 +371,56 @@ export class PrismaImpactWorkerRepository implements ImpactWorkerRepository {
           });
         }
       }
+
+      const terminal = await transaction.impactAnalysisRun.updateMany({
+        where: { ...runWhere(run), status: "RUNNING", leaseOwner },
+        data: {
+          status: analysis.status,
+          stopReason: analysis.stopReason ?? null,
+          actualGraphCheckpoint: analysis.actualGraphCheckpoint,
+          summary: jsonInput(analysis.summary),
+          unexploredFrontierCount: analysis.frontier.length,
+          completedAt: new Date(),
+          leaseOwner: null,
+          leaseExpiresAt: null
+        }
+      });
+      if (terminal.count !== 1) throw new Error("IMPACT_ANALYSIS_TERMINAL_CAS_FAILED");
+      return this.requireRunInTransaction(transaction, run);
     });
   }
 
-  async isCancellationRequested(runId: string): Promise<boolean> {
-    const run = await this.prisma.impactAnalysisRun.findUnique({ where: { dbId: runId }, select: { status: true } });
-    return run?.status === "CANCELLATION_REQUESTED" || run?.status === "CANCELLED";
+  async fail(run: ImpactAnalysisRunRef, leaseOwner: string, stopReason: string): Promise<ImpactAnalysisRunRecord | null> {
+    const updated = await this.prisma.impactAnalysisRun.updateMany({
+      where: { ...runWhere(run), status: "RUNNING", leaseOwner },
+      data: { status: "FAILED", stopReason, completedAt: new Date(), leaseOwner: null, leaseExpiresAt: null }
+    });
+    return updated.count === 1 ? this.requireRun(run) : null;
+  }
+
+  async cancel(run: ImpactAnalysisRunRef): Promise<ImpactAnalysisRunRecord | null> {
+    const updated = await this.prisma.impactAnalysisRun.updateMany({
+      where: { ...runWhere(run), status: { in: ["QUEUED", "WAITING_FOR_PROJECTION", "RUNNING", "CANCELLATION_REQUESTED"] } },
+      data: { status: "CANCELLED", stopReason: "CANCELLED", completedAt: new Date(), leaseOwner: null, leaseExpiresAt: null }
+    });
+    return updated.count === 1 ? this.requireRun(run) : this.find(run);
+  }
+
+  async isCancellationRequested(run: ImpactAnalysisRunRef): Promise<boolean> {
+    const found = await this.prisma.impactAnalysisRun.findFirst({ where: runWhere(run), select: { status: true } });
+    return found?.status === "CANCELLATION_REQUESTED" || found?.status === "CANCELLED";
+  }
+
+  private async requireRun(run: ImpactAnalysisRunRef): Promise<ImpactAnalysisRunRecord> {
+    const found = await this.find(run);
+    if (!found) throw new Error("IMPACT_ANALYSIS_RUN_NOT_FOUND");
+    return found;
+  }
+
+  private async requireRunInTransaction(transaction: Prisma.TransactionClient, run: ImpactAnalysisRunRef): Promise<ImpactAnalysisRunRecord> {
+    const found = await transaction.impactAnalysisRun.findFirst({ where: runWhere(run) });
+    if (!found) throw new Error("IMPACT_ANALYSIS_RUN_NOT_FOUND");
+    return toRunRecord(found);
   }
 }
 
@@ -344,6 +441,9 @@ type PrismaImpactRun = {
   budgets: Prisma.JsonValue;
   summary: Prisma.JsonValue;
   unexploredFrontierCount: number;
+  leaseOwner: string | null;
+  leaseExpiresAt: Date | null;
+  heartbeatAt: Date | null;
   completedAt: Date | null;
 };
 
@@ -386,9 +486,8 @@ function readAuthorization(value: unknown, expectedScope: ArchitectureScopeRef):
   if (scope.applicationServiceId !== expectedScope.applicationServiceId || scope.scopePath !== expectedScope.scopePath) {
     throw new Error("AUTHORIZATION_SCOPE_MISMATCH");
   }
-  const actor = value.actor;
-  if (!isScopedActor(actor)) throw new Error("AUTHORIZATION_SNAPSHOT_INVALID");
-  return { actor, scope: expectedScope };
+  if (!isScopedActor(value.actor)) throw new Error("AUTHORIZATION_SNAPSHOT_INVALID");
+  return { actor: value.actor, scope: expectedScope };
 }
 
 function readBudgets(value: unknown): { maxDepth: number; maxNodes: number; maxPaths: number; timeoutMs: number } {
@@ -399,11 +498,6 @@ function readBudgets(value: unknown): { maxDepth: number; maxNodes: number; maxP
     maxPaths: requiredPositiveInteger(value.maxPaths),
     timeoutMs: requiredPositiveInteger(value.timeoutMs)
   };
-}
-
-function readFrontier(summary: Record<string, unknown>): AssetNodeIdentity[] {
-  const frontier = summary.unexploredFrontier;
-  return Array.isArray(frontier) ? frontier.filter(isAssetNodeIdentity) : [];
 }
 
 function toRunRecord(row: PrismaImpactRun): ImpactAnalysisRunRecord {
@@ -424,8 +518,27 @@ function toRunRecord(row: PrismaImpactRun): ImpactAnalysisRunRecord {
     budgets: row.budgets,
     summary: isRecord(row.summary) ? row.summary : {},
     unexploredFrontierCount: row.unexploredFrontierCount,
+    leaseOwner: row.leaseOwner,
+    leaseExpiresAt: row.leaseExpiresAt,
+    heartbeatAt: row.heartbeatAt,
     completedAt: row.completedAt
   };
+}
+
+function scopeOf(run: ArchitectureScopeRef): ArchitectureScopeRef {
+  return { applicationServiceId: run.applicationServiceId, scopePath: run.scopePath };
+}
+
+function scopeWhere(run: ImpactAnalysisRunRef) {
+  return {
+    enterpriseId: run.enterpriseId,
+    applicationServiceId: run.applicationServiceId,
+    scopePath: run.scopePath
+  };
+}
+
+function runWhere(run: ImpactAnalysisRunRef) {
+  return { dbId: run.id, ...scopeWhere(run) };
 }
 
 function toIdentity(node: { applicationServiceId: string; scopePath: string; nodeType: string; logicalId: string; rootAssetType: string; rootAssetId: string; parentNodeId?: string | null }): AssetNodeIdentity {
@@ -440,21 +553,17 @@ function toIdentity(node: { applicationServiceId: string; scopePath: string; nod
   };
 }
 
-function scopeOf(run: ImpactAnalysisRunRecord): ArchitectureScopeRef {
-  return { applicationServiceId: run.applicationServiceId, scopePath: run.scopePath };
-}
-
 function stopReasonFor(reasons: string[]): string {
   const reason = reasons[0];
   return ({ MAX_DEPTH: "DEPTH_LIMIT_EXCEEDED", MAX_NODES: "NODE_BUDGET_EXCEEDED", MAX_PATHS: "PATH_BUDGET_EXCEEDED", TIMEOUT: "TIMEOUT" } as Record<string, string>)[reason ?? ""] ?? "PARTIAL";
 }
 
-function toResult(run: ImpactAnalysisRunRecord, resumedFromFrontier = false): ImpactWorkerRunResult {
+function toResult(run: ImpactAnalysisRunRecord, resumed = false): ImpactWorkerRunResult {
   return {
     id: run.id,
     status: run.status,
     ...(run.stopReason ? { stopReason: run.stopReason } : {}),
-    ...(resumedFromFrontier ? { resumedFromFrontier: true } : {})
+    ...(resumed ? { resumedFromFrontier: true } : {})
   };
 }
 
@@ -474,23 +583,9 @@ function isScopedActor(value: unknown): value is ScopedActor {
     && value.grants.every((grant) => isRecord(grant) && typeof grant.scopeId === "string" && (grant.action === "read" || grant.action === "write"));
 }
 
-function isPositiveInteger(value: unknown): value is number {
-  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
-}
-
 function requiredPositiveInteger(value: unknown): number {
-  if (!isPositiveInteger(value)) throw new Error("IMPACT_ANALYSIS_BUDGETS_INVALID");
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) throw new Error("IMPACT_ANALYSIS_BUDGETS_INVALID");
   return value;
-}
-
-function isAssetNodeIdentity(value: unknown): value is AssetNodeIdentity {
-  return isRecord(value)
-    && typeof value.applicationServiceId === "string"
-    && typeof value.scopePath === "string"
-    && typeof value.nodeType === "string"
-    && typeof value.logicalId === "string"
-    && typeof value.rootAssetType === "string"
-    && typeof value.rootAssetId === "string";
 }
 
 function uniqueIdentities(identities: AssetNodeIdentity[]): AssetNodeIdentity[] {

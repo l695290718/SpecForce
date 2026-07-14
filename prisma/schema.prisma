@@ -339,6 +339,9 @@ model ImpactAnalysisRun {
   budgets               Json     @default("{}") @db.JsonB
   summary               Json     @default("{}") @db.JsonB
   unexploredFrontierCount Int    @default(0)
+  leaseOwner            String?
+  leaseExpiresAt        DateTime?
+  heartbeatAt           DateTime?
   startedAt             DateTime @default(now())
   completedAt           DateTime?
   createdAt             DateTime @default(now())
@@ -348,6 +351,7 @@ model ImpactAnalysisRun {
 
   @@unique([enterpriseId, applicationServiceId, scopePath, dbId], map: "ImpactAnalysisRun_enterprise_scope_dbId_key")
   @@index([enterpriseId, applicationServiceId, scopePath, status, createdAt], map: "ImpactAnalysisRun_scope_status_idx")
+  @@index([enterpriseId, applicationServiceId, scopePath, status, leaseExpiresAt], map: "ImpactAnalysisRun_scope_lease_idx")
   @@index([enterpriseId, applicationServiceId, scopePath, proposalId], map: "ImpactAnalysisRun_scope_proposal_idx")
 }
 
