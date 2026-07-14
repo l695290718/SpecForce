@@ -181,7 +181,7 @@ model AssetNode {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  parent               AssetNode?           @relation("AssetNodeParent", fields: [parentNodeId], references: [dbId])
+  parent               AssetNode?           @relation("AssetNodeParent", fields: [enterpriseId, applicationServiceId, scopePath, parentNodeId], references: [enterpriseId, applicationServiceId, scopePath, dbId], map: "AssetNode_parent_scope_fkey")
   children             AssetNode[]           @relation("AssetNodeParent")
   sourceRelationships  RelationshipCurrent[] @relation("RelationshipSource")
   targetRelationships  RelationshipCurrent[] @relation("RelationshipTarget")
@@ -189,7 +189,8 @@ model AssetNode {
   startingImpactPaths  ImpactResultPath[]    @relation("ImpactPathStartNode")
   endingImpactPaths    ImpactResultPath[]    @relation("ImpactPathEndNode")
 
-  @@unique([enterpriseId, applicationServiceId, scopePath, nodeType, logicalId])
+  @@unique([enterpriseId, applicationServiceId, scopePath, nodeType, logicalId], map: "AssetNode_scope_identity_key")
+  @@unique([enterpriseId, applicationServiceId, scopePath, dbId], map: "AssetNode_enterprise_scope_dbId_key")
   @@index([enterpriseId, applicationServiceId, scopePath, rootAssetType, rootAssetId])
   @@index([enterpriseId, applicationServiceId, scopePath, parentNodeId])
 }
@@ -214,11 +215,12 @@ model RelationshipCurrent {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  sourceNode           AssetNode          @relation("RelationshipSource", fields: [sourceNodeId], references: [dbId])
-  targetNode           AssetNode          @relation("RelationshipTarget", fields: [targetNodeId], references: [dbId])
+  sourceNode           AssetNode          @relation("RelationshipSource", fields: [enterpriseId, applicationServiceId, scopePath, sourceNodeId], references: [enterpriseId, applicationServiceId, scopePath, dbId], map: "RelationshipCurrent_source_scope_fkey")
+  targetNode           AssetNode          @relation("RelationshipTarget", fields: [enterpriseId, applicationServiceId, scopePath, targetNodeId], references: [enterpriseId, applicationServiceId, scopePath, dbId], map: "RelationshipCurrent_target_scope_fkey")
   events               RelationshipEvent[] @relation("RelationshipEventCurrent")
 
-  @@unique([enterpriseId, applicationServiceId, scopePath, sourceNodeId, targetNodeId, relationType, source, sourceReference])
+  @@unique([enterpriseId, applicationServiceId, scopePath, sourceNodeId, targetNodeId, relationType, source, sourceReference], map: "RelationshipCurrent_enterprise_scope_identity_key")
+  @@unique([enterpriseId, applicationServiceId, scopePath, dbId], map: "RelationshipCurrent_enterprise_scope_dbId_key")
   @@index([enterpriseId, applicationServiceId, scopePath, sourceNodeId, relationType], map: "RelationshipCurrent_scope_source_idx")
   @@index([enterpriseId, applicationServiceId, scopePath, targetNodeId, relationType], map: "RelationshipCurrent_scope_target_idx")
 }
@@ -242,10 +244,12 @@ model RelationshipEvent {
   snapshot             Json     @default("{}") @db.JsonB
   createdAt            DateTime @default(now())
 
-  relationship         RelationshipCurrent @relation("RelationshipEventCurrent", fields: [relationshipId], references: [dbId])
+  relationship         RelationshipCurrent @relation("RelationshipEventCurrent", fields: [enterpriseId, applicationServiceId, scopePath, relationshipId], references: [enterpriseId, applicationServiceId, scopePath, dbId], map: "RelationshipEvent_relationship_scope_fkey")
   outbox               RelationshipOutbox? @relation("RelationshipEventOutbox")
+  projectionCheckpoints ProjectionCheckpoint[] @relation("ProjectionCheckpointLastEvent")
 
-  @@unique([enterpriseId, applicationServiceId, scopePath, idempotencyKey])
+  @@unique([enterpriseId, applicationServiceId, scopePath, idempotencyKey], map: "RelationshipEvent_enterprise_scope_idempotency_key")
+  @@unique([enterpriseId, applicationServiceId, scopePath, dbId], map: "RelationshipEvent_enterprise_scope_dbId_key")
   @@index([enterpriseId, applicationServiceId, scopePath, relationshipId, createdAt])
 }
 
@@ -254,7 +258,7 @@ model RelationshipOutbox {
   enterpriseId         String
   applicationServiceId String
   scopePath            String
-  relationshipEventId  String   @unique @db.Uuid
+  relationshipEventId  String   @db.Uuid
   graphVersion         BigInt
   eventType            String
   payload              Json     @default("{}") @db.JsonB
@@ -267,9 +271,10 @@ model RelationshipOutbox {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  relationshipEvent    RelationshipEvent @relation("RelationshipEventOutbox", fields: [relationshipEventId], references: [dbId])
+  relationshipEvent    RelationshipEvent @relation("RelationshipEventOutbox", fields: [enterpriseId, applicationServiceId, scopePath, relationshipEventId], references: [enterpriseId, applicationServiceId, scopePath, dbId], map: "RelationshipOutbox_event_scope_fkey")
 
-  @@unique([enterpriseId, applicationServiceId, scopePath, idempotencyKey])
+  @@unique([enterpriseId, applicationServiceId, scopePath, idempotencyKey], map: "RelationshipOutbox_enterprise_scope_idempotency_key")
+  @@unique([enterpriseId, applicationServiceId, scopePath, relationshipEventId], map: "RelationshipOutbox_enterprise_scope_event_key")
   @@index([enterpriseId, applicationServiceId, scopePath, status, availableAt])
 }
 
@@ -287,7 +292,9 @@ model ProjectionCheckpoint {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  @@unique([enterpriseId, applicationServiceId, scopePath, partitionId])
+  lastEvent            RelationshipEvent? @relation("ProjectionCheckpointLastEvent", fields: [enterpriseId, applicationServiceId, scopePath, lastEventId], references: [enterpriseId, applicationServiceId, scopePath, dbId], map: "ProjectionCheckpoint_last_event_scope_fkey")
+
+  @@unique([enterpriseId, applicationServiceId, scopePath, partitionId], map: "ProjectionCheckpoint_enterprise_scope_partition_key")
   @@index([enterpriseId, applicationServiceId, scopePath, projectionVersion])
 }
 
@@ -315,6 +322,7 @@ model ImpactAnalysisRun {
 
   resultNodes           ImpactResultNode[] @relation("ImpactRunNodes")
 
+  @@unique([enterpriseId, applicationServiceId, scopePath, dbId], map: "ImpactAnalysisRun_enterprise_scope_dbId_key")
   @@index([enterpriseId, applicationServiceId, scopePath, status, createdAt], map: "ImpactAnalysisRun_scope_status_idx")
   @@index([enterpriseId, applicationServiceId, scopePath, proposalId], map: "ImpactAnalysisRun_scope_proposal_idx")
 }
@@ -339,11 +347,12 @@ model ImpactResultNode {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  impactAnalysisRun    ImpactAnalysisRun @relation("ImpactRunNodes", fields: [impactAnalysisRunId], references: [dbId])
-  node                 AssetNode         @relation("ImpactResultAssetNode", fields: [nodeId], references: [dbId])
+  impactAnalysisRun    ImpactAnalysisRun @relation("ImpactRunNodes", fields: [enterpriseId, applicationServiceId, scopePath, impactAnalysisRunId], references: [enterpriseId, applicationServiceId, scopePath, dbId], map: "ImpactResultNode_run_scope_fkey")
+  node                 AssetNode         @relation("ImpactResultAssetNode", fields: [enterpriseId, applicationServiceId, scopePath, nodeId], references: [enterpriseId, applicationServiceId, scopePath, dbId], map: "ImpactResultNode_node_scope_fkey")
   paths                ImpactResultPath[] @relation("ImpactResultNodePaths")
 
-  @@unique([impactAnalysisRunId, nodeId])
+  @@unique([impactAnalysisRunId, nodeId], map: "ImpactResultNode_impactAnalysisRunId_nodeId_key")
+  @@unique([enterpriseId, applicationServiceId, scopePath, dbId], map: "ImpactResultNode_enterprise_scope_dbId_key")
   @@index([enterpriseId, applicationServiceId, scopePath, impactAnalysisRunId])
 }
 
@@ -361,10 +370,10 @@ model ImpactResultPath {
   path                 Json     @default("{}") @db.JsonB
   createdAt            DateTime @default(now())
 
-  impactResultNode     ImpactResultNode @relation("ImpactResultNodePaths", fields: [impactResultNodeId], references: [dbId])
-  startNode            AssetNode        @relation("ImpactPathStartNode", fields: [startNodeId], references: [dbId])
-  endNode              AssetNode        @relation("ImpactPathEndNode", fields: [endNodeId], references: [dbId])
+  impactResultNode     ImpactResultNode @relation("ImpactResultNodePaths", fields: [enterpriseId, applicationServiceId, scopePath, impactResultNodeId], references: [enterpriseId, applicationServiceId, scopePath, dbId], map: "ImpactResultPath_result_scope_fkey")
+  startNode            AssetNode        @relation("ImpactPathStartNode", fields: [enterpriseId, applicationServiceId, scopePath, startNodeId], references: [enterpriseId, applicationServiceId, scopePath, dbId], map: "ImpactResultPath_start_scope_fkey")
+  endNode              AssetNode        @relation("ImpactPathEndNode", fields: [enterpriseId, applicationServiceId, scopePath, endNodeId], references: [enterpriseId, applicationServiceId, scopePath, dbId], map: "ImpactResultPath_end_scope_fkey")
 
-  @@unique([impactResultNodeId, rank])
+  @@unique([impactResultNodeId, rank], map: "ImpactResultPath_impactResultNodeId_rank_key")
   @@index([enterpriseId, applicationServiceId, scopePath, impactResultNodeId])
 }

@@ -1,9 +1,11 @@
 import { PrismaClient } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-const testSchema = "specforge_relationship_ledger_test";
+const testSchemaPrefix = "specforge_relationship_ledger_test_";
+const testSchema = `${testSchemaPrefix}${randomUUID().replaceAll("-", "")}`;
 const migrationPath = resolve(process.cwd(), "prisma/migrations/20260714_enterprise_relationship_graph/migration.sql");
 const schemaPath = resolve(process.cwd(), "prisma/schema.prisma");
 const migrationSql = existsSync(migrationPath) ? readFileSync(migrationPath, "utf8") : "";
@@ -46,29 +48,36 @@ describe("enterprise relationship ledger schema and migration", () => {
       expect(modelBlock).toContain("@@index([enterpriseId, applicationServiceId, scopePath");
     }
 
-    expect(schema).toContain("@@unique([enterpriseId, applicationServiceId, scopePath, sourceNodeId, targetNodeId, relationType, source, sourceReference])");
-    expect(schema).toContain("@@unique([enterpriseId, applicationServiceId, scopePath, idempotencyKey])");
+    expect(schema).toContain('@@unique([enterpriseId, applicationServiceId, scopePath, sourceNodeId, targetNodeId, relationType, source, sourceReference], map: "RelationshipCurrent_enterprise_scope_identity_key")');
+    expect(schema).toContain('@@unique([enterpriseId, applicationServiceId, scopePath, idempotencyKey], map: "RelationshipEvent_enterprise_scope_idempotency_key")');
+    expect(schema).toContain('@@unique([enterpriseId, applicationServiceId, scopePath, dbId], map: "AssetNode_enterprise_scope_dbId_key")');
+    expect(schema).toContain('fields: [enterpriseId, applicationServiceId, scopePath, sourceNodeId]');
     expect(migrationSql).toContain('CREATE TABLE IF NOT EXISTS "AssetNode"');
     expect(migrationSql).toContain('CREATE TABLE IF NOT EXISTS "RelationshipCurrent"');
     expect(migrationSql).toContain('INSERT INTO "AssetNode"');
     expect(migrationSql).toContain('INSERT INTO "RelationshipCurrent"');
+    expect(migrationSql).toContain('FOREIGN KEY ("enterpriseId", "applicationServiceId", "scopePath", "sourceNodeId")');
+    expect(migrationSql).toContain("legacy_backfill_batch_size CONSTANT INTEGER := 500");
+    expect(migrationSql).toContain("LIMIT legacy_backfill_batch_size");
+    expect(migrationSql).toContain("LOOP");
     expect(migrationSql).toContain("legacy-asset-link");
-    expect(migrationSql).toContain("md5(");
+    expect(migrationSql).not.toContain("md5(");
     expect(migrationSql).toContain("ON CONFLICT");
     expect(migrationSql).not.toContain('DROP TABLE "AssetLink"');
     expect(migrationSql).not.toContain("PARTITION BY");
+    expect(testSchema).toMatch(/^specforge_relationship_ledger_test_[0-9a-f]{32}$/u);
   });
 });
 
 describe.runIf(integrationEnabled)("enterprise relationship ledger migration", () => {
   beforeAll(async () => {
-    await admin!.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${testSchema}" CASCADE`);
-    await admin!.$executeRawUnsafe(`CREATE SCHEMA "${testSchema}"`);
+    await resetDisposableSchema();
     await installLegacyAssetLinkSchema();
   });
 
   afterAll(async () => {
     await prisma!.$disconnect();
+    assertDisposableSchema();
     await admin!.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${testSchema}" CASCADE`);
     await admin!.$disconnect();
   });
@@ -99,7 +108,72 @@ describe.runIf(integrationEnabled)("enterprise relationship ledger migration", (
     expect(await prisma!.relationshipEvent.count({ where: { dbId: receipt.eventId, action: "UPSERT" } })).toBe(1);
     expect(await prisma!.relationshipOutbox.count({ where: { relationshipEventId: receipt.eventId, status: "PENDING" } })).toBe(1);
   });
+
+  it("rejects a relationship endpoint from a sibling scope", async () => {
+    const siblingScope = {
+      enterpriseId: scope.enterpriseId,
+      applicationServiceId: "com.specforge.relationships.sibling",
+      scopePath: "test/relationships/com.specforge.relationships.sibling"
+    };
+    const foreignNode = await prisma!.assetNode.create({
+      data: {
+        ...siblingScope,
+        nodeType: "api",
+        logicalId: "sibling-source",
+        rootAssetType: "api",
+        rootAssetId: "sibling-source",
+        nodePath: "api/sibling-source",
+        displayName: "Sibling source",
+        metadata: {},
+        version: 1n,
+        lifecycleStatus: "ACTIVE"
+      }
+    });
+    const localNode = await prisma!.assetNode.create({
+      data: {
+        ...scope,
+        nodeType: "event",
+        logicalId: "local-target",
+        rootAssetType: "event",
+        rootAssetId: "local-target",
+        nodePath: "event/local-target",
+        displayName: "Local target",
+        metadata: {},
+        version: 1n,
+        lifecycleStatus: "ACTIVE"
+      }
+    });
+
+    await expect(
+      prisma!.relationshipCurrent.create({
+        data: {
+          ...scope,
+          sourceNodeId: foreignNode.dbId,
+          targetNodeId: localNode.dbId,
+          relationType: "PUBLISHES",
+          strength: "strong",
+          confidence: 1,
+          source: "test-local",
+          sourceReference: "test-local:cross-scope",
+          version: 1n,
+          metadata: {}
+        }
+      })
+    ).rejects.toMatchObject({ code: "P2003" });
+  });
 });
+
+function assertDisposableSchema() {
+  if (!new RegExp(`^${testSchemaPrefix}[0-9a-f]{32}$`, "u").test(testSchema)) {
+    throw new Error(`Refusing to drop non-disposable schema: ${testSchema}`);
+  }
+}
+
+async function resetDisposableSchema() {
+  assertDisposableSchema();
+  await admin!.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${testSchema}" CASCADE`);
+  await admin!.$executeRawUnsafe(`CREATE SCHEMA "${testSchema}"`);
+}
 
 async function executeMigrationSql() {
   await prisma!.$executeRawUnsafe(migrationSql);
