@@ -1,4 +1,5 @@
 import { analyzeProposalImpact } from "../impact/analyze";
+import type { TransitiveProposalImpact } from "../impact/evaluate";
 import { localizeAsset } from "../localization/assets";
 import { findAsset, getAsset, localizeCatalogAsset } from "../repository";
 import { renderAssetSummary } from "../summary/render";
@@ -94,13 +95,15 @@ async function summaries(refs: AssetRef[], options: DerivedViewOptions): Promise
 export interface GenerateContextPackOptions extends DerivedViewOptions {
   targetAgent?: "codex" | "claude-code" | "cursor" | "copilot" | "generic" | string;
   includeAssets?: string[];
+  transitiveImpact?: Pick<TransitiveProposalImpact, "impactedAssets">;
 }
 
 export async function generateContextPack(proposalId: string, options: GenerateContextPackOptions = {}): Promise<ContextPack> {
   const canonicalProposal = getAsset<Proposal>("proposal", proposalId, options.catalog);
+  const impactAssets = options.transitiveImpact?.impactedAssets ?? canonicalProposal.impactedAssets;
   const includedAssets = options.includeAssets?.length
-    ? canonicalProposal.impactedAssets.filter((asset) => options.includeAssets?.includes(asset.id))
-    : canonicalProposal.impactedAssets;
+    ? impactAssets.filter((asset) => options.includeAssets?.includes(asset.id))
+    : impactAssets;
 
   const renderLocale = async (locale: AssetLocale) => {
     const derivedOptions = { catalog: options.catalog, locale };

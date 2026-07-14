@@ -6,6 +6,7 @@ export * from "./rules/governance";
 export * from "./context-pack/generate";
 export * from "./graph/build";
 export * from "./impact/analyze";
+export * from "./impact/evaluate";
 export * from "./summary/render";
 export * from "./ai";
 export * from "./assets/service";
