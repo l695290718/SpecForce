@@ -7,5 +7,6 @@ coverage
 *.db
 *.db-journal
 *.tsbuildinfo
+*.log
 .worktrees
 worktrees
