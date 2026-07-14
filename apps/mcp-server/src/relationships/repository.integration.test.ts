@@ -1,8 +1,11 @@
 import { PrismaClient } from "@prisma/client";
+import { defaultHuaweiActor, scopeById } from "@specforge/core";
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { RelationshipCommandService, type RelationshipCommandRepository } from "./command-service";
+import { PrismaRelationshipRepository } from "./repository";
 
 const testSchemaPrefix = "specforge_relationship_ledger_test_";
 const testSchema = `${testSchemaPrefix}${randomUUID().replaceAll("-", "")}`;
@@ -24,6 +27,12 @@ const scope = {
   enterpriseId: "enterprise-test",
   applicationServiceId: "com.specforge.relationships",
   scopePath: "test/relationships/com.specforge.relationships"
+} as const;
+const writableApplicationService = scopeById("com.huawei.celon.desiner")!;
+const commandScope = {
+  enterpriseId: "enterprise-command-test",
+  applicationServiceId: writableApplicationService.id,
+  scopePath: writableApplicationService.scopePath
 } as const;
 
 describe("enterprise relationship ledger schema and migration", () => {
@@ -161,6 +170,32 @@ describe.runIf(integrationEnabled)("enterprise relationship ledger migration", (
       })
     ).rejects.toMatchObject({ code: "P2003" });
   });
+
+  it("replays a unique command idempotency receipt without duplicate event or outbox rows", async () => {
+    await createCommandEndpoints("idempotent");
+    const service = new RelationshipCommandService(new PrismaRelationshipRepository(prisma!));
+    const command = commandInput("idempotent", "command-idempotency");
+
+    const first = await service.upsertRelationship(command);
+    const replay = await service.upsertRelationship(command);
+
+    expect(replay).toMatchObject({ relationshipId: first.relationshipId, eventId: first.eventId, graphVersion: first.graphVersion, replayed: true });
+    expect(await prisma!.relationshipEvent.count({ where: { ...commandScope, idempotencyKey: "command-idempotency" } })).toBe(1);
+    expect(await prisma!.relationshipOutbox.count({ where: { ...commandScope, idempotencyKey: "command-idempotency" } })).toBe(1);
+  });
+
+  it("rolls back the current relationship when an event write fails after the current mutation", async () => {
+    await createCommandEndpoints("rollback");
+    const repository = new PrismaRelationshipRepository(prisma!);
+    const failingRepository = eventFailingRepository(repository);
+    const service = new RelationshipCommandService(failingRepository);
+
+    await expect(service.upsertRelationship(commandInput("rollback", "command-rollback"))).rejects.toThrow("FORCED_EVENT_FAILURE");
+
+    expect(await prisma!.relationshipCurrent.count({ where: { ...commandScope, source: "mcp", sourceReference: "mcp:command-rollback" } })).toBe(0);
+    expect(await prisma!.relationshipEvent.count({ where: { ...commandScope, idempotencyKey: "command-rollback" } })).toBe(0);
+    expect(await prisma!.relationshipOutbox.count({ where: { ...commandScope, idempotencyKey: "command-rollback" } })).toBe(0);
+  });
 });
 
 function assertDisposableSchema() {
@@ -276,4 +311,92 @@ async function writeTestRelationship() {
 
     return { relationshipId: relationship.dbId, eventId: event.dbId };
   });
+}
+
+async function createCommandEndpoints(suffix: string) {
+  await prisma!.assetNode.createMany({
+    data: [
+      {
+        ...commandScope,
+        nodeType: "api",
+        logicalId: `command-source-${suffix}`,
+        rootAssetType: "api",
+        rootAssetId: `command-source-${suffix}`,
+        nodePath: `api/command-source-${suffix}`,
+        displayName: "Command source",
+        metadata: {},
+        version: 1n,
+        lifecycleStatus: "ACTIVE"
+      },
+      {
+        ...commandScope,
+        nodeType: "event",
+        logicalId: `command-target-${suffix}`,
+        rootAssetType: "event",
+        rootAssetId: `command-target-${suffix}`,
+        nodePath: `event/command-target-${suffix}`,
+        displayName: "Command target",
+        metadata: {},
+        version: 1n,
+        lifecycleStatus: "ACTIVE"
+      }
+    ]
+  });
+}
+
+function commandInput(suffix: string, idempotencyKey: string) {
+  return {
+    enterpriseId: commandScope.enterpriseId,
+    authorizedScope: {
+      applicationServiceId: commandScope.applicationServiceId,
+      scopePath: commandScope.scopePath
+    },
+    actor: defaultHuaweiActor,
+    channel: "mcp",
+    correlationId: idempotencyKey,
+    idempotencyKey,
+    source: {
+      identity: {
+        applicationServiceId: commandScope.applicationServiceId,
+        scopePath: commandScope.scopePath,
+        nodeType: "api" as const,
+        logicalId: `command-source-${suffix}`,
+        rootAssetType: "api" as const,
+        rootAssetId: `command-source-${suffix}`
+      },
+      expectedVersion: 1n
+    },
+    target: {
+      identity: {
+        applicationServiceId: commandScope.applicationServiceId,
+        scopePath: commandScope.scopePath,
+        nodeType: "event" as const,
+        logicalId: `command-target-${suffix}`,
+        rootAssetType: "event" as const,
+        rootAssetId: `command-target-${suffix}`
+      },
+      expectedVersion: 1n
+    },
+    relationType: "EMITS" as const,
+    sourceReference: `mcp:${idempotencyKey}`
+  };
+}
+
+function eventFailingRepository(repository: PrismaRelationshipRepository): RelationshipCommandRepository {
+  return new Proxy(repository, {
+    get(target, property, receiver) {
+      if (property === "transaction") {
+        return async (operation: (transaction: RelationshipCommandRepository) => Promise<unknown>) => target.transaction(async (transaction) => {
+          const failingTransaction = new Proxy(transaction, {
+            get(transactionTarget, transactionProperty, transactionReceiver) {
+              if (transactionProperty === "appendEvent") return async () => { throw new Error("FORCED_EVENT_FAILURE"); };
+              return Reflect.get(transactionTarget, transactionProperty, transactionReceiver);
+            }
+          }) as RelationshipCommandRepository;
+          return operation(failingTransaction);
+        });
+      }
+      return Reflect.get(target, property, receiver);
+    }
+  }) as RelationshipCommandRepository;
 }
