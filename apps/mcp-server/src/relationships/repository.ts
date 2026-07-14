@@ -136,8 +136,11 @@ export class PrismaRelationshipRepository implements RelationshipCommandReposito
     const node = await this.client.assetNode.findUnique({
       where: {
         enterpriseId_applicationServiceId_scopePath_nodeType_logicalId: {
-          ...scope,
-          ...identity
+          enterpriseId: scope.enterpriseId,
+          applicationServiceId: scope.applicationServiceId,
+          scopePath: scope.scopePath,
+          nodeType: identity.nodeType,
+          logicalId: identity.logicalId
         }
       }
     });
