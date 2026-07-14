@@ -196,8 +196,8 @@ describe.runIf(integrationEnabled)("enterprise relationship ledger migration", (
 
     expect(replay).toMatchObject({ relationshipId: first.relationshipId, eventId: first.eventId, graphVersion: first.graphVersion, replayed: true });
     expect(await prisma!.relationshipCommandReceipt.count({ where: { ...commandScope, idempotencyKey: "command-idempotency", status: "COMPLETED" } })).toBe(1);
-    expect(await prisma!.relationshipEvent.count({ where: { ...commandScope, idempotencyKey: { startsWith: "relationship-command:" } } })).toBe(1);
-    expect(await prisma!.relationshipOutbox.count({ where: { ...commandScope, idempotencyKey: { startsWith: "relationship-command:" } } })).toBe(1);
+    expect(await prisma!.relationshipEvent.count({ where: { ...commandScope, correlationId: "command-idempotency", idempotencyKey: { startsWith: "relationship-command:" } } })).toBe(1);
+    expect(await prisma!.relationshipOutbox.count({ where: { ...commandScope, idempotencyKey: { startsWith: "relationship-command:" }, relationshipEvent: { correlationId: "command-idempotency" } } })).toBe(1);
   });
 
   it("rolls back the current relationship when an event write fails after the current mutation", async () => {
@@ -210,8 +210,8 @@ describe.runIf(integrationEnabled)("enterprise relationship ledger migration", (
 
     expect(await prisma!.relationshipCurrent.count({ where: { ...commandScope, source: "mcp", sourceReference: "mcp:command-rollback" } })).toBe(0);
     expect(await prisma!.relationshipCommandReceipt.count({ where: { ...commandScope, idempotencyKey: "command-rollback" } })).toBe(0);
-    expect(await prisma!.relationshipEvent.count({ where: { ...commandScope, idempotencyKey: { startsWith: "relationship-command:" } } })).toBe(0);
-    expect(await prisma!.relationshipOutbox.count({ where: { ...commandScope, idempotencyKey: { startsWith: "relationship-command:" } } })).toBe(0);
+    expect(await prisma!.relationshipEvent.count({ where: { ...commandScope, correlationId: "command-rollback", idempotencyKey: { startsWith: "relationship-command:" } } })).toBe(0);
+    expect(await prisma!.relationshipOutbox.count({ where: { ...commandScope, idempotencyKey: { startsWith: "relationship-command:" }, relationshipEvent: { correlationId: "command-rollback" } } })).toBe(0);
   });
 });
 
