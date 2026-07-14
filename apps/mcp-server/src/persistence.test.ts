@@ -192,6 +192,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.SPECFORGE_MCP_SEED;
+  delete process.env.SPECFORGE_ENTERPRISE_ID;
   vi.restoreAllMocks();
 });
 
@@ -402,6 +403,45 @@ describe("legacy AssetLink ledger synchronization", () => {
     expect(harness.state.current[0]).toMatchObject({ relationType: "EMITS", source: "legacy-asset-link", lifecycleStatus: "ACTIVE" });
     expect(harness.state.events).toHaveLength(1);
     expect(harness.state.outbox).toHaveLength(1);
+    expect(harness.state.calls.indexOf("lock")).toBeLessThan(harness.state.calls.indexOf("assetLink.upsert"));
+  });
+
+  it("updates a backfilled legacy relationship in its recorded enterprise instead of duplicating it", async () => {
+    process.env.SPECFORGE_ENTERPRISE_ID = "configured-enterprise";
+    mockSchemaSetup();
+    const harness = installLegacyLedgerHarness();
+    await seedBackfilledLegacyRelationship(harness);
+
+    await upsertAssetLink({ ...legacyLinkInput(), description: "Updated migrated evidence." });
+
+    expect(harness.state.current).toHaveLength(1);
+    expect(harness.state.current[0]).toMatchObject({ enterpriseId: "legacy-enterprise", lifecycleStatus: "ACTIVE", version: 2n, metadata: { description: "Updated migrated evidence." } });
+    expect(harness.state.current.find((row) => row.enterpriseId === "configured-enterprise")).toBeUndefined();
+  });
+
+  it("invalidates a backfilled legacy relationship in its recorded enterprise during cleanup", async () => {
+    process.env.SPECFORGE_MCP_SEED = "1";
+    process.env.SPECFORGE_ENTERPRISE_ID = "configured-enterprise";
+    mockSchemaSetup();
+    const harness = installLegacyLedgerHarness();
+    await seedBackfilledLegacyRelationship(harness);
+
+    await deletePersistedDesignData({ architectureScope: writableScope, assetIds: [legacyLinkInput().sourceId] });
+
+    expect(harness.state.current).toHaveLength(1);
+    expect(harness.state.current[0]).toMatchObject({ enterpriseId: "legacy-enterprise", lifecycleStatus: "DELETED" });
+    expect(harness.state.current.find((row) => row.enterpriseId === "configured-enterprise")).toBeUndefined();
+  });
+
+  it("rejects ambiguous historical legacy relationship enterprises", async () => {
+    process.env.SPECFORGE_ENTERPRISE_ID = "configured-enterprise";
+    mockSchemaSetup();
+    const harness = installLegacyLedgerHarness();
+    await seedBackfilledLegacyRelationship(harness, "legacy-enterprise");
+    await seedBackfilledLegacyRelationship(harness, "another-enterprise");
+
+    await expect(upsertAssetLink(legacyLinkInput())).rejects.toThrow("LEGACY_RELATIONSHIP_AMBIGUOUS");
+    expect(harness.state.assetLinks).toHaveLength(1);
   });
 
   it("updates the ledger current row when a legacy AssetLink description changes", async () => {
@@ -519,6 +559,30 @@ function legacyLinkInput() {
   };
 }
 
+async function seedBackfilledLegacyRelationship(harness: ReturnType<typeof installLegacyLedgerHarness>, enterpriseId = "legacy-enterprise") {
+  const link = legacyLinkInput();
+  const id = "api:legacy-source-api:emits:event:legacy-target-event";
+  if (!harness.state.assetLinks.some((row) => row.id === id)) {
+    harness.state.assetLinks.push({ id, ...link, applicationServiceId: writableScope.applicationServiceId, scopePath: writableScope.scopePath, createdAt: new Date(now) });
+  }
+  const sourceNode = await harness.transaction.assetNode.create({ data: {
+    enterpriseId, applicationServiceId: writableScope.applicationServiceId, scopePath: writableScope.scopePath,
+    nodeType: "api", logicalId: link.sourceId, rootAssetType: "api", rootAssetId: link.sourceId,
+    nodePath: `api/${link.sourceId}`, displayName: link.sourceId, metadata: {}, version: 1n, lifecycleStatus: "ACTIVE"
+  } });
+  const targetNode = await harness.transaction.assetNode.create({ data: {
+    enterpriseId, applicationServiceId: writableScope.applicationServiceId, scopePath: writableScope.scopePath,
+    nodeType: "event", logicalId: link.targetId, rootAssetType: "event", rootAssetId: link.targetId,
+    nodePath: `event/${link.targetId}`, displayName: link.targetId, metadata: {}, version: 1n, lifecycleStatus: "ACTIVE"
+  } });
+  harness.state.current.push({
+    enterpriseId, applicationServiceId: writableScope.applicationServiceId, scopePath: writableScope.scopePath,
+    dbId: `relationship-backfilled-${enterpriseId}`, sourceNodeId: sourceNode.dbId, targetNodeId: targetNode.dbId,
+    relationType: "EMITS", strength: "strong", confidence: 1, source: "legacy-asset-link",
+    sourceReference: `legacy-asset-link:${id}`, lifecycleStatus: "ACTIVE", metadata: { description: "Backfilled evidence." }, version: 1n
+  });
+}
+
 function installLegacyLedgerHarness(options: { failOnEvent?: boolean } = {}) {
   const state = {
     designAssets: [] as Array<Record<string, unknown>>,
@@ -527,18 +591,21 @@ function installLegacyLedgerHarness(options: { failOnEvent?: boolean } = {}) {
     current: [] as Array<Record<string, unknown>>,
     events: [] as Array<Record<string, unknown>>,
     outbox: [] as Array<Record<string, unknown>>,
-    receipts: [] as Array<Record<string, unknown>>
+    receipts: [] as Array<Record<string, unknown>>,
+    calls: [] as string[]
   };
   const scopeMatches = (row: Record<string, unknown>, where: Record<string, unknown>) => (
     row.enterpriseId === where.enterpriseId && row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath
   );
   const transaction = {
     $executeRawUnsafe: vi.fn(async (sql: string) => {
+      if (sql.includes("pg_advisory_xact_lock")) state.calls.push("lock");
       if (sql.includes('DELETE FROM "AssetLink"')) state.assetLinks.splice(0);
       return 0;
     }),
     assetLink: {
       upsert: vi.fn(async ({ where, create, update }) => {
+        state.calls.push("assetLink.upsert");
         const identity = where.applicationServiceId_scopePath_id;
         const existing = state.assetLinks.find((row) => row.id === identity.id && row.applicationServiceId === identity.applicationServiceId && row.scopePath === identity.scopePath);
         if (existing) Object.assign(existing, update);
@@ -597,7 +664,12 @@ function installLegacyLedgerHarness(options: { failOnEvent?: boolean } = {}) {
         else state.current.push({ ...create, dbId: `relationship-${state.current.length + 1}`, createdAt: new Date(), updatedAt: new Date() });
         return existing ?? state.current.at(-1);
       }),
-      findMany: vi.fn(async () => [])
+      findMany: vi.fn(async ({ where }) => {
+        if (where.source === "legacy-asset-link" && where.sourceReference) {
+          return state.current.filter((row) => row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath && row.source === where.source && row.sourceReference === where.sourceReference);
+        }
+        return [];
+      })
     },
     relationshipEvent: {
       findUnique: vi.fn(async ({ where }) => state.events.find((row) => {

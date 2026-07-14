@@ -94,6 +94,7 @@ export interface RelationshipCommandRepository {
   findCurrent(scope: RelationshipScope, identity: Pick<RelationshipCurrentRecord, "sourceNodeId" | "targetNodeId" | "relationType" | "source" | "sourceReference">): Promise<RelationshipCurrentRecord | undefined>;
   writeCurrent(scope: RelationshipScope, input: Omit<RelationshipCurrentRecord, "dbId" | "version" | keyof RelationshipScope>, version: bigint): Promise<RelationshipCurrentRecord>;
   listParserRelationships(scope: RelationshipScope, rootAssetType: AssetType, rootAssetId: string): Promise<RelationshipCurrentRecord[]>;
+  findLegacyCurrentBySourceReference(applicationServiceId: string, scopePath: string, sourceReference: string): Promise<RelationshipCurrentRecord[]>;
   deleteLegacyAssetLink(scope: RelationshipScope, sourceReference: string): Promise<void>;
   appendEvent(event: RelationshipEventRecord): Promise<RelationshipEventRecord>;
   enqueueOutbox(record: RelationshipOutboxRecord): Promise<RelationshipOutboxRecord>;
@@ -255,6 +256,13 @@ export class PrismaRelationshipRepository implements RelationshipCommandReposito
         source: "asset-parser",
         sourceNode: { rootAssetType, rootAssetId }
       }
+    });
+    return relationships.map(currentRecord);
+  }
+
+  async findLegacyCurrentBySourceReference(applicationServiceId: string, scopePath: string, sourceReference: string): Promise<RelationshipCurrentRecord[]> {
+    const relationships = await this.client.relationshipCurrent.findMany({
+      where: { applicationServiceId, scopePath, source: "legacy-asset-link", sourceReference }
     });
     return relationships.map(currentRecord);
   }

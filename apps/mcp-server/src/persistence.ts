@@ -3,7 +3,7 @@ import { assertWritableApplicationService, assetLabel, defaultHuaweiActor, hasSc
 import type { ArchitectureScopeRef, Asset, AssetLocale, AssetType, ContextPack, Proposal, RelationshipCode, ScopedActor } from "@specforge/core";
 import { createHash } from "node:crypto";
 import { createTrustedRelationshipExecutionContext, RelationshipCommandService, type DeleteLegacyRelationshipCommand, type UpsertRelationshipCommand } from "./relationships/command-service";
-import { PrismaRelationshipRepository } from "./relationships/repository";
+import { PrismaRelationshipRepository, type RelationshipScope } from "./relationships/repository";
 
 const globalForPrisma = globalThis as unknown as { specforgeMcpPrisma?: PrismaClient };
 const legacyContextPackFallbackSymbol = Symbol("legacyContextPackFallback");
@@ -49,7 +49,6 @@ export interface PersistedAssetLink extends AssetLinkInput {
   createdAt: string;
 }
 
-const legacyRelationshipEnterpriseId = process.env.SPECFORGE_ENTERPRISE_ID ?? "legacy-enterprise";
 
 export function resolveWritableScope(actor: ScopedActor, scope: ArchitectureScopeRef | undefined): ArchitectureScopeRef {
   if (!scope) throw new Error("Architecture scope is required.");
@@ -325,7 +324,7 @@ export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
       }
     });
     const graphIdempotencyKey = designAssetGraphIdempotencyKey(input.assetType, canonicalAsset);
-    await relationshipService(transaction, scope).upsertAssetGraph({
+    await relationshipService(transaction, configuredRelationshipScope(scope)).upsertAssetGraph({
       channel: "mcp",
       correlationId: `design-asset:${input.assetType}:${canonicalAsset.id}:${canonicalAsset.updatedAt ?? ""}`,
       idempotencyKey: graphIdempotencyKey,
@@ -447,6 +446,7 @@ export async function deletePersistedDesignData(input: DeletePersistedDesignData
   };
   const ids = [...assetIds, ...proposalIds, ...contextPackIds];
   await prisma.$transaction(async (transaction) => {
+    await lockRelationshipScope(transaction, configuredRelationshipScope(scope));
     const links = ids.length
       ? await transaction.assetLink.findMany({
         where: {
@@ -455,7 +455,10 @@ export async function deletePersistedDesignData(input: DeletePersistedDesignData
         }
       })
       : [];
-    for (const link of links) await synchronizeLegacyAssetLinkDelete(transaction, link);
+    for (const link of links) {
+      const relationshipScope = await resolveLegacyRelationshipScope(transaction, scope, `legacy-asset-link:${link.id}`);
+      await synchronizeLegacyAssetLinkDelete(transaction, link, relationshipScope);
+    }
     await transaction.contextPack.deleteMany({ where: { ...scopedWhere, id: { in: contextPackIds } } });
     await transaction.proposal.deleteMany({ where: { ...scopedWhere, id: { in: proposalIds } } });
     await transaction.designAsset.deleteMany({ where: { ...scopedWhere, id: { in: assetIds } } });
@@ -494,6 +497,7 @@ export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedA
   const id = assetLinkId({ ...input, sourceType, targetType });
   await ensureMcpPersistenceSchema();
   await prisma.$transaction(async (transaction) => {
+    const relationshipScope = await resolveLegacyRelationshipScope(transaction, scope, `legacy-asset-link:${id}`);
     const link = await transaction.assetLink.upsert({
       where: {
         applicationServiceId_scopePath_id: {
@@ -522,7 +526,7 @@ export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedA
         description: input.description
       }
     });
-    await synchronizeLegacyAssetLinkUpsert(transaction, link, relationshipCode);
+    await synchronizeLegacyAssetLinkUpsert(transaction, link, relationshipCode, relationshipScope);
   });
 
   return {
@@ -849,15 +853,36 @@ type LegacyAssetLinkRow = {
   createdAt: Date;
 };
 
-function relationshipService(transaction: Prisma.TransactionClient, scope: ArchitectureScopeRef) {
+function relationshipService(transaction: Prisma.TransactionClient, scope: RelationshipScope) {
   return new RelationshipCommandService(
     new PrismaRelationshipRepository(transaction),
     createTrustedRelationshipExecutionContext({
-      enterpriseId: legacyRelationshipEnterpriseId,
-      scope,
+      enterpriseId: scope.enterpriseId,
+      scope: { applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath },
       actor: writableActor()
     })
   );
+}
+
+function configuredRelationshipScope(scope: ArchitectureScopeRef): RelationshipScope {
+  return { enterpriseId: process.env.SPECFORGE_ENTERPRISE_ID ?? "legacy-enterprise", applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath };
+}
+
+async function lockRelationshipScope(transaction: Prisma.TransactionClient, scope: RelationshipScope): Promise<void> {
+  await new PrismaRelationshipRepository(transaction).lockScope(scope);
+}
+
+async function resolveLegacyRelationshipScope(transaction: Prisma.TransactionClient, scope: ArchitectureScopeRef, sourceReference: string): Promise<RelationshipScope> {
+  const configuredScope = configuredRelationshipScope(scope);
+  const repository = new PrismaRelationshipRepository(transaction);
+  await repository.lockScope(configuredScope);
+  const matches = await repository.findLegacyCurrentBySourceReference(scope.applicationServiceId, scope.scopePath, sourceReference);
+  if (matches.length > 1) throw new Error("LEGACY_RELATIONSHIP_AMBIGUOUS");
+  const resolvedScope = matches.length === 1
+    ? { enterpriseId: matches[0]!.enterpriseId, applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath }
+    : configuredScope;
+  if (resolvedScope.enterpriseId !== configuredScope.enterpriseId) await repository.lockScope(resolvedScope);
+  return resolvedScope;
 }
 
 function normalizeLegacyRelationshipCode(value: string): RelationshipCode {
@@ -915,17 +940,18 @@ function legacyRelationshipIdempotencyKey(link: LegacyAssetLinkRow, action: "ups
 async function synchronizeLegacyAssetLinkUpsert(
   transaction: Prisma.TransactionClient,
   link: LegacyAssetLinkRow,
-  relationType: RelationshipCode
+  relationType: RelationshipCode,
+  scope: RelationshipScope
 ) {
-  await relationshipService(transaction, { applicationServiceId: link.applicationServiceId, scopePath: link.scopePath })
+  await relationshipService(transaction, scope)
     .upsertLegacyRelationship(legacyRelationshipCommand(link, "upsert", relationType));
 }
 
-async function synchronizeLegacyAssetLinkDelete(transaction: Prisma.TransactionClient, link: LegacyAssetLinkRow) {
+async function synchronizeLegacyAssetLinkDelete(transaction: Prisma.TransactionClient, link: LegacyAssetLinkRow, scope: RelationshipScope) {
   // Historical rows may carry relation codes that are no longer in the ontology.
   const normalized = link.relationType.trim().toUpperCase() as RelationshipCode;
   const relationType = relationshipOntology.has(normalized) ? normalized : link.relationType;
   const command = legacyRelationshipCommand(link, "delete", relationType as RelationshipCode) as DeleteLegacyRelationshipCommand;
-  await relationshipService(transaction, { applicationServiceId: link.applicationServiceId, scopePath: link.scopePath })
+  await relationshipService(transaction, scope)
     .deleteLegacyRelationship(command);
 }

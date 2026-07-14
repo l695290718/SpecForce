@@ -352,6 +352,9 @@ class InMemoryRelationshipRepository implements RelationshipCommandRepository {
     const nodeIds = new Set(this.nodes.filter((node) => sameScope(node, scopeInput) && node.rootAssetType === rootAssetType && node.rootAssetId === rootAssetId).map((node) => node.dbId));
     return this.current.filter((row) => sameScope(row, scopeInput) && row.source === "asset-parser" && nodeIds.has(row.sourceNodeId));
   }
+  async findLegacyCurrentBySourceReference(applicationServiceId: string, scopePath: string, sourceReference: string) {
+    return this.current.filter((row) => row.applicationServiceId === applicationServiceId && row.scopePath === scopePath && row.source === "legacy-asset-link" && row.sourceReference === sourceReference);
+  }
   async deleteLegacyAssetLink(_scopeInput: RelationshipScope, sourceReference: string) { this.deletedLegacyReferences.push(sourceReference); }
   async appendEvent(event: RelationshipEventRecord) { const persisted = { ...event, dbId: `event-${this.events.length + 1}` }; this.events.push(persisted); return persisted; }
   async enqueueOutbox(record: RelationshipOutboxRecord) { const persisted = { ...record, dbId: `outbox-${this.outbox.length + 1}` }; this.outbox.push(persisted); return persisted; }
