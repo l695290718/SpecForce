@@ -96,6 +96,21 @@ pnpm --filter @specforge/graph-store typecheck
 
 Result: 2 files passed, 24 tests passed; graph-store and core typechecks exited 0. PostgreSQL integration remains for the parent’s guarded disposable-schema rerun.
 
+## Path-Frontier Follow-Up
+
+Parent PostgreSQL verification found that a path-budget sentinel result included the already-expanded root node in the frontier. The bounded adapter previously built that sentinel frontier from the current state plus its queue.
+
+The sentinel branch now uses only the first omitted eligible candidate and queued, unexpanded states. It never adds the state whose outgoing candidates were already expanded. The non-PostgreSQL high-branching regression first reproduced `[customer-api, branch-one]`, then verified the corrected `[branch-one, branch-two]` frontier; this is the same distinction that yields the parent fixture frontier `[customer-entity]` when the additional raw sentinel is cross-Scope and discarded.
+
+Final verification for this follow-up:
+
+```text
+pnpm --filter @specforge/graph-store exec vitest run src/graph-store.contract.test.ts src/postgres.test.ts
+pnpm --filter @specforge/graph-store typecheck
+```
+
+Result: 2 files passed, 24 tests passed; typecheck exited 0. PostgreSQL integration remains for the parent’s guarded disposable-schema rerun.
+
 ## Files
 
 - `packages/graph-store/**`

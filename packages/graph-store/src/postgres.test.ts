@@ -24,6 +24,7 @@ describe("PostgresGraphStore", () => {
     const result = await store.traverse(plan({ maxPaths: 2 }));
 
     expect(result).toMatchObject({ status: "PARTIAL", truncationReasons: ["MAX_PATHS"] });
+    expect(result.frontier.map((node) => node.logicalId)).toEqual(["branch-one", "branch-two"]);
     expect(client.candidateLimits).toEqual([2]);
     expect(client.returnedCandidates).toBe(2);
   });

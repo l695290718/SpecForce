@@ -156,7 +156,7 @@ export class PostgresGraphStore implements GraphStore {
         paths.push({ nodes: next.nodes, edges: next.edges });
         queue.push(next);
       }
-      if (hasSentinel) return partialResult(["MAX_PATHS"], [state.node, ...queue.map((item) => item.node)], nodes, edges, paths, graphVersion, elapsed(now, startedAt));
+      if (hasSentinel) return partialResult(["MAX_PATHS"], [...eligible.slice(remainingPaths).map((candidate) => candidate.node), ...queue.map((item) => item.node)], nodes, edges, paths, graphVersion, elapsed(now, startedAt));
     }
 
     return createGraphTraversalResult({ status: "COMPLETE", nodes: sortedNodes(nodes), edges: sortedEdges(edges), paths: sortedPaths(paths), graphVersion, elapsedMs: elapsed(now, startedAt) });
