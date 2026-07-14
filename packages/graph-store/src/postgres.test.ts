@@ -78,6 +78,25 @@ describe("PostgresGraphStore", () => {
     expect(result.frontier.map((node) => node.logicalId)).toEqual(["customer-entity"]);
   });
 
+  it("orders roots canonically in SQL before applying the root limit", async () => {
+    let rootQuery = "";
+    const client: PostgresQueryClient = {
+      async $queryRawUnsafe<T>(query: string): Promise<T> {
+        if (query.includes('MAX("graphVersion")')) return [{ graph_version: 7n }] as T;
+        if (query.includes("start_nodes")) {
+          rootQuery = query;
+          return [row("00000000-0000-0000-0000-000000000001", api!)] as T;
+        }
+        return [] as T;
+      }
+    };
+    const store = new PostgresGraphStore(client, { enterpriseId: "enterprise-graph-store-test" });
+
+    await store.traverse(plan({ startNodes: [entity!, api!], maxNodes: 1 }));
+
+    expect(rootQuery).toMatch(/ORDER BY node\."nodeType", node\."logicalId"\s+LIMIT \$6/u);
+  });
+
   it("rejects a cross-Scope projection before issuing PostgreSQL", async () => {
     let queryCount = 0;
     const client: PostgresQueryClient = {

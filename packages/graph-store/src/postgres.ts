@@ -221,6 +221,7 @@ const ROOT_SQL = `
     NULL::text AS edge_id, NULL::text AS edge_code, NULL::text AS edge_source_id, NULL::text AS edge_target_id, NULL::text AS edge_strength, NULL::double precision AS edge_confidence, NULL::bigint AS edge_version
   FROM "AssetNode" node JOIN start_nodes ON start_nodes."nodeType" = node."nodeType" AND start_nodes."logicalId" = node."logicalId" CROSS JOIN authorized_scope scope CROSS JOIN query_budget
   WHERE (node."enterpriseId", node."applicationServiceId", node."scopePath") = (scope.enterprise_id, scope.application_service_id, scope.scope_path)
+  ORDER BY node."nodeType", node."logicalId"
   LIMIT $6
 `;
 
