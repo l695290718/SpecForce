@@ -83,7 +83,7 @@ The original PostgreSQL adapter materialized the recursive CTE result before app
 
 `PostgresGraphStore` now resolves scoped roots once, then performs a bounded one-hop query for each queued path state. Each one-hop query has a local PostgreSQL statement timeout, parameterized current-node and visited UUID values, exact Scope/rule/direction/confidence filters, and a hard `remainingPaths + 1` candidate limit. The extra row is a sentinel: it causes a deterministic `PARTIAL/MAX_PATHS` result without fetching further candidates. The adapter keeps paths, visited IDs, queue, nodes, edges, and deterministic sorting in JavaScript; fetched candidate rows are bounded by the node/path budgets rather than the graph size.
 
-PostgreSQL statement cancellation (`57014` or equivalent timeout text) is converted to a valid `PARTIAL/QUERY_TIMEOUT` result with the current queued node as a non-empty frontier. `QUERY_TIMEOUT` is now an explicit engine-neutral truncation reason in the core contract.
+PostgreSQL statement cancellation (`57014` or equivalent timeout text) is converted to a valid `PARTIAL/TIMEOUT` result with the current queued node as a non-empty frontier.
 
 Projection writes now call the same shared `assertProjectionScope` guard as the in-memory adapter before issuing PostgreSQL. A mismatched node or either mismatched edge endpoint fails with `PROJECTION_SCOPE_MISMATCH` and no query is made.
 
@@ -113,9 +113,13 @@ Result: 2 files passed, 24 tests passed; typecheck exited 0. PostgreSQL integrat
 
 ## Global Deadline Follow-Up
 
-PostgreSQL traversal now treats `plan.timeoutMs` as one absolute deadline, beginning before checkpoint resolution. Before checkpoint, root lookup, and every one-hop query, the adapter computes the remaining milliseconds; it returns `PARTIAL/QUERY_TIMEOUT` with a non-empty current frontier when the budget has expired. Checkpoint, root, and one-hop SQL each receive only that remaining value through a local `statement_timeout`, so no later query resets the full plan timeout. Elapsed time includes checkpoint and root work.
+PostgreSQL traversal now treats `plan.timeoutMs` as one absolute deadline, beginning before checkpoint resolution. Before checkpoint, root lookup, and every one-hop query, the adapter computes the remaining milliseconds; it returns `PARTIAL/TIMEOUT` with a non-empty current frontier when the budget has expired. Checkpoint, root, and one-hop SQL each receive only that remaining value through a local `statement_timeout`, so no later query resets the full plan timeout. Elapsed time includes checkpoint and root work.
 
-The deterministic fake-clock regression uses a 10 ms budget: checkpoint consumes 6 ms, root resolution receives the remaining 4 ms and consumes a further 5 ms, and the adapter returns `QUERY_TIMEOUT` before issuing any hop. It asserts SQL timeout inputs `[10, 4]`, a 11 ms elapsed result, and zero hop queries.
+The deterministic fake-clock regression uses a 10 ms budget: checkpoint consumes 6 ms, root resolution receives the remaining 4 ms and consumes a further 5 ms, and the adapter returns `TIMEOUT` before issuing any hop. It asserts SQL timeout inputs `[10, 4]`, a 11 ms elapsed result, and zero hop queries.
+
+## Canonical Timeout Follow-Up
+
+Task 1 defines `TIMEOUT` as the sole engine-neutral truncation reason. PostgreSQL cancellation and deadline exhaustion now use that exact code, matching the in-memory adapter and shared contract tests. The temporary `QUERY_TIMEOUT` alias was removed from the core union and all PostgreSQL regressions now assert `TIMEOUT`.
 
 Final verification:
 

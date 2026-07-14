@@ -192,7 +192,7 @@ function partialResult(reasons: GraphTraversalTruncationReason[], frontier: Asse
 
 function queryTimeoutResult(plan: GraphTraversalPlan, graphVersion: bigint, frontier: AssetNodeIdentity[], nodes: Map<string, AssetNodeIdentity> | AssetNodeIdentity[], paths: GraphEvidencePath[], elapsedMs: number): GraphTraversalResult {
   const nodeMap = Array.isArray(nodes) ? new Map(nodes.map((node) => [nodeKey(node), node])) : nodes;
-  return partialResult(["QUERY_TIMEOUT"], frontier.length > 0 ? frontier : plan.startNodes, nodeMap, new Map(), paths, graphVersion, elapsedMs);
+  return partialResult(["TIMEOUT"], frontier.length > 0 ? frontier : plan.startNodes, nodeMap, new Map(), paths, graphVersion, elapsedMs);
 }
 
 function isQueryTimeout(error: unknown): boolean {

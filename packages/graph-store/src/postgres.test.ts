@@ -34,7 +34,7 @@ describe("PostgresGraphStore", () => {
 
     const result = await store.traverse(plan());
 
-    expect(result).toMatchObject({ status: "PARTIAL", truncationReasons: ["QUERY_TIMEOUT"] });
+    expect(result).toMatchObject({ status: "PARTIAL", truncationReasons: ["TIMEOUT"] });
     expect(result.frontier.map((node) => node.logicalId)).toEqual(["customer-api"]);
   });
 
@@ -62,7 +62,7 @@ describe("PostgresGraphStore", () => {
 
     const result = await store.traverse(plan({ timeoutMs: 10 }));
 
-    expect(result).toMatchObject({ status: "PARTIAL", truncationReasons: ["QUERY_TIMEOUT"], elapsedMs: 11 });
+    expect(result).toMatchObject({ status: "PARTIAL", truncationReasons: ["TIMEOUT"], elapsedMs: 11 });
     expect(result.frontier.map((node) => node.logicalId)).toEqual(["customer-api"]);
     expect(queryTimeouts).toEqual([10, 4]);
     expect(hopQueries).toBe(0);
