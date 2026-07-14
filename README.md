@@ -211,3 +211,4 @@ Open [http://localhost:3000](http://localhost:3000). The selected application se
 - [Huawei application architecture scope design](docs/superpowers/specs/2026-07-12-huawei-architecture-scope-design.md)
 - [Agent-service workspace design](docs/superpowers/specs/2026-07-13-agent-service-workspace-design.md)
 - [Strict application-service isolation plan](docs/superpowers/plans/2026-07-13-strict-application-service-isolation.md)
+- [Product backlog](docs/TODO.md)
