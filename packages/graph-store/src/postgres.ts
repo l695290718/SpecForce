@@ -117,10 +117,31 @@ const TRAVERSAL_SQL = `
     JOIN "AssetNode" next_node ON next_node."dbId" = CASE WHEN relationship."sourceNodeId" = traversal.node_id THEN relationship."targetNodeId" ELSE relationship."sourceNodeId" END
     WHERE traversal.depth < $6
       AND NOT next_node."dbId" = ANY(traversal.visited)
+  ), depth_frontier AS (
+    SELECT next_node."dbId" AS node_id, next_node."applicationServiceId" AS node_application_service_id, next_node."scopePath" AS node_scope_path, next_node."nodeType" AS node_type, next_node."logicalId" AS logical_id,
+      next_node."rootAssetType" AS root_asset_type, next_node."rootAssetId" AS root_asset_id,
+      NULL::text AS parent_logical_id, traversal.visited || next_node."dbId" AS visited, traversal.depth + 1 AS depth,
+      relationship."dbId" AS edge_id, relationship."relationType" AS edge_code, relationship."sourceNodeId" AS edge_source_id, relationship."targetNodeId" AS edge_target_id,
+      relationship.strength AS edge_strength, relationship.confidence AS edge_confidence, relationship.version AS edge_version
+    FROM traversal
+    CROSS JOIN authorized_scope scope
+    JOIN "RelationshipCurrent" relationship ON (relationship."enterpriseId", relationship."applicationServiceId", relationship."scopePath") = (scope.enterprise_id, scope.application_service_id, scope.scope_path)
+      AND relationship."lifecycleStatus" = 'ACTIVE'
+    JOIN rules ON rules.code = relationship."relationType"
+      AND ((rules."forwardPropagation" IS TRUE AND relationship."sourceNodeId" = traversal.node_id)
+        OR (rules."reversePropagation" IS TRUE AND relationship."targetNodeId" = traversal.node_id))
+      AND relationship.confidence >= COALESCE(rules."minConfidence", 0)
+    JOIN "AssetNode" next_node ON next_node."dbId" = CASE WHEN relationship."sourceNodeId" = traversal.node_id THEN relationship."targetNodeId" ELSE relationship."sourceNodeId" END
+    WHERE traversal.depth = $6
+      AND NOT next_node."dbId" = ANY(traversal.visited)
+  ), combined AS (
+    SELECT * FROM traversal
+    UNION ALL
+    SELECT * FROM depth_frontier
   )
   SELECT node_id::text, node_application_service_id, node_scope_path, node_type, logical_id, root_asset_type, root_asset_id, parent_logical_id,
     edge_id::text, edge_code, edge_source_id::text, edge_target_id::text, edge_strength, edge_confidence, edge_version
-  FROM traversal
+  FROM combined
   ORDER BY depth, logical_id, edge_id
 `;
 
