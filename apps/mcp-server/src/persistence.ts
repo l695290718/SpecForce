@@ -2,7 +2,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { assertWritableApplicationService, assetLabel, defaultHuaweiActor, hasScopeAccess, huaweiArchitectureScopes, localizeAsset, normalizeAssetType, relationshipOntology, scopeById, seedHuaweiActor, validateAssetLocalization } from "@specforge/core";
 import type { ArchitectureScopeRef, Asset, AssetLocale, AssetType, ContextPack, Proposal, RelationshipCode, ScopedActor } from "@specforge/core";
 import { createHash } from "node:crypto";
-import { RelationshipCommandService, type UpsertRelationshipCommand } from "./relationships/command-service";
+import { createTrustedRelationshipExecutionContext, RelationshipCommandService, type DeleteLegacyRelationshipCommand, type UpsertRelationshipCommand } from "./relationships/command-service";
 import { PrismaRelationshipRepository } from "./relationships/repository";
 
 const globalForPrisma = globalThis as unknown as { specforgeMcpPrisma?: PrismaClient };
@@ -290,38 +290,47 @@ export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
   assertString(canonicalAsset.name ?? canonicalAsset.title, "asset.name");
   await ensureMcpPersistenceSchema();
 
-  await prisma.designAsset.upsert({
-    where: {
-      applicationServiceId_scopePath_id: {
+  await prisma.$transaction(async (transaction) => {
+    await transaction.designAsset.upsert({
+      where: {
+        applicationServiceId_scopePath_id: {
+          applicationServiceId: scope.applicationServiceId,
+          scopePath: scope.scopePath,
+          id: String(canonicalAsset.id)
+        }
+      },
+      create: {
+        id: String(canonicalAsset.id),
+        type: input.assetType,
+        name: String(canonicalAsset.name ?? canonicalAsset.title ?? canonicalAsset.id),
+        code: optionalString(canonicalAsset.code),
+        description: optionalString(canonicalAsset.description) ?? "",
+        domainId: optionalString(canonicalAsset.domainId),
         applicationServiceId: scope.applicationServiceId,
         scopePath: scope.scopePath,
-        id: String(canonicalAsset.id)
+        payload: JSON.stringify(canonicalAsset),
+        createdAt: optionalDate(canonicalAsset.createdAt),
+        updatedAt: optionalDate(canonicalAsset.updatedAt)
+      },
+      update: {
+        type: input.assetType,
+        name: String(canonicalAsset.name ?? canonicalAsset.title ?? canonicalAsset.id),
+        code: optionalString(canonicalAsset.code),
+        description: optionalString(canonicalAsset.description) ?? "",
+        domainId: optionalString(canonicalAsset.domainId),
+        applicationServiceId: scope.applicationServiceId,
+        scopePath: scope.scopePath,
+        payload: JSON.stringify(canonicalAsset),
+        updatedAt: optionalDate(canonicalAsset.updatedAt)
       }
-    },
-    create: {
-      id: canonicalAsset.id,
-      type: input.assetType,
-      name: String(canonicalAsset.name ?? canonicalAsset.title ?? canonicalAsset.id),
-      code: optionalString(canonicalAsset.code),
-      description: optionalString(canonicalAsset.description) ?? "",
-      domainId: optionalString(canonicalAsset.domainId),
-      applicationServiceId: scope.applicationServiceId,
-      scopePath: scope.scopePath,
-      payload: JSON.stringify(canonicalAsset),
-      createdAt: optionalDate(canonicalAsset.createdAt),
-      updatedAt: optionalDate(canonicalAsset.updatedAt)
-    },
-    update: {
-      type: input.assetType,
-      name: String(canonicalAsset.name ?? canonicalAsset.title ?? canonicalAsset.id),
-      code: optionalString(canonicalAsset.code),
-      description: optionalString(canonicalAsset.description) ?? "",
-      domainId: optionalString(canonicalAsset.domainId),
-      applicationServiceId: scope.applicationServiceId,
-      scopePath: scope.scopePath,
-      payload: JSON.stringify(canonicalAsset),
-      updatedAt: optionalDate(canonicalAsset.updatedAt)
-    }
+    });
+    await relationshipService(transaction, scope).upsertAssetGraph({
+      channel: "mcp",
+      correlationId: `design-asset:${input.assetType}:${canonicalAsset.id}:${canonicalAsset.updatedAt ?? ""}`,
+      idempotencyKey: `design-asset:${input.assetType}:${canonicalAsset.id}:${canonicalAsset.updatedAt ?? ""}`,
+      assetType: input.assetType,
+      asset: localizedAsset
+    });
   });
 
   return { id: canonicalAsset.id, type: input.assetType, status: "upserted" };
@@ -819,8 +828,15 @@ type LegacyAssetLinkRow = {
   createdAt: Date;
 };
 
-function legacyRelationshipService(transaction: Prisma.TransactionClient) {
-  return new RelationshipCommandService(new PrismaRelationshipRepository(transaction));
+function relationshipService(transaction: Prisma.TransactionClient, scope: ArchitectureScopeRef) {
+  return new RelationshipCommandService(
+    new PrismaRelationshipRepository(transaction),
+    createTrustedRelationshipExecutionContext({
+      enterpriseId: legacyRelationshipEnterpriseId,
+      scope,
+      actor: writableActor()
+    })
+  );
 }
 
 function normalizeLegacyRelationshipCode(value: string): RelationshipCode {
@@ -832,9 +848,6 @@ function normalizeLegacyRelationshipCode(value: string): RelationshipCode {
 function legacyRelationshipCommand(link: LegacyAssetLinkRow, action: "upsert" | "delete", relationType = normalizeLegacyRelationshipCode(link.relationType)): UpsertRelationshipCommand {
   const scope = { applicationServiceId: link.applicationServiceId, scopePath: link.scopePath };
   return {
-    enterpriseId: legacyRelationshipEnterpriseId,
-    authorizedScope: scope,
-    actor: writableActor(),
     channel: "mcp",
     correlationId: `${action}:${link.id}`,
     idempotencyKey: legacyRelationshipIdempotencyKey(link, action, relationType),
@@ -863,7 +876,7 @@ function legacyRelationshipCommand(link: LegacyAssetLinkRow, action: "upsert" | 
   };
 }
 
-function legacyRelationshipIdempotencyKey(link: LegacyAssetLinkRow, action: "upsert" | "delete", relationType: RelationshipCode): string {
+function legacyRelationshipIdempotencyKey(link: LegacyAssetLinkRow, action: "upsert" | "delete", relationType: string): string {
   const payload = JSON.stringify({
     action,
     id: link.id,
@@ -883,9 +896,15 @@ async function synchronizeLegacyAssetLinkUpsert(
   link: LegacyAssetLinkRow,
   relationType: RelationshipCode
 ) {
-  await legacyRelationshipService(transaction).upsertLegacyRelationship(legacyRelationshipCommand(link, "upsert", relationType));
+  await relationshipService(transaction, { applicationServiceId: link.applicationServiceId, scopePath: link.scopePath })
+    .upsertLegacyRelationship(legacyRelationshipCommand(link, "upsert", relationType));
 }
 
 async function synchronizeLegacyAssetLinkDelete(transaction: Prisma.TransactionClient, link: LegacyAssetLinkRow) {
-  await legacyRelationshipService(transaction).deleteRelationship(legacyRelationshipCommand(link, "delete"));
+  // Historical rows may carry relation codes that are no longer in the ontology.
+  const normalized = link.relationType.trim().toUpperCase() as RelationshipCode;
+  const relationType = relationshipOntology.has(normalized) ? normalized : link.relationType;
+  const command = legacyRelationshipCommand(link, "delete", relationType as RelationshipCode) as DeleteLegacyRelationshipCommand;
+  await relationshipService(transaction, { applicationServiceId: link.applicationServiceId, scopePath: link.scopePath })
+    .deleteLegacyRelationship(command);
 }

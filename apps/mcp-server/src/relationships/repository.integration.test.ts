@@ -4,14 +4,16 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { RelationshipCommandService, type RelationshipCommandRepository } from "./command-service";
+import { createTrustedRelationshipExecutionContext, RelationshipCommandService, type RelationshipCommandRepository } from "./command-service";
 import { PrismaRelationshipRepository } from "./repository";
 
 const testSchemaPrefix = "specforge_relationship_ledger_test_";
 const testSchema = `${testSchemaPrefix}${randomUUID().replaceAll("-", "")}`;
 const migrationPath = resolve(process.cwd(), "prisma/migrations/20260714_enterprise_relationship_graph/migration.sql");
+const nodeSubjectMigrationPath = resolve(process.cwd(), "prisma/migrations/20260715_relationship_event_node_subject/migration.sql");
 const schemaPath = resolve(process.cwd(), "prisma/schema.prisma");
 const migrationSql = existsSync(migrationPath) ? readFileSync(migrationPath, "utf8") : "";
+const nodeSubjectMigrationSql = existsSync(nodeSubjectMigrationPath) ? readFileSync(nodeSubjectMigrationPath, "utf8") : "";
 const schema = readFileSync(schemaPath, "utf8");
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
@@ -38,6 +40,7 @@ const commandScope = {
 describe("enterprise relationship ledger schema and migration", () => {
   it("defines the scoped ledger models and an additive idempotent AssetLink backfill", () => {
     expect(existsSync(migrationPath)).toBe(true);
+    expect(existsSync(nodeSubjectMigrationPath)).toBe(true);
 
     for (const model of [
       "AssetNode",
@@ -61,6 +64,8 @@ describe("enterprise relationship ledger schema and migration", () => {
     expect(schema).toContain('@@unique([enterpriseId, applicationServiceId, scopePath, idempotencyKey], map: "RelationshipEvent_enterprise_scope_idempotency_key")');
     expect(schema).toContain('@@unique([enterpriseId, applicationServiceId, scopePath, dbId], map: "AssetNode_enterprise_scope_dbId_key")');
     expect(schema).toContain('fields: [enterpriseId, applicationServiceId, scopePath, sourceNodeId]');
+    expect(schema).toMatch(/assetNodeId\s+String\?\s+@db\.Uuid/u);
+    expect(schema).toMatch(/relationshipId\s+String\?\s+@db\.Uuid/u);
     expect(migrationSql).toContain('CREATE TABLE IF NOT EXISTS "AssetNode"');
     expect(migrationSql).toContain('CREATE TABLE IF NOT EXISTS "RelationshipCurrent"');
     expect(migrationSql).toContain('INSERT INTO "AssetNode"');
@@ -74,6 +79,8 @@ describe("enterprise relationship ledger schema and migration", () => {
     expect(migrationSql).toContain("ON CONFLICT");
     expect(migrationSql).not.toContain('DROP TABLE "AssetLink"');
     expect(migrationSql).not.toContain("PARTITION BY");
+    expect(nodeSubjectMigrationSql).toContain('ALTER COLUMN "relationshipId" DROP NOT NULL');
+    expect(nodeSubjectMigrationSql).toContain('RelationshipEvent_exactly_one_subject_check');
     expect(testSchema).toMatch(/^specforge_relationship_ledger_test_[0-9a-f]{32}$/u);
   });
 });
@@ -173,7 +180,7 @@ describe.runIf(integrationEnabled)("enterprise relationship ledger migration", (
 
   it("replays a unique command idempotency receipt without duplicate event or outbox rows", async () => {
     await createCommandEndpoints("idempotent");
-    const service = new RelationshipCommandService(new PrismaRelationshipRepository(prisma!));
+    const service = commandService(new PrismaRelationshipRepository(prisma!));
     const command = commandInput("idempotent", "command-idempotency");
 
     const first = await service.upsertRelationship(command);
@@ -188,7 +195,7 @@ describe.runIf(integrationEnabled)("enterprise relationship ledger migration", (
     await createCommandEndpoints("rollback");
     const repository = new PrismaRelationshipRepository(prisma!);
     const failingRepository = eventFailingRepository(repository);
-    const service = new RelationshipCommandService(failingRepository);
+    const service = commandService(failingRepository);
 
     await expect(service.upsertRelationship(commandInput("rollback", "command-rollback"))).rejects.toThrow("FORCED_EVENT_FAILURE");
 
@@ -212,6 +219,7 @@ async function resetDisposableSchema() {
 
 async function executeMigrationSql() {
   await prisma!.$executeRawUnsafe(migrationSql);
+  await prisma!.$executeRawUnsafe(nodeSubjectMigrationSql);
 }
 
 async function installLegacyAssetLinkSchema() {
@@ -346,12 +354,6 @@ async function createCommandEndpoints(suffix: string) {
 
 function commandInput(suffix: string, idempotencyKey: string) {
   return {
-    enterpriseId: commandScope.enterpriseId,
-    authorizedScope: {
-      applicationServiceId: commandScope.applicationServiceId,
-      scopePath: commandScope.scopePath
-    },
-    actor: defaultHuaweiActor,
     channel: "mcp",
     correlationId: idempotencyKey,
     idempotencyKey,
@@ -380,6 +382,14 @@ function commandInput(suffix: string, idempotencyKey: string) {
     relationType: "EMITS" as const,
     sourceReference: `mcp:${idempotencyKey}`
   };
+}
+
+function commandService(repository: RelationshipCommandRepository) {
+  return new RelationshipCommandService(repository, createTrustedRelationshipExecutionContext({
+    enterpriseId: commandScope.enterpriseId,
+    scope: { applicationServiceId: commandScope.applicationServiceId, scopePath: commandScope.scopePath },
+    actor: defaultHuaweiActor
+  }));
 }
 
 function eventFailingRepository(repository: PrismaRelationshipRepository): RelationshipCommandRepository {

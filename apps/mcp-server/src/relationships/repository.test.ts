@@ -37,4 +37,19 @@ describe("PrismaRelationshipRepository", () => {
       }
     });
   });
+
+  it("deletes a canonical legacy projection by its AssetLink identity without the ledger enterprise field", async () => {
+    const deleteMany = vi.fn().mockResolvedValue({ count: 1 });
+    const repository = new PrismaRelationshipRepository({ assetLink: { deleteMany } } as never);
+
+    await repository.deleteLegacyAssetLink(scope, "legacy-asset-link:legacy-row");
+
+    expect(deleteMany).toHaveBeenCalledWith({
+      where: {
+        applicationServiceId: scope.applicationServiceId,
+        scopePath: scope.scopePath,
+        id: "legacy-row"
+      }
+    });
+  });
 });

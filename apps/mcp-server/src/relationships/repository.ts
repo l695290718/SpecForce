@@ -45,7 +45,8 @@ export interface RelationshipCurrentRecord extends RelationshipScope {
 
 export interface RelationshipEventRecord extends RelationshipScope {
   dbId: string;
-  relationshipId: string;
+  relationshipId?: string | null;
+  assetNodeId?: string | null;
   action: string;
   priorVersion?: bigint | null;
   newVersion: bigint;
@@ -80,6 +81,7 @@ export interface RelationshipCommandRepository {
   findCurrent(scope: RelationshipScope, identity: Pick<RelationshipCurrentRecord, "sourceNodeId" | "targetNodeId" | "relationType" | "source" | "sourceReference">): Promise<RelationshipCurrentRecord | undefined>;
   writeCurrent(scope: RelationshipScope, input: Omit<RelationshipCurrentRecord, "dbId" | "version" | keyof RelationshipScope>, version: bigint): Promise<RelationshipCurrentRecord>;
   listParserRelationships(scope: RelationshipScope, rootAssetType: AssetType, rootAssetId: string): Promise<RelationshipCurrentRecord[]>;
+  deleteLegacyAssetLink(scope: RelationshipScope, sourceReference: string): Promise<void>;
   appendEvent(event: RelationshipEventRecord): Promise<RelationshipEventRecord>;
   enqueueOutbox(record: RelationshipOutboxRecord): Promise<RelationshipOutboxRecord>;
 }
@@ -222,12 +224,22 @@ export class PrismaRelationshipRepository implements RelationshipCommandReposito
     return relationships.map(currentRecord);
   }
 
+  async deleteLegacyAssetLink(scope: RelationshipScope, sourceReference: string): Promise<void> {
+    const prefix = "legacy-asset-link:";
+    if (!sourceReference.startsWith(prefix)) return;
+    await this.client.assetLink.deleteMany({
+      where: { ...scopeWithoutEnterprise(scope), id: sourceReference.slice(prefix.length) }
+    });
+  }
+
   async appendEvent(event: RelationshipEventRecord): Promise<RelationshipEventRecord> {
     const { dbId: _dbId, ...data } = event;
     const persisted = await this.client.relationshipEvent.create({
       data: {
         ...data,
         priorVersion: data.priorVersion ?? null,
+        relationshipId: data.relationshipId ?? null,
+        assetNodeId: data.assetNodeId ?? null,
         snapshot: toInputJson(data.snapshot)
       }
     });
@@ -245,6 +257,10 @@ export class PrismaRelationshipRepository implements RelationshipCommandReposito
 
 function graphLockKey(scope: RelationshipScope): string {
   return `${scope.enterpriseId}:${scope.applicationServiceId}:${scope.scopePath}`;
+}
+
+function scopeWithoutEnterprise(scope: RelationshipScope) {
+  return { applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath };
 }
 
 function toInputJson(value: Record<string, unknown>): Prisma.InputJsonValue {

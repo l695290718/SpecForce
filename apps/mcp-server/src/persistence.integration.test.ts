@@ -36,6 +36,10 @@ const relationshipMigrationSql = readFileSync(
   resolve(process.cwd(), "prisma/migrations/20260714_enterprise_relationship_graph/migration.sql"),
   "utf8"
 );
+const nodeSubjectMigrationSql = readFileSync(
+  resolve(process.cwd(), "prisma/migrations/20260715_relationship_event_node_subject/migration.sql"),
+  "utf8"
+);
 
 describe("persisted identity migration SQL", () => {
   it("guards composite constraints when an identically named Prisma index already exists", () => {
@@ -62,6 +66,7 @@ describe.runIf(integrationEnabled)("scope-aware persisted identity", () => {
     await executeMigrationSql();
     await executeMigrationSql();
     await prisma.$executeRawUnsafe(relationshipMigrationSql);
+    await prisma.$executeRawUnsafe(nodeSubjectMigrationSql);
     await ensureMcpPersistenceSchema();
     await ensureMcpPersistenceSchema();
 

@@ -1,4 +1,4 @@
-import { defaultHuaweiActor, type ApiContract, type ContextPack, type Proposal } from "@specforge/core";
+import { defaultHuaweiActor, type ApiContract, type ContextPack, type DataModel, type Proposal } from "@specforge/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   deletePersistedDesignData,
@@ -51,6 +51,37 @@ const bilingualApi: ApiContract = {
       rateLimit: "每分钟 60 次",
       timeout: "2 秒",
       compatibilityPolicy: "仅允许向后兼容的增量变更。"
+    }
+  }
+};
+
+const bilingualDataModel: DataModel = {
+  id: "data-model-ledger-write",
+  name: "Ledger customer model",
+  description: "Exercises normal data-model graph persistence.",
+  code: "LEDGER_CUSTOMER",
+  modelType: "logical",
+  domainId: "domain-design-center",
+  tables: ["customers"],
+  entities: ["Customer"],
+  fields: [{ fieldName: "id", displayName: "Customer ID", dataType: "uuid", nullable: false, owner: "Design Center" }],
+  relationships: [],
+  constraints: [],
+  dataClassification: "internal",
+  lifecycle: "active",
+  lineage: "Design Center",
+  createdAt: now,
+  updatedAt: now,
+  architectureScope: writableScope,
+  localizedContent: {
+    zh: {
+      name: "账本客户模型",
+      description: "覆盖普通数据模型图持久化。",
+      relationships: [],
+      constraints: [],
+      lifecycle: "active",
+      lineage: "Design Center",
+      fields: { id: { displayName: "客户标识" } }
     }
   }
 };
@@ -293,7 +324,8 @@ describe("scoped seed cleanup", () => {
   it("uses scope-aware composite identities for every persisted upsert", async () => {
     process.env.SPECFORGE_MCP_SEED = "1";
     mockSchemaSetup();
-    const assetUpsert = vi.spyOn(prisma.designAsset, "upsert").mockResolvedValue({} as never);
+    const harness = installLegacyLedgerHarness();
+    const assetUpsert = harness.transaction.designAsset.upsert;
     const proposalUpsert = vi.spyOn(prisma.proposal, "upsert").mockResolvedValue({} as never);
     const contextPackUpsert = vi.spyOn(prisma.contextPack, "upsert").mockResolvedValue({} as never);
 
@@ -319,6 +351,34 @@ describe("scoped seed cleanup", () => {
 });
 
 describe("legacy AssetLink ledger synchronization", () => {
+  it("routes normal dataModel and API writes through the graph ledger in the aggregate transaction", async () => {
+    mockSchemaSetup();
+    const harness = installLegacyLedgerHarness();
+
+    await upsertDesignAsset({ assetType: "dataModel", asset: bilingualDataModel });
+    await upsertDesignAsset({ assetType: "api", asset: bilingualApi });
+
+    expect(harness.state.designAssets).toHaveLength(2);
+    expect(harness.state.nodes).toHaveLength(5);
+    expect(harness.state.current).toHaveLength(2);
+    expect(harness.state.events).toHaveLength(7);
+    expect(harness.state.outbox).toHaveLength(7);
+    expect(harness.state.events.filter((event) => event.assetNodeId != null)).toHaveLength(5);
+    expect(harness.state.events.filter((event) => event.relationshipId != null)).toHaveLength(2);
+  });
+
+  it("rolls back a normal aggregate write when graph projection persistence fails", async () => {
+    mockSchemaSetup();
+    const harness = installLegacyLedgerHarness({ failOnEvent: true });
+
+    await expect(upsertDesignAsset({ assetType: "api", asset: bilingualApi })).rejects.toThrow("FORCED_EVENT_FAILURE");
+
+    expect(harness.state.designAssets).toHaveLength(0);
+    expect(harness.state.nodes).toHaveLength(0);
+    expect(harness.state.events).toHaveLength(0);
+    expect(harness.state.outbox).toHaveLength(0);
+  });
+
   it("creates a legacy AssetLink and one normalized current/event/outbox ledger record", async () => {
     mockSchemaSetup();
     const harness = installLegacyLedgerHarness();
@@ -359,6 +419,44 @@ describe("legacy AssetLink ledger synchronization", () => {
     expect(harness.state.current[0]).toMatchObject({ lifecycleStatus: "DELETED" });
     expect(harness.state.events.at(-1)).toMatchObject({ action: "DELETE" });
     expect(harness.state.outbox.at(-1)).toMatchObject({ eventType: "RELATIONSHIP_DELETE" });
+  });
+
+  it("cleans an unsupported historical AssetLink without validating its obsolete relation code", async () => {
+    process.env.SPECFORGE_MCP_SEED = "1";
+    mockSchemaSetup();
+    const harness = installLegacyLedgerHarness();
+    const legacy = {
+      ...legacyLinkInput(),
+      relationType: "retired-custom-code"
+    };
+    harness.state.assetLinks.push({
+      id: "api:legacy-source-api:retired-custom-code:event:legacy-target-event",
+      ...legacy,
+      applicationServiceId: writableScope.applicationServiceId,
+      scopePath: writableScope.scopePath,
+      createdAt: new Date(now)
+    });
+    const sourceNode = await harness.transaction.assetNode.create({ data: {
+      enterpriseId: "legacy-enterprise", applicationServiceId: writableScope.applicationServiceId, scopePath: writableScope.scopePath,
+      nodeType: "api", logicalId: legacy.sourceId, rootAssetType: "api", rootAssetId: legacy.sourceId,
+      nodePath: `api/${legacy.sourceId}`, displayName: legacy.sourceId, metadata: {}, version: 1n, lifecycleStatus: "ACTIVE"
+    } });
+    const targetNode = await harness.transaction.assetNode.create({ data: {
+      enterpriseId: "legacy-enterprise", applicationServiceId: writableScope.applicationServiceId, scopePath: writableScope.scopePath,
+      nodeType: "event", logicalId: legacy.targetId, rootAssetType: "event", rootAssetId: legacy.targetId,
+      nodePath: `event/${legacy.targetId}`, displayName: legacy.targetId, metadata: {}, version: 1n, lifecycleStatus: "ACTIVE"
+    } });
+    harness.state.current.push({
+      enterpriseId: "legacy-enterprise", applicationServiceId: writableScope.applicationServiceId, scopePath: writableScope.scopePath,
+      dbId: "relationship-historical", sourceNodeId: sourceNode.dbId, targetNodeId: targetNode.dbId,
+      relationType: legacy.relationType, strength: "weak", confidence: 0, source: "legacy-asset-link",
+      sourceReference: `legacy-asset-link:${harness.state.assetLinks[0]!.id}`, lifecycleStatus: "ACTIVE", metadata: {}, version: 1n
+    });
+
+    await deletePersistedDesignData({ architectureScope: writableScope, assetIds: [legacy.sourceId] });
+
+    expect(harness.state.assetLinks).toHaveLength(0);
+    expect(harness.state.current[0]).toMatchObject({ lifecycleStatus: "DELETED" });
   });
 
   it("rejects an unsupported new legacy relation code before writing either store", async () => {
@@ -411,6 +509,7 @@ function legacyLinkInput() {
 
 function installLegacyLedgerHarness(options: { failOnEvent?: boolean } = {}) {
   const state = {
+    designAssets: [] as Array<Record<string, unknown>>,
     assetLinks: [] as Array<Record<string, unknown>>,
     nodes: [] as Array<Record<string, unknown>>,
     current: [] as Array<Record<string, unknown>>,
@@ -438,11 +537,25 @@ function installLegacyLedgerHarness(options: { failOnEvent?: boolean } = {}) {
         (where.OR ?? []).some((condition: { sourceId?: { in: string[] }; targetId?: { in: string[] } }) =>
           condition.sourceId?.in.includes(row.sourceId as string) || condition.targetId?.in.includes(row.targetId as string)
         )
-      )))
+      ))),
+      deleteMany: vi.fn(async ({ where }) => {
+        const removed = state.assetLinks.filter((row) => row.id === where.id && row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath);
+        state.assetLinks.splice(0, state.assetLinks.length, ...state.assetLinks.filter((row) => !removed.includes(row)));
+        return { count: removed.length };
+      })
     },
     contextPack: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     proposal: { deleteMany: vi.fn(async () => ({ count: 0 })) },
-    designAsset: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    designAsset: {
+      upsert: vi.fn(async ({ where, create, update }) => {
+        const identity = where.applicationServiceId_scopePath_id;
+        const existing = state.designAssets.find((row) => row.id === identity.id && row.applicationServiceId === identity.applicationServiceId && row.scopePath === identity.scopePath);
+        if (existing) Object.assign(existing, update);
+        else state.designAssets.push({ ...create, createdAt: create.createdAt ?? new Date(), updatedAt: create.updatedAt ?? new Date() });
+        return existing ?? state.designAssets.at(-1);
+      }),
+      deleteMany: vi.fn(async () => ({ count: 0 }))
+    },
     assetNode: {
       findUnique: vi.fn(async ({ where }) => state.nodes.find((row) => {
         const identity = where.enterpriseId_applicationServiceId_scopePath_nodeType_logicalId;
@@ -498,14 +611,17 @@ function installLegacyLedgerHarness(options: { failOnEvent?: boolean } = {}) {
   };
   vi.spyOn(prisma.assetLink, "upsert").mockImplementation(transaction.assetLink.upsert as never);
   vi.spyOn(prisma.assetLink, "findMany").mockImplementation(transaction.assetLink.findMany as never);
+  vi.spyOn(prisma.assetLink, "deleteMany").mockImplementation(transaction.assetLink.deleteMany as never);
   vi.spyOn(prisma.contextPack, "deleteMany").mockImplementation(transaction.contextPack.deleteMany as never);
   vi.spyOn(prisma.proposal, "deleteMany").mockImplementation(transaction.proposal.deleteMany as never);
+  vi.spyOn(prisma.designAsset, "upsert").mockImplementation(transaction.designAsset.upsert as never);
   vi.spyOn(prisma.designAsset, "deleteMany").mockImplementation(transaction.designAsset.deleteMany as never);
   vi.spyOn(prisma, "$transaction").mockImplementation(async (operation) => {
     const snapshot = structuredClone(state);
     try {
       return await operation(transaction as never);
     } catch (error) {
+      state.designAssets.splice(0, state.designAssets.length, ...snapshot.designAssets);
       state.assetLinks.splice(0, state.assetLinks.length, ...snapshot.assetLinks);
       state.nodes.splice(0, state.nodes.length, ...snapshot.nodes);
       state.current.splice(0, state.current.length, ...snapshot.current);
@@ -567,7 +683,8 @@ describe("Task 2 MCP bilingual enforcement", () => {
 
   it("accepts valid bilingual asset and proposal payloads", async () => {
     mockSchemaSetup();
-    const assetUpsertSpy = vi.spyOn(prisma.designAsset, "upsert").mockResolvedValue({} as never);
+    const harness = installLegacyLedgerHarness();
+    const assetUpsertSpy = harness.transaction.designAsset.upsert;
     const proposalUpsertSpy = vi.spyOn(prisma.proposal, "upsert").mockResolvedValue({} as never);
 
     await expect(upsertDesignAsset({ assetType: "api", asset: bilingualApi })).resolves.toEqual({

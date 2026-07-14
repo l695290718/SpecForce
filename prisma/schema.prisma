@@ -188,6 +188,7 @@ model AssetNode {
   impactResultNodes    ImpactResultNode[]    @relation("ImpactResultAssetNode")
   startingImpactPaths  ImpactResultPath[]    @relation("ImpactPathStartNode")
   endingImpactPaths    ImpactResultPath[]    @relation("ImpactPathEndNode")
+  events               RelationshipEvent[]   @relation("RelationshipEventNode")
 
   @@unique([enterpriseId, applicationServiceId, scopePath, nodeType, logicalId], map: "AssetNode_scope_identity_key")
   @@unique([enterpriseId, applicationServiceId, scopePath, dbId], map: "AssetNode_enterprise_scope_dbId_key")
@@ -230,7 +231,8 @@ model RelationshipEvent {
   enterpriseId         String
   applicationServiceId String
   scopePath            String
-  relationshipId       String   @db.Uuid
+  relationshipId       String?  @db.Uuid
+  assetNodeId          String?  @db.Uuid
   action               String
   priorVersion         BigInt?
   newVersion           BigInt
@@ -244,13 +246,15 @@ model RelationshipEvent {
   snapshot             Json     @default("{}") @db.JsonB
   createdAt            DateTime @default(now())
 
-  relationship         RelationshipCurrent @relation("RelationshipEventCurrent", fields: [enterpriseId, applicationServiceId, scopePath, relationshipId], references: [enterpriseId, applicationServiceId, scopePath, dbId], map: "RelationshipEvent_relationship_scope_fkey")
+  relationship         RelationshipCurrent? @relation("RelationshipEventCurrent", fields: [enterpriseId, applicationServiceId, scopePath, relationshipId], references: [enterpriseId, applicationServiceId, scopePath, dbId], map: "RelationshipEvent_relationship_scope_fkey")
+  assetNode            AssetNode?           @relation("RelationshipEventNode", fields: [enterpriseId, applicationServiceId, scopePath, assetNodeId], references: [enterpriseId, applicationServiceId, scopePath, dbId], map: "RelationshipEvent_asset_node_scope_fkey")
   outbox               RelationshipOutbox? @relation("RelationshipEventOutbox")
   projectionCheckpoints ProjectionCheckpoint[] @relation("ProjectionCheckpointLastEvent")
 
   @@unique([enterpriseId, applicationServiceId, scopePath, idempotencyKey], map: "RelationshipEvent_enterprise_scope_idempotency_key")
   @@unique([enterpriseId, applicationServiceId, scopePath, dbId], map: "RelationshipEvent_enterprise_scope_dbId_key")
-  @@index([enterpriseId, applicationServiceId, scopePath, relationshipId, createdAt])
+  @@index([enterpriseId, applicationServiceId, scopePath, relationshipId, createdAt], map: "RelationshipEvent_scope_relationship_idx")
+  @@index([enterpriseId, applicationServiceId, scopePath, assetNodeId, createdAt], map: "RelationshipEvent_scope_asset_node_idx")
 }
 
 model RelationshipOutbox {
