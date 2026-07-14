@@ -120,6 +120,86 @@ describe("relationship extraction", () => {
     );
   });
 
+  it("keeps fields under the model when entity ownership is ambiguous", () => {
+    const multiEntityGraph = extractAssetGraph("dataModel", {
+      ...customerModel,
+      id: "customer-profile-model",
+      entities: ["Customer", "Profile"],
+      fields: [
+        ...customerModel.fields,
+        {
+          fieldName: "profile_id",
+          displayName: "Profile ID",
+          dataType: "string",
+          nullable: false,
+          owner: "Customer Team"
+        }
+      ]
+    });
+    const zeroEntityGraph = extractAssetGraph("dataModel", {
+      ...customerModel,
+      id: "customer-fields-model",
+      entities: []
+    });
+
+    expect(multiEntityGraph.nodes.map((node) => node.logicalId)).toEqual([
+      "customer-profile-model",
+      "customer-profile-model.Customer",
+      "customer-profile-model.Profile",
+      "customer-profile-model.email",
+      "customer-profile-model.profile_id"
+    ]);
+    expect(multiEntityGraph.relationships).toContainEqual(
+      expect.objectContaining({
+        code: "CONTAINS",
+        sourceLogicalId: "customer-profile-model",
+        targetLogicalId: "customer-profile-model.email"
+      })
+    );
+    expect(multiEntityGraph.relationships).not.toContainEqual(
+      expect.objectContaining({
+        sourceLogicalId: "customer-profile-model.Customer",
+        targetLogicalId: "customer-profile-model.Customer.email"
+      })
+    );
+    expect(zeroEntityGraph.nodes.map((node) => node.logicalId)).toEqual([
+      "customer-fields-model",
+      "customer-fields-model.email"
+    ]);
+    expect(zeroEntityGraph.relationships).toContainEqual(
+      expect.objectContaining({
+        sourceLogicalId: "customer-fields-model",
+        targetLogicalId: "customer-fields-model.email"
+      })
+    );
+  });
+
+  it("orders technical identifiers by UTF-16 code unit rather than the runtime locale", () => {
+    const graph = extractAssetGraph("dataModel", {
+      ...customerModel,
+      id: "ordering-model",
+      entities: ["z", "ä"],
+      fields: [
+        {
+          ...customerModel.fields[0]!,
+          fieldName: "z-field"
+        },
+        {
+          ...customerModel.fields[0]!,
+          fieldName: "ä-field"
+        }
+      ]
+    });
+
+    expect(graph.nodes.map((node) => node.logicalId)).toEqual([
+      "ordering-model",
+      "ordering-model.z",
+      "ordering-model.ä",
+      "ordering-model.z-field",
+      "ordering-model.ä-field"
+    ]);
+  });
+
   it("extracts a canonical API operation and an event root", () => {
     const apiGraph = extractAssetGraph("api", customerQuery);
     const eventGraph = extractAssetGraph("event", customerUpdated);

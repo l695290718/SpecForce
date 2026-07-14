@@ -66,9 +66,9 @@ function extractDataModelNodes(
   relationships: ExtractedAssetRelationship[]
 ): void {
   const sourceReference = `dataModel:${asset.id}:${asset.updatedAt}`;
+  const entityNames = uniqueSorted(asset.entities);
   const fieldNames = uniqueSorted(asset.fields.map((field) => field.fieldName));
-
-  for (const entityName of uniqueSorted(asset.entities)) {
+  const entities = entityNames.map((entityName) => {
     const entity: AssetNodeIdentity = {
       ...root,
       nodeType: "dataEntity",
@@ -77,17 +77,20 @@ function extractDataModelNodes(
     };
     nodes.push(entity);
     relationships.push(createContainsRelationship(root, entity, sourceReference));
+    return entity;
+  });
 
-    for (const fieldName of fieldNames) {
-      const field: AssetNodeIdentity = {
-        ...root,
-        nodeType: "dataField",
-        logicalId: `${entity.logicalId}.${fieldName}`,
-        parentLogicalId: entity.logicalId
-      };
-      nodes.push(field);
-      relationships.push(createContainsRelationship(entity, field, sourceReference));
-    }
+  const fieldParent = entities.length === 1 ? entities[0]! : root;
+
+  for (const fieldName of fieldNames) {
+    const field: AssetNodeIdentity = {
+      ...root,
+      nodeType: "dataField",
+      logicalId: `${fieldParent.logicalId}.${fieldName}`,
+      parentLogicalId: fieldParent.logicalId
+    };
+    nodes.push(field);
+    relationships.push(createContainsRelationship(fieldParent, field, sourceReference));
   }
 }
 
@@ -111,5 +114,9 @@ function createContainsRelationship(
 }
 
 function uniqueSorted(values: string[]): string[] {
-  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+  return [...new Set(values)].sort(compareCodeUnits);
+}
+
+function compareCodeUnits(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
