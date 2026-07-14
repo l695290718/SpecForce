@@ -17,3 +17,6 @@ export * from "./governance/localization";
 export * from "./architecture/types";
 export * from "./architecture/mock";
 export * from "./architecture/service";
+export * from "./relationships/types";
+export * from "./relationships/ontology";
+export * from "./graph-store/types";
