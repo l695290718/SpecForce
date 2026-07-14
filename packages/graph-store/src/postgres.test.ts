@@ -38,6 +38,36 @@ describe("PostgresGraphStore", () => {
     expect(result.frontier.map((node) => node.logicalId)).toEqual(["customer-api"]);
   });
 
+  it("uses one deadline across checkpoint and root resolution before the first hop", async () => {
+    let time = 0;
+    const queryTimeouts: number[] = [];
+    let hopQueries = 0;
+    const client: PostgresQueryClient = {
+      async $queryRawUnsafe<T>(query: string, ...values: unknown[]): Promise<T> {
+        if (query.includes('MAX("graphVersion")')) {
+          queryTimeouts.push(values[3] as number);
+          time = 6;
+          return [{ graph_version: 7n }] as T;
+        }
+        if (query.includes("start_nodes")) {
+          queryTimeouts.push(values[4] as number);
+          time = 11;
+          return [row("00000000-0000-0000-0000-000000000001", api!)] as T;
+        }
+        hopQueries += 1;
+        return [] as T;
+      }
+    };
+    const store = new PostgresGraphStore(client, { enterpriseId: "enterprise-graph-store-test", now: () => time });
+
+    const result = await store.traverse(plan({ timeoutMs: 10 }));
+
+    expect(result).toMatchObject({ status: "PARTIAL", truncationReasons: ["QUERY_TIMEOUT"], elapsedMs: 11 });
+    expect(result.frontier.map((node) => node.logicalId)).toEqual(["customer-api"]);
+    expect(queryTimeouts).toEqual([10, 4]);
+    expect(hopQueries).toBe(0);
+  });
+
   it("rejects a cross-Scope projection before issuing PostgreSQL", async () => {
     let queryCount = 0;
     const client: PostgresQueryClient = {

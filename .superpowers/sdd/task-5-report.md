@@ -111,6 +111,21 @@ pnpm --filter @specforge/graph-store typecheck
 
 Result: 2 files passed, 24 tests passed; typecheck exited 0. PostgreSQL integration remains for the parent’s guarded disposable-schema rerun.
 
+## Global Deadline Follow-Up
+
+PostgreSQL traversal now treats `plan.timeoutMs` as one absolute deadline, beginning before checkpoint resolution. Before checkpoint, root lookup, and every one-hop query, the adapter computes the remaining milliseconds; it returns `PARTIAL/QUERY_TIMEOUT` with a non-empty current frontier when the budget has expired. Checkpoint, root, and one-hop SQL each receive only that remaining value through a local `statement_timeout`, so no later query resets the full plan timeout. Elapsed time includes checkpoint and root work.
+
+The deterministic fake-clock regression uses a 10 ms budget: checkpoint consumes 6 ms, root resolution receives the remaining 4 ms and consumes a further 5 ms, and the adapter returns `QUERY_TIMEOUT` before issuing any hop. It asserts SQL timeout inputs `[10, 4]`, a 11 ms elapsed result, and zero hop queries.
+
+Final verification:
+
+```text
+pnpm --filter @specforge/graph-store exec vitest run src/graph-store.contract.test.ts src/postgres.test.ts
+pnpm --filter @specforge/graph-store typecheck
+```
+
+Result: 2 files passed, 25 tests passed; typecheck exited 0. PostgreSQL integration remains for the parent’s guarded disposable-schema rerun.
+
 ## Files
 
 - `packages/graph-store/**`

@@ -54,20 +54,25 @@ export class PostgresGraphStore implements GraphStore {
   async traverse(plan: GraphTraversalPlan): Promise<GraphTraversalResult> {
     const now = this.options.now ?? Date.now;
     const startedAt = now();
+    const deadline = startedAt + plan.timeoutMs;
     let graphVersion = plan.graphVersion ?? 0n;
 
     try {
-      if (plan.graphVersion === undefined) graphVersion = await this.checkpoint(plan.authorizedScope);
+      const checkpointTimeout = remainingMs(now, deadline);
+      if (checkpointTimeout <= 0) return queryTimeoutResult(plan, graphVersion, plan.startNodes, [], [], elapsed(now, startedAt));
+      if (plan.graphVersion === undefined) graphVersion = await this.readCheckpoint(plan.authorizedScope, checkpointTimeout);
       const startLimit = Math.min(plan.maxNodes, plan.maxPaths);
+      const rootTimeout = remainingMs(now, deadline);
+      if (rootTimeout <= 0) return queryTimeoutResult(plan, graphVersion, plan.startNodes, [], [], elapsed(now, startedAt));
       const rootRows = await this.client.$queryRawUnsafe<TraversalRow[]>(ROOT_SQL,
         this.options.enterpriseId,
         plan.authorizedScope.applicationServiceId,
         plan.authorizedScope.scopePath,
         JSON.stringify(plan.startNodes.slice(0, startLimit).map((node) => ({ nodeType: node.nodeType, logicalId: node.logicalId }))),
-        plan.timeoutMs,
+        rootTimeout,
         startLimit
       );
-      return this.traverseBounded(plan, rootRows, graphVersion, now, startedAt);
+      return this.traverseBounded(plan, rootRows, graphVersion, now, startedAt, deadline);
     } catch (error) {
       if (!isQueryTimeout(error)) throw error;
       return queryTimeoutResult(plan, graphVersion, plan.startNodes, [], [], elapsed(now, startedAt));
@@ -82,11 +87,15 @@ export class PostgresGraphStore implements GraphStore {
   }
 
   async checkpoint(scope: ArchitectureScopeRef): Promise<bigint> {
-    const rows = await this.client.$queryRawUnsafe<Array<{ graph_version: bigint | string | number }>>(CHECKPOINT_SQL, this.options.enterpriseId, scope.applicationServiceId, scope.scopePath);
+    return this.readCheckpoint(scope, 3_000);
+  }
+
+  private async readCheckpoint(scope: ArchitectureScopeRef, timeoutMs: number): Promise<bigint> {
+    const rows = await this.client.$queryRawUnsafe<Array<{ graph_version: bigint | string | number }>>(CHECKPOINT_SQL, this.options.enterpriseId, scope.applicationServiceId, scope.scopePath, timeoutMs);
     return asBigInt(rows[0]?.graph_version ?? 0);
   }
 
-  private async traverseBounded(plan: GraphTraversalPlan, rootRows: TraversalRow[], graphVersion: bigint, now: () => number, startedAt: number): Promise<GraphTraversalResult> {
+  private async traverseBounded(plan: GraphTraversalPlan, rootRows: TraversalRow[], graphVersion: bigint, now: () => number, startedAt: number, deadline: number): Promise<GraphTraversalResult> {
     const states = rootRows
       .map((row) => ({ nodeId: row.node_id, node: nodeFromRow(row) }))
       .filter((state) => sameScope(state.node, plan.authorizedScope))
@@ -105,13 +114,15 @@ export class PostgresGraphStore implements GraphStore {
     }
 
     while (queue.length > 0) {
-      if (elapsed(now, startedAt) >= plan.timeoutMs) return partialResult(["TIMEOUT"], queue.map((state) => state.node), nodes, edges, paths, graphVersion, elapsed(now, startedAt));
+      if (remainingMs(now, deadline) <= 0) return queryTimeoutResult(plan, graphVersion, queue.map((state) => state.node), nodes, paths, elapsed(now, startedAt));
       const state = queue.shift()!;
       const remainingPaths = plan.maxPaths - paths.length;
       if (remainingPaths <= 0) return partialResult(["MAX_PATHS"], [state.node, ...queue.map((item) => item.node)], nodes, edges, paths, graphVersion, elapsed(now, startedAt));
 
       let candidates: TraversalRow[];
       try {
+        const hopTimeout = remainingMs(now, deadline);
+        if (hopTimeout <= 0) return queryTimeoutResult(plan, graphVersion, [state.node, ...queue.map((item) => item.node)], nodes, paths, elapsed(now, startedAt));
         candidates = await this.client.$queryRawUnsafe<TraversalRow[]>(ONE_HOP_SQL,
           this.options.enterpriseId,
           plan.authorizedScope.applicationServiceId,
@@ -119,7 +130,7 @@ export class PostgresGraphStore implements GraphStore {
           state.nodeId,
           state.visited,
           JSON.stringify(plan.relationRules),
-          plan.timeoutMs,
+          hopTimeout,
           state.depth >= plan.maxDepth ? 1 : remainingPaths + 1
         );
       } catch (error) {
@@ -138,7 +149,7 @@ export class PostgresGraphStore implements GraphStore {
 
       const hasSentinel = candidates.length > remainingPaths;
       for (const candidate of eligible.slice(0, remainingPaths)) {
-        if (elapsed(now, startedAt) >= plan.timeoutMs) return partialResult(["TIMEOUT"], [state.node, ...queue.map((item) => item.node)], nodes, edges, paths, graphVersion, elapsed(now, startedAt));
+        if (remainingMs(now, deadline) <= 0) return queryTimeoutResult(plan, graphVersion, [state.node, ...queue.map((item) => item.node)], nodes, paths, elapsed(now, startedAt));
         const relationship = relationshipFromRow(candidate.row, state, candidate.node);
         if (!relationship) continue;
         const key = nodeKey(candidate.node);
@@ -192,13 +203,14 @@ function isQueryTimeout(error: unknown): boolean {
 
 function asBigInt(value: bigint | string | number): bigint { return typeof value === "bigint" ? value : BigInt(value); }
 function elapsed(now: () => number, startedAt: number): number { return Math.max(0, now() - startedAt); }
+function remainingMs(now: () => number, deadline: number): number { return Math.max(0, deadline - now()); }
 function compareNodes(left: AssetNodeIdentity, right: AssetNodeIdentity): number { return nodeKey(left).localeCompare(nodeKey(right)); }
 function compareRows(left: TraversalRow, right: TraversalRow): number { return [left.edge_id ?? "", left.node_id].join("\u0000").localeCompare([right.edge_id ?? "", right.node_id].join("\u0000")); }
 function sortedNodes(nodes: Map<string, AssetNodeIdentity>): AssetNodeIdentity[] { return [...nodes.values()].sort(compareNodes); }
 function sortedEdges(edges: Map<string, GraphRelationship>): GraphRelationship[] { return [...edges.values()].sort((left, right) => [left.id, nodeKey(left.source), nodeKey(left.target)].join("\u0000").localeCompare([right.id, nodeKey(right.source), nodeKey(right.target)].join("\u0000"))); }
 function sortedPaths(paths: GraphEvidencePath[]): GraphEvidencePath[] { return [...paths].sort((left, right) => left.nodes.map(nodeKey).join("\u0001").localeCompare(right.nodes.map(nodeKey).join("\u0001"))); }
 
-const CHECKPOINT_SQL = `SELECT COALESCE(MAX("graphVersion"), 0)::bigint AS graph_version FROM "RelationshipEvent" WHERE ("enterpriseId", "applicationServiceId", "scopePath") = ($1, $2, $3)`;
+const CHECKPOINT_SQL = `WITH query_budget AS MATERIALIZED (SELECT set_config('statement_timeout', $4::text, true) AS configured) SELECT COALESCE(MAX("graphVersion"), 0)::bigint AS graph_version FROM "RelationshipEvent" CROSS JOIN query_budget WHERE ("enterpriseId", "applicationServiceId", "scopePath") = ($1, $2, $3)`;
 
 const ROOT_SQL = `
   WITH authorized_scope AS (SELECT $1::text AS enterprise_id, $2::text AS application_service_id, $3::text AS scope_path),
