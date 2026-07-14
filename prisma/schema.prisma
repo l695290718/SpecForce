@@ -162,3 +162,209 @@ model AuditLog {
   @@index([targetType, targetId])
   @@index([createdAt])
 }
+
+model AssetNode {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  enterpriseId         String
+  applicationServiceId String
+  scopePath            String
+  nodeType             String
+  logicalId            String
+  rootAssetType        String
+  rootAssetId          String
+  parentNodeId         String?  @db.Uuid
+  nodePath             String
+  displayName          String
+  metadata             Json     @default("{}") @db.JsonB
+  version              BigInt
+  lifecycleStatus      String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  parent               AssetNode?           @relation("AssetNodeParent", fields: [parentNodeId], references: [dbId])
+  children             AssetNode[]           @relation("AssetNodeParent")
+  sourceRelationships  RelationshipCurrent[] @relation("RelationshipSource")
+  targetRelationships  RelationshipCurrent[] @relation("RelationshipTarget")
+  impactResultNodes    ImpactResultNode[]    @relation("ImpactResultAssetNode")
+  startingImpactPaths  ImpactResultPath[]    @relation("ImpactPathStartNode")
+  endingImpactPaths    ImpactResultPath[]    @relation("ImpactPathEndNode")
+
+  @@unique([enterpriseId, applicationServiceId, scopePath, nodeType, logicalId])
+  @@index([enterpriseId, applicationServiceId, scopePath, rootAssetType, rootAssetId])
+  @@index([enterpriseId, applicationServiceId, scopePath, parentNodeId])
+}
+
+model RelationshipCurrent {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  enterpriseId         String
+  applicationServiceId String
+  scopePath            String
+  sourceNodeId         String   @db.Uuid
+  targetNodeId         String   @db.Uuid
+  relationType         String
+  strength             String
+  confidence           Float
+  source               String
+  sourceReference      String   @default("")
+  validFrom            DateTime @default(now())
+  validTo              DateTime?
+  version              BigInt
+  lifecycleStatus      String   @default("ACTIVE")
+  metadata             Json     @default("{}") @db.JsonB
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  sourceNode           AssetNode          @relation("RelationshipSource", fields: [sourceNodeId], references: [dbId])
+  targetNode           AssetNode          @relation("RelationshipTarget", fields: [targetNodeId], references: [dbId])
+  events               RelationshipEvent[] @relation("RelationshipEventCurrent")
+
+  @@unique([enterpriseId, applicationServiceId, scopePath, sourceNodeId, targetNodeId, relationType, source, sourceReference])
+  @@index([enterpriseId, applicationServiceId, scopePath, sourceNodeId, relationType], map: "RelationshipCurrent_scope_source_idx")
+  @@index([enterpriseId, applicationServiceId, scopePath, targetNodeId, relationType], map: "RelationshipCurrent_scope_target_idx")
+}
+
+model RelationshipEvent {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  enterpriseId         String
+  applicationServiceId String
+  scopePath            String
+  relationshipId       String   @db.Uuid
+  action               String
+  priorVersion         BigInt?
+  newVersion           BigInt
+  graphVersion         BigInt
+  actorType            String
+  actorId              String
+  channel              String
+  correlationId        String
+  idempotencyKey       String
+  source               String
+  snapshot             Json     @default("{}") @db.JsonB
+  createdAt            DateTime @default(now())
+
+  relationship         RelationshipCurrent @relation("RelationshipEventCurrent", fields: [relationshipId], references: [dbId])
+  outbox               RelationshipOutbox? @relation("RelationshipEventOutbox")
+
+  @@unique([enterpriseId, applicationServiceId, scopePath, idempotencyKey])
+  @@index([enterpriseId, applicationServiceId, scopePath, relationshipId, createdAt])
+}
+
+model RelationshipOutbox {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  enterpriseId         String
+  applicationServiceId String
+  scopePath            String
+  relationshipEventId  String   @unique @db.Uuid
+  graphVersion         BigInt
+  eventType            String
+  payload              Json     @default("{}") @db.JsonB
+  status               String
+  idempotencyKey       String
+  availableAt          DateTime @default(now())
+  sentAt               DateTime?
+  attemptCount         Int      @default(0)
+  lastError            String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  relationshipEvent    RelationshipEvent @relation("RelationshipEventOutbox", fields: [relationshipEventId], references: [dbId])
+
+  @@unique([enterpriseId, applicationServiceId, scopePath, idempotencyKey])
+  @@index([enterpriseId, applicationServiceId, scopePath, status, availableAt])
+}
+
+model ProjectionCheckpoint {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  enterpriseId         String
+  applicationServiceId String
+  scopePath            String
+  partitionId          String
+  lastEventId          String?  @db.Uuid
+  projectionVersion    BigInt
+  projectedAt          DateTime?
+  status               String
+  error                String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([enterpriseId, applicationServiceId, scopePath, partitionId])
+  @@index([enterpriseId, applicationServiceId, scopePath, projectionVersion])
+}
+
+model ImpactAnalysisRun {
+  dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  enterpriseId          String
+  applicationServiceId  String
+  scopePath             String
+  proposalId            String
+  status                String
+  stopReason            String?
+  assetVersion          BigInt
+  relationshipVersion   BigInt
+  ontologyVersion       String
+  requiredGraphVersion  BigInt
+  actualGraphCheckpoint BigInt?
+  authorizationSnapshot Json     @default("{}") @db.JsonB
+  budgets               Json     @default("{}") @db.JsonB
+  summary               Json     @default("{}") @db.JsonB
+  unexploredFrontierCount Int    @default(0)
+  startedAt             DateTime @default(now())
+  completedAt           DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  resultNodes           ImpactResultNode[] @relation("ImpactRunNodes")
+
+  @@index([enterpriseId, applicationServiceId, scopePath, status, createdAt], map: "ImpactAnalysisRun_scope_status_idx")
+  @@index([enterpriseId, applicationServiceId, scopePath, proposalId], map: "ImpactAnalysisRun_scope_proposal_idx")
+}
+
+model ImpactResultNode {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  enterpriseId         String
+  applicationServiceId String
+  scopePath            String
+  impactAnalysisRunId  String   @db.Uuid
+  nodeId               String   @db.Uuid
+  impactLevel          String
+  certainty            String
+  depth                Int
+  confidence           Float
+  primaryPath          Json     @default("{}") @db.JsonB
+  alternativePaths     Json     @default("[]") @db.JsonB
+  matchedRules         Json     @default("[]") @db.JsonB
+  recommendedActions   Json     @default("[]") @db.JsonB
+  owner                String?
+  snapshot             Json     @default("{}") @db.JsonB
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  impactAnalysisRun    ImpactAnalysisRun @relation("ImpactRunNodes", fields: [impactAnalysisRunId], references: [dbId])
+  node                 AssetNode         @relation("ImpactResultAssetNode", fields: [nodeId], references: [dbId])
+  paths                ImpactResultPath[] @relation("ImpactResultNodePaths")
+
+  @@unique([impactAnalysisRunId, nodeId])
+  @@index([enterpriseId, applicationServiceId, scopePath, impactAnalysisRunId])
+}
+
+model ImpactResultPath {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  enterpriseId         String
+  applicationServiceId String
+  scopePath            String
+  impactResultNodeId   String   @db.Uuid
+  startNodeId          String   @db.Uuid
+  endNodeId            String   @db.Uuid
+  rank                 Int
+  certainty            String
+  confidence           Float
+  path                 Json     @default("{}") @db.JsonB
+  createdAt            DateTime @default(now())
+
+  impactResultNode     ImpactResultNode @relation("ImpactResultNodePaths", fields: [impactResultNodeId], references: [dbId])
+  startNode            AssetNode        @relation("ImpactPathStartNode", fields: [startNodeId], references: [dbId])
+  endNode              AssetNode        @relation("ImpactPathEndNode", fields: [endNodeId], references: [dbId])
+
+  @@unique([impactResultNodeId, rank])
+  @@index([enterpriseId, applicationServiceId, scopePath, impactResultNodeId])
+}
