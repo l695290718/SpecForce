@@ -136,6 +136,15 @@ export function graphStoreContractSuite(name: string, createStore: StoreFactory)
       expect(result.frontier.map((item) => item.logicalId)).toEqual(["customer-entity"]);
     });
 
+    it("canonically sorts reversed start nodes before applying the node budget", async () => {
+      const result = await (await createStore()).traverse(plan({ startNodes: [entity, api], maxNodes: 1 }));
+
+      expect(result).toMatchObject({ status: "PARTIAL", truncationReasons: ["MAX_NODES"] });
+      expect(result.nodes.map((item) => item.logicalId)).toEqual(["customer-api"]);
+      expect(result.paths.map((path) => path.nodes.map((item) => item.logicalId))).toEqual([["customer-api"]]);
+      expect(result.frontier.map((item) => item.logicalId)).toEqual(["customer-entity"]);
+    });
+
     it("returns deterministic partial result and frontier when the path budget is exhausted", async () => {
       const result = await (await createStore()).traverse(plan({ maxPaths: 2 }));
 

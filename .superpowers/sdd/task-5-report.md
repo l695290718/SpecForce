@@ -121,6 +121,21 @@ The deterministic fake-clock regression uses a 10 ms budget: checkpoint consumes
 
 Task 1 defines `TIMEOUT` as the sole engine-neutral truncation reason. PostgreSQL cancellation and deadline exhaustion now use that exact code, matching the in-memory adapter and shared contract tests. The temporary `QUERY_TIMEOUT` alias was removed from the core union and all PostgreSQL regressions now assert `TIMEOUT`.
 
+## Root Order Parity Follow-Up
+
+PostgreSQL previously sliced the caller-provided root array before sorting database results, while `InMemoryGraphStore` sorted roots before applying the node budget. PostgreSQL now canonical-sorts authorized start identities before serializing the bounded root query and before deriving the initial overflow frontier.
+
+The shared contract uses reversed starts with `maxNodes: 1` and verifies both adapters return `customer-api` as the sole node/path and `customer-entity` as the frontier. A PostgreSQL fake-query regression verifies the serialized root input follows that same canonical order.
+
+Final verification:
+
+```text
+pnpm --filter @specforge/graph-store exec vitest run src/graph-store.contract.test.ts src/postgres.test.ts
+pnpm --filter @specforge/graph-store typecheck
+```
+
+Result: 2 files passed, 28 tests passed; typecheck exited 0. PostgreSQL integration remains for the parent’s guarded disposable-schema rerun.
+
 Final verification:
 
 ```text

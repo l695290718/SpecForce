@@ -68,6 +68,16 @@ describe("PostgresGraphStore", () => {
     expect(hopQueries).toBe(0);
   });
 
+  it("sorts reversed roots before sending the node-budget-limited root query", async () => {
+    const store = new PostgresGraphStore(reversedRootClient(), { enterpriseId: "enterprise-graph-store-test" });
+
+    const result = await store.traverse(plan({ startNodes: [entity!, api!], maxNodes: 1 }));
+
+    expect(result.nodes.map((node) => node.logicalId)).toEqual(["customer-api"]);
+    expect(result.paths.map((path) => path.nodes.map((node) => node.logicalId))).toEqual([["customer-api"]]);
+    expect(result.frontier.map((node) => node.logicalId)).toEqual(["customer-entity"]);
+  });
+
   it("rejects a cross-Scope projection before issuing PostgreSQL", async () => {
     let queryCount = 0;
     const client: PostgresQueryClient = {
@@ -121,6 +131,19 @@ function queryTimeoutClient(): PostgresQueryClient {
       if (query.includes('MAX("graphVersion")')) return [{ graph_version: 7n }] as T;
       if (query.includes("start_nodes")) return [row("00000000-0000-0000-0000-000000000001", api!)] as T;
       throw Object.assign(new Error("canceling statement due to statement timeout"), { code: "57014" });
+    }
+  };
+}
+
+function reversedRootClient(): PostgresQueryClient {
+  return {
+    async $queryRawUnsafe<T>(query: string, ...values: unknown[]): Promise<T> {
+      if (query.includes('MAX("graphVersion")')) return [{ graph_version: 7n }] as T;
+      if (query.includes("start_nodes")) {
+        const [first] = JSON.parse(values[3] as string) as Array<{ logicalId: string }>;
+        return [row("00000000-0000-0000-0000-000000000001", first!.logicalId === "customer-api" ? api! : entity!)] as T;
+      }
+      return [] as T;
     }
   };
 }

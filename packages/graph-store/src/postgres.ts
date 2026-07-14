@@ -62,17 +62,18 @@ export class PostgresGraphStore implements GraphStore {
       if (checkpointTimeout <= 0) return queryTimeoutResult(plan, graphVersion, plan.startNodes, [], [], elapsed(now, startedAt));
       if (plan.graphVersion === undefined) graphVersion = await this.readCheckpoint(plan.authorizedScope, checkpointTimeout);
       const startLimit = Math.min(plan.maxNodes, plan.maxPaths);
+      const orderedStartNodes = [...plan.startNodes].sort(compareNodes);
       const rootTimeout = remainingMs(now, deadline);
       if (rootTimeout <= 0) return queryTimeoutResult(plan, graphVersion, plan.startNodes, [], [], elapsed(now, startedAt));
       const rootRows = await this.client.$queryRawUnsafe<TraversalRow[]>(ROOT_SQL,
         this.options.enterpriseId,
         plan.authorizedScope.applicationServiceId,
         plan.authorizedScope.scopePath,
-        JSON.stringify(plan.startNodes.slice(0, startLimit).map((node) => ({ nodeType: node.nodeType, logicalId: node.logicalId }))),
+        JSON.stringify(orderedStartNodes.slice(0, startLimit).map((node) => ({ nodeType: node.nodeType, logicalId: node.logicalId }))),
         rootTimeout,
         startLimit
       );
-      return this.traverseBounded(plan, rootRows, graphVersion, now, startedAt, deadline);
+      return this.traverseBounded(plan, orderedStartNodes, rootRows, graphVersion, now, startedAt, deadline);
     } catch (error) {
       if (!isQueryTimeout(error)) throw error;
       return queryTimeoutResult(plan, graphVersion, plan.startNodes, [], [], elapsed(now, startedAt));
@@ -95,7 +96,7 @@ export class PostgresGraphStore implements GraphStore {
     return asBigInt(rows[0]?.graph_version ?? 0);
   }
 
-  private async traverseBounded(plan: GraphTraversalPlan, rootRows: TraversalRow[], graphVersion: bigint, now: () => number, startedAt: number, deadline: number): Promise<GraphTraversalResult> {
+  private async traverseBounded(plan: GraphTraversalPlan, orderedStartNodes: AssetNodeIdentity[], rootRows: TraversalRow[], graphVersion: bigint, now: () => number, startedAt: number, deadline: number): Promise<GraphTraversalResult> {
     const states = rootRows
       .map((row) => ({ nodeId: row.node_id, node: nodeFromRow(row) }))
       .filter((state) => sameScope(state.node, plan.authorizedScope))
@@ -110,7 +111,7 @@ export class PostgresGraphStore implements GraphStore {
       const reasons: GraphTraversalTruncationReason[] = [];
       if (plan.startNodes.length > plan.maxNodes) reasons.push("MAX_NODES");
       if (plan.startNodes.length > plan.maxPaths) reasons.push("MAX_PATHS");
-      return partialResult(reasons, plan.startNodes.slice(Math.min(plan.maxNodes, plan.maxPaths)), nodes, edges, paths, graphVersion, elapsed(now, startedAt));
+      return partialResult(reasons, orderedStartNodes.slice(Math.min(plan.maxNodes, plan.maxPaths)), nodes, edges, paths, graphVersion, elapsed(now, startedAt));
     }
 
     while (queue.length > 0) {
