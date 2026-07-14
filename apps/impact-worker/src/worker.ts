@@ -65,9 +65,11 @@ export interface ImpactWorkerRepository {
   claim(run: ImpactAnalysisRunRef, leaseOwner: string, leaseExpiresAt: Date): Promise<ImpactAnalysisRunRecord | null>;
   find(run: ImpactAnalysisRunRef): Promise<ImpactAnalysisRunRecord | null>;
   updateRun(run: ImpactAnalysisRunRef, patch: Partial<ImpactAnalysisRunRecord>): Promise<ImpactAnalysisRunRecord>;
+  updateRunning(run: ImpactAnalysisRunRef, leaseOwner: string, patch: Partial<ImpactAnalysisRunRecord>): Promise<ImpactAnalysisRunRecord | null>;
   projectionCheckpoint(run: ImpactAnalysisRunRef): Promise<bigint>;
   heartbeat(run: ImpactAnalysisRunRef, leaseOwner: string, leaseExpiresAt: Date): Promise<ImpactAnalysisRunRecord | null>;
   loadExecution(run: ImpactAnalysisRunRecord): Promise<ImpactAnalysisExecution>;
+  loadPersistedAnalysis(run: ImpactAnalysisRunRecord): Promise<PersistedImpactAnalysis | null>;
   complete(run: ImpactAnalysisRunRef, leaseOwner: string, analysis: PersistedImpactAnalysis): Promise<ImpactAnalysisRunRecord | null>;
   fail(run: ImpactAnalysisRunRef, leaseOwner: string, stopReason: string): Promise<ImpactAnalysisRunRecord | null>;
   cancel(run: ImpactAnalysisRunRef): Promise<ImpactAnalysisRunRecord | null>;
@@ -121,12 +123,14 @@ export class ImpactAnalysisWorker {
   async resume(run: ImpactAnalysisRunRef): Promise<ImpactWorkerRunResult> {
     const existing = await this.requireRun(run);
     if (existing.status !== "PARTIAL") throw new Error("IMPACT_ANALYSIS_RUN_NOT_PARTIAL");
+    const frontier = readFrontier(existing.summary);
+    if (frontier.length === 0) throw new Error("IMPACT_ANALYSIS_FRONTIER_REQUIRED");
+    const historical = await this.repository.loadPersistedAnalysis(existing);
 
-    // Rebuild from original roots in one terminal transaction so prior partial paths cannot mix with resumed paths.
     await this.repository.updateRun(run, { status: "QUEUED", stopReason: null, completedAt: null });
     const claimed = await this.claim(run);
     if (!claimed) return toResult(await this.requireRun(run), true);
-    return this.execute(claimed, true);
+    return this.execute(claimed, true, { frontier, historical });
   }
 
   async retry(run: ImpactAnalysisRunRef): Promise<ImpactWorkerRunResult> {
@@ -136,25 +140,32 @@ export class ImpactAnalysisWorker {
     return this.run(run);
   }
 
-  private async execute(run: ImpactAnalysisRunRecord, resumed: boolean): Promise<ImpactWorkerRunResult> {
+  private async execute(
+    run: ImpactAnalysisRunRecord,
+    resumed: boolean,
+    resume?: { frontier: AssetNodeIdentity[]; historical: PersistedImpactAnalysis | null }
+  ): Promise<ImpactWorkerRunResult> {
     const heartbeat = this.startHeartbeat(run);
     try {
       const checkpoint = await this.repository.projectionCheckpoint(run);
-      await this.repository.updateRun(run, { actualGraphCheckpoint: checkpoint });
-      if (checkpoint < run.requiredGraphVersion) {
-        const waiting = await this.repository.updateRun(run, { status: "WAITING_FOR_PROJECTION", actualGraphCheckpoint: checkpoint });
+      const checkpointed = await this.repository.updateRunning(run, this.workerId, { actualGraphCheckpoint: checkpoint });
+      if (!checkpointed) return this.afterFencedWriteMiss(run, resumed);
+      if (checkpoint < checkpointed.requiredGraphVersion) {
+        const waiting = await this.repository.updateRunning(run, this.workerId, { status: "WAITING_FOR_PROJECTION", actualGraphCheckpoint: checkpoint });
+        if (!waiting) return this.afterFencedWriteMiss(run, resumed);
         return toResult(waiting, resumed);
       }
 
       if (await this.repository.isCancellationRequested(run)) return this.cancel(run, run);
-      const authorization = readAuthorization(run.authorizationSnapshot, scopeOf(run));
-      const execution = await this.repository.loadExecution(run);
-      if (execution.roots.length === 0) throw new Error("IMPACT_ANALYSIS_ROOTS_REQUIRED");
+      const authorization = readAuthorization(checkpointed.authorizationSnapshot, scopeOf(checkpointed));
+      const execution = await this.repository.loadExecution(checkpointed);
+      const roots = resume?.frontier ?? execution.roots;
+      if (roots.length === 0) throw new Error("IMPACT_ANALYSIS_ROOTS_REQUIRED");
 
-      const budgets = readBudgets(run.budgets);
+      const budgets = readBudgets(checkpointed.budgets);
       const analysis = await analyzeTransitiveProposalImpact({
         proposal: execution.proposal,
-        roots: execution.roots,
+        roots,
         authorization,
         maxDepth: budgets.maxDepth,
         maxNodes: budgets.maxNodes,
@@ -164,7 +175,9 @@ export class ImpactAnalysisWorker {
       }, { graphStore: this.graphStore });
 
       if (await this.repository.isCancellationRequested(run)) return this.cancel(run, run);
-      const completed = await this.repository.complete(run, this.workerId, toPersistedAnalysis(run, analysis, checkpoint));
+      const currentAnalysis = toPersistedAnalysis(checkpointed, analysis, checkpoint);
+      const persisted = resume ? composeResumedAnalysis(resume.historical, currentAnalysis, resume.frontier) : currentAnalysis;
+      const completed = await this.repository.complete(run, this.workerId, persisted);
       if (completed) return toResult(completed, resumed);
 
       const current = await this.requireRun(run);
@@ -181,7 +194,7 @@ export class ImpactAnalysisWorker {
 
   private startHeartbeat(run: ImpactAnalysisRunRecord): ReturnType<typeof setInterval> {
     return setInterval(() => {
-      void this.repository.heartbeat(run, this.workerId, this.nextLeaseExpiry());
+      void this.repository.heartbeat(run, this.workerId, this.nextLeaseExpiry()).catch(() => undefined);
     }, this.heartbeatIntervalMs);
   }
 
@@ -192,6 +205,11 @@ export class ImpactAnalysisWorker {
   private async cancel(run: ImpactAnalysisRunRef, fallback: ImpactAnalysisRunRecord): Promise<ImpactWorkerRunResult> {
     const cancelled = await this.repository.cancel(run);
     return toResult(cancelled ?? fallback);
+  }
+
+  private async afterFencedWriteMiss(run: ImpactAnalysisRunRef, resumed: boolean): Promise<ImpactWorkerRunResult> {
+    const current = await this.requireRun(run);
+    return await this.repository.isCancellationRequested(run) ? this.cancel(run, current) : toResult(current, resumed);
   }
 
   private async requireRun(run: ImpactAnalysisRunRef): Promise<ImpactAnalysisRunRecord> {
@@ -255,6 +273,21 @@ export class PrismaImpactWorkerRepository implements ImpactWorkerRepository {
     return this.requireRun(run);
   }
 
+  async updateRunning(run: ImpactAnalysisRunRef, leaseOwner: string, patch: Partial<ImpactAnalysisRunRecord>): Promise<ImpactAnalysisRunRecord | null> {
+    const data: Prisma.ImpactAnalysisRunUpdateManyMutationInput = {};
+    if (patch.status !== undefined) data.status = patch.status;
+    if (patch.stopReason !== undefined) data.stopReason = patch.stopReason;
+    if (patch.actualGraphCheckpoint !== undefined) data.actualGraphCheckpoint = patch.actualGraphCheckpoint;
+    if (patch.summary !== undefined) data.summary = jsonInput(patch.summary);
+    if (patch.unexploredFrontierCount !== undefined) data.unexploredFrontierCount = patch.unexploredFrontierCount;
+    if (patch.completedAt !== undefined) data.completedAt = patch.completedAt;
+    const updated = await this.prisma.impactAnalysisRun.updateMany({
+      where: { ...runWhere(run), status: "RUNNING", leaseOwner, leaseExpiresAt: { gt: new Date() } },
+      data
+    });
+    return updated.count === 1 ? this.requireRun(run) : null;
+  }
+
   async projectionCheckpoint(run: ImpactAnalysisRunRef): Promise<bigint> {
     const checkpoints = await this.prisma.projectionCheckpoint.findMany({
       where: scopeWhere(run),
@@ -266,7 +299,7 @@ export class PrismaImpactWorkerRepository implements ImpactWorkerRepository {
 
   async heartbeat(run: ImpactAnalysisRunRef, leaseOwner: string, leaseExpiresAt: Date): Promise<ImpactAnalysisRunRecord | null> {
     const updated = await this.prisma.impactAnalysisRun.updateMany({
-      where: { ...runWhere(run), status: "RUNNING", leaseOwner },
+      where: { ...runWhere(run), status: "RUNNING", leaseOwner, leaseExpiresAt: { gt: new Date() } },
       data: { heartbeatAt: new Date(), leaseExpiresAt }
     });
     return updated.count === 1 ? this.requireRun(run) : null;
@@ -294,6 +327,36 @@ export class PrismaImpactWorkerRepository implements ImpactWorkerRepository {
     return { proposal, roots: roots.map(toIdentity) };
   }
 
+  async loadPersistedAnalysis(run: ImpactAnalysisRunRecord): Promise<PersistedImpactAnalysis | null> {
+    const rows = await this.prisma.impactResultNode.findMany({
+      where: { ...scopeWhere(run), impactAnalysisRunId: run.id },
+      include: { paths: true }
+    });
+    const nodes: PersistedImpactAnalysis["nodes"] = rows.flatMap((row) =>
+      isImpactedNodeSnapshot(row.snapshot) ? [row.snapshot as unknown as PersistedImpactAnalysis["nodes"][number]] : []
+    );
+    if (nodes.length === 0) return null;
+    return {
+      status: run.status === "PARTIAL" ? "PARTIAL" : "COMPLETE",
+      stopReason: run.stopReason ?? undefined,
+      actualGraphCheckpoint: run.actualGraphCheckpoint ?? 0n,
+      frontier: readFrontier(run.summary),
+      summary: run.summary,
+      nodes,
+      paths: rows.flatMap((row) => {
+        const node = row.snapshot;
+        if (!isImpactedNodeSnapshot(node)) return [];
+        return row.paths.map((path) => ({
+          node: node.node,
+          rank: path.rank,
+          certainty: path.certainty,
+          confidence: path.confidence,
+          path: path.path as unknown as GraphEvidencePath
+        }));
+      })
+    };
+  }
+
   async complete(run: ImpactAnalysisRunRef, leaseOwner: string, analysis: PersistedImpactAnalysis): Promise<ImpactAnalysisRunRecord | null> {
     return this.prisma.$transaction(async (transaction) => {
       const locked = await transaction.$queryRaw<Array<{ dbId: string }>>`
@@ -305,6 +368,7 @@ export class PrismaImpactWorkerRepository implements ImpactWorkerRepository {
           AND "scopePath" = ${run.scopePath}
           AND status = 'RUNNING'
           AND "leaseOwner" = ${leaseOwner}
+          AND "leaseExpiresAt" > CURRENT_TIMESTAMP
         FOR UPDATE
       `;
       if (locked.length !== 1) return null;
@@ -373,7 +437,7 @@ export class PrismaImpactWorkerRepository implements ImpactWorkerRepository {
       }
 
       const terminal = await transaction.impactAnalysisRun.updateMany({
-        where: { ...runWhere(run), status: "RUNNING", leaseOwner },
+        where: { ...runWhere(run), status: "RUNNING", leaseOwner, leaseExpiresAt: { gt: new Date() } },
         data: {
           status: analysis.status,
           stopReason: analysis.stopReason ?? null,
@@ -392,7 +456,7 @@ export class PrismaImpactWorkerRepository implements ImpactWorkerRepository {
 
   async fail(run: ImpactAnalysisRunRef, leaseOwner: string, stopReason: string): Promise<ImpactAnalysisRunRecord | null> {
     const updated = await this.prisma.impactAnalysisRun.updateMany({
-      where: { ...runWhere(run), status: "RUNNING", leaseOwner },
+      where: { ...runWhere(run), status: "RUNNING", leaseOwner, leaseExpiresAt: { gt: new Date() } },
       data: { status: "FAILED", stopReason, completedAt: new Date(), leaseOwner: null, leaseExpiresAt: null }
     });
     return updated.count === 1 ? this.requireRun(run) : null;
@@ -480,6 +544,32 @@ function toPersistedAnalysis(run: ImpactAnalysisRunRecord, analysis: TransitiveP
   };
 }
 
+function composeResumedAnalysis(
+  historical: PersistedImpactAnalysis | null,
+  resumed: PersistedImpactAnalysis,
+  frontier: AssetNodeIdentity[]
+): PersistedImpactAnalysis {
+  const nodeByIdentity = new Map<string, PersistedImpactAnalysis["nodes"][number]>();
+  for (const node of [...(historical?.nodes ?? []), ...resumed.nodes]) {
+    const key = identityKey(node.node);
+    if (!nodeByIdentity.has(key)) nodeByIdentity.set(key, node);
+  }
+  const pathByNodeAndRank = new Map<string, PersistedImpactAnalysis["paths"][number]>();
+  for (const path of [...(historical?.paths ?? []), ...resumed.paths]) {
+    const key = `${identityKey(path.node)}|${path.rank}`;
+    if (!pathByNodeAndRank.has(key)) pathByNodeAndRank.set(key, path);
+  }
+  return {
+    ...resumed,
+    nodes: [...nodeByIdentity.values()].sort((left, right) => identityKey(left.node).localeCompare(identityKey(right.node))),
+    paths: [...pathByNodeAndRank.values()].sort((left, right) => identityKey(left.node).localeCompare(identityKey(right.node)) || left.rank - right.rank),
+    summary: {
+      ...resumed.summary,
+      resumeSegments: [...resumeSegments(historical?.summary), { roots: frontier }]
+    }
+  };
+}
+
 function readAuthorization(value: unknown, expectedScope: ArchitectureScopeRef): TraversalAuthorization {
   if (!isRecord(value) || !isRecord(value.actor) || !isRecord(value.scope)) throw new Error("AUTHORIZATION_SNAPSHOT_INVALID");
   const scope = value.scope;
@@ -498,6 +588,16 @@ function readBudgets(value: unknown): { maxDepth: number; maxNodes: number; maxP
     maxPaths: requiredPositiveInteger(value.maxPaths),
     timeoutMs: requiredPositiveInteger(value.timeoutMs)
   };
+}
+
+function readFrontier(summary: Record<string, unknown>): AssetNodeIdentity[] {
+  const frontier = summary.unexploredFrontier;
+  return Array.isArray(frontier) ? frontier.filter(isAssetNodeIdentity) : [];
+}
+
+function resumeSegments(summary: Record<string, unknown> | undefined): unknown[] {
+  const segments = summary?.resumeSegments;
+  return Array.isArray(segments) ? segments : [];
 }
 
 function toRunRecord(row: PrismaImpactRun): ImpactAnalysisRunRecord {
@@ -581,6 +681,30 @@ function isScopedActor(value: unknown): value is ScopedActor {
     && typeof value.actorId === "string"
     && Array.isArray(value.grants)
     && value.grants.every((grant) => isRecord(grant) && typeof grant.scopeId === "string" && (grant.action === "read" || grant.action === "write"));
+}
+
+function isAssetNodeIdentity(value: unknown): value is AssetNodeIdentity {
+  return isRecord(value)
+    && typeof value.applicationServiceId === "string"
+    && typeof value.scopePath === "string"
+    && typeof value.nodeType === "string"
+    && typeof value.logicalId === "string"
+    && typeof value.rootAssetType === "string"
+    && typeof value.rootAssetId === "string";
+}
+
+function isImpactedNodeSnapshot(value: unknown): value is PersistedImpactAnalysis["nodes"][number] {
+  return isRecord(value)
+    && isAssetNodeIdentity(value.node)
+    && typeof value.impactLevel === "string"
+    && typeof value.certainty === "string"
+    && typeof value.depth === "number"
+    && typeof value.confidence === "number"
+    && isRecord(value.primaryPath)
+    && Array.isArray(value.alternativePaths)
+    && Array.isArray(value.matchedRules)
+    && Array.isArray(value.recommendedActions)
+    && isRecord(value.scope);
 }
 
 function requiredPositiveInteger(value: unknown): number {

@@ -35,6 +35,13 @@ const dependent: AssetNodeIdentity = {
   rootAssetType: "dataModel",
   rootAssetId: "customer-model"
 };
+const downstream: AssetNodeIdentity = {
+  ...scope,
+  nodeType: "event",
+  logicalId: "customer-updated",
+  rootAssetType: "event",
+  rootAssetId: "customer-updated"
+};
 
 describe("ImpactAnalysisWorker", () => {
   it("claims a queued run exactly once and marks it RUNNING", async () => {
@@ -67,6 +74,26 @@ describe("ImpactAnalysisWorker", () => {
     expect(repository.run.actualGraphCheckpoint).toBe(7n);
   });
 
+  it("stops when a stale owner loses its lease before checkpoint mutation", async () => {
+    const repository = new MemoryRepository(createRun());
+    repository.loseLeaseOnRunningUpdate = true;
+    const worker = new ImpactAnalysisWorker(repository, new StubGraphStore(5n));
+
+    await expect(worker.run(ref(repository.run))).resolves.toMatchObject({ status: "RUNNING" });
+    expect(repository.persisted).toBeUndefined();
+    expect(repository.run.actualGraphCheckpoint).toBeUndefined();
+  });
+
+  it("lets cancellation win while a worker attempts to enter projection wait", async () => {
+    const repository = new MemoryRepository(createRun({ requiredGraphVersion: 8n }));
+    repository.projectionVersion = 7n;
+    repository.cancelOnRunningUpdate = true;
+    const worker = new ImpactAnalysisWorker(repository, new StubGraphStore(99n));
+
+    await expect(worker.run(ref(repository.run))).resolves.toMatchObject({ status: "CANCELLED" });
+    expect(repository.run.status).toBe("CANCELLED");
+  });
+
   it("reclaims a RUNNING run only after its lease expires", async () => {
     const repository = new MemoryRepository(createRun({
       status: "RUNNING",
@@ -94,15 +121,15 @@ describe("ImpactAnalysisWorker", () => {
       status: "PARTIAL",
       summary: { unexploredFrontier: [dependent] }
     }));
-    const graphStore = new StubGraphStore(5n, completeTraversal(root));
+    const graphStore = new StubGraphStore(5n, resumedTraversal());
     const worker = new ImpactAnalysisWorker(repository, graphStore);
 
-    repository.persisted = { ...partialPersistedResult(), nodes: [partialPersistedResult().nodes[1]!], paths: [partialPersistedResult().paths[1]!] };
+    repository.persisted = partialPersistedResult();
 
     await expect(worker.resume(ref(repository.run))).resolves.toMatchObject({ status: "COMPLETE", resumedFromFrontier: true });
-    expect(graphStore.plans[0]?.startNodes).toEqual([root]);
-    expect(repository.persisted?.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ node: root })]));
-    expect(repository.persisted?.nodes).not.toEqual(expect.arrayContaining([expect.objectContaining({ node: dependent })]));
+    expect(graphStore.plans[0]?.startNodes).toEqual([dependent]);
+    expect(repository.persisted?.nodes.map((node) => node.node)).toEqual([root, dependent, downstream]);
+    expect(repository.persisted?.summary.resumeSegments).toEqual([{ roots: [dependent] }]);
   });
 
   it("lets a concurrent cancellation win instead of writing a terminal result", async () => {
@@ -163,6 +190,8 @@ class MemoryRepository implements ImpactWorkerRepository {
   persisted: PersistedImpactAnalysis | undefined;
   projectionVersion = 5n;
   cancelOnFinalize = false;
+  cancelOnRunningUpdate = false;
+  loseLeaseOnRunningUpdate = false;
   run: ImpactAnalysisRunRecord;
 
   constructor(run: ImpactAnalysisRunRecord) {
@@ -192,6 +221,20 @@ class MemoryRepository implements ImpactWorkerRepository {
     return this.run;
   }
 
+  async updateRunning(runRef: ImpactAnalysisRunRef, leaseOwner: string, patch: Partial<ImpactAnalysisRunRecord>) {
+    if (!matches(this.run, runRef) || this.run.status !== "RUNNING" || this.run.leaseOwner !== leaseOwner) return null;
+    if (this.loseLeaseOnRunningUpdate) {
+      this.run = { ...this.run, leaseOwner: "replacement-worker" };
+      return null;
+    }
+    if (this.cancelOnRunningUpdate) {
+      this.run = { ...this.run, status: "CANCELLATION_REQUESTED" };
+      return null;
+    }
+    this.run = { ...this.run, ...patch };
+    return this.run;
+  }
+
   async projectionCheckpoint(runRef: ImpactAnalysisRunRef) {
     if (!matches(this.run, runRef)) throw new Error("RUN_NOT_FOUND");
     return this.projectionVersion;
@@ -205,6 +248,10 @@ class MemoryRepository implements ImpactWorkerRepository {
 
   async loadExecution() {
     return this.execution;
+  }
+
+  async loadPersistedAnalysis(_run: ImpactAnalysisRunRecord) {
+    return this.persisted ?? null;
   }
 
   async persistAnalysis(runRef: string | ImpactAnalysisRunRef, analysis: PersistedImpactAnalysis) {
@@ -368,5 +415,27 @@ function partialPersistedResult(): PersistedImpactAnalysis {
       { node: root, rank: 0, certainty: "DIRECT", confidence: 1, path: { nodes: [root], edges: [] } },
       { node: dependent, rank: 0, certainty: "DEFINITE", confidence: 1, path: { nodes: [root, dependent], edges: [edge] } }
     ]
+  };
+}
+
+function resumedTraversal(): GraphTraversalResult {
+  const edge = {
+    id: "edge-2",
+    code: "EMITS" as const,
+    source: dependent,
+    target: downstream,
+    strength: "strong" as const,
+    confidence: 1,
+    version: 5n
+  };
+  return {
+    status: "COMPLETE",
+    nodes: [dependent, downstream],
+    edges: [edge],
+    paths: [{ nodes: [dependent, downstream], edges: [edge] }],
+    graphVersion: 5n,
+    elapsedMs: 1,
+    frontier: [],
+    truncationReasons: []
   };
 }
