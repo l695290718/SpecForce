@@ -367,6 +367,18 @@ describe("legacy AssetLink ledger synchronization", () => {
     expect(harness.state.events.filter((event) => event.relationshipId != null)).toHaveLength(2);
   });
 
+  it("uses canonical asset content in the automatic idempotency key when updatedAt is unchanged", async () => {
+    mockSchemaSetup();
+    const harness = installLegacyLedgerHarness();
+
+    await upsertDesignAsset({ assetType: "dataModel", asset: bilingualDataModel });
+    await upsertDesignAsset({ assetType: "dataModel", asset: { ...bilingualDataModel, entities: ["Customer", "Account"] } });
+
+    expect(harness.state.receipts).toHaveLength(2);
+    expect(harness.state.receipts.map((receipt) => receipt.graphVersion)).toEqual([1n, 2n]);
+    expect(harness.state.current.filter((row) => row.lifecycleStatus === "ACTIVE").length).toBeGreaterThan(2);
+  });
+
   it("rolls back a normal aggregate write when graph projection persistence fails", async () => {
     mockSchemaSetup();
     const harness = installLegacyLedgerHarness({ failOnEvent: true });
@@ -514,7 +526,8 @@ function installLegacyLedgerHarness(options: { failOnEvent?: boolean } = {}) {
     nodes: [] as Array<Record<string, unknown>>,
     current: [] as Array<Record<string, unknown>>,
     events: [] as Array<Record<string, unknown>>,
-    outbox: [] as Array<Record<string, unknown>>
+    outbox: [] as Array<Record<string, unknown>>,
+    receipts: [] as Array<Record<string, unknown>>
   };
   const scopeMatches = (row: Record<string, unknown>, where: Record<string, unknown>) => (
     row.enterpriseId === where.enterpriseId && row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath
@@ -601,6 +614,23 @@ function installLegacyLedgerHarness(options: { failOnEvent?: boolean } = {}) {
         return row;
       })
     },
+    relationshipCommandReceipt: {
+      findUnique: vi.fn(async ({ where }) => state.receipts.find((row) => {
+        const identity = where.enterpriseId_applicationServiceId_scopePath_idempotencyKey;
+        return scopeMatches(row, identity) && row.idempotencyKey === identity.idempotencyKey;
+      })),
+      create: vi.fn(async ({ data }) => {
+        const row = { ...data, dbId: `receipt-${state.receipts.length + 1}`, createdAt: new Date(), updatedAt: new Date() };
+        state.receipts.push(row);
+        return row;
+      }),
+      update: vi.fn(async ({ where, data }) => {
+        const identity = where.enterpriseId_applicationServiceId_scopePath_dbId;
+        const row = state.receipts.find((receipt) => receipt.dbId === identity.dbId && scopeMatches(receipt, identity))!;
+        Object.assign(row, data, { updatedAt: new Date() });
+        return row;
+      })
+    },
     relationshipOutbox: {
       create: vi.fn(async ({ data }) => {
         const row = { ...data, dbId: `outbox-${state.outbox.length + 1}`, createdAt: new Date(), updatedAt: new Date() };
@@ -627,6 +657,7 @@ function installLegacyLedgerHarness(options: { failOnEvent?: boolean } = {}) {
       state.current.splice(0, state.current.length, ...snapshot.current);
       state.events.splice(0, state.events.length, ...snapshot.events);
       state.outbox.splice(0, state.outbox.length, ...snapshot.outbox);
+      state.receipts.splice(0, state.receipts.length, ...snapshot.receipts);
       throw error;
     }
   });

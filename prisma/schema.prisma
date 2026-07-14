@@ -257,6 +257,26 @@ model RelationshipEvent {
   @@index([enterpriseId, applicationServiceId, scopePath, assetNodeId, createdAt], map: "RelationshipEvent_scope_asset_node_idx")
 }
 
+model RelationshipCommandReceipt {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  enterpriseId         String
+  applicationServiceId String
+  scopePath            String
+  idempotencyKey       String
+  commandHash          String
+  commandType          String
+  status               String
+  result               Json     @default("{}") @db.JsonB
+  graphVersion         BigInt
+  primaryEventId       String?  @db.Uuid
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([enterpriseId, applicationServiceId, scopePath, idempotencyKey], map: "RelationshipCommandReceipt_scope_idempotency_key")
+  @@unique([enterpriseId, applicationServiceId, scopePath, dbId], map: "RelationshipCommandReceipt_scope_dbId_key")
+  @@index([enterpriseId, applicationServiceId, scopePath, createdAt], map: "RelationshipCommandReceipt_scope_created_idx")
+}
+
 model RelationshipOutbox {
   dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   enterpriseId         String

@@ -11,9 +11,11 @@ const testSchemaPrefix = "specforge_relationship_ledger_test_";
 const testSchema = `${testSchemaPrefix}${randomUUID().replaceAll("-", "")}`;
 const migrationPath = resolve(process.cwd(), "prisma/migrations/20260714_enterprise_relationship_graph/migration.sql");
 const nodeSubjectMigrationPath = resolve(process.cwd(), "prisma/migrations/20260715_relationship_event_node_subject/migration.sql");
+const receiptMigrationPath = resolve(process.cwd(), "prisma/migrations/20260716_relationship_command_receipts/migration.sql");
 const schemaPath = resolve(process.cwd(), "prisma/schema.prisma");
 const migrationSql = existsSync(migrationPath) ? readFileSync(migrationPath, "utf8") : "";
 const nodeSubjectMigrationSql = existsSync(nodeSubjectMigrationPath) ? readFileSync(nodeSubjectMigrationPath, "utf8") : "";
+const receiptMigrationSql = existsSync(receiptMigrationPath) ? readFileSync(receiptMigrationPath, "utf8") : "";
 const schema = readFileSync(schemaPath, "utf8");
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
@@ -41,11 +43,13 @@ describe("enterprise relationship ledger schema and migration", () => {
   it("defines the scoped ledger models and an additive idempotent AssetLink backfill", () => {
     expect(existsSync(migrationPath)).toBe(true);
     expect(existsSync(nodeSubjectMigrationPath)).toBe(true);
+    expect(existsSync(receiptMigrationPath)).toBe(true);
 
     for (const model of [
       "AssetNode",
       "RelationshipCurrent",
       "RelationshipEvent",
+      "RelationshipCommandReceipt",
       "RelationshipOutbox",
       "ProjectionCheckpoint",
       "ImpactAnalysisRun",
@@ -82,6 +86,9 @@ describe("enterprise relationship ledger schema and migration", () => {
     expect(nodeSubjectMigrationSql).toContain('ALTER COLUMN "relationshipId" DROP NOT NULL');
     expect(nodeSubjectMigrationSql).toContain('RelationshipEvent_exactly_one_subject_check');
     expect(nodeSubjectMigrationSql.trim()).toMatch(/^DO \$\$[\s\S]*END \$\$;$/u);
+    expect(schema).toContain('@@unique([enterpriseId, applicationServiceId, scopePath, idempotencyKey], map: "RelationshipCommandReceipt_scope_idempotency_key")');
+    expect(receiptMigrationSql).toContain('CREATE TABLE IF NOT EXISTS "RelationshipCommandReceipt"');
+    expect(receiptMigrationSql.trim()).toMatch(/^DO \$\$[\s\S]*END \$\$;$/u);
     expect(testSchema).toMatch(/^specforge_relationship_ledger_test_[0-9a-f]{32}$/u);
   });
 });
@@ -188,8 +195,9 @@ describe.runIf(integrationEnabled)("enterprise relationship ledger migration", (
     const replay = await service.upsertRelationship(command);
 
     expect(replay).toMatchObject({ relationshipId: first.relationshipId, eventId: first.eventId, graphVersion: first.graphVersion, replayed: true });
-    expect(await prisma!.relationshipEvent.count({ where: { ...commandScope, idempotencyKey: "command-idempotency" } })).toBe(1);
-    expect(await prisma!.relationshipOutbox.count({ where: { ...commandScope, idempotencyKey: "command-idempotency" } })).toBe(1);
+    expect(await prisma!.relationshipCommandReceipt.count({ where: { ...commandScope, idempotencyKey: "command-idempotency", status: "COMPLETED" } })).toBe(1);
+    expect(await prisma!.relationshipEvent.count({ where: { ...commandScope, idempotencyKey: { startsWith: "relationship-command:" } } })).toBe(1);
+    expect(await prisma!.relationshipOutbox.count({ where: { ...commandScope, idempotencyKey: { startsWith: "relationship-command:" } } })).toBe(1);
   });
 
   it("rolls back the current relationship when an event write fails after the current mutation", async () => {
@@ -201,8 +209,9 @@ describe.runIf(integrationEnabled)("enterprise relationship ledger migration", (
     await expect(service.upsertRelationship(commandInput("rollback", "command-rollback"))).rejects.toThrow("FORCED_EVENT_FAILURE");
 
     expect(await prisma!.relationshipCurrent.count({ where: { ...commandScope, source: "mcp", sourceReference: "mcp:command-rollback" } })).toBe(0);
-    expect(await prisma!.relationshipEvent.count({ where: { ...commandScope, idempotencyKey: "command-rollback" } })).toBe(0);
-    expect(await prisma!.relationshipOutbox.count({ where: { ...commandScope, idempotencyKey: "command-rollback" } })).toBe(0);
+    expect(await prisma!.relationshipCommandReceipt.count({ where: { ...commandScope, idempotencyKey: "command-rollback" } })).toBe(0);
+    expect(await prisma!.relationshipEvent.count({ where: { ...commandScope, idempotencyKey: { startsWith: "relationship-command:" } } })).toBe(0);
+    expect(await prisma!.relationshipOutbox.count({ where: { ...commandScope, idempotencyKey: { startsWith: "relationship-command:" } } })).toBe(0);
   });
 });
 
@@ -221,6 +230,7 @@ async function resetDisposableSchema() {
 async function executeMigrationSql() {
   await prisma!.$executeRawUnsafe(migrationSql);
   await prisma!.$executeRawUnsafe(nodeSubjectMigrationSql);
+  await prisma!.$executeRawUnsafe(receiptMigrationSql);
 }
 
 async function installLegacyAssetLinkSchema() {

@@ -60,6 +60,17 @@ export interface RelationshipEventRecord extends RelationshipScope {
   snapshot: Record<string, unknown>;
 }
 
+export interface RelationshipCommandReceiptRecord extends RelationshipScope {
+  dbId: string;
+  idempotencyKey: string;
+  commandHash: string;
+  commandType: string;
+  status: string;
+  result: Record<string, unknown>;
+  graphVersion: bigint;
+  primaryEventId?: string | null;
+}
+
 export interface RelationshipOutboxRecord extends RelationshipScope {
   dbId: string;
   relationshipEventId: string;
@@ -73,7 +84,9 @@ export interface RelationshipOutboxRecord extends RelationshipScope {
 export interface RelationshipCommandRepository {
   transaction<T>(operation: (repository: RelationshipCommandRepository) => Promise<T>): Promise<T>;
   lockScope(scope: RelationshipScope): Promise<void>;
-  findEvent(scope: RelationshipScope, idempotencyKey: string): Promise<RelationshipEventRecord | undefined>;
+  findReceipt(scope: RelationshipScope, idempotencyKey: string): Promise<RelationshipCommandReceiptRecord | undefined>;
+  createReceipt(scope: RelationshipScope, input: Pick<RelationshipCommandReceiptRecord, "idempotencyKey" | "commandHash" | "commandType">): Promise<RelationshipCommandReceiptRecord>;
+  completeReceipt(scope: RelationshipScope, receiptId: string, input: Pick<RelationshipCommandReceiptRecord, "status" | "result" | "graphVersion" | "primaryEventId">): Promise<RelationshipCommandReceiptRecord>;
   reserveNextGraphVersion(scope: RelationshipScope): Promise<bigint>;
   currentGraphVersion(scope: RelationshipScope): Promise<bigint>;
   findNode(scope: RelationshipScope, identity: Pick<RelationshipNodeRecord, "nodeType" | "logicalId">): Promise<RelationshipNodeRecord | undefined>;
@@ -106,8 +119,8 @@ export class PrismaRelationshipRepository implements RelationshipCommandReposito
     );
   }
 
-  async findEvent(scope: RelationshipScope, idempotencyKey: string): Promise<RelationshipEventRecord | undefined> {
-    const event = await this.client.relationshipEvent.findUnique({
+  async findReceipt(scope: RelationshipScope, idempotencyKey: string): Promise<RelationshipCommandReceiptRecord | undefined> {
+    const receipt = await this.client.relationshipCommandReceipt.findUnique({
       where: {
         enterpriseId_applicationServiceId_scopePath_idempotencyKey: {
           ...scope,
@@ -115,7 +128,29 @@ export class PrismaRelationshipRepository implements RelationshipCommandReposito
         }
       }
     });
-    return event ? eventRecord(event) : undefined;
+    return receipt ? receiptRecord(receipt) : undefined;
+  }
+
+  async createReceipt(scope: RelationshipScope, input: Pick<RelationshipCommandReceiptRecord, "idempotencyKey" | "commandHash" | "commandType">): Promise<RelationshipCommandReceiptRecord> {
+    const receipt = await this.client.relationshipCommandReceipt.create({
+      data: { ...scope, ...input, status: "PENDING", result: toInputJson({}), graphVersion: 0n, primaryEventId: null }
+    });
+    return receiptRecord(receipt);
+  }
+
+  async completeReceipt(scope: RelationshipScope, receiptId: string, input: Pick<RelationshipCommandReceiptRecord, "status" | "result" | "graphVersion" | "primaryEventId">): Promise<RelationshipCommandReceiptRecord> {
+    const receipt = await this.client.relationshipCommandReceipt.update({
+      where: {
+        enterpriseId_applicationServiceId_scopePath_dbId: {
+          enterpriseId: scope.enterpriseId,
+          applicationServiceId: scope.applicationServiceId,
+          scopePath: scope.scopePath,
+          dbId: receiptId
+        }
+      },
+      data: { status: input.status, result: toInputJson(input.result), graphVersion: input.graphVersion, primaryEventId: input.primaryEventId ?? null }
+    });
+    return receiptRecord(receipt);
   }
 
   async reserveNextGraphVersion(scope: RelationshipScope): Promise<bigint> {
@@ -286,6 +321,10 @@ function currentRecord(relationship: Awaited<ReturnType<PrismaClient["relationsh
 
 function eventRecord(event: Awaited<ReturnType<PrismaClient["relationshipEvent"]["findUnique"]>> extends infer T ? NonNullable<T> : never): RelationshipEventRecord {
   return { ...event, snapshot: event.snapshot as Record<string, unknown> };
+}
+
+function receiptRecord(receipt: Awaited<ReturnType<PrismaClient["relationshipCommandReceipt"]["findUnique"]>> extends infer T ? NonNullable<T> : never): RelationshipCommandReceiptRecord {
+  return { ...receipt, result: receipt.result as Record<string, unknown> };
 }
 
 function outboxRecord(record: Awaited<ReturnType<PrismaClient["relationshipOutbox"]["findUnique"]>> extends infer T ? NonNullable<T> : never): RelationshipOutboxRecord {

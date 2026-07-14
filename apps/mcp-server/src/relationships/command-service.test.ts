@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createTrustedRelationshipExecutionContext,
   RelationshipCommandService,
+  type RelationshipCommandReceiptRecord,
   type RelationshipCommandRepository,
   type RelationshipCurrentRecord,
   type RelationshipEventRecord,
@@ -37,7 +38,49 @@ describe("RelationshipCommandService", () => {
     expect(repository.currentRows()).toHaveLength(1);
     expect(repository.events).toHaveLength(1);
     expect(repository.outbox).toHaveLength(1);
+    expect(repository.receipts).toHaveLength(1);
     expect(first.graphVersion).toBe(1n);
+  });
+
+  it("persists and replays a stable receipt for an effective no-op command", async () => {
+    const repository = new InMemoryRelationshipRepository();
+    const service = createService(repository);
+    await seedEndpoints(repository);
+    await service.upsertRelationship(validRelationshipCommand());
+    const noOpCommand = { ...validRelationshipCommand(), correlationId: "relationship-no-op", idempotencyKey: "relationship-no-op" };
+
+    const first = await service.upsertRelationship(noOpCommand);
+    const replay = await service.upsertRelationship(noOpCommand);
+
+    expect(first).toMatchObject({ graphVersion: 1n, replayed: false });
+    expect(replay).toMatchObject({ relationshipId: first.relationshipId, graphVersion: first.graphVersion, replayed: true });
+    expect(repository.events).toHaveLength(1);
+    expect(repository.receipts).toHaveLength(2);
+    expect(repository.receipts.at(-1)).toMatchObject({ status: "COMPLETED", graphVersion: 1n });
+  });
+
+  it("rejects a reused idempotency key when its canonical business payload differs", async () => {
+    const repository = new InMemoryRelationshipRepository();
+    const service = createService(repository);
+    await seedEndpoints(repository);
+    await service.upsertRelationship(validRelationshipCommand());
+
+    await expect(service.upsertRelationship({ ...validRelationshipCommand(), confidence: 0.2 })).rejects.toThrow("IDEMPOTENCY_KEY_CONFLICT");
+    expect(repository.currentRows()).toHaveLength(1);
+    expect(repository.receipts).toHaveLength(1);
+  });
+
+  it("does not treat an external key ending in :1 as a prior secondary event", async () => {
+    const repository = new InMemoryRelationshipRepository();
+    const service = createService(repository);
+    await seedEndpoints(repository);
+    await service.upsertAssetGraph(assetGraphCommand(dataModelAsset(), "key"));
+
+    const receipt = await service.upsertRelationship({ ...validRelationshipCommand(), correlationId: "key:1", idempotencyKey: "key:1" });
+
+    expect(receipt.replayed).toBe(false);
+    expect(repository.receipts.map((stored) => stored.idempotencyKey)).toEqual(["key", "key:1"]);
+    expect(repository.events.every((event) => event.idempotencyKey.startsWith("relationship-command:receipt-"))).toBe(true);
   });
 
   it("uses only the trusted execution context when a command forges authorization fields", async () => {
@@ -166,6 +209,7 @@ describe("RelationshipCommandService", () => {
     expect(repository.currentRows()).toHaveLength(0);
     expect(repository.events).toHaveLength(0);
     expect(repository.outbox).toHaveLength(0);
+    expect(repository.receipts).toHaveLength(0);
     expect(repository.graphVersion).toBe(0n);
   });
 });
@@ -245,12 +289,13 @@ class InMemoryRelationshipRepository implements RelationshipCommandRepository {
   current: RelationshipCurrentRecord[] = [];
   events: RelationshipEventRecord[] = [];
   outbox: RelationshipOutboxRecord[] = [];
+  receipts: RelationshipCommandReceiptRecord[] = [];
   deletedLegacyReferences: string[] = [];
   graphVersion = 0n;
   failAfterCurrentWrite = false;
 
   async transaction<T>(operation: (repository: RelationshipCommandRepository) => Promise<T>): Promise<T> {
-    const snapshot = structuredClone({ nodes: this.nodes, current: this.current, events: this.events, outbox: this.outbox, deletedLegacyReferences: this.deletedLegacyReferences, graphVersion: this.graphVersion });
+    const snapshot = structuredClone({ nodes: this.nodes, current: this.current, events: this.events, outbox: this.outbox, receipts: this.receipts, deletedLegacyReferences: this.deletedLegacyReferences, graphVersion: this.graphVersion });
     try {
       return await operation(this);
     } catch (error) {
@@ -258,13 +303,26 @@ class InMemoryRelationshipRepository implements RelationshipCommandRepository {
       this.current = snapshot.current;
       this.events = snapshot.events;
       this.outbox = snapshot.outbox;
+      this.receipts = snapshot.receipts;
       this.deletedLegacyReferences = snapshot.deletedLegacyReferences;
       this.graphVersion = snapshot.graphVersion;
       throw error;
     }
   }
 
-  async findEvent(scopeInput: RelationshipScope, idempotencyKey: string) { return this.events.find((event) => sameScope(event, scopeInput) && event.idempotencyKey === idempotencyKey); }
+  async findReceipt(scopeInput: RelationshipScope, idempotencyKey: string) { return this.receipts.find((receipt) => sameScope(receipt, scopeInput) && receipt.idempotencyKey === idempotencyKey); }
+  async createReceipt(scopeInput: RelationshipScope, input: Pick<RelationshipCommandReceiptRecord, "idempotencyKey" | "commandHash" | "commandType">) {
+    const receipt: RelationshipCommandReceiptRecord = { ...scopeInput, ...input, dbId: `receipt-${this.receipts.length + 1}`, status: "PENDING", result: {}, graphVersion: 0n, primaryEventId: null };
+    this.receipts.push(receipt);
+    return receipt;
+  }
+  async completeReceipt(scopeInput: RelationshipScope, receiptId: string, input: Pick<RelationshipCommandReceiptRecord, "status" | "result" | "graphVersion" | "primaryEventId">) {
+    const existing = this.receipts.find((receipt) => receipt.dbId === receiptId && sameScope(receipt, scopeInput));
+    if (!existing) throw new Error("RECEIPT_SCOPE_MISMATCH");
+    const updated = { ...existing, ...input };
+    this.receipts.splice(this.receipts.indexOf(existing), 1, updated);
+    return updated;
+  }
   async lockScope() { /* The fake transaction already excludes concurrent writes for this test. */ }
   async reserveNextGraphVersion() { this.graphVersion += 1n; return this.graphVersion; }
   async currentGraphVersion() { return this.graphVersion; }

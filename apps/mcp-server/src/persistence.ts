@@ -324,10 +324,11 @@ export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
         updatedAt: optionalDate(canonicalAsset.updatedAt)
       }
     });
+    const graphIdempotencyKey = designAssetGraphIdempotencyKey(input.assetType, canonicalAsset);
     await relationshipService(transaction, scope).upsertAssetGraph({
       channel: "mcp",
       correlationId: `design-asset:${input.assetType}:${canonicalAsset.id}:${canonicalAsset.updatedAt ?? ""}`,
-      idempotencyKey: `design-asset:${input.assetType}:${canonicalAsset.id}:${canonicalAsset.updatedAt ?? ""}`,
+      idempotencyKey: graphIdempotencyKey,
       assetType: input.assetType,
       asset: localizedAsset
     });
@@ -813,6 +814,26 @@ function assetLinkId(input: Pick<AssetLinkInput, "sourceType" | "sourceId" | "ta
   return `${input.sourceType}:${input.sourceId}:${input.relationType}:${input.targetType}:${input.targetId}`
     .toLowerCase()
     .replace(/[^a-z0-9:_-]+/g, "-");
+}
+
+function designAssetGraphIdempotencyKey(assetType: AssetType, canonicalAsset: Record<string, unknown>): string {
+  const contentHash = createHash("sha256").update(stableJson(canonicalAsset)).digest("hex");
+  return `design-asset:${assetType}:${String(canonicalAsset.id)}:${contentHash}`;
+}
+
+function stableJson(value: unknown): string {
+  return JSON.stringify(stableJsonValue(value));
+}
+
+function stableJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableJsonValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+      .filter(([, nested]) => nested !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, nested]) => [key, stableJsonValue(nested)]));
+  }
+  return value;
 }
 
 type LegacyAssetLinkRow = {
