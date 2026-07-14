@@ -1,5 +1,5 @@
 import type { ArchitectureScopeRef, GraphProjectionBatch, GraphStore, ProjectionReceipt } from "@specforge/core";
-import { sameScope, snapshotStore, type GraphProjectionSnapshot, type TraversalOptions } from "./traversal";
+import { assertProjectionScope, sameScope, snapshotStore, type GraphProjectionSnapshot, type TraversalOptions } from "./traversal";
 
 export class InMemoryGraphStore implements GraphStore {
   private snapshot: GraphProjectionSnapshot;
@@ -15,9 +15,7 @@ export class InMemoryGraphStore implements GraphStore {
   }
 
   async upsertProjection(batch: GraphProjectionBatch): Promise<ProjectionReceipt> {
-    if (batch.nodes.some((node) => !sameScope(node, batch.scope)) || batch.edges.some((edge) => !sameScope(edge.source, batch.scope) || !sameScope(edge.target, batch.scope))) {
-      throw new Error("PROJECTION_SCOPE_MISMATCH");
-    }
+    assertProjectionScope(batch);
     const retainedNodes = this.snapshot.nodes.filter((node) => !sameScope(node, batch.scope));
     const retainedEdges = this.snapshot.edges.filter((edge) => !sameScope(edge.source, batch.scope) || !sameScope(edge.target, batch.scope));
     this.snapshot = { nodes: [...retainedNodes, ...batch.nodes], edges: [...retainedEdges, ...batch.edges], graphVersion: batch.graphVersion };

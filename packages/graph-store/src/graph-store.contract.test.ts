@@ -100,6 +100,18 @@ export function graphStoreContractSuite(name: string, createStore: StoreFactory)
       expect(result.edges.every((item) => item.source.applicationServiceId === scope.applicationServiceId && item.target.applicationServiceId === scope.applicationServiceId)).toBe(true);
     });
 
+    it("rejects a projection whose node is outside the exact batch Scope", async () => {
+      await expect((await createStore()).upsertProjection({ scope, graphVersion: 8n, nodes: [sibling], edges: [] })).rejects.toThrow("PROJECTION_SCOPE_MISMATCH");
+    });
+
+    it("rejects a projection whose edge endpoint is outside the exact batch Scope", async () => {
+      const localEdge = graph.edges.find((edge) => edge.code === "READS")!;
+      const store = await createStore();
+
+      await expect(store.upsertProjection({ scope, graphVersion: 8n, nodes: [], edges: [{ ...localEdge, source: sibling }] })).rejects.toThrow("PROJECTION_SCOPE_MISMATCH");
+      await expect(store.upsertProjection({ scope, graphVersion: 8n, nodes: [], edges: [{ ...localEdge, target: sibling }] })).rejects.toThrow("PROJECTION_SCOPE_MISMATCH");
+    });
+
     it("returns deterministic partial result and frontier when the depth budget is exhausted", async () => {
       const result = await (await createStore()).traverse(plan({ maxDepth: 1 }));
 

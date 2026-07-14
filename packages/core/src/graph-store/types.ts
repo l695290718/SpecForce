@@ -51,7 +51,7 @@ export interface GraphEvidencePath {
   edges: GraphRelationship[];
 }
 
-export type GraphTraversalTruncationReason = "MAX_DEPTH" | "MAX_NODES" | "MAX_PATHS" | "TIMEOUT";
+export type GraphTraversalTruncationReason = "MAX_DEPTH" | "MAX_NODES" | "MAX_PATHS" | "TIMEOUT" | "QUERY_TIMEOUT";
 
 export type NonEmptyArray<T> = [T, ...T[]];
 

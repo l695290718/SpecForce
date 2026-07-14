@@ -16,22 +16,86 @@ describe("PostgresGraphStore", () => {
     expect(result.frontier.map((node) => node.logicalId)).toEqual(["customer-entity"]);
     expect(result.nodes.map((node) => node.logicalId)).toEqual(["customer-api", "customer-entity"]);
   });
+
+  it("bounds a high-branching database fetch to the remaining path capacity plus one sentinel", async () => {
+    const client = highBranchingClient();
+    const store = new PostgresGraphStore(client, { enterpriseId: "enterprise-graph-store-test" });
+
+    const result = await store.traverse(plan({ maxPaths: 2 }));
+
+    expect(result).toMatchObject({ status: "PARTIAL", truncationReasons: ["MAX_PATHS"] });
+    expect(client.candidateLimits).toEqual([2]);
+    expect(client.returnedCandidates).toBe(2);
+  });
+
+  it("maps a PostgreSQL statement cancellation to a partial query-timeout result", async () => {
+    const store = new PostgresGraphStore(queryTimeoutClient(), { enterpriseId: "enterprise-graph-store-test" });
+
+    const result = await store.traverse(plan());
+
+    expect(result).toMatchObject({ status: "PARTIAL", truncationReasons: ["QUERY_TIMEOUT"] });
+    expect(result.frontier.map((node) => node.logicalId)).toEqual(["customer-api"]);
+  });
+
+  it("rejects a cross-Scope projection before issuing PostgreSQL", async () => {
+    let queryCount = 0;
+    const client: PostgresQueryClient = {
+      async $queryRawUnsafe<T>(): Promise<T> {
+        queryCount += 1;
+        return [] as T;
+      }
+    };
+    const store = new PostgresGraphStore(client, { enterpriseId: "enterprise-graph-store-test" });
+
+    await expect(store.upsertProjection({ scope: apiScope(), graphVersion: 8n, nodes: [graph.nodes[1]!], edges: [] })).rejects.toThrow("PROJECTION_SCOPE_MISMATCH");
+    expect(queryCount).toBe(0);
+  });
 });
 
 function depthBoundaryClient(): PostgresQueryClient {
   return {
-    async $queryRawUnsafe<T>(query: string): Promise<T> {
+    async $queryRawUnsafe<T>(query: string, ...values: unknown[]): Promise<T> {
       if (query.includes('MAX("graphVersion")')) return [{ graph_version: 7n }] as T;
+      if (query.includes("start_nodes")) return [row("00000000-0000-0000-0000-000000000001", api!)] as T;
+      if (values[3] === "00000000-0000-0000-0000-000000000001") return [row("00000000-0000-0000-0000-000000000002", entity!, reads, "00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002")] as T;
+      return [row("00000000-0000-0000-0000-000000000003", event!, carries, "00000000-0000-0000-0000-000000000002", "00000000-0000-0000-0000-000000000003")] as T;
+    }
+  };
+}
+
+function highBranchingClient() {
+  const targetOne = { ...entity!, logicalId: "branch-one", rootAssetId: "branch-one" };
+  const targetTwo = { ...entity!, logicalId: "branch-two", rootAssetId: "branch-two" };
+  const client: PostgresQueryClient & { candidateLimits: number[]; returnedCandidates: number } = {
+    candidateLimits: [] as number[],
+    returnedCandidates: 0,
+    async $queryRawUnsafe<T>(query: string, ...values: unknown[]): Promise<T> {
+      if (query.includes('MAX("graphVersion")')) return [{ graph_version: 7n }] as T;
+      if (query.includes("start_nodes")) return [row("00000000-0000-0000-0000-000000000001", api!)] as T;
+      client.candidateLimits.push(values.at(-1) as number);
       const rows = [
-        row("00000000-0000-0000-0000-000000000001", api!),
-        row("00000000-0000-0000-0000-000000000002", entity!, reads, "00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002")
+        row("00000000-0000-0000-0000-000000000002", targetOne, reads, "00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"),
+        row("00000000-0000-0000-0000-000000000003", targetTwo, reads, "00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000003")
       ];
-      if (query.includes("depth_frontier")) {
-        rows.push(row("00000000-0000-0000-0000-000000000003", event!, carries, "00000000-0000-0000-0000-000000000002", "00000000-0000-0000-0000-000000000003"));
-      }
+      client.returnedCandidates += rows.length;
       return rows as T;
     }
   };
+  return client;
+}
+
+function queryTimeoutClient(): PostgresQueryClient {
+  return {
+    async $queryRawUnsafe<T>(query: string): Promise<T> {
+      if (query.includes('MAX("graphVersion")')) return [{ graph_version: 7n }] as T;
+      if (query.includes("start_nodes")) return [row("00000000-0000-0000-0000-000000000001", api!)] as T;
+      throw Object.assign(new Error("canceling statement due to statement timeout"), { code: "57014" });
+    }
+  };
+}
+
+function apiScope() {
+  return { applicationServiceId: api!.applicationServiceId, scopePath: api!.scopePath };
 }
 
 function row(id: string, node: NonNullable<typeof api>, relation?: typeof reads, sourceId?: string, targetId?: string) {

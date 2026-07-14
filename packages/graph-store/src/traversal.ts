@@ -2,6 +2,7 @@ import {
   createGraphTraversalResult,
   type AssetNodeIdentity,
   type GraphEvidencePath,
+  type GraphProjectionBatch,
   type GraphRelationship,
   type GraphStore,
   type GraphTraversalPlan,
@@ -130,6 +131,15 @@ export function snapshotStore(snapshot: GraphProjectionSnapshot, options: Traver
 
 export function sameScope(left: Pick<AssetNodeIdentity, "applicationServiceId" | "scopePath">, right: Pick<AssetNodeIdentity, "applicationServiceId" | "scopePath">): boolean {
   return left.applicationServiceId === right.applicationServiceId && left.scopePath === right.scopePath;
+}
+
+export function assertProjectionScope(batch: GraphProjectionBatch): void {
+  if (
+    batch.nodes.some((node) => !sameScope(node, batch.scope)) ||
+    batch.edges.some((edge) => !sameScope(edge.source, batch.scope) || !sameScope(edge.target, batch.scope))
+  ) {
+    throw new Error("PROJECTION_SCOPE_MISMATCH");
+  }
 }
 
 export function nodeKey(node: Pick<AssetNodeIdentity, "applicationServiceId" | "scopePath" | "nodeType" | "logicalId">): string {

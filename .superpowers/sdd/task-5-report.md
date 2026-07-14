@@ -77,6 +77,25 @@ Result: exit 0.
 
 The PostgreSQL integration suite remains unrun in this worktree. Parent should rerun the guarded disposable-schema command above.
 
+## Bounded Execution Review Fix
+
+The original PostgreSQL adapter materialized the recursive CTE result before applying the shared in-memory traversal kernel. That allowed a high-degree Scope to produce an unbounded number of simple paths in PostgreSQL even when the public node/path budgets were small.
+
+`PostgresGraphStore` now resolves scoped roots once, then performs a bounded one-hop query for each queued path state. Each one-hop query has a local PostgreSQL statement timeout, parameterized current-node and visited UUID values, exact Scope/rule/direction/confidence filters, and a hard `remainingPaths + 1` candidate limit. The extra row is a sentinel: it causes a deterministic `PARTIAL/MAX_PATHS` result without fetching further candidates. The adapter keeps paths, visited IDs, queue, nodes, edges, and deterministic sorting in JavaScript; fetched candidate rows are bounded by the node/path budgets rather than the graph size.
+
+PostgreSQL statement cancellation (`57014` or equivalent timeout text) is converted to a valid `PARTIAL/QUERY_TIMEOUT` result with the current queued node as a non-empty frontier. `QUERY_TIMEOUT` is now an explicit engine-neutral truncation reason in the core contract.
+
+Projection writes now call the same shared `assertProjectionScope` guard as the in-memory adapter before issuing PostgreSQL. A mismatched node or either mismatched edge endpoint fails with `PROJECTION_SCOPE_MISMATCH` and no query is made.
+
+New non-PostgreSQL regressions cover a high-branching hard candidate cap, query-cancel mapping, PostgreSQL pre-query projection Scope rejection, and the shared projection Scope contract. Final verification:
+
+```text
+pnpm --filter @specforge/graph-store exec vitest run src/graph-store.contract.test.ts src/postgres.test.ts
+pnpm --filter @specforge/graph-store typecheck
+```
+
+Result: 2 files passed, 24 tests passed; graph-store and core typechecks exited 0. PostgreSQL integration remains for the parent’s guarded disposable-schema rerun.
+
 ## Files
 
 - `packages/graph-store/**`
