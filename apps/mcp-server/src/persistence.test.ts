@@ -7,6 +7,7 @@ import {
   renderPersistedAssetAsMarkdown,
   resolveWritableScope,
   searchPersistedDesignAssets,
+  upsertAssetLink,
   upsertContextPack,
   upsertDesignAsset,
   upsertProposal
@@ -114,8 +115,10 @@ const bilingualContextPack: ContextPack = {
 
 function mockSchemaSetup() {
   vi.spyOn(prisma, "$executeRawUnsafe").mockResolvedValue(0);
+  vi.spyOn(prisma, "$transaction").mockImplementation(async (operation) => operation(prisma as never));
   vi.spyOn(prisma.architectureScope, "upsert").mockResolvedValue({} as never);
   vi.spyOn(prisma.actorScopeGrant, "upsert").mockResolvedValue({} as never);
+  vi.spyOn(prisma.assetLink, "findMany").mockResolvedValue([] as never);
 }
 
 function persistedAssetRow(asset: ApiContract) {
@@ -314,6 +317,205 @@ describe("scoped seed cleanup", () => {
     }));
   });
 });
+
+describe("legacy AssetLink ledger synchronization", () => {
+  it("creates a legacy AssetLink and one normalized current/event/outbox ledger record", async () => {
+    mockSchemaSetup();
+    const harness = installLegacyLedgerHarness();
+
+    await expect(upsertAssetLink(legacyLinkInput())).resolves.toMatchObject({ relationType: "emits" });
+
+    expect(harness.state.assetLinks).toHaveLength(1);
+    expect(harness.state.current).toHaveLength(1);
+    expect(harness.state.current[0]).toMatchObject({ relationType: "EMITS", source: "legacy-asset-link", lifecycleStatus: "ACTIVE" });
+    expect(harness.state.events).toHaveLength(1);
+    expect(harness.state.outbox).toHaveLength(1);
+  });
+
+  it("updates the ledger current row when a legacy AssetLink description changes", async () => {
+    mockSchemaSetup();
+    const harness = installLegacyLedgerHarness();
+    await upsertAssetLink(legacyLinkInput());
+
+    await upsertAssetLink({ ...legacyLinkInput(), description: "Updated relationship evidence." });
+
+    expect(harness.state.assetLinks).toHaveLength(1);
+    expect(harness.state.current).toHaveLength(1);
+    expect(harness.state.current[0]).toMatchObject({ version: 2n, metadata: { description: "Updated relationship evidence." } });
+    expect(harness.state.events).toHaveLength(2);
+    expect(harness.state.outbox).toHaveLength(2);
+  });
+
+  it("invalidates the ledger relationship before deleting a legacy AssetLink", async () => {
+    process.env.SPECFORGE_MCP_SEED = "1";
+    mockSchemaSetup();
+    const harness = installLegacyLedgerHarness();
+    await upsertAssetLink(legacyLinkInput());
+
+    await deletePersistedDesignData({ architectureScope: writableScope, assetIds: ["legacy-source-api"] });
+
+    expect(harness.state.assetLinks).toHaveLength(0);
+    expect(harness.state.current).toHaveLength(1);
+    expect(harness.state.current[0]).toMatchObject({ lifecycleStatus: "DELETED" });
+    expect(harness.state.events.at(-1)).toMatchObject({ action: "DELETE" });
+    expect(harness.state.outbox.at(-1)).toMatchObject({ eventType: "RELATIONSHIP_DELETE" });
+  });
+
+  it("rejects an unsupported new legacy relation code before writing either store", async () => {
+    mockSchemaSetup();
+    const harness = installLegacyLedgerHarness();
+
+    await expect(upsertAssetLink({ ...legacyLinkInput(), relationType: "depends-on" })).rejects.toThrow("LEGACY_RELATIONSHIP_CODE_UNSUPPORTED");
+
+    expect(harness.state.assetLinks).toHaveLength(0);
+    expect(harness.state.current).toHaveLength(0);
+    expect(harness.state.events).toHaveLength(0);
+  });
+
+  it("replays an unchanged legacy retry without duplicate ledger events or outbox rows", async () => {
+    mockSchemaSetup();
+    const harness = installLegacyLedgerHarness();
+
+    await upsertAssetLink(legacyLinkInput());
+    await upsertAssetLink(legacyLinkInput());
+
+    expect(harness.state.current).toHaveLength(1);
+    expect(harness.state.events).toHaveLength(1);
+    expect(harness.state.outbox).toHaveLength(1);
+  });
+
+  it("rolls back the AssetLink and ledger state when event persistence fails", async () => {
+    mockSchemaSetup();
+    const harness = installLegacyLedgerHarness({ failOnEvent: true });
+
+    await expect(upsertAssetLink(legacyLinkInput())).rejects.toThrow("FORCED_EVENT_FAILURE");
+
+    expect(harness.state.assetLinks).toHaveLength(0);
+    expect(harness.state.current).toHaveLength(0);
+    expect(harness.state.events).toHaveLength(0);
+    expect(harness.state.outbox).toHaveLength(0);
+  });
+});
+
+function legacyLinkInput() {
+  return {
+    sourceType: "api",
+    sourceId: "legacy-source-api",
+    targetType: "event",
+    targetId: "legacy-target-event",
+    relationType: "emits",
+    description: "Legacy relationship evidence.",
+    architectureScope: writableScope
+  };
+}
+
+function installLegacyLedgerHarness(options: { failOnEvent?: boolean } = {}) {
+  const state = {
+    assetLinks: [] as Array<Record<string, unknown>>,
+    nodes: [] as Array<Record<string, unknown>>,
+    current: [] as Array<Record<string, unknown>>,
+    events: [] as Array<Record<string, unknown>>,
+    outbox: [] as Array<Record<string, unknown>>
+  };
+  const scopeMatches = (row: Record<string, unknown>, where: Record<string, unknown>) => (
+    row.enterpriseId === where.enterpriseId && row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath
+  );
+  const transaction = {
+    $executeRawUnsafe: vi.fn(async (sql: string) => {
+      if (sql.includes('DELETE FROM "AssetLink"')) state.assetLinks.splice(0);
+      return 0;
+    }),
+    assetLink: {
+      upsert: vi.fn(async ({ where, create, update }) => {
+        const identity = where.applicationServiceId_scopePath_id;
+        const existing = state.assetLinks.find((row) => row.id === identity.id && row.applicationServiceId === identity.applicationServiceId && row.scopePath === identity.scopePath);
+        if (existing) Object.assign(existing, update);
+        else state.assetLinks.push({ ...create, createdAt: new Date("2026-07-14T00:00:00.000Z") });
+        return existing ?? state.assetLinks.at(-1);
+      }),
+      findMany: vi.fn(async ({ where }) => state.assetLinks.filter((row) => (
+        row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath &&
+        (where.OR ?? []).some((condition: { sourceId?: { in: string[] }; targetId?: { in: string[] } }) =>
+          condition.sourceId?.in.includes(row.sourceId as string) || condition.targetId?.in.includes(row.targetId as string)
+        )
+      )))
+    },
+    contextPack: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    proposal: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    designAsset: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    assetNode: {
+      findUnique: vi.fn(async ({ where }) => state.nodes.find((row) => {
+        const identity = where.enterpriseId_applicationServiceId_scopePath_nodeType_logicalId;
+        return scopeMatches(row, identity) && row.nodeType === identity.nodeType && row.logicalId === identity.logicalId;
+      })),
+      create: vi.fn(async ({ data }) => {
+        const row = { ...data, dbId: `node-${state.nodes.length + 1}`, createdAt: new Date(), updatedAt: new Date() };
+        state.nodes.push(row);
+        return row;
+      }),
+      update: vi.fn(async ({ where, data }) => {
+        const row = state.nodes.find((node) => node.dbId === where.dbId)!;
+        Object.assign(row, data, { version: (row.version as bigint) + 1n });
+        return row;
+      })
+    },
+    relationshipCurrent: {
+      findUnique: vi.fn(async ({ where }) => state.current.find((row) => {
+        const identity = where.enterpriseId_applicationServiceId_scopePath_sourceNodeId_targetNodeId_relationType_source_sourceReference;
+        return scopeMatches(row, identity) && row.sourceNodeId === identity.sourceNodeId && row.targetNodeId === identity.targetNodeId && row.relationType === identity.relationType && row.source === identity.source && row.sourceReference === identity.sourceReference;
+      })),
+      upsert: vi.fn(async ({ where, create, update }) => {
+        const identity = where.enterpriseId_applicationServiceId_scopePath_sourceNodeId_targetNodeId_relationType_source_sourceReference;
+        const existing = state.current.find((row) => scopeMatches(row, identity) && row.sourceNodeId === identity.sourceNodeId && row.targetNodeId === identity.targetNodeId && row.relationType === identity.relationType && row.source === identity.source && row.sourceReference === identity.sourceReference);
+        if (existing) Object.assign(existing, update);
+        else state.current.push({ ...create, dbId: `relationship-${state.current.length + 1}`, createdAt: new Date(), updatedAt: new Date() });
+        return existing ?? state.current.at(-1);
+      }),
+      findMany: vi.fn(async () => [])
+    },
+    relationshipEvent: {
+      findUnique: vi.fn(async ({ where }) => state.events.find((row) => {
+        const identity = where.enterpriseId_applicationServiceId_scopePath_idempotencyKey;
+        return scopeMatches(row, identity) && row.idempotencyKey === identity.idempotencyKey;
+      })),
+      aggregate: vi.fn(async ({ where }) => ({
+        _max: { graphVersion: state.events.filter((row) => scopeMatches(row, where)).reduce<bigint | null>((max, row) => max === null || (row.graphVersion as bigint) > max ? row.graphVersion as bigint : max, null) }
+      })),
+      create: vi.fn(async ({ data }) => {
+        if (options.failOnEvent) throw new Error("FORCED_EVENT_FAILURE");
+        const row = { ...data, dbId: `event-${state.events.length + 1}`, createdAt: new Date() };
+        state.events.push(row);
+        return row;
+      })
+    },
+    relationshipOutbox: {
+      create: vi.fn(async ({ data }) => {
+        const row = { ...data, dbId: `outbox-${state.outbox.length + 1}`, createdAt: new Date(), updatedAt: new Date() };
+        state.outbox.push(row);
+        return row;
+      })
+    }
+  };
+  vi.spyOn(prisma.assetLink, "upsert").mockImplementation(transaction.assetLink.upsert as never);
+  vi.spyOn(prisma.assetLink, "findMany").mockImplementation(transaction.assetLink.findMany as never);
+  vi.spyOn(prisma.contextPack, "deleteMany").mockImplementation(transaction.contextPack.deleteMany as never);
+  vi.spyOn(prisma.proposal, "deleteMany").mockImplementation(transaction.proposal.deleteMany as never);
+  vi.spyOn(prisma.designAsset, "deleteMany").mockImplementation(transaction.designAsset.deleteMany as never);
+  vi.spyOn(prisma, "$transaction").mockImplementation(async (operation) => {
+    const snapshot = structuredClone(state);
+    try {
+      return await operation(transaction as never);
+    } catch (error) {
+      state.assetLinks.splice(0, state.assetLinks.length, ...snapshot.assetLinks);
+      state.nodes.splice(0, state.nodes.length, ...snapshot.nodes);
+      state.current.splice(0, state.current.length, ...snapshot.current);
+      state.events.splice(0, state.events.length, ...snapshot.events);
+      state.outbox.splice(0, state.outbox.length, ...snapshot.outbox);
+      throw error;
+    }
+  });
+  return { state, transaction };
+}
 
 describe("Task 2 MCP bilingual enforcement", () => {
   it("rejects invalid design assets before schema setup or prisma writes", async () => {

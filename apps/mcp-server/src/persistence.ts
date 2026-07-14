@@ -1,6 +1,9 @@
-import { PrismaClient } from "@prisma/client";
-import { assertWritableApplicationService, assetLabel, defaultHuaweiActor, hasScopeAccess, huaweiArchitectureScopes, localizeAsset, normalizeAssetType, scopeById, seedHuaweiActor, validateAssetLocalization } from "@specforge/core";
-import type { ArchitectureScopeRef, Asset, AssetLocale, AssetType, ContextPack, Proposal, ScopedActor } from "@specforge/core";
+import { Prisma, PrismaClient } from "@prisma/client";
+import { assertWritableApplicationService, assetLabel, defaultHuaweiActor, hasScopeAccess, huaweiArchitectureScopes, localizeAsset, normalizeAssetType, relationshipOntology, scopeById, seedHuaweiActor, validateAssetLocalization } from "@specforge/core";
+import type { ArchitectureScopeRef, Asset, AssetLocale, AssetType, ContextPack, Proposal, RelationshipCode, ScopedActor } from "@specforge/core";
+import { createHash } from "node:crypto";
+import { RelationshipCommandService, type UpsertRelationshipCommand } from "./relationships/command-service";
+import { PrismaRelationshipRepository } from "./relationships/repository";
 
 const globalForPrisma = globalThis as unknown as { specforgeMcpPrisma?: PrismaClient };
 const legacyContextPackFallbackSymbol = Symbol("legacyContextPackFallback");
@@ -45,6 +48,8 @@ export interface PersistedAssetLink extends AssetLinkInput {
   id: string;
   createdAt: string;
 }
+
+const legacyRelationshipEnterpriseId = process.env.SPECFORGE_ENTERPRISE_ID ?? "legacy-enterprise";
 
 export function resolveWritableScope(actor: ScopedActor, scope: ArchitectureScopeRef | undefined): ArchitectureScopeRef {
   if (!scope) throw new Error("Architecture scope is required.");
@@ -430,14 +435,24 @@ export async function deletePersistedDesignData(input: DeletePersistedDesignData
     applicationServiceId: scope.applicationServiceId,
     scopePath: scope.scopePath
   };
-  await prisma.contextPack.deleteMany({ where: { ...scopedWhere, id: { in: contextPackIds } } });
-  await prisma.proposal.deleteMany({ where: { ...scopedWhere, id: { in: proposalIds } } });
-  await prisma.designAsset.deleteMany({ where: { ...scopedWhere, id: { in: assetIds } } });
-  if (assetIds.length || proposalIds.length || contextPackIds.length) {
-    const ids = [...assetIds, ...proposalIds, ...contextPackIds];
+  const ids = [...assetIds, ...proposalIds, ...contextPackIds];
+  await prisma.$transaction(async (transaction) => {
+    const links = ids.length
+      ? await transaction.assetLink.findMany({
+        where: {
+          ...scopedWhere,
+          OR: [{ sourceId: { in: ids } }, { targetId: { in: ids } }]
+        }
+      })
+      : [];
+    for (const link of links) await synchronizeLegacyAssetLinkDelete(transaction, link);
+    await transaction.contextPack.deleteMany({ where: { ...scopedWhere, id: { in: contextPackIds } } });
+    await transaction.proposal.deleteMany({ where: { ...scopedWhere, id: { in: proposalIds } } });
+    await transaction.designAsset.deleteMany({ where: { ...scopedWhere, id: { in: assetIds } } });
+    if (!ids.length) return;
     const sourcePlaceholders = ids.map((_, index) => `$${index + 3}`).join(",");
     const targetPlaceholders = ids.map((_, index) => `$${ids.length + index + 3}`).join(",");
-    await prisma.$executeRawUnsafe(
+    await transaction.$executeRawUnsafe(
       `DELETE FROM "AssetLink"
        WHERE "applicationServiceId" = $1
          AND "scopePath" = $2
@@ -447,7 +462,7 @@ export async function deletePersistedDesignData(input: DeletePersistedDesignData
       ...ids,
       ...ids
     );
-  }
+  });
 
   return {
     deletedAssetIds: assetIds,
@@ -465,35 +480,39 @@ export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedA
   assertString(input.sourceId, "sourceId");
   assertString(input.targetId, "targetId");
   assertString(input.relationType, "relationType");
+  const relationshipCode = normalizeLegacyRelationshipCode(input.relationType);
   const id = assetLinkId({ ...input, sourceType, targetType });
   await ensureMcpPersistenceSchema();
-  await prisma.assetLink.upsert({
-    where: {
-      applicationServiceId_scopePath_id: {
+  await prisma.$transaction(async (transaction) => {
+    const link = await transaction.assetLink.upsert({
+      where: {
+        applicationServiceId_scopePath_id: {
+          applicationServiceId: scope.applicationServiceId,
+          scopePath: scope.scopePath,
+          id
+        }
+      },
+      create: {
+        id,
+        sourceType,
+        sourceId: input.sourceId,
+        targetType,
+        targetId: input.targetId,
+        relationType: input.relationType,
+        description: input.description,
         applicationServiceId: scope.applicationServiceId,
-        scopePath: scope.scopePath,
-        id
+        scopePath: scope.scopePath
+      },
+      update: {
+        sourceType,
+        sourceId: input.sourceId,
+        targetType,
+        targetId: input.targetId,
+        relationType: input.relationType,
+        description: input.description
       }
-    },
-    create: {
-      id,
-      sourceType,
-      sourceId: input.sourceId,
-      targetType,
-      targetId: input.targetId,
-      relationType: input.relationType,
-      description: input.description,
-      applicationServiceId: scope.applicationServiceId,
-      scopePath: scope.scopePath
-    },
-    update: {
-      sourceType,
-      sourceId: input.sourceId,
-      targetType,
-      targetId: input.targetId,
-      relationType: input.relationType,
-      description: input.description
-    }
+    });
+    await synchronizeLegacyAssetLinkUpsert(transaction, link, relationshipCode);
   });
 
   return {
@@ -785,4 +804,88 @@ function assetLinkId(input: Pick<AssetLinkInput, "sourceType" | "sourceId" | "ta
   return `${input.sourceType}:${input.sourceId}:${input.relationType}:${input.targetType}:${input.targetId}`
     .toLowerCase()
     .replace(/[^a-z0-9:_-]+/g, "-");
+}
+
+type LegacyAssetLinkRow = {
+  id: string;
+  sourceType: string;
+  sourceId: string;
+  targetType: string;
+  targetId: string;
+  relationType: string;
+  description: string | null;
+  applicationServiceId: string;
+  scopePath: string;
+  createdAt: Date;
+};
+
+function legacyRelationshipService(transaction: Prisma.TransactionClient) {
+  return new RelationshipCommandService(new PrismaRelationshipRepository(transaction));
+}
+
+function normalizeLegacyRelationshipCode(value: string): RelationshipCode {
+  const code = value.trim().toUpperCase() as RelationshipCode;
+  if (!relationshipOntology.has(code)) throw new Error(`LEGACY_RELATIONSHIP_CODE_UNSUPPORTED: ${value}`);
+  return code;
+}
+
+function legacyRelationshipCommand(link: LegacyAssetLinkRow, action: "upsert" | "delete", relationType = normalizeLegacyRelationshipCode(link.relationType)): UpsertRelationshipCommand {
+  const scope = { applicationServiceId: link.applicationServiceId, scopePath: link.scopePath };
+  return {
+    enterpriseId: legacyRelationshipEnterpriseId,
+    authorizedScope: scope,
+    actor: writableActor(),
+    channel: "mcp",
+    correlationId: `${action}:${link.id}`,
+    idempotencyKey: legacyRelationshipIdempotencyKey(link, action, relationType),
+    source: {
+      identity: {
+        ...scope,
+        nodeType: normalizeAssetType(link.sourceType),
+        logicalId: link.sourceId,
+        rootAssetType: normalizeAssetType(link.sourceType),
+        rootAssetId: link.sourceId
+      }
+    },
+    target: {
+      identity: {
+        ...scope,
+        nodeType: normalizeAssetType(link.targetType),
+        logicalId: link.targetId,
+        rootAssetType: normalizeAssetType(link.targetType),
+        rootAssetId: link.targetId
+      }
+    },
+    relationType,
+    relationshipSource: "legacy-asset-link",
+    sourceReference: `legacy-asset-link:${link.id}`,
+    metadata: link.description ? { description: link.description } : {}
+  };
+}
+
+function legacyRelationshipIdempotencyKey(link: LegacyAssetLinkRow, action: "upsert" | "delete", relationType: RelationshipCode): string {
+  const payload = JSON.stringify({
+    action,
+    id: link.id,
+    createdAt: link.createdAt.toISOString(),
+    sourceType: link.sourceType,
+    sourceId: link.sourceId,
+    targetType: link.targetType,
+    targetId: link.targetId,
+    relationType,
+    description: link.description
+  });
+  return `legacy-asset-link:${action}:${createHash("sha256").update(payload).digest("hex")}`;
+}
+
+async function synchronizeLegacyAssetLinkUpsert(
+  transaction: Prisma.TransactionClient,
+  link: LegacyAssetLinkRow,
+  relationType: RelationshipCode
+) {
+  await legacyRelationshipService(transaction).upsertLegacyRelationship(legacyRelationshipCommand(link, "upsert", relationType));
+}
+
+async function synchronizeLegacyAssetLinkDelete(transaction: Prisma.TransactionClient, link: LegacyAssetLinkRow) {
+  await legacyRelationshipService(transaction).deleteRelationship(legacyRelationshipCommand(link, "delete"));
 }
