@@ -81,6 +81,7 @@ describe("enterprise relationship ledger schema and migration", () => {
     expect(migrationSql).not.toContain("PARTITION BY");
     expect(nodeSubjectMigrationSql).toContain('ALTER COLUMN "relationshipId" DROP NOT NULL');
     expect(nodeSubjectMigrationSql).toContain('RelationshipEvent_exactly_one_subject_check');
+    expect(nodeSubjectMigrationSql.trim()).toMatch(/^DO \$\$[\s\S]*END \$\$;$/u);
     expect(testSchema).toMatch(/^specforge_relationship_ledger_test_[0-9a-f]{32}$/u);
   });
 });
