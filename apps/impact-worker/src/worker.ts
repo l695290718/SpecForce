@@ -547,26 +547,56 @@ function toPersistedAnalysis(run: ImpactAnalysisRunRecord, analysis: TransitiveP
 function composeResumedAnalysis(
   historical: PersistedImpactAnalysis | null,
   resumed: PersistedImpactAnalysis,
-  frontier: AssetNodeIdentity[]
+  _frontier: AssetNodeIdentity[]
 ): PersistedImpactAnalysis {
+  const prefixes = historicalEvidencePrefixes(historical);
+  const resumedNodes = resumed.nodes.map((node) => ({
+    ...node,
+    primaryPath: prefixEvidencePath(node.primaryPath, prefixes),
+    alternativePaths: node.alternativePaths.map((path) => prefixEvidencePath(path, prefixes))
+  }));
+  const resumedPaths = resumed.paths.map((path) => ({ ...path, path: prefixEvidencePath(path.path, prefixes) }));
   const nodeByIdentity = new Map<string, PersistedImpactAnalysis["nodes"][number]>();
-  for (const node of [...(historical?.nodes ?? []), ...resumed.nodes]) {
+  for (const node of [...(historical?.nodes ?? []), ...resumedNodes]) {
     const key = identityKey(node.node);
     if (!nodeByIdentity.has(key)) nodeByIdentity.set(key, node);
   }
   const pathByNodeAndRank = new Map<string, PersistedImpactAnalysis["paths"][number]>();
-  for (const path of [...(historical?.paths ?? []), ...resumed.paths]) {
+  for (const path of [...(historical?.paths ?? []), ...resumedPaths]) {
     const key = `${identityKey(path.node)}|${path.rank}`;
     if (!pathByNodeAndRank.has(key)) pathByNodeAndRank.set(key, path);
   }
+  const { resumeSegments: _legacyResumeSegments, ...summary } = resumed.summary;
   return {
     ...resumed,
     nodes: [...nodeByIdentity.values()].sort((left, right) => identityKey(left.node).localeCompare(identityKey(right.node))),
     paths: [...pathByNodeAndRank.values()].sort((left, right) => identityKey(left.node).localeCompare(identityKey(right.node)) || left.rank - right.rank),
-    summary: {
-      ...resumed.summary,
-      resumeSegments: [...resumeSegments(historical?.summary), { roots: frontier }]
-    }
+    summary
+  };
+}
+
+function historicalEvidencePrefixes(historical: PersistedImpactAnalysis | null): Map<string, GraphEvidencePath> {
+  const prefixes = new Map<string, GraphEvidencePath>();
+  for (const path of historical?.paths ?? []) {
+    const terminal = path.path.nodes.at(-1);
+    if (!terminal || identityKey(terminal) !== identityKey(path.node)) continue;
+    const existing = prefixes.get(identityKey(path.node));
+    if (!existing || path.rank === 0) prefixes.set(identityKey(path.node), path.path);
+  }
+  for (const node of historical?.nodes ?? []) {
+    if (!prefixes.has(identityKey(node.node))) prefixes.set(identityKey(node.node), node.primaryPath);
+  }
+  return prefixes;
+}
+
+function prefixEvidencePath(path: GraphEvidencePath, prefixes: Map<string, GraphEvidencePath>): GraphEvidencePath {
+  const start = path.nodes[0];
+  if (!start) return path;
+  const prefix = prefixes.get(identityKey(start));
+  if (!prefix || prefix.nodes.length === 0) return path;
+  return {
+    nodes: [...prefix.nodes, ...path.nodes.slice(1)],
+    edges: [...prefix.edges, ...path.edges]
   };
 }
 
@@ -593,11 +623,6 @@ function readBudgets(value: unknown): { maxDepth: number; maxNodes: number; maxP
 function readFrontier(summary: Record<string, unknown>): AssetNodeIdentity[] {
   const frontier = summary.unexploredFrontier;
   return Array.isArray(frontier) ? frontier.filter(isAssetNodeIdentity) : [];
-}
-
-function resumeSegments(summary: Record<string, unknown> | undefined): unknown[] {
-  const segments = summary?.resumeSegments;
-  return Array.isArray(segments) ? segments : [];
 }
 
 function toRunRecord(row: PrismaImpactRun): ImpactAnalysisRunRecord {

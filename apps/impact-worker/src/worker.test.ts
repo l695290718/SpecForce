@@ -129,7 +129,9 @@ describe("ImpactAnalysisWorker", () => {
     await expect(worker.resume(ref(repository.run))).resolves.toMatchObject({ status: "COMPLETE", resumedFromFrontier: true });
     expect(graphStore.plans[0]?.startNodes).toEqual([dependent]);
     expect(repository.persisted?.nodes.map((node) => node.node)).toEqual([root, dependent, downstream]);
-    expect(repository.persisted?.summary.resumeSegments).toEqual([{ roots: [dependent] }]);
+    expect(repository.persisted?.nodes.find((node) => node.node.logicalId === downstream.logicalId)?.primaryPath.nodes).toEqual([root, dependent, downstream]);
+    expect(repository.persisted?.paths.find((path) => path.node.logicalId === downstream.logicalId && path.rank === 0)?.path.nodes).toEqual([root, dependent, downstream]);
+    expect(repository.persisted?.summary.resumeSegments).toBeUndefined();
   });
 
   it("lets a concurrent cancellation win instead of writing a terminal result", async () => {
