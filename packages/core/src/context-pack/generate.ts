@@ -1,5 +1,5 @@
 import { analyzeProposalImpact } from "../impact/analyze";
-import type { TransitiveProposalImpact } from "../impact/evaluate";
+import { deriveTransitiveImpactSummary, type TransitiveProposalImpact } from "../impact/evaluate";
 import { localizeAsset } from "../localization/assets";
 import { findAsset, getAsset, localizeCatalogAsset } from "../repository";
 import { renderAssetSummary } from "../summary/render";
@@ -95,20 +95,20 @@ async function summaries(refs: AssetRef[], options: DerivedViewOptions): Promise
 export interface GenerateContextPackOptions extends DerivedViewOptions {
   targetAgent?: "codex" | "claude-code" | "cursor" | "copilot" | "generic" | string;
   includeAssets?: string[];
-  transitiveImpact?: Pick<TransitiveProposalImpact, "impactedAssets">;
+  transitiveImpact?: Pick<TransitiveProposalImpact, "impactedAssets" | "nodes">;
 }
 
 export async function generateContextPack(proposalId: string, options: GenerateContextPackOptions = {}): Promise<ContextPack> {
   const canonicalProposal = getAsset<Proposal>("proposal", proposalId, options.catalog);
-  const impactAssets = options.transitiveImpact?.impactedAssets ?? canonicalProposal.impactedAssets;
-  const includedAssets = options.includeAssets?.length
-    ? impactAssets.filter((asset) => options.includeAssets?.includes(asset.id))
-    : impactAssets;
-
   const renderLocale = async (locale: AssetLocale) => {
     const derivedOptions = { catalog: options.catalog, locale };
     const proposal = localizeCatalogAsset("proposal", canonicalProposal, locale, options.catalog);
-    const impact = await analyzeProposalImpact(proposalId, derivedOptions);
+    const impact = options.transitiveImpact
+      ? await deriveTransitiveImpactSummary(canonicalProposal, options.transitiveImpact.nodes, derivedOptions)
+      : await analyzeProposalImpact(proposalId, derivedOptions);
+    const includedAssets = options.includeAssets?.length
+      ? impact.impactedAssets.filter((asset) => options.includeAssets?.includes(asset.id))
+      : impact.impactedAssets;
     const titles = localizedSectionTitles[locale];
     const localizedIncludedAssets = includedAssets.map((ref) => {
       const asset = localizeCatalogAsset(ref.type, findAsset(ref, options.catalog), locale, options.catalog);

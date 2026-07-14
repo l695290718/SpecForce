@@ -1,8 +1,11 @@
-import { createTraversalPlan, type GraphEvidencePath, type GraphRelationship, type GraphStore, type GraphTraversalPlan, type TraversalAuthorization } from "../graph-store/types";
+import { deriveImplementationTasks } from "./analyze";
+import { createTraversalPlan, type GraphEvidencePath, type GraphStore, type GraphTraversalPlan, type GraphTraversalTruncationReason, type TraversalAuthorization } from "../graph-store/types";
 import { relationshipOntology } from "../relationships/ontology";
 import type { AssetNodeIdentity, RelationshipCode, RelationshipStrength } from "../relationships/types";
 import type { ArchitectureScopeRef } from "../architecture/types";
-import type { AssetRef, GovernanceCheckResult, ImpactAnalysis, Proposal } from "../types";
+import { getDomainName, listAssets, localizeCatalogAsset } from "../repository";
+import { runGovernanceChecks } from "../rules/governance";
+import type { AssetRef, DerivedViewOptions, GovernanceCheckResult, ImpactAnalysis, Proposal } from "../types";
 
 export type ProposalChangeType =
   | "ADD"
@@ -22,7 +25,7 @@ export interface NormalizedProposalChanges {
   roots: AssetNodeIdentity[];
 }
 
-export interface ProposalImpactInput {
+export interface ProposalImpactInput extends DerivedViewOptions {
   proposal: Proposal;
   roots: AssetNodeIdentity[];
   authorization: TraversalAuthorization;
@@ -35,7 +38,6 @@ export interface ProposalImpactInput {
 
 export interface ProposalImpactDependencies {
   graphStore: Pick<GraphStore, "traverse">;
-  governanceWarnings?: GovernanceCheckResult[];
 }
 
 export interface ImpactedNode {
@@ -56,7 +58,7 @@ export interface TransitiveProposalImpact extends ImpactAnalysis {
   nodes: ImpactedNode[];
   status: "COMPLETE" | "PARTIAL";
   frontier: AssetNodeIdentity[];
-  truncationReasons: string[];
+  truncationReasons: GraphTraversalTruncationReason[];
   graphVersion: bigint;
   elapsedMs: number;
 }
@@ -132,11 +134,6 @@ export async function analyzeTransitiveProposalImpact(
     rankedByNode.set(key, paths);
   }
 
-  for (const root of normalized.roots) {
-    const key = nodeKey(root);
-    if (!rankedByNode.has(key)) rankedByNode.set(key, [rankPath({ nodes: [root], edges: [] }, normalized.roots)]);
-  }
-
   for (const node of traversal.nodes) {
     const key = nodeKey(node);
     if (!rankedByNode.has(key)) rankedByNode.set(key, [rankPath({ nodes: [node], edges: [] }, normalized.roots)]);
@@ -145,18 +142,10 @@ export async function analyzeTransitiveProposalImpact(
   const nodes = [...rankedByNode.values()]
     .map((paths) => toImpactedNode(paths, normalized.changes))
     .sort(compareImpactedNodes);
-  const impactedAssets = toAssetRefs(nodes);
-  const riskLevel = nodes.reduce<ImpactLevel>((current, node) => impactLevelRank(node.impactLevel) > impactLevelRank(current) ? node.impactLevel : current, "low");
+  const summary = await deriveTransitiveImpactSummary(input.proposal, nodes, input);
 
   return {
-    proposalId: input.proposal.id,
-    impactedAssetCount: impactedAssets.length,
-    impactedAssets,
-    affectedDomains: [],
-    riskLevel,
-    requiredContextPack: impactedAssets.some((asset) => asset.type === "api" || asset.type === "event"),
-    governanceWarnings: dependencies.governanceWarnings ?? [],
-    implementationTasks: input.proposal.specChanges.map((change) => `Implement proposal specification change: ${change}`),
+    ...summary,
     affectedArchitectureScopes: uniqueScopes(nodes.map((node) => node.scope)),
     changes: normalized.changes,
     nodes,
@@ -169,6 +158,40 @@ export async function analyzeTransitiveProposalImpact(
 }
 
 export const previewProposalImpact = analyzeTransitiveProposalImpact;
+
+export async function deriveTransitiveImpactSummary(
+  proposal: Proposal,
+  nodes: ImpactedNode[],
+  options: DerivedViewOptions = {}
+): Promise<ImpactAnalysis> {
+  const locale = options.locale ?? "en";
+  const canonicalAssets = toAssetRefs(nodes);
+  const impactedAssets = canonicalAssets.map((ref) => localizedRef(ref, options));
+  const affectedDomains = Array.from(new Set(
+    canonicalAssets.flatMap((ref) => {
+      const asset = listAssets(ref.type, options.catalog).find((item) => item.id === ref.id);
+      if (!asset || !("domainId" in asset)) return [];
+      return [getDomainName(asset.domainId, options.catalog, locale)];
+    })
+  ));
+  const governanceWarnings = (await Promise.all(
+    canonicalAssets
+      .filter((ref) => listAssets(ref.type, options.catalog).some((asset) => asset.id === ref.id))
+      .map((ref) => runGovernanceChecks(ref.type, ref.id, options))
+  )).flat().filter((result) => result.status === "fail");
+  const localizedProposal = localizeCatalogAsset("proposal", proposal, locale, options.catalog);
+
+  return {
+    proposalId: proposal.id,
+    impactedAssetCount: impactedAssets.length,
+    impactedAssets,
+    affectedDomains,
+    riskLevel: deriveRiskLevel(proposal, nodes),
+    requiredContextPack: impactedAssets.some((asset) => asset.type === "api" || asset.type === "event"),
+    governanceWarnings,
+    implementationTasks: deriveImplementationTasks(localizedProposal, impactedAssets, options)
+  };
+}
 
 function evidencePathPrefixes(paths: GraphEvidencePath[]): GraphEvidencePath[] {
   return paths.flatMap((path) => {
@@ -186,15 +209,15 @@ function rankPath(path: GraphEvidencePath, roots: AssetNodeIdentity[]): RankedPa
   const contextual = path.edges.some((edge) => contextualCodes.has(edge.code)) || contextualNodeTypes.has(terminal.nodeType);
   const strength = path.edges.reduce((minimum, edge) => Math.min(minimum, strengthRank[edge.strength]), 3);
   const confidence = path.edges.reduce((minimum, edge) => Math.min(minimum, edge.confidence), 1);
-  const certainty: ImpactCertainty = direct
-    ? "DIRECT"
+  const certainty: ImpactCertainty = path.edges.length === 0
+    ? direct ? "DIRECT" : "NOT_IMPACTED"
     : contextual
       ? "CONTEXTUAL"
       : strength === 1 || confidence < 0.8
         ? "POSSIBLE"
         : "DEFINITE";
 
-  return { path, certainty, strength, confidence };
+  return { path, certainty, strength: certainty === "NOT_IMPACTED" ? 0 : strength, confidence: certainty === "NOT_IMPACTED" ? 0 : confidence };
 }
 
 function toImpactedNode(paths: RankedPath[], changes: ProposalChangeType[]): ImpactedNode {
@@ -212,7 +235,7 @@ function toImpactedNode(paths: RankedPath[], changes: ProposalChangeType[]): Imp
     alternativePaths: deduplicated.slice(1, 4).map((candidate) => candidate.path),
     matchedRules,
     confidence: primary.confidence,
-    recommendedActions: recommendedActions(primary.certainty),
+    recommendedActions: [],
     scope: { applicationServiceId: node.applicationServiceId, scopePath: node.scopePath }
   };
 }
@@ -226,13 +249,6 @@ function deriveImpactLevel(path: RankedPath, changes: ProposalChangeType[]): Imp
 
 function hasBreakingChange(changes: ProposalChangeType[]): boolean {
   return changes.some((change) => change === "DELETE" || change === "TYPE_CHANGE" || change === "CONSTRAINT_CHANGE" || change === "SECURITY_CHANGE" || change === "BEHAVIOR_CHANGE");
-}
-
-function recommendedActions(certainty: ImpactCertainty): string[] {
-  if (certainty === "CONTEXTUAL") return ["Review this contextual design evidence."];
-  if (certainty === "POSSIBLE") return ["Confirm whether this dependency is affected."];
-  if (certainty === "NOT_IMPACTED") return ["No action is required under the matched rule."];
-  return ["Plan and validate the dependent change."];
 }
 
 function toAssetRefs(nodes: ImpactedNode[]): AssetRef[] {
@@ -249,12 +265,32 @@ function toAssetRefs(nodes: ImpactedNode[]): AssetRef[] {
     .values()];
 }
 
+function localizedRef(ref: AssetRef, options: DerivedViewOptions): AssetRef {
+  const asset = listAssets(ref.type, options.catalog).find((item) => item.id === ref.id);
+  if (!asset) return ref;
+  const localized = localizeCatalogAsset(ref.type, asset, options.locale ?? "en", options.catalog);
+  return { ...ref, label: "title" in localized && localized.title ? localized.title : localized.name };
+}
+
+function deriveRiskLevel(proposal: Proposal, nodes: ImpactedNode[]): ImpactLevel {
+  const transitiveRisk = nodes.reduce<ImpactLevel>((current, node) => impactLevelRank(node.impactLevel) > impactLevelRank(current) ? node.impactLevel : current, "low");
+  return /\bhigh\b|\u9ad8\u98ce\u9669/i.test(proposal.risks.join("\n")) || transitiveRisk === "high"
+    ? "high"
+    : transitiveRisk === "medium" || nodes.length > 5
+      ? "medium"
+      : "low";
+}
+
 function uniqueScopes(scopes: ArchitectureScopeRef[]): ArchitectureScopeRef[] {
   return [...new Map(scopes.map((scope) => [`${scope.applicationServiceId}/${scope.scopePath}`, scope])).values()];
 }
 
 function compareImpactedNodes(left: ImpactedNode, right: ImpactedNode): number {
-  return compareRankedPaths(rankPath(left.primaryPath, []), rankPath(right.primaryPath, [])) || nodeKey(left.node).localeCompare(nodeKey(right.node));
+  return certaintyRank[right.certainty] - certaintyRank[left.certainty]
+    || pathStrength(right.primaryPath) - pathStrength(left.primaryPath)
+    || pathConfidence(right.primaryPath) - pathConfidence(left.primaryPath)
+    || left.primaryPath.edges.length - right.primaryPath.edges.length
+    || nodeKey(left.node).localeCompare(nodeKey(right.node));
 }
 
 function compareRankedPaths(left: RankedPath, right: RankedPath): number {
@@ -267,6 +303,14 @@ function compareRankedPaths(left: RankedPath, right: RankedPath): number {
 
 function impactLevelRank(level: ImpactLevel): number {
   return { low: 1, medium: 2, high: 3 }[level];
+}
+
+function pathStrength(path: GraphEvidencePath): number {
+  return path.edges.reduce((minimum, edge) => Math.min(minimum, strengthRank[edge.strength]), path.edges.length === 0 ? 0 : 3);
+}
+
+function pathConfidence(path: GraphEvidencePath): number {
+  return path.edges.reduce((minimum, edge) => Math.min(minimum, edge.confidence), path.edges.length === 0 ? 0 : 1);
 }
 
 function nodeKey(node: AssetNodeIdentity): string {

@@ -7,7 +7,7 @@ function localizedRef(ref: AssetRef, options: DerivedViewOptions): AssetRef {
   return { ...ref, label: "title" in asset && asset.title ? asset.title : asset.name };
 }
 
-function deriveImplementationTasks(proposal: Proposal, impactedAssets: AssetRef[], options: DerivedViewOptions): string[] {
+export function deriveImplementationTasks(proposal: Proposal, impactedAssets: AssetRef[], options: DerivedViewOptions): string[] {
   const locale = options.locale ?? "en";
   const specificationTasks = proposal.specChanges.map((change) => locale === "zh"
     ? `实施提案规格变更：${change}`
