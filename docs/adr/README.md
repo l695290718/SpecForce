@@ -39,8 +39,10 @@ If synchronization fails, record **`MCP synchronization blocked`**, the failure 
 
 ### 文件名和章节
 
-文件名必须符合 `NNNN-kebab-case.md`，其中 `NNNN` 是四位、补零的序号。每份 ADR 必须包含 `Status`、`Context`、`Decision`、`Alternatives`、`Consequences`、`Constraints`、`Evidence` 和 `MCP Record` 章节。标题、背景和决策以英文为规范字段，并为面向人的决策内容提供完整中文覆盖。
+文件名必须符合 `NNNN-kebab-case.md`，其中 `NNNN` 是四位、补零的序号；发布后文件名必须稳定。ADR 重命名必须有明确决策，并更新仓库中的所有引用。每份 ADR 必须按顺序（除非更强的本地模板另有规定）包含 `Status`、`Context`、`Decision`、`Alternatives`、`Consequences`、`Constraints`、`Evidence` 和 `MCP Record` 章节。标题、背景和决策以英文为规范字段，并为面向人的决策内容提供完整中文覆盖。
+
+ADR 必须写明稳定 ID、精确的所属 `architectureScope`、相关资产或记录以及实现状态。`Alternatives` 必须说明被拒绝的选项及原因；`Consequences` 必须包含实质性权衡；`Constraints` 必须在适用时包含范围、权威性、隔离和兼容性要求；`Evidence` 必须列出精确命令或操作检查及其结果。
 
 ### MCP 记录与失败处理
 
-`MCP Record` 必须包含与仓库 ADR 相同的稳定 MCP ADR ID 和精确的所属范围，并列出匹配的 Proposal、Context Pack、资产关系和证据。MCP 是唯一的系统记录写入路径；写入失败时必须记录 **`MCP synchronization blocked`**、失败原因和重试触发条件，登记待办事实。MCP 记录和必要关系写入并核验成功前，ADR 与实现都不能标记为完成。
+`MCP Record` 必须包含与仓库 ADR 相同的稳定 MCP ADR ID 和精确的所属范围，并列出匹配的 Proposal、Context Pack、资产关系和证据。MCP 是唯一的系统记录写入路径；每次写入后必须核验返回的 ID、精确范围、英文规范字段、中文覆盖、关系目标和证据。PostgreSQL 对已编写资产和关系事件保持权威，图数据库仅作为派生投影。写入失败时必须记录 **`MCP synchronization blocked`**、失败原因和重试触发条件，登记待办事实。MCP 记录和必要关系写入并核验成功前，ADR 与实现都不能标记为完成。
