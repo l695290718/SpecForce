@@ -16,6 +16,7 @@
     "db:push": "prisma db push",
     "db:seed": "pnpm --filter @specforge/mcp-server seed",
     "design-facts:relations:check": "tsx scripts/check-legacy-relations.ts",
+    "design-facts:sync": "tsx scripts/sync-design-facts.ts",
     "format": "prettier --write ."
   },
   "devDependencies": {

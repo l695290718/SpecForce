@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted as repository policy; partially implemented and locally verified.** `AGENTS.md`, `docs/adr/README.md`, and the governance specification enforce the repository-side policy. MCP persistence, reconciliation reporting, and complete equivalent operational records are **deferred/blocked** until the MCP write boundary is available and verified.
+**Accepted as repository policy; partially implemented and locally verified.** `AGENTS.md`, `docs/adr/README.md`, and the governance specification enforce the repository-side policy. The seven baseline ADR records are persisted through the MCP write boundary. Read-back reconciliation, Proposal/Context Pack synchronization, and evidence-link verification remain deferred.
 
 - Stable ADR/MCP ID: `adr-design-fact-dual-record-governance`
 - Owning `architectureScope.applicationServiceId`: `com.huawei.celon.desiner`
@@ -58,15 +58,16 @@ Tradeoffs:
 - **Implemented:** `docs/adr/README.md` defines stable filenames, required sections, MCP Record requirements, PostgreSQL authority, and blocked-synchronization handling.
 - **Implemented:** `docs/superpowers/specs/2026-07-17-design-fact-governance-design.md` defines fact classification, bilingual canonical rules, stable IDs, typed links, and completion workflow.
 - **Locally verified:** repository inspection confirms the three policy records and the exact Designer Scope path are present; this ADR and ADR 0006 use stable IDs and all required sections.
-- **Deferred/blocked:** equivalent MCP records, verified MCP links/evidence, and a reconciliation command or test that reports missing/mismatched/out-of-scope facts are not available in this session.
+- **Locally verified:** `pnpm design-facts:sync` persisted all seven manifest ADR IDs through the MCP stdio write boundary using the exact Designer scope.
+- **Deferred:** read-back reconciliation, Proposal/Context Pack synchronization, verified MCP links/evidence, and a reconciliation command or test that reports missing/mismatched/out-of-scope facts.
 
 ## MCP Record
 
 - Matching MCP ADR ID: `adr-design-fact-dual-record-governance`
 - Exact owning `architectureScope`: `com.huawei.celon.desiner` / `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - Related repository records: `AGENTS.md`, `docs/adr/README.md`, `docs/superpowers/specs/2026-07-17-design-fact-governance-design.md`, and `docs/adr/0006-transactional-outbox-graph-projection.md`.
-- Matching Proposal, Context Pack, typed MCP links, backlog fact, and persisted evidence references: not verified in this session.
-- **MCP synchronization blocked:** the available tool surface has no SpecForge ADR/design-record write endpoint. Retry when MCP persistence tools are available; then persist and reconcile the stable ID, exact Scope, English canonical fields, complete Chinese overlay, typed links, and evidence before marking governance complete.
+- Matching Proposal, Context Pack, typed MCP links, backlog fact, and persisted evidence references: deferred pending synchronization and read-back reconciliation.
+- **MCP ADR synchronization:** complete for the baseline manifest through `pnpm design-facts:sync`; the command uses the MCP stdio write boundary and the exact owning scope. Retry the remaining synchronization and reconciliation work when their commands are implemented.
 
 ## 中文本地化 / Chinese Localization
 
