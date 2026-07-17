@@ -31,11 +31,13 @@ export interface DesignFactSyncReceipt {
 }
 
 type CallTool = (name: string, input: Record<string, unknown>) => Promise<{ ok?: boolean; isError?: boolean; message?: string }>;
+type ExistingRecordType = "proposal" | "contextPack";
 
 export async function synchronizeDesignFacts(input: {
   callTool: CallTool;
   manifest: DesignFactManifest;
   readAdr: (path: string) => Promise<AdrSource>;
+  readExisting?: (type: ExistingRecordType, id: string, scope: DesignFactManifestDecision["scope"]) => Promise<Record<string, unknown> | undefined>;
 }): Promise<DesignFactSyncReceipt[]> {
   const receipts: DesignFactSyncReceipt[] = [];
 
@@ -53,10 +55,52 @@ export async function synchronizeDesignFacts(input: {
       throw new Error(`DESIGN_FACT_MCP_WRITE_FAILED: ${decision.id}${result.message ? `: ${result.message}` : ""}`);
     }
 
+    if (input.readExisting) {
+      const proposal = await input.readExisting("proposal", decision.proposalId, decision.scope);
+      const contextPack = await input.readExisting("contextPack", decision.contextPackId, decision.scope);
+      const syncedProposal = proposal ?? buildProposal(decision, source);
+      const syncedContextPack = contextPack ?? buildContextPack(decision, source);
+      await callOrThrow(input.callTool, "upsert_proposal", { proposal: syncedProposal, architectureScope: decision.scope }, decision.id);
+      await callOrThrow(input.callTool, "upsert_context_pack", { contextPack: syncedContextPack, architectureScope: decision.scope }, decision.id);
+      await callOrThrow(input.callTool, "link_assets", link("proposal", decision.proposalId, "adr", decision.mcpAdrId, "IMPLEMENTS_DECISION", decision.scope), decision.id);
+      await callOrThrow(input.callTool, "link_assets", link("contextPack", decision.contextPackId, "proposal", decision.proposalId, "IMPLEMENTS_CONTEXT_FOR", decision.scope), decision.id);
+      for (const assetId of decision.relatedAssetIds) {
+        await callOrThrow(input.callTool, "link_assets", link("adr", decision.mcpAdrId, assetTypeFor(assetId), assetId, "DECIDES", decision.scope), decision.id);
+      }
+    }
+
     receipts.push({ id: decision.id, mcpAdrId: decision.mcpAdrId, status: "complete" });
   }
 
   return receipts;
+}
+
+function buildProposal(decision: DesignFactManifestDecision, source: AdrSource) {
+  const now = new Date().toISOString();
+  return { id: decision.proposalId, name: source.title, title: source.title, description: source.english, background: source.english, goal: source.english, nonGoal: "No additional product behavior.", scope: source.english, impactedAssets: [], specChanges: [], risks: [], rolloutPlan: "Maintain through MCP.", status: "implemented", createdAt: now, updatedAt: now, localizedContent: { zh: { name: localizedTitle(source.chinese), title: localizedTitle(source.chinese), description: source.chinese, background: source.chinese, goal: source.chinese, nonGoal: "不增加额外产品行为。", scope: source.chinese, specChanges: [], risks: [], rolloutPlan: "通过 MCP 维护。" } } };
+}
+
+function buildContextPack(decision: DesignFactManifestDecision, source: AdrSource) {
+  const now = new Date().toISOString();
+  return { id: decision.contextPackId, name: `${source.title} Context Pack`, proposalId: decision.proposalId, targetAgent: "generic", summary: source.english, includedAssets: [], constraints: [], instructions: [], generatedMarkdown: source.english, createdAt: now, architectureScope: decision.scope, localizedContent: { zh: { name: `${localizedTitle(source.chinese)} 上下文包`, summary: source.chinese, constraints: [], instructions: [], generatedMarkdown: source.chinese } } };
+}
+
+async function callOrThrow(callTool: CallTool, name: string, input: Record<string, unknown>, decisionId: string): Promise<void> {
+  const result = await callTool(name, input);
+  if (result.isError || result.ok === false) throw new Error(`DESIGN_FACT_MCP_WRITE_FAILED: ${decisionId}${result.message ? `: ${result.message}` : ""}`);
+}
+
+function link(sourceType: string, sourceId: string, targetType: string, targetId: string, relationType: string, architectureScope: DesignFactManifestDecision["scope"]) {
+  return { sourceType, sourceId, targetType, targetId, relationType, architectureScope };
+}
+
+function assetTypeFor(id: string): string {
+  if (id.startsWith("api-")) return "api";
+  if (id.startsWith("data-")) return "dataModel";
+  if (id.startsWith("rule-")) return "businessRule";
+  if (id.startsWith("quality-")) return "quality";
+  if (id.startsWith("adr-")) return "adr";
+  return "api";
 }
 
 function assertDecision(decision: DesignFactManifestDecision): void {
@@ -133,6 +177,13 @@ async function main(): Promise<void> {
     const receipts = await synchronizeDesignFacts({
       manifest,
       readAdr: readRepositoryAdr,
+      readExisting: async (type, id, scope) => {
+        const assetType = type === "contextPack" ? "contextPack" : "proposal";
+        const result = await client.callTool({ name: "get_asset_detail", arguments: { assetType, assetId: id, applicationServiceId: scope.applicationServiceId, format: "json" } });
+        if (result.isError) return undefined;
+        const text = Array.isArray(result.content) ? result.content.map((item) => "text" in item ? item.text : "").join("") : "";
+        return (JSON.parse(text) as { asset?: Record<string, unknown> }).asset;
+      },
       callTool: async (name, arguments_) => {
         const result = await client.callTool({ name, arguments: arguments_ });
         const message = Array.isArray(result.content)

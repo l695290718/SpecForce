@@ -41,4 +41,31 @@ describe("synchronizeDesignFacts", () => {
       })
     }));
   });
+
+  it("preserves existing proposal and Context Pack payloads before linking ADR evidence", async () => {
+    const callTool = vi.fn().mockResolvedValue({ ok: true });
+    await synchronizeDesignFacts({
+      callTool,
+      manifest: {
+        decisions: [{
+          id: "adr-scope",
+          repositoryAdr: "docs/adr/0001-scope.md",
+          mcpAdrId: "adr-scope",
+          scope,
+          proposalId: "proposal-scope",
+          contextPackId: "ctx-scope",
+          relatedAssetIds: ["api-specforge-mcp-tools"],
+          evidence: [{ command: "pnpm test", result: "passes" }]
+        }]
+      },
+      readAdr: async () => ({ title: "Scope isolation", english: "English.", chinese: "中文。" }),
+      readExisting: async (type) => type === "proposal"
+        ? { id: "proposal-scope", title: "Existing proposal" }
+        : { id: "ctx-scope", proposalId: "proposal-scope", name: "Existing context" }
+    });
+
+    expect(callTool).toHaveBeenCalledWith("upsert_proposal", expect.objectContaining({ proposal: { id: "proposal-scope", title: "Existing proposal" } }));
+    expect(callTool).toHaveBeenCalledWith("upsert_context_pack", expect.objectContaining({ contextPack: { id: "ctx-scope", proposalId: "proposal-scope", name: "Existing context" } }));
+    expect(callTool).toHaveBeenCalledWith("link_assets", expect.objectContaining({ sourceType: "proposal", targetType: "adr", relationType: "IMPLEMENTS_DECISION" }));
+  });
 });
