@@ -3,9 +3,10 @@ import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-type Decision = { id: string; mcpAdrId: string; scope: { applicationServiceId: string; scopePath: string } };
+type Decision = { id: string; mcpAdrId: string; proposalId: string; contextPackId: string; scope: { applicationServiceId: string; scopePath: string } };
 type Manifest = { decisions: Decision[] };
 type PersistedAdr = { id?: string; architectureScope?: { applicationServiceId?: string; scopePath?: string }; localizedContent?: { zh?: unknown } };
+type RecordType = "adr" | "proposal" | "contextPack";
 
 export interface DesignFactReconciliationReport {
   missing: string[];
@@ -17,17 +18,23 @@ export interface DesignFactReconciliationReport {
 
 export async function reconcileDesignFacts(input: {
   manifest: Manifest;
-  find: (decision: Decision) => Promise<PersistedAdr | undefined>;
+  find: (type: RecordType, decision: Decision) => Promise<PersistedAdr | undefined>;
 }): Promise<DesignFactReconciliationReport> {
   const report: DesignFactReconciliationReport = { missing: [], mismatched: [], outOfScope: [], blocked: [], verified: [] };
   for (const decision of input.manifest.decisions) {
     try {
-      const adr = await input.find(decision);
+      const adr = await input.find("adr", decision);
       if (!adr) report.missing.push(decision.id);
       else if (adr.id !== decision.mcpAdrId) report.mismatched.push(decision.id);
       else if (adr.architectureScope?.applicationServiceId !== decision.scope.applicationServiceId || adr.architectureScope?.scopePath !== decision.scope.scopePath) report.outOfScope.push(decision.id);
       else if (!adr.localizedContent?.zh) report.mismatched.push(decision.id);
-      else report.verified.push(decision.id);
+      else {
+        const proposal = await input.find("proposal", decision);
+        const contextPack = await input.find("contextPack", decision);
+        if (!proposal) report.missing.push(`${decision.id}:proposal`);
+        else if (!contextPack) report.missing.push(`${decision.id}:contextPack`);
+        else report.verified.push(decision.id);
+      }
     } catch {
       report.blocked.push(decision.id);
     }
@@ -50,8 +57,9 @@ async function main(): Promise<void> {
   try {
     const report = await reconcileDesignFacts({
       manifest,
-      find: async (decision) => {
-        const result = await client.callTool({ name: "get_asset_detail", arguments: { assetType: "adr", assetId: decision.mcpAdrId, applicationServiceId: decision.scope.applicationServiceId, format: "json" } });
+      find: async (type, decision) => {
+        const assetId = type === "adr" ? decision.mcpAdrId : type === "proposal" ? decision.proposalId : decision.contextPackId;
+        const result = await client.callTool({ name: "get_asset_detail", arguments: { assetType: type, assetId, applicationServiceId: decision.scope.applicationServiceId, format: "json" } });
         if (result.isError) return undefined;
         const text = Array.isArray(result.content) ? result.content.map((item) => "text" in item ? item.text : "").join("") : "";
         const parsed = JSON.parse(text) as { asset?: PersistedAdr };
