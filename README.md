@@ -183,6 +183,17 @@ specforge://scopes/{applicationServiceId}/{locale}/graph
 
 The MVP transport is stdio. Streamable HTTP and production OAuth/RBAC are not implemented.
 
+## Design-Fact Governance
+
+Baseline architectural decisions are recorded in `docs/adr/` and mapped in `docs/design-facts/baseline-manifest.json`. Use the local PostgreSQL connection before running:
+
+```bash
+pnpm design-facts:sync
+pnpm design-facts:check
+```
+
+`design-facts:sync` writes the baseline ADR records through the MCP stdio boundary using each manifest entry's exact scope. `design-facts:check` reads them back through scoped MCP tools and exits non-zero for missing, mismatched, out-of-scope, or blocked records. A failed synchronization or check blocks completion under `AGENTS.md`.
+
 ## AI Provider Boundary
 
 `packages/core/src/ai` defines one provider interface for Proposal, ADR, business-rule, test-suggestion, and Agent Context Pack draft generation. `MockAIProvider` is deterministic and active for the MVP. `OpenAIProvider` is a reserved boundary and intentionally makes no real model call and requires no API secret.

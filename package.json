@@ -17,6 +17,7 @@
     "db:seed": "pnpm --filter @specforge/mcp-server seed",
     "design-facts:relations:check": "tsx scripts/check-legacy-relations.ts",
     "design-facts:sync": "tsx scripts/sync-design-facts.ts",
+    "design-facts:check": "tsx scripts/reconcile-design-facts.ts",
     "format": "prettier --write ."
   },
   "devDependencies": {
