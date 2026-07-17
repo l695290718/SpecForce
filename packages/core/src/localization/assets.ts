@@ -272,6 +272,18 @@ const registry: DefinitionMap = {
       "createdAt",
       "architectureScope"
     ]
+  },
+  evidence: {
+    requiredStringFields: ["name", "description", "command", "result"],
+    technicalFieldNames: [
+      "id",
+      "decisionId",
+      "status",
+      "recordedAt",
+      "createdAt",
+      "updatedAt",
+      "architectureScope"
+    ]
   }
 };
 

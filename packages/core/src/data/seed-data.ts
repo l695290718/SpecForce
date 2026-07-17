@@ -285,7 +285,8 @@ export const seedData: SpecForgeDataStore = {
       updatedAt: now
     }
   ],
-  contextPacks: []
+  contextPacks: [],
+  evidence: []
 };
 
 export const seededContextPack: ContextPack = {

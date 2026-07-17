@@ -124,6 +124,7 @@ function scopedCatalog(scope: "alpha" | "beta"): SpecForgeDataStore {
   catalog.observabilityDesigns = [];
   catalog.adrs = [];
   catalog.contextPacks = [];
+  catalog.evidence = [];
 
   return catalog;
 }
@@ -143,7 +144,8 @@ function mixedScopeCatalog(): SpecForgeDataStore {
     observabilityDesigns: [],
     adrs: [],
     proposals: [...alpha.proposals, ...beta.proposals],
-    contextPacks: []
+    contextPacks: [],
+    evidence: []
   };
 }
 
@@ -278,7 +280,8 @@ describe("scoped localized derived views", () => {
       observabilityDesigns: [],
       adrs: [],
       proposals: [sourceProposal],
-      contextPacks: []
+      contextPacks: [],
+      evidence: []
     };
 
     const graph = await buildAssetGraph(undefined, undefined, { catalog, locale: "en" });

@@ -14,7 +14,8 @@ export const assetCollections = {
   observability: "observabilityDesigns",
   adr: "adrs",
   proposal: "proposals",
-  contextPack: "contextPacks"
+  contextPack: "contextPacks",
+  evidence: "evidence"
 } as const satisfies Record<AssetType, keyof SpecForgeDataStore>;
 
 export function getStore(catalog?: SpecForgeDataStore): SpecForgeDataStore {
@@ -71,7 +72,8 @@ export function assetLabel(assetType: AssetType, locale: AssetLocale = "en"): st
       observability: "Observability Design",
       adr: "ADR",
       proposal: "Proposal",
-      contextPack: "AI Context Pack"
+      contextPack: "AI Context Pack",
+      evidence: "Verification Evidence"
     },
     zh: {
       domain: "领域模型",
@@ -85,7 +87,8 @@ export function assetLabel(assetType: AssetType, locale: AssetLocale = "en"): st
       observability: "可观测性设计",
       adr: "架构决策记录",
       proposal: "变更提案",
-      contextPack: "Agent 上下文包"
+      contextPack: "Agent 上下文包",
+      evidence: "验证证据"
     }
   };
   return labels[locale][assetType];

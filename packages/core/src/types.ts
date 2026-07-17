@@ -12,7 +12,8 @@ export type AssetType =
   | "observability"
   | "adr"
   | "proposal"
-  | "contextPack";
+  | "contextPack"
+  | "evidence";
 
 export type AssetLocale = "zh" | "en";
 
@@ -144,6 +145,11 @@ export interface ContextPackLocalizedFields {
   generatedMarkdown: string;
 }
 
+export interface EvidenceLocalizedFields extends BaseAssetLocalizedFields {
+  command: string;
+  result: string;
+}
+
 export interface AssetLocalizedContentMap {
   domain: LocalizedContent<DomainModelLocalizedFields>;
   dataModel: LocalizedContent<DataModelLocalizedFields>;
@@ -157,6 +163,7 @@ export interface AssetLocalizedContentMap {
   adr: LocalizedContent<AdrLocalizedFields>;
   proposal: LocalizedContent<ProposalLocalizedFields>;
   contextPack: LocalizedContent<ContextPackLocalizedFields>;
+  evidence: LocalizedContent<EvidenceLocalizedFields>;
 }
 
 export type GovernanceSeverity = "info" | "warning" | "error";
@@ -370,6 +377,14 @@ export interface ContextPack {
   localizedContent?: LocalizedContent<ContextPackLocalizedFields>;
 }
 
+export interface Evidence extends BaseAsset<EvidenceLocalizedFields> {
+  decisionId: string;
+  command: string;
+  result: string;
+  status: "passed" | "failed" | "blocked";
+  recordedAt: string;
+}
+
 export interface AssetRef {
   type: AssetType;
   id: string;
@@ -467,6 +482,7 @@ export interface SpecForgeDataStore {
   adrs: Adr[];
   proposals: Proposal[];
   contextPacks: ContextPack[];
+  evidence: Evidence[];
   auditLogs?: AuditLog[];
 }
 
@@ -483,6 +499,7 @@ export interface AssetTypeMap {
   adr: Adr;
   proposal: Proposal;
   contextPack: ContextPack;
+  evidence: Evidence;
 }
 
 export type Asset = AssetTypeMap[AssetType];

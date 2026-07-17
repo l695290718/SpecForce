@@ -11,6 +11,7 @@ import {
   type ContextPack,
   type DataModel,
   type DomainModel,
+  type Evidence,
   type EventContract,
   type IntegrationContract,
   type ObservabilityDesign,
@@ -426,6 +427,27 @@ const contextPack: ContextPack = {
   }
 };
 
+const evidence: Evidence = {
+  id: "evidence-adr-canonical-assets-localization",
+  name: "Canonical asset localization verification",
+  description: "Verifies canonical asset localization behavior.",
+  decisionId: "adr-canonical-assets",
+  command: "pnpm --filter @specforge/core test",
+  result: "Localization tests pass.",
+  status: "passed",
+  recordedAt: now,
+  createdAt: now,
+  updatedAt: now,
+  localizedContent: {
+    zh: {
+      name: "zh canonical asset localization verification",
+      description: "zh verifies canonical asset localization behavior",
+      command: "pnpm --filter @specforge/core test",
+      result: "zh localization tests pass"
+    }
+  }
+};
+
 const allAssets: Array<[AssetType, Asset]> = [
   ["domain", domain],
   ["dataModel", dataModel],
@@ -439,6 +461,7 @@ const allAssets: Array<[AssetType, Asset]> = [
   ["adr", adr],
   ["proposal", proposal],
   ["contextPack", contextPack]
+  , ["evidence", evidence]
 ];
 
 describe("asset localization", () => {
@@ -469,6 +492,18 @@ describe("asset localization", () => {
         assetType: "api",
         assetId: "api-upsert-design-asset",
         path: "localizedContent.zh"
+      })
+    );
+  });
+
+  it("requires a Chinese result for evidence", () => {
+    const candidate = structuredClone(evidence);
+    delete (candidate.localizedContent?.zh as Record<string, unknown> | undefined)?.result;
+
+    expect(() => localizeAsset("evidence", candidate, "zh")).toThrowError(
+      expect.objectContaining({
+        code: "ASSET_TRANSLATION_REQUIRED",
+        path: "localizedContent.zh.result"
       })
     );
   });
