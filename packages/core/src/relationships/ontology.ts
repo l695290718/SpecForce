@@ -329,6 +329,18 @@ const relationshipDefinitions = [
     terminal: false,
     description: "Proposal to ADR decision",
     version: RELATIONSHIP_ONTOLOGY_VERSION
+  },
+  {
+    code: "VALIDATES",
+    allowedSourceTypes: ["evidence"],
+    allowedTargetTypes: ["adr"],
+    forwardPropagation: false,
+    reversePropagation: true,
+    strength: "weak",
+    defaultConfidence: 1,
+    terminal: true,
+    description: "Verification evidence to ADR decision",
+    version: RELATIONSHIP_ONTOLOGY_VERSION
   }
 ] as const satisfies readonly RelationshipTypeDefinition[];
 

@@ -50,6 +50,7 @@ describe("relationship ontology", () => {
     expect(() => relationshipApi.validateRelationshipEndpoints?.("EMITTED_BY", "event", "api")).not.toThrow();
     expect(() => relationshipApi.validateRelationshipEndpoints?.("CONNECTS_TO", "integration", "api")).not.toThrow();
     expect(() => relationshipApi.validateRelationshipEndpoints?.("IMPLEMENTS_CONTEXT_FOR", "contextPack", "proposal")).not.toThrow();
+    expect(() => relationshipApi.validateRelationshipEndpoints?.("VALIDATES", "evidence", "adr")).not.toThrow();
     expect(() => relationshipApi.validateRelationshipEndpoints?.("CALLS", "event", "api")).toThrow(
       "RELATIONSHIP_ENDPOINT_INVALID"
     );

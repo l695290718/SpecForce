@@ -26,7 +26,8 @@ export type RelationshipCode =
   | "REQUIRES"
   | "USES"
   | "IMPLEMENTS_CONTEXT_FOR"
-  | "IMPLEMENTS_DECISION";
+  | "IMPLEMENTS_DECISION"
+  | "VALIDATES";
 
 export type AssetNodeType = AssetType | "applicationService" | "dataEntity" | "dataField" | "apiOperation";
 
