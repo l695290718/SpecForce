@@ -3,10 +3,11 @@ import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-type Decision = { id: string; mcpAdrId: string; proposalId: string; contextPackId: string; scope: { applicationServiceId: string; scopePath: string } };
+type Decision = { id: string; mcpAdrId: string; proposalId: string; contextPackId: string; relatedAssetIds: string[]; scope: { applicationServiceId: string; scopePath: string } };
 type Manifest = { decisions: Decision[] };
 type PersistedAdr = { id?: string; architectureScope?: { applicationServiceId?: string; scopePath?: string }; localizedContent?: { zh?: unknown } };
 type RecordType = "adr" | "proposal" | "contextPack";
+type Link = { sourceLogicalId?: string; targetLogicalId?: string; label?: string };
 
 export interface DesignFactReconciliationReport {
   missing: string[];
@@ -19,6 +20,7 @@ export interface DesignFactReconciliationReport {
 export async function reconcileDesignFacts(input: {
   manifest: Manifest;
   find: (type: RecordType, decision: Decision) => Promise<PersistedAdr | undefined>;
+  findLinks?: (decision: Decision) => Promise<Link[]>;
 }): Promise<DesignFactReconciliationReport> {
   const report: DesignFactReconciliationReport = { missing: [], mismatched: [], outOfScope: [], blocked: [], verified: [] };
   for (const decision of input.manifest.decisions) {
@@ -33,13 +35,23 @@ export async function reconcileDesignFacts(input: {
         const contextPack = await input.find("contextPack", decision);
         if (!proposal) report.missing.push(`${decision.id}:proposal`);
         else if (!contextPack) report.missing.push(`${decision.id}:contextPack`);
-        else report.verified.push(decision.id);
+        else if (input.findLinks) {
+          const links = await input.findLinks(decision);
+          if (!hasLink(links, decision.proposalId, decision.mcpAdrId, "IMPLEMENTS_DECISION")) report.missing.push(`${decision.id}:proposal-adr-link`);
+          else if (!hasLink(links, decision.contextPackId, decision.proposalId, "IMPLEMENTS_CONTEXT_FOR")) report.missing.push(`${decision.id}:context-proposal-link`);
+          else if (decision.relatedAssetIds.some((assetId) => !hasLink(links, decision.mcpAdrId, assetId, "DECIDES"))) report.missing.push(`${decision.id}:adr-asset-link`);
+          else report.verified.push(decision.id);
+        } else report.verified.push(decision.id);
       }
     } catch {
       report.blocked.push(decision.id);
     }
   }
   return report;
+}
+
+function hasLink(links: Link[], sourceId: string, targetId: string, relationType: string): boolean {
+  return links.some((link) => link.sourceLogicalId === sourceId && link.targetLogicalId === targetId && link.label === relationType);
 }
 
 export function reconciliationExitCode(report: DesignFactReconciliationReport): 0 | 1 {
@@ -64,6 +76,12 @@ async function main(): Promise<void> {
         const text = Array.isArray(result.content) ? result.content.map((item) => "text" in item ? item.text : "").join("") : "";
         const parsed = JSON.parse(text) as { asset?: PersistedAdr };
         return parsed.asset;
+      },
+      findLinks: async (decision) => {
+        const result = await client.callTool({ name: "get_asset_graph", arguments: { applicationServiceId: decision.scope.applicationServiceId, locale: "en" } });
+        if (result.isError) return [];
+        const text = Array.isArray(result.content) ? result.content.map((item) => "text" in item ? item.text : "").join("") : "";
+        return (JSON.parse(text) as { graph?: { edges?: Link[] } }).graph?.edges ?? [];
       }
     });
     console.log(JSON.stringify(report, null, 2));
