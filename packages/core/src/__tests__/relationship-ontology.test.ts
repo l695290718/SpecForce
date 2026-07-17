@@ -44,6 +44,17 @@ describe("relationship ontology", () => {
     );
   });
 
+  it("defines canonical endpoint constraints for historical seed relationships", () => {
+    expect(() => relationshipApi.validateRelationshipEndpoints?.("CALLS", "api", "api")).not.toThrow();
+    expect(() => relationshipApi.validateRelationshipEndpoints?.("RECORDS", "event", "dataModel")).not.toThrow();
+    expect(() => relationshipApi.validateRelationshipEndpoints?.("EMITTED_BY", "event", "api")).not.toThrow();
+    expect(() => relationshipApi.validateRelationshipEndpoints?.("CONNECTS_TO", "integration", "api")).not.toThrow();
+    expect(() => relationshipApi.validateRelationshipEndpoints?.("IMPLEMENTS_CONTEXT_FOR", "contextPack", "proposal")).not.toThrow();
+    expect(() => relationshipApi.validateRelationshipEndpoints?.("CALLS", "event", "api")).toThrow(
+      "RELATIONSHIP_ENDPOINT_INVALID"
+    );
+  });
+
   it("requires an explicit authorization boundary for traversal plans", () => {
     expect(relationshipApi.createTraversalPlan).toBeTypeOf("function");
     expect(() => relationshipApi.createTraversalPlan?.({ startNodes: [rootIn(designerService, "customer-model")], allowedScopes: [] })).toThrow(

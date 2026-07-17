@@ -24,7 +24,7 @@ describe("MCP bilingual multi-scope seed", () => {
       proposal: 5,
       contextPack: 1
     });
-    expect(seedSource.selfDesignAssetLinks).toHaveLength(53);
+    expect(seedSource.selfDesignAssetLinks).toHaveLength(54);
   });
 
   it("provides complete meaningful Chinese overlays for every sibling service asset", () => {

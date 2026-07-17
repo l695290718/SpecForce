@@ -24,6 +24,7 @@ import {
   defaultArchitectureScope,
   validateSeedLocalizationInventory
 } from "./localization-report";
+import { normalizeLegacyAssetLink } from "./relationships/legacy-migration";
 
 const seedConfiguration = createSeedConfiguration({
   architectureChangeProposals,
@@ -110,7 +111,9 @@ async function main() {
   });
 
   for (const link of selfDesignAssetLinks) {
-    await callToolOrThrow(client, "link_assets", { ...link, architectureScope: defaultArchitectureScope });
+    for (const normalizedLink of normalizeLegacyAssetLink(link)) {
+      await callToolOrThrow(client, "link_assets", { ...normalizedLink, architectureScope: defaultArchitectureScope });
+    }
   }
 
   await client.close();

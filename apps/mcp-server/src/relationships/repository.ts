@@ -209,11 +209,16 @@ export class PrismaRelationshipRepository implements RelationshipCommandReposito
   }
 
   async findCurrent(scope: RelationshipScope, identity: Pick<RelationshipCurrentRecord, "sourceNodeId" | "targetNodeId" | "relationType" | "source" | "sourceReference">): Promise<RelationshipCurrentRecord | undefined> {
+    const { sourceNodeId, targetNodeId, relationType, source, sourceReference } = identity;
     const relationship = await this.client.relationshipCurrent.findUnique({
       where: {
         enterpriseId_applicationServiceId_scopePath_sourceNodeId_targetNodeId_relationType_source_sourceReference: {
           ...scope,
-          ...identity
+          sourceNodeId,
+          targetNodeId,
+          relationType,
+          source,
+          sourceReference
         }
       }
     });

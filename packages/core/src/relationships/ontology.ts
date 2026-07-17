@@ -26,6 +26,7 @@ const ownedNodeTypes = impactableNodeTypes.filter((nodeType) => nodeType !== "do
 const serviceNodeTypes = ["applicationService"] as const satisfies readonly AssetNodeType[];
 const apiNodeTypes = ["api", "apiOperation"] as const satisfies readonly AssetNodeType[];
 const dataNodeTypes = ["dataEntity", "dataField"] as const satisfies readonly AssetNodeType[];
+const dataAccessTargetTypes = ["dataModel", ...dataNodeTypes] as const satisfies readonly AssetNodeType[];
 const dataAccessSourceTypes = [...serviceNodeTypes, ...apiNodeTypes] as const satisfies readonly AssetNodeType[];
 
 const relationshipDefinitions = [
@@ -68,25 +69,25 @@ const relationshipDefinitions = [
   {
     code: "READS",
     allowedSourceTypes: dataAccessSourceTypes,
-    allowedTargetTypes: dataNodeTypes,
+    allowedTargetTypes: dataAccessTargetTypes,
     forwardPropagation: false,
     reversePropagation: true,
     strength: "medium",
     defaultConfidence: 0.9,
     terminal: false,
-    description: "API or Service to Entity",
+    description: "API or Service to Data Model, Entity, or Field",
     version: RELATIONSHIP_ONTOLOGY_VERSION
   },
   {
     code: "WRITES",
     allowedSourceTypes: dataAccessSourceTypes,
-    allowedTargetTypes: dataNodeTypes,
+    allowedTargetTypes: dataAccessTargetTypes,
     forwardPropagation: true,
     reversePropagation: true,
     strength: "strong",
     defaultConfidence: 0.95,
     terminal: false,
-    description: "API or Service to Entity",
+    description: "API or Service to Data Model, Entity, or Field",
     version: RELATIONSHIP_ONTOLOGY_VERSION
   },
   {
@@ -103,14 +104,14 @@ const relationshipDefinitions = [
   },
   {
     code: "CONTAINS",
-    allowedSourceTypes: ["dataModel", "dataEntity"],
-    allowedTargetTypes: dataNodeTypes,
+    allowedSourceTypes: ["dataModel", "dataEntity", "api"],
+    allowedTargetTypes: [...dataNodeTypes, "api"],
     forwardPropagation: true,
     reversePropagation: true,
     strength: "strong",
     defaultConfidence: 1,
     terminal: false,
-    description: "DataModel to Entity or Field",
+    description: "DataModel to Entity or Field, or API Contract to API Contract",
     version: RELATIONSHIP_ONTOLOGY_VERSION
   },
   {
@@ -231,6 +232,102 @@ const relationshipDefinitions = [
     defaultConfidence: 1,
     terminal: true,
     description: "Proposal to ContextPack",
+    version: RELATIONSHIP_ONTOLOGY_VERSION
+  },
+  {
+    code: "CALLS",
+    allowedSourceTypes: apiNodeTypes,
+    allowedTargetTypes: apiNodeTypes,
+    forwardPropagation: true,
+    reversePropagation: true,
+    strength: "strong",
+    defaultConfidence: 0.95,
+    terminal: false,
+    description: "API to API invocation",
+    version: RELATIONSHIP_ONTOLOGY_VERSION
+  },
+  {
+    code: "RECORDS",
+    allowedSourceTypes: ["event"],
+    allowedTargetTypes: dataAccessTargetTypes,
+    forwardPropagation: true,
+    reversePropagation: true,
+    strength: "strong",
+    defaultConfidence: 0.95,
+    terminal: false,
+    description: "Event to persisted data",
+    version: RELATIONSHIP_ONTOLOGY_VERSION
+  },
+  {
+    code: "EMITTED_BY",
+    allowedSourceTypes: ["event"],
+    allowedTargetTypes: [...serviceNodeTypes, ...apiNodeTypes],
+    forwardPropagation: false,
+    reversePropagation: true,
+    strength: "strong",
+    defaultConfidence: 0.95,
+    terminal: false,
+    description: "Event to emitting service or API",
+    version: RELATIONSHIP_ONTOLOGY_VERSION
+  },
+  {
+    code: "CONNECTS_TO",
+    allowedSourceTypes: ["integration"],
+    allowedTargetTypes: [...serviceNodeTypes, ...apiNodeTypes, "integration"],
+    forwardPropagation: true,
+    reversePropagation: true,
+    strength: "strong",
+    defaultConfidence: 0.9,
+    terminal: false,
+    description: "Integration to service, API, or integration",
+    version: RELATIONSHIP_ONTOLOGY_VERSION
+  },
+  {
+    code: "REQUIRES",
+    allowedSourceTypes: ["businessRule", "proposal"],
+    allowedTargetTypes: impactableNodeTypes,
+    forwardPropagation: false,
+    reversePropagation: true,
+    strength: "medium",
+    defaultConfidence: 0.9,
+    terminal: false,
+    description: "Rule or proposal to required asset",
+    version: RELATIONSHIP_ONTOLOGY_VERSION
+  },
+  {
+    code: "USES",
+    allowedSourceTypes: ["stateMachine"],
+    allowedTargetTypes: apiNodeTypes,
+    forwardPropagation: true,
+    reversePropagation: true,
+    strength: "medium",
+    defaultConfidence: 0.9,
+    terminal: false,
+    description: "State machine to API",
+    version: RELATIONSHIP_ONTOLOGY_VERSION
+  },
+  {
+    code: "IMPLEMENTS_CONTEXT_FOR",
+    allowedSourceTypes: ["contextPack"],
+    allowedTargetTypes: ["proposal"],
+    forwardPropagation: false,
+    reversePropagation: true,
+    strength: "medium",
+    defaultConfidence: 1,
+    terminal: false,
+    description: "Context pack to proposal",
+    version: RELATIONSHIP_ONTOLOGY_VERSION
+  },
+  {
+    code: "IMPLEMENTS_DECISION",
+    allowedSourceTypes: ["proposal"],
+    allowedTargetTypes: ["adr"],
+    forwardPropagation: true,
+    reversePropagation: false,
+    strength: "strong",
+    defaultConfidence: 1,
+    terminal: false,
+    description: "Proposal to ADR decision",
     version: RELATIONSHIP_ONTOLOGY_VERSION
   }
 ] as const satisfies readonly RelationshipTypeDefinition[];

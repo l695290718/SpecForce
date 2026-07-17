@@ -47,32 +47,57 @@ describe("normalizeLegacyAssetLink", () => {
       .toThrow(new LegacyRelationMigrationError("LEGACY_RELATION_UNKNOWN", "synchronizes"));
   });
 
-  it("rejects calls without explicit consuming or providing role metadata", () => {
+  it("rejects an unregistered relation with no canonical migration", () => {
     expect(() => normalizeLegacyAssetLink({
       sourceType: "api",
       sourceId: "api-web-console",
       targetType: "api",
       targetId: "api-ai-generation",
-      relationType: "calls"
-    })).toThrow(new LegacyRelationMigrationError("LEGACY_RELATION_AMBIGUOUS", "calls"));
+      relationType: "synchronizes"
+    })).toThrow(new LegacyRelationMigrationError("LEGACY_RELATION_UNKNOWN", "synchronizes"));
   });
 
-  it("maps calls using explicit role metadata", () => {
-    const link = {
+  it("maps historical relationship vocabulary to canonical ontology codes", () => {
+    expect(normalizeLegacyAssetLink({
       sourceType: "api",
       sourceId: "api-web-console",
       targetType: "api",
       targetId: "api-ai-generation",
-      relationType: "calls",
-      metadata: { legacyCallRole: "consuming" }
-    };
+      relationType: "calls"
+    })).toEqual([{
+      sourceType: "api",
+      sourceId: "api-web-console",
+      targetType: "api",
+      targetId: "api-ai-generation",
+      relationType: "CALLS"
+    }]);
 
-    expect(normalizeLegacyAssetLink(link)).toEqual([{
-      sourceType: link.sourceType,
-      sourceId: link.sourceId,
-      targetType: link.targetType,
-      targetId: link.targetId,
-      relationType: "CONSUMES"
+    expect(normalizeLegacyAssetLink({
+      sourceType: "event",
+      sourceId: "event-asset-upserted",
+      targetType: "api",
+      targetId: "api-asset-upsert",
+      relationType: "emitted-by"
+    })).toEqual([{
+      sourceType: "event",
+      sourceId: "event-asset-upserted",
+      targetType: "api",
+      targetId: "api-asset-upsert",
+      relationType: "EMITTED_BY"
+    }]);
+
+    expect(normalizeLegacyAssetLink({
+      sourceType: "contextPack",
+      sourceId: "ctx-self-design",
+      targetType: "proposal",
+      targetId: "proposal-self-design",
+      relationType: "implements-context-for"
+    })).toEqual([{
+      sourceType: "contextPack",
+      sourceId: "ctx-self-design",
+      targetType: "proposal",
+      targetId: "proposal-self-design",
+      relationType: "IMPLEMENTS_CONTEXT_FOR"
     }]);
   });
 });

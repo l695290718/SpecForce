@@ -2,8 +2,6 @@ import type { ArchitectureScopeRef, RelationshipCode } from "@specforge/core";
 
 export const LEGACY_RELATION_MIGRATION_VERSION = "specforge.legacy-asset-links.v1" as const;
 
-export type LegacyCallRole = "consuming" | "providing";
-
 export interface LegacyAssetLink {
   sourceType: string;
   sourceId: string;
@@ -12,9 +10,6 @@ export interface LegacyAssetLink {
   relationType: string;
   description?: string;
   architectureScope?: ArchitectureScopeRef;
-  metadata?: {
-    legacyCallRole?: LegacyCallRole | string;
-  };
 }
 
 export interface CanonicalAssetLink {
@@ -46,14 +41,15 @@ interface DirectMigrationRule {
   readonly relationTypes: readonly RelationshipCode[];
 }
 
-interface CallsMigrationRule {
-  readonly kind: "calls";
-  readonly relationTypesByRole: Readonly<Record<LegacyCallRole, RelationshipCode>>;
-}
+type LegacyRelationMigrationRule = DirectMigrationRule;
 
-type LegacyRelationMigrationRule = DirectMigrationRule | CallsMigrationRule;
-
-type RegisteredLegacyRelationCode = RelationshipCode | "READS-WRITES" | "CALLS";
+type RegisteredLegacyRelationCode =
+  | RelationshipCode
+  | "READS-WRITES"
+  | "EMITTED-BY"
+  | "CONNECTS-TO"
+  | "IMPLEMENTS-CONTEXT-FOR"
+  | "IMPLEMENTS-DECISION";
 
 export interface LegacyRelationMigrationRegistry {
   readonly version: typeof LEGACY_RELATION_MIGRATION_VERSION;
@@ -82,14 +78,19 @@ export const legacyRelationMigrationRegistry: LegacyRelationMigrationRegistry = 
     DECIDES: direct("DECIDES"),
     IMPACTS: direct("IMPACTS"),
     GENERATES: direct("GENERATES"),
+    CALLS: direct("CALLS"),
+    RECORDS: direct("RECORDS"),
+    EMITTED_BY: direct("EMITTED_BY"),
+    "EMITTED-BY": direct("EMITTED_BY"),
+    CONNECTS_TO: direct("CONNECTS_TO"),
+    "CONNECTS-TO": direct("CONNECTS_TO"),
+    REQUIRES: direct("REQUIRES"),
+    USES: direct("USES"),
+    IMPLEMENTS_CONTEXT_FOR: direct("IMPLEMENTS_CONTEXT_FOR"),
+    "IMPLEMENTS-CONTEXT-FOR": direct("IMPLEMENTS_CONTEXT_FOR"),
+    IMPLEMENTS_DECISION: direct("IMPLEMENTS_DECISION"),
+    "IMPLEMENTS-DECISION": direct("IMPLEMENTS_DECISION"),
     "READS-WRITES": direct("READS", "WRITES"),
-    CALLS: {
-      kind: "calls",
-      relationTypesByRole: {
-        consuming: "CONSUMES",
-        providing: "PROVIDES"
-      }
-    }
   }
 };
 
@@ -98,19 +99,9 @@ export function normalizeLegacyAssetLink(link: LegacyAssetLink): CanonicalAssetL
   const rule = legacyRelationMigrationRegistry.mappings[legacyCode as RegisteredLegacyRelationCode];
   if (!rule) throw new LegacyRelationMigrationError("LEGACY_RELATION_UNKNOWN", link.relationType);
 
-  const relationTypes = rule.kind === "direct"
-    ? rule.relationTypes
-    : [relationTypeForCallRole(link, rule)];
+  const relationTypes = rule.relationTypes;
 
   return relationTypes.map((relationType) => canonicalAssetLink(link, relationType));
-}
-
-function relationTypeForCallRole(link: LegacyAssetLink, rule: CallsMigrationRule): RelationshipCode {
-  const role = link.metadata?.legacyCallRole;
-  if (role !== "consuming" && role !== "providing") {
-    throw new LegacyRelationMigrationError("LEGACY_RELATION_AMBIGUOUS", link.relationType);
-  }
-  return rule.relationTypesByRole[role];
 }
 
 function canonicalAssetLink(link: LegacyAssetLink, relationType: RelationshipCode): CanonicalAssetLink {

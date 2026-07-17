@@ -1730,8 +1730,16 @@ export const selfDesignAssetLinks = [
     sourceId: "api-specforge-ai-generation",
     targetType: "dataModel",
     targetId: "data-specforge-ai-generation",
-    relationType: "reads-writes",
-    description: "The AI generation endpoint consumes provider request and response data."
+    relationType: "reads",
+    description: "The AI generation endpoint reads provider request and response data."
+  },
+  {
+    sourceType: "api",
+    sourceId: "api-specforge-ai-generation",
+    targetType: "dataModel",
+    targetId: "data-specforge-ai-generation",
+    relationType: "writes",
+    description: "The AI generation endpoint writes provider request and response data."
   },
   {
     sourceType: "api",
@@ -1778,8 +1786,8 @@ export const selfDesignAssetLinks = [
     sourceId: "api-specforge-web-console",
     targetType: "api",
     targetId: "api-specforge-graph-query",
-    relationType: "reads",
-    description: "The Web Console displays the graph query result."
+    relationType: "calls",
+    description: "The Web Console calls the graph query API to display its result."
   },
   {
     sourceType: "event",

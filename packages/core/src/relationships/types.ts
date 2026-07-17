@@ -18,7 +18,15 @@ export type RelationshipCode =
   | "OBSERVES"
   | "DECIDES"
   | "IMPACTS"
-  | "GENERATES";
+  | "GENERATES"
+  | "CALLS"
+  | "RECORDS"
+  | "EMITTED_BY"
+  | "CONNECTS_TO"
+  | "REQUIRES"
+  | "USES"
+  | "IMPLEMENTS_CONTEXT_FOR"
+  | "IMPLEMENTS_DECISION";
 
 export type AssetNodeType = AssetType | "applicationService" | "dataEntity" | "dataField" | "apiOperation";
 
@@ -45,4 +53,4 @@ export interface AssetNodeIdentity extends ArchitectureScopeRef {
   parentLogicalId?: string;
 }
 
-export const RELATIONSHIP_ONTOLOGY_VERSION = "specforge.relationships.v1" as const;
+export const RELATIONSHIP_ONTOLOGY_VERSION = "specforge.relationships.v2" as const;
