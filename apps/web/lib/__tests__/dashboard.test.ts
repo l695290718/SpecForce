@@ -5,7 +5,7 @@ import { buildDashboardScopeView } from "../dashboard";
 function emptyCatalog(): SpecForgeDataStore {
   return {
     domains: [], dataModels: [], apis: [], events: [], businessRules: [], stateMachines: [], integrations: [],
-    qualityRequirements: [], observabilityDesigns: [], adrs: [], proposals: [], contextPacks: []
+    qualityRequirements: [], observabilityDesigns: [], adrs: [], proposals: [], contextPacks: [], evidence: []
   };
 }
 

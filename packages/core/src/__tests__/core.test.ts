@@ -3,11 +3,18 @@ import {
   analyzeProposalImpact,
   buildAssetGraph,
   generateContextPack,
+  normalizeAssetType,
   renderAssetSummary,
   runGovernanceChecks
 } from "../index";
+import { seedData } from "../data/seed-data";
 
 describe("SpecForge core services", () => {
+  it("normalizes evidence asset types for MCP relationship writes", () => {
+    expect(normalizeAssetType("evidence")).toBe("evidence");
+    expect(normalizeAssetType("evidences")).toBe("evidence");
+  });
+
   it("generates a context pack with all required markdown sections", async () => {
     const pack = await generateContextPack("proposal-partial-refund");
 
@@ -42,6 +49,27 @@ describe("SpecForge core services", () => {
     expect(graph.nodes.some((node) => node.id === "api-create-refund")).toBe(true);
     expect(graph.nodes.every((node) => node.type === "domain" || node.type === "api")).toBe(true);
     expect(graph.edges.every((edge) => graph.nodes.some((node) => node.id === edge.source) && graph.nodes.some((node) => node.id === edge.target))).toBe(true);
+  });
+
+  it("includes evidence assets as graph nodes", async () => {
+    const catalog = structuredClone(seedData);
+    catalog.evidence.push({
+      id: "evidence-graph-test",
+      name: "Graph verification evidence",
+      description: "Verifies evidence graph nodes.",
+      decisionId: "adr-test",
+      command: "pnpm test",
+      result: "passes",
+      status: "passed",
+      recordedAt: "2026-07-17T00:00:00.000Z",
+      createdAt: "2026-07-17T00:00:00.000Z",
+      updatedAt: "2026-07-17T00:00:00.000Z",
+      localizedContent: { zh: { name: "zh graph verification evidence", description: "zh verifies evidence graph nodes", command: "pnpm test", result: "zh passes" } }
+    });
+
+    const graph = await buildAssetGraph(undefined, undefined, { catalog });
+
+    expect(graph.nodes).toContainEqual(expect.objectContaining({ id: "evidence-graph-test", type: "evidence" }));
   });
 
   it("analyzes proposal impact across assets and risks", async () => {

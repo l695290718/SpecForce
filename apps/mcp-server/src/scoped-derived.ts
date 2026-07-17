@@ -52,7 +52,8 @@ function emptyCatalog(): SpecForgeDataStore {
     observabilityDesigns: [],
     adrs: [],
     proposals: [],
-    contextPacks: []
+    contextPacks: [],
+    evidence: []
   };
 }
 

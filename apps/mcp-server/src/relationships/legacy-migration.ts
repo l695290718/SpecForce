@@ -90,6 +90,7 @@ export const legacyRelationMigrationRegistry: LegacyRelationMigrationRegistry = 
     "IMPLEMENTS-CONTEXT-FOR": direct("IMPLEMENTS_CONTEXT_FOR"),
     IMPLEMENTS_DECISION: direct("IMPLEMENTS_DECISION"),
     "IMPLEMENTS-DECISION": direct("IMPLEMENTS_DECISION"),
+    VALIDATES: direct("VALIDATES"),
     "READS-WRITES": direct("READS", "WRITES"),
   }
 };

@@ -191,6 +191,31 @@ describe("scoped localized derived tools", () => {
     });
   });
 
+  it("accepts evidence through the generic design-asset write boundary", async () => {
+    const architectureScope = {
+      applicationServiceId: "com.huawei.celon.desiner",
+      scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+    };
+    const evidence = { id: "evidence-adr-1", name: "Verification evidence" };
+    const tool = captureTools().get("upsert_design_asset")!;
+    const schema = tool.config.inputSchema as { assetType: { safeParse: (value: unknown) => { success: boolean } } };
+
+    expect(schema.assetType.safeParse("evidence").success).toBe(true);
+
+    const result = await tool.handler({
+      assetType: "evidence",
+      asset: evidence,
+      architectureScope
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(persistence.upsertDesignAsset).toHaveBeenCalledWith({
+      assetType: "evidence",
+      asset: { ...evidence, architectureScope },
+      architectureScope
+    });
+  });
+
   it("rejects a mismatched applicationServiceId before persisted writes", async () => {
     const result = await captureTools().get("create_proposal")!.handler({
       applicationServiceId: "com.huawei.celon.policyhub",

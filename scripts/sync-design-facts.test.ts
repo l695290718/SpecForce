@@ -67,5 +67,23 @@ describe("synchronizeDesignFacts", () => {
     expect(callTool).toHaveBeenCalledWith("upsert_proposal", expect.objectContaining({ proposal: { id: "proposal-scope", title: "Existing proposal" } }));
     expect(callTool).toHaveBeenCalledWith("upsert_context_pack", expect.objectContaining({ contextPack: { id: "ctx-scope", proposalId: "proposal-scope", name: "Existing context" } }));
     expect(callTool).toHaveBeenCalledWith("link_assets", expect.objectContaining({ sourceType: "proposal", targetType: "adr", relationType: "IMPLEMENTS_DECISION" }));
+    expect(callTool).toHaveBeenCalledWith("upsert_design_asset", expect.objectContaining({
+      assetType: "evidence",
+      architectureScope: scope,
+      asset: expect.objectContaining({
+        id: "evidence-adr-scope-1",
+        decisionId: "adr-scope",
+        command: "pnpm test",
+        result: "passes",
+        status: "passed"
+      })
+    }));
+    expect(callTool).toHaveBeenCalledWith("link_assets", expect.objectContaining({
+      sourceType: "evidence",
+      sourceId: "evidence-adr-scope-1",
+      targetType: "adr",
+      targetId: "adr-scope",
+      relationType: "VALIDATES"
+    }));
   });
 });

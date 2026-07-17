@@ -30,6 +30,10 @@ export interface DesignFactSyncReceipt {
   status: "complete";
 }
 
+export function designEvidenceId(decisionId: string, index: number): string {
+  return `evidence-${decisionId}-${index + 1}`;
+}
+
 type CallTool = (name: string, input: Record<string, unknown>) => Promise<{ ok?: boolean; isError?: boolean; message?: string }>;
 type ExistingRecordType = "proposal" | "contextPack";
 
@@ -69,6 +73,16 @@ export async function synchronizeDesignFacts(input: {
       }
     }
 
+    for (const [index, evidence] of decision.evidence.entries()) {
+      const evidenceId = designEvidenceId(decision.id, index);
+      await callOrThrow(input.callTool, "upsert_design_asset", {
+        assetType: "evidence",
+        asset: buildEvidence(decision, source, evidenceId, evidence),
+        architectureScope: decision.scope
+      }, decision.id);
+      await callOrThrow(input.callTool, "link_assets", link("evidence", evidenceId, "adr", decision.mcpAdrId, "VALIDATES", decision.scope), decision.id);
+    }
+
     receipts.push({ id: decision.id, mcpAdrId: decision.mcpAdrId, status: "complete" });
   }
 
@@ -83,6 +97,37 @@ function buildProposal(decision: DesignFactManifestDecision, source: AdrSource) 
 function buildContextPack(decision: DesignFactManifestDecision, source: AdrSource) {
   const now = new Date().toISOString();
   return { id: decision.contextPackId, name: `${source.title} Context Pack`, proposalId: decision.proposalId, targetAgent: "generic", summary: source.english, includedAssets: [], constraints: [], instructions: [], generatedMarkdown: source.english, createdAt: now, architectureScope: decision.scope, localizedContent: { zh: { name: `${localizedTitle(source.chinese)} 上下文包`, summary: source.chinese, constraints: [], instructions: [], generatedMarkdown: source.chinese } } };
+}
+
+function buildEvidence(
+  decision: DesignFactManifestDecision,
+  source: AdrSource,
+  id: string,
+  evidence: DesignFactManifestDecision["evidence"][number]
+) {
+  const now = new Date().toISOString();
+  const name = `${source.title} verification evidence`;
+  const description = `Verification evidence for ${source.title}.`;
+  return {
+    id,
+    name,
+    description,
+    decisionId: decision.mcpAdrId,
+    command: evidence.command,
+    result: evidence.result,
+    status: "passed" as const,
+    recordedAt: now,
+    createdAt: now,
+    updatedAt: now,
+    localizedContent: {
+      zh: {
+        name: `${localizedTitle(source.chinese)} 验证证据`,
+        description: `用于验证 ${localizedTitle(source.chinese)} 的证据。`,
+        command: evidence.command,
+        result: evidence.result
+      }
+    }
+  };
 }
 
 async function callOrThrow(callTool: CallTool, name: string, input: Record<string, unknown>, decisionId: string): Promise<void> {

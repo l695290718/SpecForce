@@ -97,7 +97,7 @@ function registerJsonTool<T extends z.ZodRawShape>(
   );
 }
 
-const assetTypeSchema = z.enum(["domain", "dataModel", "api", "event", "businessRule", "stateMachine", "integration", "quality", "observability", "adr", "proposal", "contextPack"]);
+const assetTypeSchema = z.enum(["domain", "dataModel", "api", "event", "businessRule", "stateMachine", "integration", "quality", "observability", "adr", "proposal", "contextPack", "evidence"]);
 const assetLocaleSchema = z.enum(["zh", "en"]);
 const architectureScopeSchema = z.object({
   applicationServiceId: z.string().min(1),

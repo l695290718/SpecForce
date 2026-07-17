@@ -29,8 +29,21 @@ it("reports a missing linked proposal as incomplete", async () => {
 it("reports a missing typed relationship as incomplete", async () => {
   const report = await reconcileDesignFacts({
     manifest: { decisions: [{ id: "scope", mcpAdrId: "adr-scope", proposalId: "proposal-scope", contextPackId: "ctx-scope", relatedAssetIds: [], scope: { applicationServiceId: "com.huawei.celon.desiner", scopePath: "scope" } }] } as never,
-    find: async (type) => ({ id: type === "adr" ? "adr-scope" : type === "proposal" ? "proposal-scope" : "ctx-scope", architectureScope: { applicationServiceId: "com.huawei.celon.desiner", scopePath: "scope" }, localizedContent: { zh: {} } }),
+    find: async (type) => type === "evidence" ? undefined : ({ id: type === "adr" ? "adr-scope" : type === "proposal" ? "proposal-scope" : "ctx-scope", architectureScope: { applicationServiceId: "com.huawei.celon.desiner", scopePath: "scope" }, localizedContent: { zh: {} } }),
     findLinks: async () => []
   });
   expect(report.missing).toEqual(["scope:proposal-adr-link"]);
+});
+
+it("reports missing evidence as incomplete", async () => {
+  const report = await reconcileDesignFacts({
+    manifest: { decisions: [{ id: "scope", mcpAdrId: "adr-scope", proposalId: "proposal-scope", contextPackId: "ctx-scope", relatedAssetIds: [], evidence: [{ command: "pnpm test", result: "passes" }], scope: { applicationServiceId: "com.huawei.celon.desiner", scopePath: "scope" } }] } as never,
+    find: async (type) => type === "evidence" ? undefined : ({ id: type === "adr" ? "adr-scope" : type === "proposal" ? "proposal-scope" : "ctx-scope", architectureScope: { applicationServiceId: "com.huawei.celon.desiner", scopePath: "scope" }, localizedContent: { zh: {} } }),
+    findLinks: async () => [
+      { sourceLogicalId: "proposal-scope", targetLogicalId: "adr-scope", label: "IMPLEMENTS_DECISION" },
+      { sourceLogicalId: "ctx-scope", targetLogicalId: "proposal-scope", label: "IMPLEMENTS_CONTEXT_FOR" }
+    ]
+  });
+
+  expect(report.missing).toEqual(["scope:evidence"]);
 });

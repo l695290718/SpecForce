@@ -4,11 +4,11 @@
 
 ### Complete dual-record synchronization
 
-**Status:** Pending.
+**Status:** Complete (locally verified on 2026-07-17).
 
-The baseline ADR records are synchronized and reconciled through MCP. Extend the same workflow to the matching Proposals, Context Packs, typed ADR-to-asset links, and command/test evidence. The reconciliation report must verify all of these records in the exact owning application-service scope and fail closed on any mismatch.
+The baseline ADR records, matching Proposals, Context Packs, typed ADR-to-asset links, and independent Evidence assets are synchronized through MCP. The reconciliation report verifies all of these records in the exact owning application-service scope and fails closed on any mismatch.
 
-**Completion evidence:** `pnpm design-facts:sync` and `pnpm design-facts:check` report no missing, mismatched, out-of-scope, or blocked records for ADRs, Proposals, Context Packs, links, and evidence.
+**Completion evidence:** On 2026-07-17, `pnpm design-facts:sync` persisted all seven baseline decisions and their Evidence/`VALIDATES` links; `pnpm design-facts:check` reported seven verified decisions with no missing, mismatched, out-of-scope, or blocked records.
 
 ### Reconcile historical ADR status text
 

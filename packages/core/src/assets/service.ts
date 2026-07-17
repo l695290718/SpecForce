@@ -59,7 +59,9 @@ const assetTypeAliases: Record<string, AssetType> = {
   "context-pack": "contextPack",
   "context-packs": "contextPack",
   contextPack: "contextPack",
-  contextPacks: "contextPack"
+  contextPacks: "contextPack",
+  evidence: "evidence",
+  evidences: "evidence"
 };
 
 export function normalizeAssetType(assetType: string): AssetType {

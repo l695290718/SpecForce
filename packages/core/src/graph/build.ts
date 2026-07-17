@@ -158,6 +158,10 @@ export async function buildAssetGraph(domainId?: string, assetType?: AssetType, 
     addNode("proposal", canonical, proposal.title, proposal.description, proposal.domainId);
     addRefEdges("proposal", canonical, proposal.impactedAssets, "impacts");
   });
+  store.evidence.filter(inDomain).forEach((canonical) => {
+    const evidence = localizeCatalogAsset("evidence", canonical, locale, options.catalog);
+    addNode("evidence", canonical, evidence.name, evidence.result, evidence.domainId);
+  });
 
   const filteredNodes = assetType ? nodes.filter((item) => item.type === "domain" || item.type === assetType) : nodes;
   const nodeIds = new Set(filteredNodes.map((item) => item.id));
