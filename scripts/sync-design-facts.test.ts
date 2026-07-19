@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { synchronizeDesignFacts } from "./sync-design-facts";
+import { validateAssetLocalization } from "../packages/core/src/localization/assets";
+import type { Asset } from "../packages/core/src/types";
 
 const scope = {
   applicationServiceId: "com.huawei.celon.desiner",
@@ -260,8 +262,7 @@ describe("synchronizeDesignFacts", () => {
             decision: "Use the governance core for scoped persistence and read-only reconciliation.",
             alternatives: ["**Direct external mutation.** Deferred until a later increment.", "**Last-writer-wins.** Rejected for governed facts."],
             consequences: ["Scope-safe records are auditable.", "Connector delivery remains separately reviewed."],
-            constraints: ["MCP is the authored write boundary.", "PostgreSQL is authoritative and graph stores are derived."],
-            evidence: ["**Implemented:** Core contracts and MCP tools.", "**Locally verified:** Focused sync tests pass."]
+            constraints: ["MCP is the authored write boundary.", "PostgreSQL is authoritative and graph stores are derived."]
           },
           zh: {
             name: "联邦设计事实同步",
@@ -271,12 +272,17 @@ describe("synchronizeDesignFacts", () => {
             decision: "使用治理核心进行受 Scope 约束的持久化和只读对账。",
             alternatives: ["**直接修改外部系统。** 延期到后续增量。", "**最后写入者获胜。** 治理事实禁止采用。"],
             consequences: ["Scope 安全的记录可审计。", "连接器投递需要独立评审。"],
-            constraints: ["MCP 是已编写事实的写入边界。", "PostgreSQL 保持权威，图存储是派生投影。"],
-            evidence: ["**已实现：** 核心契约和 MCP 工具。", "**已本地验证：** 针对性同步测试通过。"]
+            constraints: ["MCP 是已编写事实的写入边界。", "PostgreSQL 保持权威，图存储是派生投影。"]
           }
         }
       }
     });
+
+    const adr = adrCall?.[1]?.adr as { evidence: string[]; localizedContent: { en: Record<string, unknown>; zh: Record<string, unknown> } };
+    expect(adr.evidence).toEqual(["**Implemented:** Core contracts and MCP tools.", "**Locally verified:** Focused sync tests pass."]);
+    expect(adr.localizedContent.en).not.toHaveProperty("evidence");
+    expect(adr.localizedContent.zh).not.toHaveProperty("evidence");
+    expect(() => validateAssetLocalization("adr", adr as unknown as Asset)).not.toThrow();
 
     expect(callTool).toHaveBeenCalledWith("upsert_proposal", expect.objectContaining({
       architectureScope: scope,
@@ -315,7 +321,16 @@ describe("synchronizeDesignFacts", () => {
     expect(callTool).toHaveBeenCalledWith("upsert_design_asset", expect.objectContaining({
       assetType: "evidence",
       architectureScope: scope,
-      asset: expect.objectContaining({ id: "evidence-adr-federated-design-fact-synchronization-1", decisionId: federatedDecision.mcpAdrId, command: "pnpm test", result: "Focused sync tests pass.", localizedContent: { en: expect.any(Object), zh: expect.any(Object) } })
+      asset: expect.objectContaining({
+        id: "evidence-adr-federated-design-fact-synchronization-1",
+        decisionId: federatedDecision.mcpAdrId,
+        command: "pnpm test",
+        result: "Focused sync tests pass.",
+        localizedContent: {
+          en: { name: expect.any(String), description: expect.any(String), command: "pnpm test", result: "Focused sync tests pass." },
+          zh: { name: expect.any(String), description: expect.any(String), command: "pnpm test", result: "Focused sync tests pass." }
+        }
+      })
     }));
   });
 });

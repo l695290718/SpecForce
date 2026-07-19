@@ -4,7 +4,7 @@
 
 Recorded `adr-federated-design-fact-synchronization` with explicit English canonical Context, Decision, Alternatives, Consequences, Constraints, and Evidence fields plus complete Chinese localization. The ADR, manifest, Proposal, Context Pack, typed links, and Evidence records use the exact Designer Scope and stable IDs.
 
-Fixed the existing manifest-driven `synchronizeDesignFacts` MCP builder to parse structured ADR sections, preserve non-empty canonical fields, emit `localizedContent.en` and `localizedContent.zh`, map `data-*` references to `dataModel`, and generate Proposal, Context Pack, typed `IMPLEMENTS_DECISION`, `IMPLEMENTS_CONTEXT_FOR`, `DECIDES`, `VALIDATES`, and Evidence calls through the same MCP path. The federated ADR covers valid `DECIDES` target types `api`, `dataModel`, and `adr`; no parallel sync path was added.
+Fixed the existing manifest-driven `synchronizeDesignFacts` MCP builder to parse structured ADR sections, preserve non-empty canonical fields, emit only validator-supported ADR localization fields in `localizedContent.en` and `localizedContent.zh`, map `data-*` references to `dataModel`, and generate Proposal, Context Pack, typed `IMPLEMENTS_DECISION`, `IMPLEMENTS_CONTEXT_FOR`, `DECIDES`, `VALIDATES`, and separate Evidence asset calls through the same MCP path. ADR evidence remains canonical and is not duplicated into the ADR localization overlay. The federated ADR covers valid `DECIDES` target types `api`, `dataModel`, and `adr`; no parallel sync path was added.
 
 Aligned the design specification status: governance-core implementation is complete locally; MCP persistence/read-back and real PostgreSQL verification are blocked pending environment configuration; legacy scanners, continuous inbound/outbound synchronization, and external `APPLY` remain deferred. No Task 6 or unrelated UI work is included.
 
@@ -29,9 +29,11 @@ RED: `node .\\node_modules\\vitest\\vitest.mjs run scripts\\sync-design-facts.te
 
 The review-focused test failed as intended before implementation: canonical section fields were empty/whole-Markdown values, `localizedContent.en` was absent, and all related assets were emitted as `api`.
 
+P1 RED: the follow-up assertion failed because `localizedContent.en/zh.evidence` was emitted even though the ADR localization registry does not permit that field.
+
 GREEN: `node .\\node_modules\\vitest\\vitest.mjs run scripts\\design-fact-manifest.test.ts scripts\\sync-design-facts.test.ts scripts\\reconcile-design-facts.test.ts scripts\\reconcile-federated-facts.test.ts`
 
-Result: 4 files passed, 19 tests passed.
+Result: 4 files passed, 19 tests passed; the sync fixture also passes the existing `validateAssetLocalization("adr", ...)` validator.
 
 ## Verification
 
@@ -50,4 +52,4 @@ Result: 4 files passed, 19 tests passed.
 
 ## Commit
 
-`fix: make federated design-fact sync payloads canonical`
+`fix: remove unsupported ADR evidence localization`

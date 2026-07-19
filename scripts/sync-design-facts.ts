@@ -263,8 +263,7 @@ function buildAdr(decision: DesignFactManifestDecision, parsed: ParsedAdr) {
         decision: parsed.en.decision,
         alternatives: parsed.en.alternatives,
         consequences: parsed.en.consequences,
-        constraints: parsed.en.constraints,
-        evidence: parsed.en.evidence
+        constraints: parsed.en.constraints
       },
       zh: {
         name: parsed.zh.title,
@@ -274,8 +273,7 @@ function buildAdr(decision: DesignFactManifestDecision, parsed: ParsedAdr) {
         decision: parsed.zh.decision,
         alternatives: parsed.zh.alternatives,
         consequences: parsed.zh.consequences,
-        constraints: parsed.zh.constraints,
-        evidence: parsed.zh.evidence
+        constraints: parsed.zh.constraints
       }
     }
   };
