@@ -562,6 +562,23 @@ describe("federation MCP tools", () => {
     expect(errorCode(result)).toBe("DELIVERY_BLOCKED");
   });
 
+  it("preserves stable connector readiness errors from observation persistence", async () => {
+    federationPersistence.recordObservation.mockRejectedValueOnce(new Error("CONNECTOR_NOT_ACTIVE"));
+
+    const result = await callTool("record_external_observation", {
+      connectorId: connector.id,
+      sourceNamespace: "github",
+      externalAssetType: "api",
+      externalId: "payments-api",
+      payload: { version: 1 },
+      sourceVersion: "abc123",
+      architectureScope: designerScope
+    });
+
+    expect(result.isError).toBe(true);
+    expect(errorCode(result)).toBe("CONNECTOR_NOT_ACTIVE");
+  });
+
   it("routes scoped reconciliation without a write-side snapshot", async () => {
     const tool = captureToolsWithFederationRegistration().get("reconcile_federated_scope")!;
     expect(tool.config.inputSchema).not.toHaveProperty("acceptedFacts");

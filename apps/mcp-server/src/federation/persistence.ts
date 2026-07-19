@@ -66,12 +66,21 @@ type FederationTransaction = Omit<typeof prisma, "$connect" | "$disconnect" | "$
 
 export async function registerConnector(input: RegisterConnectorInput): Promise<ConnectorInstance> {
   const scope = writableScope(input.architectureScope);
-  const row = await prisma.connectorInstance.upsert({
-    where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } },
-    create: { ...scope, id: input.id, kind: input.kind, capabilities: json(input.capabilities), status: input.status, secretReference: input.secretReference ?? null },
-    update: { kind: input.kind, capabilities: json(input.capabilities), status: input.status, secretReference: input.secretReference ?? null }
+  return prisma.$transaction(async (transaction) => {
+    const tx = transaction as FederationTransaction;
+    const row = await tx.connectorInstance.upsert({
+      where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } },
+      create: { ...scope, id: input.id, kind: input.kind, capabilities: json(input.capabilities), status: input.status, secretReference: input.secretReference ?? null },
+      update: { kind: input.kind, capabilities: json(input.capabilities), status: input.status, secretReference: input.secretReference ?? null }
+    });
+    await createOutbox(tx, {
+      eventType: "FEDERATION_CONNECTOR_REGISTERED",
+      payload: { connectorId: input.id, kind: input.kind, status: input.status, capabilities: input.capabilities },
+      idempotencyKey: federationEventKey("FEDERATION_CONNECTOR_REGISTERED", scope, input.id),
+      architectureScope: scope
+    });
+    return connector(row);
   });
-  return connector(row);
 }
 
 export async function listConnectors(scopeInput: ArchitectureScopeRef): Promise<ConnectorInstance[]> {
@@ -81,16 +90,18 @@ export async function listConnectors(scopeInput: ArchitectureScopeRef): Promise<
 
 export async function recordObservation(input: RecordObservationInput): Promise<SourceObservation> {
   const scope = writableScope(input.architectureScope);
-  const connectorRow = await prisma.connectorInstance.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.connectorId } } });
-  if (!connectorRow) {
-    const connectorInAnotherScope = await prisma.connectorInstance.findFirst({ where: { id: input.connectorId } });
-    if (connectorInAnotherScope) throw new Error("SCOPE_MISMATCH");
-    throw new Error("CONNECTOR_NOT_FOUND");
-  }
-  if (connectorRow.applicationServiceId !== scope.applicationServiceId || connectorRow.scopePath !== scope.scopePath) throw new Error("SCOPE_MISMATCH");
-
   return prisma.$transaction(async (transaction) => {
     const tx = transaction as FederationTransaction;
+    await tx.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1))", connectorLockKey(scope, input.connectorId));
+    const connectorRow = await tx.connectorInstance.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.connectorId } } });
+    if (!connectorRow) {
+      const connectorInAnotherScope = await tx.connectorInstance.findFirst({ where: { id: input.connectorId } });
+      if (connectorInAnotherScope) throw new Error("SCOPE_MISMATCH");
+      throw new Error("CONNECTOR_NOT_FOUND");
+    }
+    if (connectorRow.applicationServiceId !== scope.applicationServiceId || connectorRow.scopePath !== scope.scopePath) throw new Error("SCOPE_MISMATCH");
+    if (connectorRow.status !== "ACTIVE") throw new Error("CONNECTOR_NOT_ACTIVE");
+    if (!Array.isArray(connectorRow.capabilities) || !connectorRow.capabilities.includes("OBSERVE")) throw new Error("CONNECTOR_CAPABILITY_MISSING");
     const existing = await tx.sourceObservation.findUnique({ where: { applicationServiceId_scopePath_idempotencyKey: { ...scope, idempotencyKey: input.idempotencyKey } } });
     if (existing) return observation(existing);
     const persisted = await tx.sourceObservation.upsert({
@@ -187,6 +198,12 @@ async function promoteCandidateInTransaction(transaction: Prisma.TransactionClie
     }
   }
   await transaction.sourceObservation.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.candidateId } }, data: { status: "PROMOTED", payload: json(promotedFact) } });
+  await createOutbox(transaction as FederationTransaction, {
+    eventType: "FEDERATION_CANDIDATE_PROMOTED",
+    payload: { candidateId: input.candidateId, assetId: promotedFact.id, normalizedDigest: promotedFact.normalizedDigest },
+    idempotencyKey: federationEventKey("FEDERATION_CANDIDATE_PROMOTED", scope, input.candidateId),
+    architectureScope: scope
+  });
   return promotedFact;
 }
 
@@ -200,12 +217,22 @@ function assertPromotionInput(input: unknown): asserts input is PromoteCandidate
 
 export async function createDesignChangeSession(input: CreateDesignChangeSessionInput): Promise<DesignChangeSession> {
   const scope = writableScope(input.architectureScope);
-  const row = await prisma.designChangeSession.upsert({
-    where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } },
-    create: { ...scope, id: input.id, actorId: input.actorId, intent: input.intent, affectedFactIds: json(input.affectedFactIds), expectedEvidenceRefs: json(input.expectedEvidenceRefs), status: input.status, openedAt: input.openedAt ? new Date(input.openedAt) : undefined },
-    update: { actorId: input.actorId, intent: input.intent, affectedFactIds: json(input.affectedFactIds), expectedEvidenceRefs: json(input.expectedEvidenceRefs), status: input.status }
+  return prisma.$transaction(async (transaction) => {
+    const tx = transaction as FederationTransaction;
+    const row = await tx.designChangeSession.upsert({
+      where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } },
+      create: { ...scope, id: input.id, actorId: input.actorId, intent: input.intent, affectedFactIds: json(input.affectedFactIds), expectedEvidenceRefs: json(input.expectedEvidenceRefs), status: input.status, openedAt: input.openedAt ? new Date(input.openedAt) : undefined },
+      update: { actorId: input.actorId, intent: input.intent, affectedFactIds: json(input.affectedFactIds), expectedEvidenceRefs: json(input.expectedEvidenceRefs), status: input.status }
+    });
+    await createOutbox(tx, {
+      eventType: "FEDERATION_DESIGN_CHANGE_SESSION_CREATED",
+      payload: { designChangeSessionId: input.id, actorId: input.actorId, affectedFactIds: input.affectedFactIds },
+      idempotencyKey: federationEventKey("FEDERATION_DESIGN_CHANGE_SESSION_CREATED", scope, input.id),
+      designChangeSessionId: input.id,
+      architectureScope: scope
+    });
+    return session(row);
   });
-  return session(row);
 }
 
 export async function appendFederationOutbox(input: AppendFederationOutboxInput): Promise<FederationOutboxRecord> {
@@ -268,6 +295,14 @@ function readableExactScope(scope: ArchitectureScopeRef): ArchitectureScopeRef {
 
 function promotionLockKey(scope: ArchitectureScopeRef, factId: string): string {
   return `${scope.applicationServiceId}|${scope.scopePath}|${factId}`;
+}
+
+function connectorLockKey(scope: ArchitectureScopeRef, connectorId: string): string {
+  return `${scope.applicationServiceId}|${scope.scopePath}|connector|${connectorId}`;
+}
+
+function federationEventKey(eventType: string, scope: ArchitectureScopeRef, subjectId: string): string {
+  return `${eventType}:${contentDigest({ architectureScope: scope, subjectId })}`;
 }
 
 async function createOutbox(client: Pick<FederationTransaction, "federationOutbox" | "designChangeSession"> | typeof prisma, input: AppendFederationOutboxInput): Promise<FederationOutboxRecord> {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { contentDigest } from "@specforge/core";
 import { prisma } from "../persistence";
-import { appendFederationOutbox, listConnectors, listPersistedCanonicalFederatedFacts, promoteCandidate, reconcilePersistedScope, recordObservation, registerConnector } from "./persistence";
+import { appendFederationOutbox, createDesignChangeSession, listConnectors, listPersistedCanonicalFederatedFacts, promoteCandidate, reconcilePersistedScope, recordObservation, registerConnector } from "./persistence";
 
 const designerScope = {
   applicationServiceId: "com.huawei.celon.desiner",
@@ -56,6 +56,14 @@ const candidateFact = {
   provenance: observation.provenance
 } as const;
 const candidateLocalizedContent = observation.payload.localizedContent;
+const changeSession = {
+  id: "session-1",
+  actorId: "caller-agent",
+  intent: "Review the Payments API contract.",
+  affectedFactIds: ["fact-1"],
+  expectedEvidenceRefs: [],
+  status: "OPEN"
+} as const;
 
 beforeEach(() => {
   process.env.SPECFORGE_MCP_SEED = "1";
@@ -146,6 +154,19 @@ beforeEach(() => {
     await predecessor;
     const snapshot = structuredClone(rows);
     try { return await operation({
+    connectorInstance: {
+      upsert: vi.fn(async ({ create, update, where }: { create: Row; update: Row; where: { applicationServiceId_scopePath_id: Row } }) => {
+        const key = where.applicationServiceId_scopePath_id;
+        const existing = rows.connectors.find((row) => row.id === key.id && row.applicationServiceId === key.applicationServiceId && row.scopePath === key.scopePath);
+        if (existing) return Object.assign(existing, update);
+        rows.connectors.push(create); return create;
+      }),
+      findUnique: vi.fn(async ({ where }: { where: { applicationServiceId_scopePath_id: Row } }) => {
+        const key = where.applicationServiceId_scopePath_id;
+        return rows.connectors.find((row) => row.id === key.id && row.applicationServiceId === key.applicationServiceId && row.scopePath === key.scopePath) ?? null;
+      }),
+      findFirst: vi.fn(async ({ where }: { where: { id: string } }) => rows.connectors.find((row) => row.id === where.id) ?? null)
+    },
     sourceObservation: {
       findUnique: vi.fn(async ({ where }: { where: Row }) => {
         const key = (where.applicationServiceId_scopePath_id ?? where.applicationServiceId_scopePath_idempotencyKey) as Row;
@@ -201,6 +222,13 @@ beforeEach(() => {
       })
     },
     designChangeSession: {
+      upsert: vi.fn(async ({ create, update, where }: { create: Row; update: Row; where: { applicationServiceId_scopePath_id: Row } }) => {
+        const key = where.applicationServiceId_scopePath_id;
+        const existing = rows.sessions.find((row) => row.id === key.id && row.applicationServiceId === key.applicationServiceId && row.scopePath === key.scopePath);
+        if (existing) return Object.assign(existing, update);
+        const created = { ...create, openedAt: create.openedAt ?? new Date(), updatedAt: new Date() };
+        rows.sessions.push(created); return created;
+      }),
       findUnique: vi.fn(async ({ where }: { where: { applicationServiceId_scopePath_id: Row } }) => {
         const key = where.applicationServiceId_scopePath_id;
         return rows.sessions.find((row) => row.id === key.id && row.applicationServiceId === key.applicationServiceId && row.scopePath === key.scopePath) ?? null;
@@ -216,6 +244,67 @@ afterEach(() => {
 });
 
 describe("federation persistence", () => {
+  it("registers one exact-Scope connector delivery event", async () => {
+    await registerConnector({ ...connector, architectureScope: designerScope });
+
+    expect(rows.outbox).toEqual([expect.objectContaining({
+      eventType: "FEDERATION_CONNECTOR_REGISTERED",
+      status: "PENDING",
+      applicationServiceId: designerScope.applicationServiceId,
+      scopePath: designerScope.scopePath,
+      idempotencyKey: expect.stringContaining("FEDERATION_CONNECTOR_REGISTERED")
+    })]);
+  });
+
+  it("replays connector registration without another delivery event", async () => {
+    await registerConnector({ ...connector, architectureScope: designerScope });
+    await registerConnector({ ...connector, architectureScope: designerScope });
+
+    expect(rows.connectors).toHaveLength(1);
+    expect(rows.outbox).toHaveLength(1);
+  });
+
+  it("keeps connector registration delivery keys and references isolated by Scope", async () => {
+    await registerConnector({ ...connector, architectureScope: designerScope });
+    await registerConnector({ ...connector, architectureScope: policyScope });
+
+    expect(rows.outbox).toHaveLength(2);
+    expect(new Set(rows.outbox.map((row) => row.idempotencyKey)).size).toBe(2);
+    expect(rows.outbox).toEqual(expect.arrayContaining([
+      expect.objectContaining({ applicationServiceId: designerScope.applicationServiceId, scopePath: designerScope.scopePath }),
+      expect.objectContaining({ applicationServiceId: policyScope.applicationServiceId, scopePath: policyScope.scopePath })
+    ]));
+  });
+
+  it("rolls back connector registration when its delivery event fails", async () => {
+    failOutbox = true;
+
+    await expect(registerConnector({ ...connector, architectureScope: designerScope })).rejects.toThrow("OUTBOX_WRITE_FAILED");
+
+    expect(rows.connectors).toHaveLength(0);
+    expect(rows.outbox).toHaveLength(0);
+  });
+
+  it.each([
+    ["SUSPENDED", ["OBSERVE"]],
+    ["REVOKED", ["OBSERVE"]],
+    ["ACTIVE", []]
+  ] as const)("rejects observation for connector status/capability %s/%j inside the transaction", async (status, capabilities) => {
+    await registerConnector({ ...connector, status, capabilities, architectureScope: designerScope });
+
+    await expect(recordObservation({ ...observation, connectorId: connector.id, architectureScope: designerScope })).rejects.toThrow(
+      status !== "ACTIVE" ? "CONNECTOR_NOT_ACTIVE" : "CONNECTOR_CAPABILITY_MISSING"
+    );
+    expect(rows.observations).toHaveLength(0);
+  });
+
+  it("rechecks an active OBSERVE connector and records the observation", async () => {
+    await registerConnector({ ...connector, architectureScope: designerScope });
+
+    await expect(recordObservation({ ...observation, connectorId: connector.id, architectureScope: designerScope })).resolves.toMatchObject({ id: observation.id });
+    expect(rows.observations).toHaveLength(1);
+  });
+
   it("rejects an observation whose Scope differs from the connector Scope", async () => {
     await registerConnector({ ...connector, architectureScope: designerScope });
     await expect(recordObservation({ ...observation, connectorId: connector.id, architectureScope: siblingScope })).rejects.toThrow("SCOPE_MISMATCH");
@@ -225,8 +314,11 @@ describe("federation persistence", () => {
     await registerConnector({ ...connector, architectureScope: designerScope });
     await recordObservation({ ...observation, connectorId: connector.id, architectureScope: designerScope });
     expect(rows.observations).toHaveLength(1);
-    expect(rows.outbox).toEqual([expect.objectContaining({ status: "PENDING", applicationServiceId: designerScope.applicationServiceId, scopePath: designerScope.scopePath })]);
-    expect((prisma as unknown as { $transaction: ReturnType<typeof vi.fn> }).$transaction).toHaveBeenCalledOnce();
+    expect(rows.outbox).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventType: "FEDERATION_CONNECTOR_REGISTERED", status: "PENDING", applicationServiceId: designerScope.applicationServiceId, scopePath: designerScope.scopePath }),
+      expect.objectContaining({ eventType: "FEDERATION_OBSERVATION_RECORDED", status: "PENDING", applicationServiceId: designerScope.applicationServiceId, scopePath: designerScope.scopePath })
+    ]));
+    expect((prisma as unknown as { $transaction: ReturnType<typeof vi.fn> }).$transaction).toHaveBeenCalledTimes(2);
   });
 
   it("keeps identical external identities isolated between application services", async () => {
@@ -243,7 +335,7 @@ describe("federation persistence", () => {
     const first = await recordObservation({ ...observation, connectorId: connector.id, architectureScope: designerScope });
     const replay = await recordObservation({ ...observation, connectorId: connector.id, architectureScope: designerScope });
     expect(replay).toEqual(first);
-    expect(rows.outbox).toHaveLength(1);
+    expect(rows.outbox).toHaveLength(2);
   });
 
   it("concurrently upserts one observation and one outbox receipt", async () => {
@@ -251,7 +343,7 @@ describe("federation persistence", () => {
     const [first, replay] = await Promise.all([recordObservation({ ...observation, connectorId: connector.id, architectureScope: designerScope }), recordObservation({ ...observation, connectorId: connector.id, architectureScope: designerScope })]);
     expect(replay).toEqual(first);
     expect(rows.observations).toHaveLength(1);
-    expect(rows.outbox).toHaveLength(1);
+    expect(rows.outbox).toHaveLength(2);
     expect(observationUpsertCalls).toBeGreaterThan(0);
     expect(outboxUpsertCalls).toBeGreaterThan(0);
   });
@@ -261,6 +353,7 @@ describe("federation persistence", () => {
     failOutbox = true;
     await expect(recordObservation({ ...observation, connectorId: connector.id, architectureScope: designerScope })).rejects.toThrow("OUTBOX_WRITE_FAILED");
     expect(rows.observations).toHaveLength(0);
+    expect(rows.outbox).toHaveLength(1);
   });
 
   it("loads canonical facts inside persistence during read-only reconciliation", async () => {
@@ -451,6 +544,46 @@ describe("federation persistence", () => {
     arrangePromotion();
     await expect(promoteCandidate(promotionInput())).resolves.toMatchObject({ id: candidateFact.id, status: "PROMOTED", architectureScope: designerScope });
     expect(rows.observations[0]).toMatchObject({ status: "PROMOTED", ...designerScope, payload: expect.objectContaining({ id: candidateFact.id, status: "PROMOTED", architectureScope: designerScope }) });
+    expect(rows.outbox).toEqual([expect.objectContaining({
+      eventType: "FEDERATION_CANDIDATE_PROMOTED",
+      status: "PENDING",
+      applicationServiceId: designerScope.applicationServiceId,
+      scopePath: designerScope.scopePath,
+      idempotencyKey: expect.stringContaining("FEDERATION_CANDIDATE_PROMOTED")
+    })]);
+  });
+
+  it("rolls back candidate promotion when its delivery event fails", async () => {
+    arrangePromotion();
+    failOutbox = true;
+
+    await expect(promoteCandidate(promotionInput())).rejects.toThrow("OUTBOX_WRITE_FAILED");
+
+    expect(rows.observations[0]).toMatchObject({ status: "CANDIDATE" });
+    expect(rows.outbox).toHaveLength(0);
+  });
+
+  it("creates one exact-Scope DesignChangeSession delivery event and replays it idempotently", async () => {
+    await createDesignChangeSession({ ...changeSession, affectedFactIds: [...changeSession.affectedFactIds], expectedEvidenceRefs: [...changeSession.expectedEvidenceRefs], openedAt: "2026-07-19T00:00:00.000Z", architectureScope: designerScope });
+    await createDesignChangeSession({ ...changeSession, affectedFactIds: [...changeSession.affectedFactIds], expectedEvidenceRefs: [...changeSession.expectedEvidenceRefs], openedAt: "2026-07-19T00:00:00.000Z", architectureScope: designerScope });
+
+    expect(rows.sessions).toHaveLength(1);
+    expect(rows.outbox).toEqual([expect.objectContaining({
+      eventType: "FEDERATION_DESIGN_CHANGE_SESSION_CREATED",
+      designChangeSessionId: changeSession.id,
+      applicationServiceId: designerScope.applicationServiceId,
+      scopePath: designerScope.scopePath,
+      status: "PENDING"
+    })]);
+  });
+
+  it("rolls back DesignChangeSession creation when its delivery event fails", async () => {
+    failOutbox = true;
+
+    await expect(createDesignChangeSession({ ...changeSession, affectedFactIds: [...changeSession.affectedFactIds], expectedEvidenceRefs: [...changeSession.expectedEvidenceRefs], openedAt: "2026-07-19T00:00:00.000Z", architectureScope: designerScope })).rejects.toThrow("OUTBOX_WRITE_FAILED");
+
+    expect(rows.sessions).toHaveLength(0);
+    expect(rows.outbox).toHaveLength(0);
   });
 
   it("retires an earlier revision and reconciles only the current canonical fact", async () => {
