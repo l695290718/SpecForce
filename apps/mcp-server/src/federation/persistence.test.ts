@@ -28,7 +28,7 @@ const observation = {
   sourceNamespace: "github",
   externalAssetType: "api",
   externalId: "payments-api",
-  payload: { name: "Payments API" },
+  payload: { name: "Payments API", localizedContent: { en: { name: "Payments API", description: "Payments interface" }, zh: { name: "支付 API", description: "支付接口" } } },
   normalizedDigest: contentDigest({ name: "Payments API" }),
   sourceVersion: "abc123",
   observedAt: "2026-07-19T00:00:00.000Z",
@@ -52,9 +52,10 @@ let outboxUpsertCalls = 0;
 let promotionLockCalls = 0;
 let transactionTail = Promise.resolve();
 const candidateFact = {
-  id: "fact-1", assetType: "api", schemaVersion: "1", payload: observation.payload, localizedContent: { en: { name: "Payments API", description: "Payments interface" }, zh: { name: "支付 API", description: "支付接口" } }, normalizedDigest: observation.normalizedDigest, authority: "EXTERNAL", confidence: 1,
+  id: "fact-1", assetType: "api", schemaVersion: "1", payload: { name: "Payments API" }, localizedContent: { en: { name: "Payments API", description: "Payments interface" }, zh: { name: "支付 API", description: "支付接口" } }, normalizedDigest: observation.normalizedDigest, authority: "EXTERNAL", confidence: 1,
   provenance: observation.provenance
 } as const;
+const candidateLocalizedContent = observation.payload.localizedContent;
 
 beforeEach(() => {
   process.env.SPECFORGE_MCP_SEED = "1";
@@ -343,36 +344,57 @@ describe("federation persistence", () => {
 
   it("rejects promotion without complete Chinese localization", async () => {
     arrangePromotion();
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: { ...candidateFact, localizedContent: { en: candidateFact.localizedContent.en, zh: {} } } })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
+    rows.observations[0]!.payload = { name: "Payments API", localizedContent: { en: candidateLocalizedContent.en, zh: {} } };
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
   });
 
   it("rejects a partial Chinese localization overlay for a human-facing fact", async () => {
     arrangePromotion();
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: { ...candidateFact, localizedContent: { en: candidateFact.localizedContent.en, zh: { name: "支付 API" } } } })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
+    rows.observations[0]!.payload = { name: "Payments API", localizedContent: { en: candidateLocalizedContent.en, zh: { name: "支付 API" } } };
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
   });
 
   it("rejects a human-facing fact without an English canonical overlay", async () => {
+    arrangePromotion();
+    rows.observations[0]!.payload = { name: "Payments API", localizedContent: { zh: candidateLocalizedContent.zh } };
+    await expect(promoteCandidate({
+      candidateId: observation.id,
+      architectureScope: designerScope,
+      humanFacing: true,
+      fact: { ...candidateFact, localizedContent: { zh: candidateLocalizedContent.zh } as unknown as typeof candidateFact.localizedContent }
+    })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
+  });
+
+  it("derives localized content from the persisted candidate observation", async () => {
+    arrangePromotion();
+    const promoted = await promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact });
+    expect(promoted.localizedContent).toEqual(candidateLocalizedContent);
+    expect(promoted.payload).toEqual({ name: "Payments API" });
+  });
+
+  it("rejects caller-supplied localized content that differs from the candidate", async () => {
     arrangePromotion();
     await expect(promoteCandidate({
       candidateId: observation.id,
       architectureScope: designerScope,
       humanFacing: true,
-      fact: { ...candidateFact, localizedContent: { zh: candidateFact.localizedContent.zh } as unknown as typeof candidateFact.localizedContent }
-    })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
+      fact: { ...candidateFact, localizedContent: { en: { name: "Caller" }, zh: { name: "调用方" } } }
+    })).rejects.toThrow("CANDIDATE_LOCALIZATION_MISMATCH");
   });
 
-  it("rejects promotion without an explicit humanFacing signal", async () => {
+  it("does not require a caller humanFacing signal", async () => {
     arrangePromotion();
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, fact: candidateFact } as unknown as Parameters<typeof promoteCandidate>[0])).rejects.toThrow("HUMAN_FACING_REQUIRED");
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, fact: candidateFact })).resolves.toMatchObject({ status: "PROMOTED" });
   });
 
   it("does not allow humanFacing false to bypass complete bilingual localization", async () => {
     arrangePromotion();
+    rows.observations[0]!.payload = { name: "Payments API", localizedContent: { en: candidateLocalizedContent.en, zh: {} } };
     await expect(promoteCandidate({
       candidateId: observation.id,
       architectureScope: designerScope,
       humanFacing: false,
-      fact: { ...candidateFact, localizedContent: { en: candidateFact.localizedContent.en, zh: {} } }
+      fact: { ...candidateFact, localizedContent: { en: candidateLocalizedContent.en, zh: {} } }
     })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
   });
 
@@ -553,14 +575,14 @@ function promotedFactPayload(overrides: Row = {}): Row {
 
 function secondObservation(): Row {
   const observedAt = "2026-07-20T00:00:00.000Z";
-  const payload = { name: "Payments API v2" };
+  const payload = { name: "Payments API v2", localizedContent: { en: { name: "Payments API v2", description: "Payments interface" }, zh: { name: "支付 API v2", description: "支付接口" } } };
   return {
     ...observation,
     id: "observation-2",
     connectorId: connector.id,
     sourceVersion: "def456",
     idempotencyKey: "observation:github:payments-api:def456",
-    normalizedDigest: contentDigest(payload),
+    normalizedDigest: contentDigest({ name: "Payments API v2" }),
     payload,
     provenance: { ...observation.provenance, externalVersion: "def456", observedAt },
     observedAt: new Date(observedAt),
@@ -570,9 +592,11 @@ function secondObservation(): Row {
 
 function secondCandidateFact() {
   const source = secondObservation();
+  const sourcePayload = source.payload as { name: string; localizedContent: typeof candidateLocalizedContent };
   return {
     ...candidateFact,
-    payload: source.payload as typeof candidateFact.payload,
+    payload: { name: sourcePayload.name },
+    localizedContent: sourcePayload.localizedContent,
     normalizedDigest: String(source.normalizedDigest),
     provenance: source.provenance as typeof candidateFact.provenance
   };

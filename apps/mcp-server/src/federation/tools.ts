@@ -1,4 +1,4 @@
-import { contentDigest, hasScopeAccess, scopeById, type ArchitectureScopeRef, type ConnectorCapability, type FederatedFactEnvelope, type Permission, type ScopedActor } from "@specforge/core";
+import { contentDigest, hasScopeAccess, scopeById, type ArchitectureScopeRef, type ConnectorCapability, type Permission, type ScopedActor } from "@specforge/core";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { randomUUID } from "node:crypto";
@@ -16,32 +16,6 @@ import {
 const architectureScopeSchema = z.object({
   applicationServiceId: z.string().min(1),
   scopePath: z.string().min(1)
-});
-
-const federatedFactSchema = z.object({
-  id: z.string().min(1),
-  assetType: z.string().min(1),
-  schemaVersion: z.string().min(1),
-  payload: z.record(z.unknown()),
-  localizedContent: z.object({
-    en: z.record(z.unknown()).optional(),
-    zh: z.record(z.unknown())
-  }),
-  normalizedDigest: z.string().min(1),
-  authority: z.enum(["EXTERNAL", "SPECFORGE", "SHARED"]),
-  confidence: z.number().min(0).max(1),
-  provenance: z.object({
-    sourceSystem: z.string().min(1),
-    connectorInstanceId: z.string().min(1),
-    externalIdentity: z.string().optional(),
-    externalVersion: z.string().optional(),
-    sourceTimestamp: z.string().optional(),
-    observedAt: z.string().min(1),
-    repositoryCommit: z.string().optional()
-  }),
-  relationshipRefs: z.array(z.string()).optional(),
-  evidenceRefs: z.array(z.string()).optional(),
-  designChangeSessionId: z.string().optional()
 });
 
 type FederationRequestExtra = {
@@ -79,6 +53,8 @@ const stableErrorCodes = new Set([
   "AUTHORITY_CONFLICT",
   "AUTHORITY_MISSING",
   "AUTHORITY_POLICY_AMBIGUOUS",
+  "CANDIDATE_INPUT_UNSUPPORTED",
+  "CANDIDATE_LOCALIZATION_MISMATCH",
   "CANDIDATE_CONTENT_MISMATCH",
   "CANDIDATE_DIGEST_INVALID",
   "CANDIDATE_DIGEST_MISMATCH",
@@ -115,6 +91,8 @@ function safeClientMessage(code: string): string {
     AUTHENTICATION_REQUIRED: "An authenticated MCP caller is required.",
     AUDIT_PERSISTENCE_FAILED: "The federation audit record could not be persisted.",
     AUTHORITY_CONFLICT: "The requested fact has an authority conflict.",
+    CANDIDATE_INPUT_UNSUPPORTED: "Promotion accepts only the selected candidate and exact Scope.",
+    CANDIDATE_LOCALIZATION_MISMATCH: "The supplied localization does not match the selected candidate.",
     CANDIDATE_CONTENT_MISMATCH: "The promoted fact does not match the selected candidate observation.",
     CANDIDATE_DIGEST_INVALID: "The selected candidate observation failed content validation.",
     CANDIDATE_DIGEST_MISMATCH: "The promoted fact does not match the selected candidate observation.",
@@ -196,12 +174,11 @@ function authorizeCaller(caller: FederationCaller, permissions: Permission[], in
   if (!registered || registered.level !== "applicationService" || registered.scopePath !== scope.scopePath) {
     throw new FederationToolError("SCOPE_MISMATCH");
   }
-  const requiredAction = permissions.includes("asset:write") ? "write" : "read";
-  if (!hasScopeAccess(caller, registered, requiredAction)) throw new FederationToolError("PERMISSION_DENIED");
-  const nonScopePermissions = permissions.filter((permission) => permission !== "asset:read" && permission !== "asset:write");
-  if (nonScopePermissions.some((permission) => !caller.permissions.includes(permission))) {
+  if (permissions.some((permission) => !caller.permissions.includes(permission))) {
     throw new FederationToolError("PERMISSION_DENIED");
   }
+  if (permissions.includes("asset:write") && !hasScopeAccess(caller, registered, "write")) throw new FederationToolError("PERMISSION_DENIED");
+  if ((permissions.includes("asset:read") || permissions.includes("governance:run")) && !hasScopeAccess(caller, registered, "read")) throw new FederationToolError("PERMISSION_DENIED");
 }
 
 type FederationAuditInput = {
@@ -277,6 +254,11 @@ function isPermission(value: unknown): value is Permission {
 
 function isRecord(value: unknown): value is Record<string, any> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function candidateCanonicalPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  const { localizedContent: _localizedContent, ...canonicalPayload } = payload;
+  return canonicalPayload;
 }
 
 function registerFederationJsonTool<T extends z.ZodRawShape>(
@@ -373,7 +355,7 @@ export function registerFederationTools(server: McpServer): void {
     readOnly: false
   }, async (input, caller) => {
     const architectureScope = assertWritableExactScope(input.architectureScope, caller);
-    const normalizedDigest = contentDigest(input.payload);
+    const normalizedDigest = contentDigest(candidateCanonicalPayload(input.payload));
     const identity = `${input.connectorId}:${input.sourceNamespace}:${input.externalAssetType}:${input.externalId}:${input.sourceVersion}:${normalizedDigest}`;
     const observedAt = input.observedAt ?? new Date().toISOString();
     return recordObservation({
@@ -405,19 +387,21 @@ export function registerFederationTools(server: McpServer): void {
     inputSchema: {
       candidateId: z.string().min(1),
       approvalReason: z.string().min(1),
-      fieldPath: z.string().min(1).optional(),
-      fact: federatedFactSchema,
       architectureScope: architectureScopeSchema
     },
     permissions: ["asset:write"],
     readOnly: false
-  }, async (input, caller) => promoteCandidate({
-    candidateId: input.candidateId,
-    architectureScope: assertWritableExactScope(input.architectureScope, caller),
-    humanFacing: true,
-    fieldPath: input.fieldPath,
-    fact: input.fact as Omit<FederatedFactEnvelope, "architectureScope" | "status">
-  } satisfies PromoteCandidateInput));
+  }, async (input, caller) => {
+    const rawInput = input as Record<string, unknown>;
+    if (Object.keys(rawInput).some((field) => !["candidateId", "approvalReason", "architectureScope"].includes(field))) {
+      throw new FederationToolError("CANDIDATE_INPUT_UNSUPPORTED");
+    }
+    return promoteCandidate({
+      candidateId: input.candidateId,
+      approvalReason: input.approvalReason,
+      architectureScope: assertWritableExactScope(input.architectureScope, caller)
+    } satisfies PromoteCandidateInput);
+  });
 
   registerFederationJsonTool(server, "create_design_change_session", {
     title: "Create design change session",

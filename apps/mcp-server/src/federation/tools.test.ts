@@ -1,4 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { contentDigest } from "@specforge/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const federationPersistence = vi.hoisted(() => ({
@@ -89,7 +90,7 @@ const authorizedExtra: ToolExtra = {
   authInfo: {
     token: "test-token",
     clientId: "test-client",
-    scopes: ["governance:run"],
+    scopes: ["asset:read", "asset:write", "governance:run"],
     extra: {
       actor: {
         actorType: "agent",
@@ -98,7 +99,7 @@ const authorizedExtra: ToolExtra = {
           { scopeId: designerScope.applicationServiceId, action: "read" },
           { scopeId: designerScope.applicationServiceId, action: "write" }
         ],
-        permissions: ["governance:run"]
+        permissions: ["asset:read", "asset:write", "governance:run"]
       }
     }
   }
@@ -181,6 +182,41 @@ describe("federation MCP tools", () => {
     expect((tools.get("register_connector")!.config._meta as { permissions: string[] }).permissions).toEqual(["asset:write"]);
     expect((tools.get("reconcile_federated_scope")!.config._meta as { permissions: string[] }).permissions).toEqual(["asset:read", "governance:run"]);
     expect((tools.get("get_federated_sync_status")!.config._meta as { permissions: string[] }).permissions).toEqual(["asset:read"]);
+  });
+
+  it("requires every declared permission claim in addition to the exact Scope grant", async () => {
+    const writeClaimMissing = structuredClone(authorizedExtra);
+    writeClaimMissing.authInfo!.scopes = ["asset:read", "governance:run"];
+    writeClaimMissing.authInfo!.extra = { actor: {
+      actorType: "agent", actorId: "caller-agent", grants: [{ scopeId: designerScope.applicationServiceId, action: "write" }], permissions: ["asset:read", "governance:run"]
+    } };
+    const readClaimMissing = structuredClone(authorizedExtra);
+    readClaimMissing.authInfo!.scopes = ["asset:write", "governance:run"];
+    readClaimMissing.authInfo!.extra = { actor: {
+      actorType: "agent", actorId: "caller-agent", grants: [{ scopeId: designerScope.applicationServiceId, action: "read" }], permissions: ["asset:write", "governance:run"]
+    } };
+    const governanceClaimMissing = structuredClone(authorizedExtra);
+    governanceClaimMissing.authInfo!.scopes = ["asset:read", "asset:write"];
+    governanceClaimMissing.authInfo!.extra = { actor: {
+      actorType: "agent", actorId: "caller-agent", grants: [{ scopeId: designerScope.applicationServiceId, action: "read" }], permissions: ["asset:read", "asset:write"]
+    } };
+
+    expect(errorCode(await callTool("register_connector", { ...connector, architectureScope: designerScope }, writeClaimMissing))).toBe("PERMISSION_DENIED");
+    expect(errorCode(await callTool("get_federated_sync_status", { architectureScope: designerScope }, readClaimMissing))).toBe("PERMISSION_DENIED");
+    expect(errorCode(await callTool("reconcile_federated_scope", { architectureScope: designerScope }, governanceClaimMissing))).toBe("PERMISSION_DENIED");
+  });
+
+  it("accepts promotion only through the candidate identifier and exact Scope", async () => {
+    const tool = captureToolsWithFederationRegistration().get("promote_candidate_fact")!;
+    expect(tool.config.inputSchema).not.toHaveProperty("fact");
+    expect(tool.config.inputSchema).not.toHaveProperty("payload");
+    expect(tool.config.inputSchema).not.toHaveProperty("localizedContent");
+    expect(tool.config.inputSchema).not.toHaveProperty("normalizedDigest");
+
+    const result = await tool.handler({ candidateId: "candidate-1", approvalReason: "Reviewed source contract.", architectureScope: designerScope, payload: { arbitrary: true }, normalizedDigest: "caller-digest", localizedContent: { en: {}, zh: {} } }, authorizedExtra);
+    expect(result.isError).toBe(true);
+    expect(errorCode(result)).toBe("CANDIDATE_INPUT_UNSUPPORTED");
+    expect(federationPersistence.promoteCandidate).not.toHaveBeenCalled();
   });
 
   it("rejects a connector write when applicationServiceId and scopePath do not match the registered Scope", async () => {
@@ -303,24 +339,29 @@ describe("federation MCP tools", () => {
     }));
   });
 
+  it("derives observation digests from canonical payload while retaining candidate localization", async () => {
+    await callTool("record_external_observation", {
+      connectorId: connector.id,
+      sourceNamespace: "github",
+      externalAssetType: "api",
+      externalId: "payments-api",
+      payload: { name: "Payments API", localizedContent: { en: { name: "Payments API" }, zh: { name: "支付 API" } } },
+      sourceVersion: "abc123",
+      architectureScope: designerScope
+    });
+
+    expect(federationPersistence.recordObservation).toHaveBeenCalledWith(expect.objectContaining({
+      normalizedDigest: contentDigest({ name: "Payments API" }),
+      payload: { name: "Payments API", localizedContent: { en: { name: "Payments API" }, zh: { name: "支付 API" } } }
+    }));
+  });
+
   it("returns a structured stable persistence error and audits the failed write", async () => {
     federationPersistence.promoteCandidate.mockRejectedValueOnce(new Error("IDENTITY_CONFLICT"));
 
     const result = await callTool("promote_candidate_fact", {
       candidateId: "candidate-1",
       approvalReason: "Reviewed source contract.",
-      humanFacing: true,
-      fact: {
-        id: "fact-1",
-        assetType: "api",
-        schemaVersion: "1",
-        payload: { name: "Payments API" },
-        localizedContent: { en: { name: "Payments API" }, zh: { name: "Payments API" } },
-        normalizedDigest: "digest-1",
-        authority: "EXTERNAL",
-        confidence: 1,
-        provenance: { sourceSystem: "github", connectorInstanceId: connector.id, observedAt: "2026-07-19T00:00:00.000Z" }
-      },
       architectureScope: designerScope
     });
 
@@ -334,17 +375,6 @@ describe("federation MCP tools", () => {
     const result = await callTool("promote_candidate_fact", {
       candidateId: "candidate-1",
       approvalReason: "Reviewed source contract.",
-      fact: {
-        id: "fact-1",
-        assetType: "api",
-        schemaVersion: "1",
-        payload: { name: "Caller replacement" },
-        localizedContent: { en: { name: "Caller replacement" }, zh: { name: "调用方替换" } },
-        normalizedDigest: "caller-digest",
-        authority: "EXTERNAL",
-        confidence: 1,
-        provenance: { sourceSystem: "github", connectorInstanceId: connector.id, observedAt: "2026-07-19T00:00:00.000Z" }
-      },
       architectureScope: designerScope
     });
 
@@ -376,11 +406,6 @@ describe("federation MCP tools", () => {
     const result = await callTool("promote_candidate_fact", {
       candidateId: "candidate-1",
       approvalReason: "Reviewed source contract.",
-      humanFacing: true,
-      fact: {
-        id: "fact-1", assetType: "api", schemaVersion: "1", payload: {}, localizedContent: { zh: {} }, normalizedDigest: "digest-1", authority: "EXTERNAL", confidence: 1,
-        provenance: { sourceSystem: "github", connectorInstanceId: connector.id, observedAt: "2026-07-19T00:00:00.000Z" }
-      },
       architectureScope: designerScope
     });
 

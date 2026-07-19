@@ -38,9 +38,10 @@ export interface RecordObservationInput extends Omit<SourceObservation, "archite
 export interface PromoteCandidateInput {
   candidateId: string;
   architectureScope: ArchitectureScopeRef;
-  fact: Omit<FederatedFactEnvelope, "architectureScope" | "status">;
+  approvalReason?: string;
+  fact?: Omit<FederatedFactEnvelope, "architectureScope" | "status">;
   fieldPath?: string;
-  humanFacing: boolean;
+  humanFacing?: boolean;
 }
 
 export interface CreateDesignChangeSessionInput extends Omit<DesignChangeSession, "architectureScope" | "openedAt" | "updatedAt"> {
@@ -126,7 +127,6 @@ export async function recordObservation(input: RecordObservationInput): Promise<
 
 export async function promoteCandidate(input: PromoteCandidateInput): Promise<FederatedFactEnvelope> {
   const scope = writableScope(input.architectureScope);
-  if (typeof input.humanFacing !== "boolean") throw new Error("HUMAN_FACING_REQUIRED");
   return prisma.$transaction((transaction) => promoteCandidateInTransaction(transaction as Prisma.TransactionClient, input, scope));
 }
 
@@ -138,7 +138,9 @@ async function promoteCandidateInTransaction(transaction: Prisma.TransactionClie
     throw new Error("CANDIDATE_NOT_FOUND");
   }
   if (candidate.status !== "CANDIDATE") throw new Error("CANDIDATE_STATUS_INVALID");
-  if (!isRecord(candidate.payload) || contentDigest(candidate.payload) !== candidate.normalizedDigest) throw new Error("CANDIDATE_DIGEST_INVALID");
+  const candidateEnvelope = candidateEnvelopeFromPayload(candidate.payload);
+  if (!candidateEnvelope || !hasCompleteBilingualLocalization(candidateEnvelope.localizedContent)) throw new Error("LOCALIZATION_INCOMPLETE");
+  if (contentDigest(candidateEnvelope.payload) !== candidate.normalizedDigest) throw new Error("CANDIDATE_DIGEST_INVALID");
   if (!hasValidCandidateProvenance(candidate)) throw new Error("CANDIDATE_PROVENANCE_INVALID");
   const mappingIdentity = { connectorId: candidate.connectorId, sourceNamespace: candidate.sourceNamespace, externalAssetType: candidate.externalAssetType, externalId: candidate.externalId };
   const mapping = await transaction.externalIdentityMapping.findUnique({ where: { applicationServiceId_scopePath_connectorId_sourceNamespace_externalAssetType_externalId: { ...scope, ...mappingIdentity } } });
@@ -148,15 +150,19 @@ async function promoteCandidateInTransaction(transaction: Prisma.TransactionClie
     throw new Error("IDENTITY_MAPPING_MISSING");
   }
   if (mapping.applicationServiceId !== scope.applicationServiceId || mapping.scopePath !== scope.scopePath) throw new Error("SCOPE_MISMATCH");
-  if (!mapping.assetId || mapping.assetType !== input.fact.assetType || mapping.assetId !== input.fact.id) throw new Error("IDENTITY_MAPPING_INVALID");
+  if (!mapping.assetId) throw new Error("IDENTITY_MAPPING_INVALID");
   await transaction.$executeRawUnsafe(
     "SELECT pg_advisory_xact_lock(hashtext($1))",
     promotionLockKey(scope, mapping.assetId)
   );
-  if (contentDigest(input.fact.payload) !== candidate.normalizedDigest) throw new Error("CANDIDATE_CONTENT_MISMATCH");
-  if (input.fact.normalizedDigest !== candidate.normalizedDigest) throw new Error("CANDIDATE_DIGEST_MISMATCH");
-  if (!matchesCandidateProvenance(input.fact.provenance, candidate)) throw new Error("CANDIDATE_PROVENANCE_MISMATCH");
-  const policies = await transaction.authorityPolicy.findMany({ where: { ...scope, assetType: input.fact.assetType, fieldPath: input.fieldPath ?? "$" } });
+  if (input.fact) {
+    if (input.fact.assetType !== mapping.assetType || input.fact.id !== mapping.assetId) throw new Error("IDENTITY_MAPPING_INVALID");
+    if (contentDigest(input.fact.payload) !== candidate.normalizedDigest) throw new Error("CANDIDATE_CONTENT_MISMATCH");
+    if (input.fact.normalizedDigest !== candidate.normalizedDigest) throw new Error("CANDIDATE_DIGEST_MISMATCH");
+    if (!matchesCandidateProvenance(input.fact.provenance, candidate)) throw new Error("CANDIDATE_PROVENANCE_MISMATCH");
+    if (contentDigest(input.fact.localizedContent) !== contentDigest(candidateEnvelope.localizedContent)) throw new Error("CANDIDATE_LOCALIZATION_MISMATCH");
+  }
+  const policies = await transaction.authorityPolicy.findMany({ where: { ...scope, assetType: mapping.assetType, fieldPath: input.fieldPath ?? "$" } });
   if (policies.length > 1) throw new Error("AUTHORITY_POLICY_AMBIGUOUS");
   const policy = policies[0];
   const decision = evaluateObservation({
@@ -164,20 +170,24 @@ async function promoteCandidateInTransaction(transaction: Prisma.TransactionClie
     identityMatch: mapping.matchStatus as "UNMATCHED" | "UNAMBIGUOUS" | "AMBIGUOUS",
     policyAllowsPromotion: policy?.promotionMode === "AUTO",
     humanFacing: true,
-    hasCompleteChineseLocalization: hasCompleteBilingualLocalization(input.fact.localizedContent)
+    hasCompleteChineseLocalization: hasCompleteBilingualLocalization(candidateEnvelope.localizedContent)
   });
   if (decision.action !== "PROMOTE") throw new Error(decision.reason);
-  if (input.fact.authority !== policy?.authority) throw new Error("AUTHORITY_CONFLICT");
+  if (input.fact && input.fact.authority !== policy?.authority) throw new Error("AUTHORITY_CONFLICT");
   const promotedFact: FederatedFactEnvelope = {
-    ...input.fact,
     id: mapping.assetId,
     assetType: mapping.assetType,
-    payload: candidate.payload,
+    schemaVersion: "1",
+    payload: candidateEnvelope.payload,
+    localizedContent: candidateEnvelope.localizedContent,
     normalizedDigest: candidate.normalizedDigest,
     architectureScope: scope,
     status: "PROMOTED",
     authority: policy!.authority as FactAuthority,
-    provenance: canonicalCandidateProvenance(candidate)
+    confidence: 1,
+    provenance: canonicalCandidateProvenance(candidate),
+    relationshipRefs: [],
+    evidenceRefs: []
   };
   const previousPromotedRows = await transaction.sourceObservation.findMany({ where: { ...scope, status: "PROMOTED" } });
   for (const previousRow of previousPromotedRows) {
@@ -292,7 +302,7 @@ type CandidateObservationRow = {
 
 function hasValidCandidateProvenance(candidate: CandidateObservationRow): boolean {
   if (!isRecord(candidate.provenance)) return false;
-  return nonEmptyString(candidate.provenance.sourceSystem) &&
+  return candidate.provenance.sourceSystem === candidate.sourceNamespace &&
     candidate.provenance.connectorInstanceId === candidate.connectorId &&
     candidate.provenance.externalIdentity === `${candidate.externalAssetType}:${candidate.externalId}` &&
     candidate.provenance.externalVersion === candidate.sourceVersion &&
@@ -311,6 +321,12 @@ function canonicalCandidateProvenance(candidate: CandidateObservationRow): Feder
 
 function matchesCandidateProvenance(provenance: FederatedFactEnvelope["provenance"], candidate: CandidateObservationRow): boolean {
   return contentDigest(provenance) === contentDigest(canonicalCandidateProvenance(candidate));
+}
+
+function candidateEnvelopeFromPayload(value: Prisma.JsonValue): { payload: Record<string, unknown>; localizedContent: FederatedFactEnvelope["localizedContent"] } | undefined {
+  if (!isRecord(value) || !isRecord(value.localizedContent) || !isRecord(value.localizedContent.en) || !isRecord(value.localizedContent.zh)) return undefined;
+  const { localizedContent: _localizedContent, ...payload } = value;
+  return { payload, localizedContent: value.localizedContent as unknown as FederatedFactEnvelope["localizedContent"] };
 }
 
 function persistedCanonicalFact(value: Prisma.JsonValue): FederatedFactEnvelope | undefined {
