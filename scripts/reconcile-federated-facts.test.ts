@@ -54,6 +54,12 @@ it("treats source, identity, Scope, localization, and delivery diagnostics as bl
   }
 });
 
+it("treats every governed non-convergence diagnostic as blocking", () => {
+  for (const code of ["CONTENT_DRIFT", "MISSING_FACT", "UNDECLARED_CHANGE", "RELATIONSHIP_DRIFT", "EVIDENCE_DRIFT"] as const) {
+    expect(reconciliationExitCode({ status: "DRIFTED", blocking: false, issues: [{ code }], root: "root" })).toBe(1);
+  }
+});
+
 it("resolves only an exact application-service Scope from the architecture registry", () => {
   expect(resolveFederatedScope({ SPECFORGE_APPLICATION_SERVICE_ID: "com.huawei.celon.desiner" })).toEqual({
     applicationServiceId: "com.huawei.celon.desiner",

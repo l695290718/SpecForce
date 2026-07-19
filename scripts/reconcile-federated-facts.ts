@@ -3,8 +3,6 @@ import { pathToFileURL } from "node:url";
 import {
   scopeById,
   type ArchitectureScopeRef,
-  type ReconciliationIssue,
-  type ReconciliationIssueCode,
   type ReconciliationReport
 } from "../packages/core/src/index";
 
@@ -29,14 +27,6 @@ export interface ReconciliationCliResult {
   stdout: string;
   exitCode: 0 | 1;
 }
-
-const blockingIssueCodes = new Set<ReconciliationIssueCode>([
-  "DELIVERY_BLOCKED",
-  "IDENTITY_CONFLICT",
-  "LOCALIZATION_DRIFT",
-  "SCOPE_DRIFT",
-  "SOURCE_UNREACHABLE"
-]);
 
 export function resolveFederatedScope(environment: FederationCliEnvironment): ArchitectureScopeRef {
   const applicationServiceId = environment.SPECFORGE_APPLICATION_SERVICE_ID?.trim();
@@ -77,7 +67,7 @@ export function federatedReconciliationDiagnostics(report: ReconciliationReport)
 }
 
 function isBlocking(report: ReconciliationGateReport): boolean {
-  return report.blocking === true || report.status === "BLOCKED" || report.issues.some((issue: Pick<ReconciliationIssue, "code">) => blockingIssueCodes.has(issue.code));
+  return report.blocking === true || report.status === "BLOCKED" || report.status === "DRIFTED" || report.issues.length > 0;
 }
 
 export async function reconcileFederatedFacts(environment: FederationCliEnvironment = process.env): Promise<FederatedReconciliationDiagnostics> {

@@ -28,6 +28,16 @@ ADR-0001 through ADR-0006 now contain bilingual reconciliation updates that supe
 
 **Retry trigger:** Configure a reachable PostgreSQL `DATABASE_URL`, then run `pnpm design-facts:sync`, `pnpm design-facts:check`, and `SPECFORGE_APPLICATION_SERVICE_ID=com.huawei.celon.desiner SPECFORGE_SCOPE_PATH=pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner pnpm design-facts:federation:check`.
 
+### Complete federation integration hardening slice two
+
+**Status:** Pending.
+
+**Owner:** SpecForge Architecture.
+
+**Rationale:** The first hardening slice closes the Critical reconciliation-input, candidate-promotion, and fail-closed gate findings. Transactional federation Outbox coverage, connector permission/state enforcement, deterministic active observation handling, and scoped audit redaction remain for the separately requested second slice.
+
+**Retry trigger:** Begin the second hardening slice from the first-slice commit, add failing regression tests for each remaining Important/Minor finding, and run the focused core/MCP/CLI/sync suites plus configured PostgreSQL checks when `DATABASE_URL` is available.
+
 ## Enterprise Impact Analysis
 
 ### NebulaGraph production projection

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma, resolveWritableScope } from "../persistence";
 import {
   createDesignChangeSession,
+  listPersistedCanonicalFederatedFacts,
   promoteCandidate,
   reconcilePersistedScope,
   recordObservation,
@@ -79,7 +80,12 @@ const stableErrorCodes = new Set([
   "AUTHORITY_CONFLICT",
   "AUTHORITY_MISSING",
   "AUTHORITY_POLICY_AMBIGUOUS",
+  "CANDIDATE_CONTENT_MISMATCH",
+  "CANDIDATE_DIGEST_INVALID",
+  "CANDIDATE_DIGEST_MISMATCH",
   "CANDIDATE_NOT_FOUND",
+  "CANDIDATE_PROVENANCE_INVALID",
+  "CANDIDATE_PROVENANCE_MISMATCH",
   "CANDIDATE_STATUS_INVALID",
   "CONNECTOR_NOT_FOUND",
   "DELIVERY_BLOCKED",
@@ -110,6 +116,11 @@ function safeClientMessage(code: string): string {
     AUTHENTICATION_REQUIRED: "An authenticated MCP caller is required.",
     AUDIT_PERSISTENCE_FAILED: "The federation audit record could not be persisted.",
     AUTHORITY_CONFLICT: "The requested fact has an authority conflict.",
+    CANDIDATE_CONTENT_MISMATCH: "The promoted fact does not match the selected candidate observation.",
+    CANDIDATE_DIGEST_INVALID: "The selected candidate observation failed content validation.",
+    CANDIDATE_DIGEST_MISMATCH: "The promoted fact does not match the selected candidate observation.",
+    CANDIDATE_PROVENANCE_INVALID: "The selected candidate observation failed provenance validation.",
+    CANDIDATE_PROVENANCE_MISMATCH: "The promoted fact does not match the selected candidate observation.",
     DELIVERY_BLOCKED: "Federation delivery is currently blocked.",
     FEDERATION_TOOL_ERROR: "The federation tool request could not be completed.",
     IDENTITY_CONFLICT: "The requested fact has an identity conflict.",
@@ -395,7 +406,6 @@ export function registerFederationTools(server: McpServer): void {
     inputSchema: {
       candidateId: z.string().min(1),
       approvalReason: z.string().min(1),
-      humanFacing: z.boolean(),
       fieldPath: z.string().min(1).optional(),
       fact: federatedFactSchema,
       architectureScope: architectureScopeSchema
@@ -405,7 +415,7 @@ export function registerFederationTools(server: McpServer): void {
   }, async (input, caller) => promoteCandidate({
     candidateId: input.candidateId,
     architectureScope: assertWritableExactScope(input.architectureScope, caller),
-    humanFacing: input.humanFacing,
+    humanFacing: true,
     fieldPath: input.fieldPath,
     fact: input.fact as Omit<FederatedFactEnvelope, "architectureScope" | "status">
   } satisfies PromoteCandidateInput));
@@ -435,15 +445,15 @@ export function registerFederationTools(server: McpServer): void {
     title: "Reconcile federated Scope",
     description: "Runs a read-only reconciliation and returns deterministic diagnostics for one exact architecture Scope.",
     inputSchema: {
-      architectureScope: architectureScopeSchema,
-      acceptedFacts: z.array(federatedFactSchema).optional()
+      architectureScope: architectureScopeSchema
     },
     permissions: ["asset:read", "governance:run"],
     readOnly: true
-  }, async (input, caller) => reconcilePersistedScope({
-    architectureScope: assertReadableExactScope(input.architectureScope, caller),
-    acceptedFacts: (input.acceptedFacts ?? []) as FederatedFactEnvelope[]
-  }));
+  }, async (input, caller) => {
+    const architectureScope = assertReadableExactScope(input.architectureScope, caller);
+    const acceptedFacts = await listPersistedCanonicalFederatedFacts(architectureScope);
+    return reconcilePersistedScope({ architectureScope, acceptedFacts });
+  });
 
   registerFederationJsonTool(server, "get_federated_sync_status", {
     title: "Get federated sync status",

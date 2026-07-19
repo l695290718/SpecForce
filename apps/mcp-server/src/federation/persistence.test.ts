@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { contentDigest } from "@specforge/core";
 import { prisma } from "../persistence";
 import { appendFederationOutbox, listConnectors, listPersistedCanonicalFederatedFacts, promoteCandidate, reconcilePersistedScope, recordObservation, registerConnector } from "./persistence";
 
@@ -27,14 +28,16 @@ const observation = {
   sourceNamespace: "github",
   externalAssetType: "api",
   externalId: "payments-api",
-  payload: { version: 1 },
-  normalizedDigest: "digest-1",
+  payload: { name: "Payments API" },
+  normalizedDigest: contentDigest({ name: "Payments API" }),
   sourceVersion: "abc123",
   observedAt: "2026-07-19T00:00:00.000Z",
   status: "CANDIDATE",
   provenance: {
     sourceSystem: "github",
     connectorInstanceId: connector.id,
+    externalIdentity: "api:payments-api",
+    externalVersion: "abc123",
     observedAt: "2026-07-19T00:00:00.000Z"
   },
   idempotencyKey: "observation:github:payments-api:abc123"
@@ -49,8 +52,8 @@ let outboxUpsertCalls = 0;
 let promotionLockCalls = 0;
 let transactionTail = Promise.resolve();
 const candidateFact = {
-  id: "fact-1", assetType: "api", schemaVersion: "1", payload: { name: "Payments API" }, localizedContent: { en: { name: "Payments API", description: "Payments interface" }, zh: { name: "支付 API", description: "支付接口" } }, normalizedDigest: "digest-1", authority: "EXTERNAL", confidence: 1,
-  provenance: { sourceSystem: "github", connectorInstanceId: connector.id, observedAt: observation.observedAt }
+  id: "fact-1", assetType: "api", schemaVersion: "1", payload: observation.payload, localizedContent: { en: { name: "Payments API", description: "Payments interface" }, zh: { name: "支付 API", description: "支付接口" } }, normalizedDigest: observation.normalizedDigest, authority: "EXTERNAL", confidence: 1,
+  provenance: observation.provenance
 } as const;
 
 beforeEach(() => {
@@ -301,6 +304,9 @@ describe("federation persistence", () => {
   });
 
   it.each([
+    ["architectureScope", { architectureScope: undefined }],
+    ["promotion status", { status: "CANDIDATE" }],
+    ["missing English canonical content", { localizedContent: { zh: { name: "支付 API" } } }],
     ["relationshipRefs", { relationshipRefs: ["valid", 42] }],
     ["evidenceRefs", { evidenceRefs: ["valid", null] }],
     ["designChangeSessionId", { designChangeSessionId: 42 }],
@@ -336,12 +342,79 @@ describe("federation persistence", () => {
 
   it("rejects a human-facing fact without an English canonical overlay", async () => {
     arrangePromotion();
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: { ...candidateFact, localizedContent: { zh: candidateFact.localizedContent.zh } } })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
+    await expect(promoteCandidate({
+      candidateId: observation.id,
+      architectureScope: designerScope,
+      humanFacing: true,
+      fact: { ...candidateFact, localizedContent: { zh: candidateFact.localizedContent.zh } as unknown as typeof candidateFact.localizedContent }
+    })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
   });
 
   it("rejects promotion without an explicit humanFacing signal", async () => {
     arrangePromotion();
     await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, fact: candidateFact } as unknown as Parameters<typeof promoteCandidate>[0])).rejects.toThrow("HUMAN_FACING_REQUIRED");
+  });
+
+  it("does not allow humanFacing false to bypass complete bilingual localization", async () => {
+    arrangePromotion();
+    await expect(promoteCandidate({
+      candidateId: observation.id,
+      architectureScope: designerScope,
+      humanFacing: false,
+      fact: { ...candidateFact, localizedContent: { en: candidateFact.localizedContent.en, zh: {} } }
+    })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
+  });
+
+  it("requires the candidate mapping to name the promoted asset", async () => {
+    arrangePromotion();
+    delete rows.mappings[0]!.assetId;
+
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("IDENTITY_MAPPING_INVALID");
+  });
+
+  it("rejects caller payload and digest that do not match the candidate observation", async () => {
+    arrangePromotion();
+
+    await expect(promoteCandidate({
+      candidateId: observation.id,
+      architectureScope: designerScope,
+      humanFacing: true,
+      fact: { ...candidateFact, payload: { name: "Caller-authored replacement" }, normalizedDigest: contentDigest({ name: "Caller-authored replacement" }) }
+    })).rejects.toThrow("CANDIDATE_CONTENT_MISMATCH");
+    await expect(promoteCandidate({
+      candidateId: observation.id,
+      architectureScope: designerScope,
+      humanFacing: true,
+      fact: { ...candidateFact, normalizedDigest: "caller-digest" }
+    })).rejects.toThrow("CANDIDATE_DIGEST_MISMATCH");
+  });
+
+  it("rejects a candidate whose persisted source digest or provenance is inconsistent", async () => {
+    arrangePromotion();
+    rows.observations[0]!.normalizedDigest = "tampered-source-digest";
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("CANDIDATE_DIGEST_INVALID");
+
+    rows.observations.length = 0;
+    rows.mappings.length = 0;
+    rows.policies.length = 0;
+    arrangePromotion({ provenance: { ...observation.provenance, connectorInstanceId: "other-connector" } });
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("CANDIDATE_PROVENANCE_INVALID");
+  });
+
+  it("rejects caller provenance and authority that do not match candidate-governed values", async () => {
+    arrangePromotion();
+    await expect(promoteCandidate({
+      candidateId: observation.id,
+      architectureScope: designerScope,
+      humanFacing: true,
+      fact: { ...candidateFact, provenance: { ...candidateFact.provenance, sourceSystem: "caller" } }
+    })).rejects.toThrow("CANDIDATE_PROVENANCE_MISMATCH");
+    await expect(promoteCandidate({
+      candidateId: observation.id,
+      architectureScope: designerScope,
+      humanFacing: true,
+      fact: { ...candidateFact, authority: "SPECFORGE" }
+    })).rejects.toThrow("AUTHORITY_CONFLICT");
   });
 
   it("rejects promotion when authority policy disables it", async () => {
@@ -386,23 +459,13 @@ describe("federation persistence", () => {
   it("retires an earlier revision and reconciles only the current canonical fact", async () => {
     arrangePromotion();
     await promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact });
-    rows.observations.push({
-      ...observation,
-      id: "observation-2",
-      connectorId: connector.id,
-      sourceVersion: "def456",
-      idempotencyKey: "observation:github:payments-api:def456",
-      normalizedDigest: "digest-2",
-      payload: { version: 2 },
-      observedAt: new Date("2026-07-20T00:00:00.000Z"),
-      ...designerScope
-    });
+    rows.observations.push(secondObservation());
 
     await promoteCandidate({
       candidateId: "observation-2",
       architectureScope: designerScope,
       humanFacing: true,
-      fact: { ...candidateFact, payload: { name: "Payments API v2" }, normalizedDigest: "digest-2" }
+      fact: secondCandidateFact()
     });
 
     expect(rows.observations).toEqual(expect.arrayContaining([
@@ -411,31 +474,21 @@ describe("federation persistence", () => {
     ]));
     const currentFacts = await listPersistedCanonicalFederatedFacts(designerScope);
     expect(currentFacts).toHaveLength(1);
-    expect(currentFacts[0]).toMatchObject({ id: candidateFact.id, normalizedDigest: "digest-2", payload: { name: "Payments API v2" } });
+    expect(currentFacts[0]).toMatchObject({ id: candidateFact.id, normalizedDigest: contentDigest({ name: "Payments API v2" }), payload: { name: "Payments API v2" } });
     await expect(reconcilePersistedScope({ architectureScope: designerScope, acceptedFacts: currentFacts })).resolves.toMatchObject({ status: "CONVERGED", issues: [] });
   });
 
   it("rolls back retirement when a replacement promotion fails", async () => {
     arrangePromotion();
     await promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact });
-    rows.observations.push({
-      ...observation,
-      id: "observation-2",
-      connectorId: connector.id,
-      sourceVersion: "def456",
-      idempotencyKey: "observation:github:payments-api:def456",
-      normalizedDigest: "digest-2",
-      payload: { version: 2 },
-      observedAt: new Date("2026-07-20T00:00:00.000Z"),
-      ...designerScope
-    });
+    rows.observations.push(secondObservation());
     failPromotionUpdate = true;
 
     await expect(promoteCandidate({
       candidateId: "observation-2",
       architectureScope: designerScope,
       humanFacing: true,
-      fact: { ...candidateFact, payload: { name: "Payments API v2" }, normalizedDigest: "digest-2" }
+      fact: secondCandidateFact()
     })).rejects.toThrow("PROMOTION_WRITE_FAILED");
     expect(rows.observations).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: observation.id, status: "PROMOTED" }),
@@ -445,17 +498,7 @@ describe("federation persistence", () => {
 
   it("serializes concurrent same-fact promotions to one current revision", async () => {
     arrangePromotion();
-    rows.observations.push({
-      ...observation,
-      id: "observation-2",
-      connectorId: connector.id,
-      sourceVersion: "def456",
-      idempotencyKey: "observation:github:payments-api:def456",
-      normalizedDigest: "digest-2",
-      payload: { version: 2 },
-      observedAt: new Date("2026-07-20T00:00:00.000Z"),
-      ...designerScope
-    });
+    rows.observations.push(secondObservation());
 
     await Promise.all([
       promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact }),
@@ -463,7 +506,7 @@ describe("federation persistence", () => {
         candidateId: "observation-2",
         architectureScope: designerScope,
         humanFacing: true,
-        fact: { ...candidateFact, payload: { name: "Payments API v2" }, normalizedDigest: "digest-2" }
+        fact: secondCandidateFact()
       })
     ]);
 
@@ -488,12 +531,39 @@ function promotedFactPayload(overrides: Row = {}): Row {
     schemaVersion: "1",
     payload: { name: "Payments API" },
     localizedContent: { en: { name: "Payments API" }, zh: { name: "支付 API" } },
-    normalizedDigest: "digest-1",
-    provenance: { sourceSystem: "github", connectorInstanceId: connector.id, observedAt: observation.observedAt },
+    normalizedDigest: observation.normalizedDigest,
+    provenance: observation.provenance,
     authority: "EXTERNAL",
     confidence: 1,
     status: "PROMOTED",
     ...overrides
+  };
+}
+
+function secondObservation(): Row {
+  const observedAt = "2026-07-20T00:00:00.000Z";
+  const payload = { name: "Payments API v2" };
+  return {
+    ...observation,
+    id: "observation-2",
+    connectorId: connector.id,
+    sourceVersion: "def456",
+    idempotencyKey: "observation:github:payments-api:def456",
+    normalizedDigest: contentDigest(payload),
+    payload,
+    provenance: { ...observation.provenance, externalVersion: "def456", observedAt },
+    observedAt: new Date(observedAt),
+    ...designerScope
+  };
+}
+
+function secondCandidateFact() {
+  const source = secondObservation();
+  return {
+    ...candidateFact,
+    payload: source.payload as typeof candidateFact.payload,
+    normalizedDigest: String(source.normalizedDigest),
+    provenance: source.provenance as typeof candidateFact.provenance
   };
 }
 

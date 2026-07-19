@@ -70,6 +70,12 @@ Tradeoffs:
 - Evidence IDs: `evidence-adr-federated-design-fact-synchronization-1` through `evidence-adr-federated-design-fact-synchronization-3`.
 - **MCP synchronization blocked:** the matching records are manifest-driven, but they are not complete until `pnpm design-facts:sync` persists them and `pnpm design-facts:check` reads them back through MCP. Retry trigger: run both commands with a reachable configured `DATABASE_URL`, then run the exact Designer Scope federation reconciliation command.
 
+## Integration Hardening Update (2026-07-19)
+
+The first hardening slice makes three governance boundaries fail closed. `reconcile_federated_scope` accepts only an exact Scope and loads promoted canonical envelopes from persisted state. Candidate promotion requires a mapped asset identity, validates the selected observation's digest and provenance, derives promoted content and policy-owned fields server-side, and always enforces complete bilingual localization. Reconciliation and its CLI gate now block every governed non-converged issue instead of allowing content-only or missing-fact drift to return success.
+
+Local evidence: the focused core/CLI command passed 30 tests; the focused MCP/persistence command passed 64 tests; both package typechecks passed. PostgreSQL integration and MCP synchronization/read-back were not run without a reachable `DATABASE_URL`. The broader integration-hardening effort remains in progress because the separately tracked second slice is still pending.
+
 ## 中文本地化 / Chinese Localization
 
 ### 标题
@@ -137,3 +143,9 @@ MCP 仍是已编写 SpecForge 设计事实的唯一写入边界。PostgreSQL 是
 - 有类型关系：Proposal `--IMPLEMENTS_DECISION-->` ADR；Context Pack `--IMPLEMENTS_CONTEXT_FOR-->` Proposal；ADR `--DECIDES-->` 每个相关资产（目标类型为 `api`、`dataModel` 和 `adr`）；每个 Evidence 资产 `--VALIDATES-->` ADR。
 - Evidence ID：`evidence-adr-federated-design-fact-synchronization-1` 至 `evidence-adr-federated-design-fact-synchronization-3`。
 - **MCP 同步受阻：** 匹配记录由清单驱动，但只有在 `pnpm design-facts:sync` 通过 MCP 持久化并由 `pnpm design-facts:check` 回读后才完整。重试触发条件：使用可访问且已配置的 `DATABASE_URL` 运行这两个命令，然后运行精确 Designer Scope 的联邦对账命令。
+
+### 集成加固更新（2026-07-19）
+
+第一轮加固使三个治理边界按失败关闭。`reconcile_federated_scope` 只接收精确 Scope，并从持久化状态加载已提升的规范信封。候选提升要求映射后的资产身份，校验所选观察的内容摘要和来源，根据持久化候选、映射及策略在服务端生成正式内容，并始终要求完整中英文覆盖。核心对账及 CLI 门禁现在会阻断所有受治理的不收敛问题，不再允许仅内容漂移或事实缺失返回成功。
+
+本地证据：core/CLI 聚焦命令通过 30 个测试；MCP/持久化聚焦命令通过 64 个测试；两个包的类型检查均通过。由于没有可访问的 `DATABASE_URL`，未运行 PostgreSQL 集成及 MCP 同步/回读。单独跟踪的第二轮尚未完成，因此整体集成加固仍在进行中。

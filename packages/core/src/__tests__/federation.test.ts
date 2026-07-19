@@ -48,7 +48,7 @@ function createReconciliationFixture(options: DriftOptions = {}): Reconciliation
     schemaVersion: "1",
     payload,
     normalizedDigest: contentDigest(payload),
-    localizedContent: { zh: { name: "订单 API" } },
+    localizedContent: { en: { name: "Orders API" }, zh: { name: "订单 API" } },
     provenance: {
       sourceSystem: "SpecForge",
       connectorInstanceId: "specforge-core",
@@ -208,4 +208,19 @@ describe("federation domain", () => {
     expect(report.root).toMatch(/^[a-f0-9]{64}$/);
     expect(JSON.stringify(inputFacts)).toBe(before);
   });
+
+  it.each([
+    ["content drift", createReconciliationFixture({ contentDrift: true }), "CONTENT_DRIFT"],
+    ["missing fact", { ...createReconciliationFixture(), acceptedFacts: [] }, "MISSING_FACT"],
+    ["undeclared change", createReconciliationFixture({ undeclaredChange: true }), "UNDECLARED_CHANGE"],
+    ["localization drift", createReconciliationFixture({ localizationDrift: true }), "LOCALIZATION_DRIFT"],
+    ["relationship drift", createReconciliationFixture({ relationshipDrift: true }), "RELATIONSHIP_DRIFT"],
+    ["evidence drift", createReconciliationFixture({ evidenceDrift: true }), "EVIDENCE_DRIFT"]
+  ] satisfies Array<[string, ReconciliationInput, string]>)("blocks reconciliation for %s", (_label, input, issueCode) => {
+    const report = reconcileFacts(input);
+
+    expect(report.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: issueCode })]));
+    expect(report.status).toBe("BLOCKED");
+  });
+
 });

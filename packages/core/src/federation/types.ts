@@ -36,7 +36,7 @@ export interface FactProvenance {
 }
 
 export interface FederatedFactLocalizedContent {
-  en?: Record<string, unknown>;
+  en: Record<string, unknown>;
   zh: Record<string, unknown>;
 }
 

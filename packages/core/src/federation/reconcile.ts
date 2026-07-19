@@ -1,5 +1,5 @@
 import { compareCanonical, contentDigest } from "./digest";
-import type { FactAuthority, ReconciliationInput, ReconciliationReport } from "./types";
+import type { FactAuthority, FederatedFactLocalizedContent, ReconciliationInput, ReconciliationReport } from "./types";
 
 export type ObservationDecision = {
   action: "PROMOTE" | "CANDIDATE" | "CONFLICT" | "REJECT";
@@ -28,12 +28,30 @@ export function evaluateObservation(input: ObservationDecisionInput): Observatio
   return { action: "CANDIDATE", reason: `${input.authority}_AUTHORITY` };
 }
 
+export function hasCompleteBilingualLocalization(localizedContent: FederatedFactLocalizedContent): boolean {
+  const english = localizedContent.en;
+  const chinese = localizedContent.zh;
+  return isCompleteLocalizedValue(english) && isCompleteLocalizedValue(chinese) && hasLocalizedOverlay(english, chinese);
+}
+
 export function reconcileFacts(input: ReconciliationInput): ReconciliationReport {
   const issues = [] as ReconciliationReport["issues"];
   const factById = new Map(input.acceptedFacts.map((fact) => [fact.id, fact]));
   const isInScope = (scope: { applicationServiceId: string; scopePath: string }) =>
     scope.applicationServiceId === input.architectureScope.applicationServiceId &&
     scope.scopePath === input.architectureScope.scopePath;
+
+  for (const fact of input.acceptedFacts) {
+    if (!isInScope(fact.architectureScope)) {
+      issues.push({ code: "SCOPE_DRIFT", message: `Accepted fact is outside the reconciliation Scope for ${fact.id}`, factId: fact.id });
+    }
+    if (fact.status !== "PROMOTED") {
+      issues.push({ code: "MISSING_FACT", message: `Accepted fact ${fact.id} is not promoted`, factId: fact.id });
+    }
+    if (!hasCompleteBilingualLocalization(fact.localizedContent)) {
+      issues.push({ code: "LOCALIZATION_DRIFT", message: `Localized content is incomplete for ${fact.id}`, factId: fact.id });
+    }
+  }
 
   for (const observation of input.observations) {
     if (!isInScope(observation.architectureScope)) {
@@ -80,12 +98,24 @@ export function reconcileFacts(input: ReconciliationInput): ReconciliationReport
   if (input.localizationDrift) issues.push({ code: "LOCALIZATION_DRIFT", message: "Localized content differs from the accepted fact." });
   if (input.relationshipDrift) issues.push({ code: "RELATIONSHIP_DRIFT", message: "Relationships differ from the accepted fact." });
   if (input.evidenceDrift) issues.push({ code: "EVIDENCE_DRIFT", message: "Evidence differs from the accepted fact." });
-
   const factDigests = input.acceptedFacts.map((fact) => ({ factId: fact.id, digest: fact.normalizedDigest }));
   const root = contentDigest({ architectureScope: input.architectureScope, factDigests: factDigests.sort((a, b) => compareCanonical(a.factId, b.factId)), issues });
-  const blocked = issues.some((issue) =>
-    issue.code === "IDENTITY_CONFLICT" || issue.code === "SCOPE_DRIFT" ||
-    issue.code === "DELIVERY_BLOCKED" || issue.code === "SOURCE_UNREACHABLE"
-  );
-  return { architectureScope: input.architectureScope, root, status: blocked ? "BLOCKED" : issues.length === 0 ? "CONVERGED" : "DRIFTED", issues, factDigests };
+  return { architectureScope: input.architectureScope, root, status: issues.length === 0 ? "CONVERGED" : "BLOCKED", issues, factDigests };
+}
+
+function hasLocalizedOverlay(english: unknown, chinese: unknown): boolean {
+  if (typeof english === "string") return typeof chinese === "string" && chinese.trim().length > 0;
+  if (Array.isArray(english)) return Array.isArray(chinese) && english.length === chinese.length && english.every((value, index) => hasLocalizedOverlay(value, chinese[index]));
+  if (isRecord(english)) return isRecord(chinese) && Object.entries(english).every(([key, value]) => key in chinese && hasLocalizedOverlay(value, chinese[key]));
+  return chinese !== undefined && chinese !== null;
+}
+
+function isCompleteLocalizedValue(value: unknown): boolean {
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0 && value.every(isCompleteLocalizedValue);
+  return isRecord(value) && Object.keys(value).length > 0 && Object.values(value).every(isCompleteLocalizedValue);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
