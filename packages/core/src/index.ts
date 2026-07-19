@@ -22,3 +22,4 @@ export * from "./relationships/types";
 export * from "./relationships/ontology";
 export * from "./relationships/extract";
 export * from "./graph-store/types";
+export * from "./federation";
