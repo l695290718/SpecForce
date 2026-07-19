@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "../persistence";
-import { listConnectors, recordObservation, registerConnector } from "./persistence";
+import { appendFederationOutbox, listConnectors, promoteCandidate, reconcilePersistedScope, recordObservation, registerConnector } from "./persistence";
 
 const designerScope = {
   applicationServiceId: "com.huawei.celon.desiner",
@@ -41,13 +41,24 @@ const observation = {
 } as const;
 
 type Row = Record<string, unknown>;
-const rows = { connectors: [] as Row[], observations: [] as Row[], outbox: [] as Row[] };
+const rows = { connectors: [] as Row[], observations: [] as Row[], outbox: [] as Row[], mappings: [] as Row[], policies: [] as Row[], sessions: [] as Row[] };
+let failOutbox = false;
+let duplicateObservationCreate = false;
+const candidateFact = {
+  id: "fact-1", assetType: "api", schemaVersion: "1", payload: { name: "Payments API" }, localizedContent: { zh: { name: "支付 API" } }, normalizedDigest: "digest-1", authority: "EXTERNAL", confidence: 1,
+  provenance: { sourceSystem: "github", connectorInstanceId: connector.id, observedAt: observation.observedAt }
+} as const;
 
 beforeEach(() => {
   process.env.SPECFORGE_MCP_SEED = "1";
   rows.connectors.length = 0;
   rows.observations.length = 0;
   rows.outbox.length = 0;
+  rows.mappings.length = 0;
+  rows.policies.length = 0;
+  rows.sessions.length = 0;
+  failOutbox = false;
+  duplicateObservationCreate = false;
   const client = prisma as unknown as Record<string, unknown>;
   client.connectorInstance = {
     upsert: vi.fn(async ({ create, update, where }: { create: Row; update: Row; where: { applicationServiceId_scopePath_id: Row } }) => {
@@ -64,20 +75,68 @@ beforeEach(() => {
     findFirst: vi.fn(async ({ where }: { where: { id: string } }) => rows.connectors.find((row) => row.id === where.id) ?? null),
     findMany: vi.fn(async ({ where }: { where: Row }) => rows.connectors.filter((row) => row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath))
   };
-  client.$transaction = vi.fn(async (operation: (transaction: Row) => Promise<unknown>) => operation({
+  client.externalIdentityMapping = {
+    findUnique: vi.fn(async ({ where }: { where: { applicationServiceId_scopePath_connectorId_sourceNamespace_externalAssetType_externalId: Row } }) => {
+      const key = where.applicationServiceId_scopePath_connectorId_sourceNamespace_externalAssetType_externalId;
+      return rows.mappings.find((row) => Object.entries(key).every(([name, value]) => row[name] === value)) ?? null;
+    }),
+    findFirst: vi.fn(async ({ where }: { where: Row }) => rows.mappings.find((row) => Object.entries(where).every(([name, value]) => row[name] === value)) ?? null),
+    findMany: vi.fn(async ({ where }: { where: Row }) => rows.mappings.filter((row) => row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath))
+  };
+  client.authorityPolicy = { findFirst: vi.fn(async ({ where }: { where: Row }) => rows.policies.find((row) => Object.entries(where).every(([name, value]) => row[name] === value)) ?? null) };
+  client.designChangeSession = { findUnique: vi.fn(async ({ where }: { where: { applicationServiceId_scopePath_id: Row } }) => {
+    const key = where.applicationServiceId_scopePath_id;
+    return rows.sessions.find((row) => row.id === key.id && row.applicationServiceId === key.applicationServiceId && row.scopePath === key.scopePath) ?? null;
+  }) };
+  client.reconciliationSnapshot = { upsert: vi.fn() };
+  client.sourceObservation = {
+    findUnique: vi.fn(async ({ where }: { where: Row }) => {
+      const key = (where.applicationServiceId_scopePath_id ?? where.applicationServiceId_scopePath_idempotencyKey) as Row;
+      return rows.observations.find((row) => Object.entries(key).every(([name, value]) => row[name] === value)) ?? null;
+    }),
+    findFirst: vi.fn(async ({ where }: { where: Row }) => rows.observations.find((row) => Object.entries(where).every(([name, value]) => row[name] === value)) ?? null),
+    findMany: vi.fn(async ({ where }: { where: Row }) => rows.observations.filter((row) => row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath)),
+    update: vi.fn(async ({ where, data }: { where: { applicationServiceId_scopePath_id: Row }; data: Row }) => {
+      const row = rows.observations.find((candidate) => Object.entries(where.applicationServiceId_scopePath_id).every(([name, value]) => candidate[name] === value));
+      return Object.assign(row!, data);
+    })
+  };
+  client.federationOutbox = {
+    findUnique: vi.fn(async ({ where }: { where: { applicationServiceId_scopePath_idempotencyKey: Row } }) => rows.outbox.find((row) => Object.entries(where.applicationServiceId_scopePath_idempotencyKey).every(([name, value]) => row[name] === value)) ?? null),
+    create: vi.fn(async ({ data }: { data: Row }) => {
+      const row = { ...data, dbId: `outbox-${rows.outbox.length + 1}`, availableAt: data.availableAt ?? new Date(), sentAt: null, attemptCount: 0, lastError: null };
+      rows.outbox.push(row);
+      return row;
+    })
+  };
+  client.$transaction = vi.fn(async (operation: (transaction: Row) => Promise<unknown>) => {
+    const snapshot = structuredClone(rows);
+    try { return await operation({
     sourceObservation: {
       findUnique: vi.fn(async ({ where }: { where: { applicationServiceId_scopePath_idempotencyKey: Row } }) => rows.observations.find((row) => row.idempotencyKey === where.applicationServiceId_scopePath_idempotencyKey.idempotencyKey && row.applicationServiceId === where.applicationServiceId_scopePath_idempotencyKey.applicationServiceId && row.scopePath === where.applicationServiceId_scopePath_idempotencyKey.scopePath) ?? null),
-      create: vi.fn(async ({ data }: { data: Row }) => { rows.observations.push(data); return data; })
+      create: vi.fn(async ({ data }: { data: Row }) => {
+        if (duplicateObservationCreate) { duplicateObservationCreate = false; rows.observations.push(data); throw Object.assign(new Error("unique"), { code: "P2002" }); }
+        rows.observations.push(data); return data;
+      }),
+      update: vi.fn(async ({ data }: { data: Row }) => data)
     },
     federationOutbox: {
       findUnique: vi.fn(async ({ where }: { where: { applicationServiceId_scopePath_idempotencyKey: Row } }) => rows.outbox.find((row) => row.idempotencyKey === where.applicationServiceId_scopePath_idempotencyKey.idempotencyKey && row.applicationServiceId === where.applicationServiceId_scopePath_idempotencyKey.applicationServiceId && row.scopePath === where.applicationServiceId_scopePath_idempotencyKey.scopePath) ?? null),
       create: vi.fn(async ({ data }: { data: Row }) => {
+        if (failOutbox) throw new Error("OUTBOX_WRITE_FAILED");
         const row = { ...data, dbId: `outbox-${rows.outbox.length + 1}`, availableAt: data.availableAt ?? new Date(), sentAt: null, attemptCount: 0, lastError: null };
         rows.outbox.push(row);
         return row;
       })
+    },
+    designChangeSession: {
+      findUnique: vi.fn(async ({ where }: { where: { applicationServiceId_scopePath_id: Row } }) => {
+        const key = where.applicationServiceId_scopePath_id;
+        return rows.sessions.find((row) => row.id === key.id && row.applicationServiceId === key.applicationServiceId && row.scopePath === key.scopePath) ?? null;
+      })
     }
-  }));
+    }); } catch (error) { Object.assign(rows, snapshot); throw error; }
+  });
 });
 
 afterEach(() => {
@@ -101,9 +160,11 @@ describe("federation persistence", () => {
 
   it("keeps identical external identities isolated between application services", async () => {
     await registerConnector({ ...connector, architectureScope: designerScope });
-    await registerConnector({ ...connector, id: "policy-connector", architectureScope: policyScope });
-    expect(await listConnectors(designerScope)).toHaveLength(1);
-    expect(await listConnectors(policyScope)).toHaveLength(1);
+    await registerConnector({ ...connector, architectureScope: policyScope });
+    await recordObservation({ ...observation, connectorId: connector.id, architectureScope: designerScope });
+    await recordObservation({ ...observation, connectorId: connector.id, architectureScope: policyScope });
+    expect(rows.observations).toHaveLength(2);
+    expect(rows.observations.map((row) => row.applicationServiceId)).toEqual([designerScope.applicationServiceId, policyScope.applicationServiceId]);
   });
 
   it("replays an observation idempotency key without another outbox event", async () => {
@@ -113,4 +174,64 @@ describe("federation persistence", () => {
     expect(replay).toEqual(first);
     expect(rows.outbox).toHaveLength(1);
   });
+
+  it("recovers a concurrent duplicate observation without another outbox event", async () => {
+    await registerConnector({ ...connector, architectureScope: designerScope });
+    duplicateObservationCreate = true;
+    await expect(recordObservation({ ...observation, connectorId: connector.id, architectureScope: designerScope })).resolves.toMatchObject({ id: observation.id });
+    expect(rows.outbox).toHaveLength(0);
+  });
+
+  it("rolls back the observation when its outbox write fails", async () => {
+    await registerConnector({ ...connector, architectureScope: designerScope });
+    failOutbox = true;
+    await expect(recordObservation({ ...observation, connectorId: connector.id, architectureScope: designerScope })).rejects.toThrow("OUTBOX_WRITE_FAILED");
+    expect(rows.observations).toHaveLength(0);
+  });
+
+  it("does not persist a snapshot during read-only reconciliation", async () => {
+    await reconcilePersistedScope({ architectureScope: designerScope, acceptedFacts: [] });
+    expect((prisma as unknown as { reconciliationSnapshot: { upsert: ReturnType<typeof vi.fn> } }).reconciliationSnapshot.upsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects a federation outbox session from another Scope", async () => {
+    rows.sessions.push({ id: "session-1", ...policyScope });
+    await expect(appendFederationOutbox({ eventType: "TEST", payload: {}, idempotencyKey: "session-outbox", designChangeSessionId: "session-1", architectureScope: designerScope })).rejects.toThrow("DESIGN_CHANGE_SESSION_SCOPE_MISMATCH");
+  });
+
+  it("rejects a federation outbox session that does not exist in Scope", async () => {
+    await expect(appendFederationOutbox({ eventType: "TEST", payload: {}, idempotencyKey: "missing-session-outbox", designChangeSessionId: "missing-session", architectureScope: designerScope })).rejects.toThrow("DESIGN_CHANGE_SESSION_SCOPE_MISMATCH");
+  });
+
+  it("rejects promotion without complete Chinese localization", async () => {
+    arrangePromotion();
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: { ...candidateFact, localizedContent: { zh: {} } } })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
+  });
+
+  it("rejects promotion when authority policy disables it", async () => {
+    arrangePromotion({ promotionMode: "DISABLED" });
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, fact: candidateFact })).rejects.toThrow("POLICY_DISABLED");
+  });
+
+  it("rejects promotion with an ambiguous identity mapping", async () => {
+    arrangePromotion({ matchStatus: "AMBIGUOUS" });
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, fact: candidateFact })).rejects.toThrow("IDENTITY_CONFLICT");
+  });
+
+  it("rejects a candidate whose Scope differs from the requested Scope", async () => {
+    arrangePromotion();
+    Object.assign(rows.mappings[0]!, policyScope);
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, fact: candidateFact })).rejects.toThrow("SCOPE_MISMATCH");
+  });
+
+  it.each(["REJECTED", "TOMBSTONED", "CONFLICTED"])('rejects a %s candidate', async (status) => {
+    arrangePromotion({ status });
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, fact: candidateFact })).rejects.toThrow("CANDIDATE_STATUS_INVALID");
+  });
 });
+
+function arrangePromotion(overrides: Row = {}) {
+  rows.observations.push({ ...observation, connectorId: connector.id, ...designerScope, observedAt: new Date(observation.observedAt), ...overrides });
+  rows.mappings.push({ id: "mapping-1", connectorId: connector.id, sourceNamespace: observation.sourceNamespace, externalAssetType: observation.externalAssetType, externalId: observation.externalId, assetType: candidateFact.assetType, assetId: candidateFact.id, matchStatus: "UNAMBIGUOUS", normalizedDigest: observation.normalizedDigest, ...designerScope, ...overrides });
+  rows.policies.push({ id: "policy-1", assetType: candidateFact.assetType, fieldPath: "$", authority: "EXTERNAL", promotionMode: "AUTO", policyVersion: "1", ...designerScope, ...overrides });
+}

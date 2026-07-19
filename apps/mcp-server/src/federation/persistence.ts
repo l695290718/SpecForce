@@ -1,4 +1,4 @@
-import { reconcileFacts, type ArchitectureScopeRef, type CandidateFactStatus, type ConnectorCapability, type ConnectorStatus, type DesignChangeSession, type DesignChangeSessionStatus, type FederatedFactEnvelope, type ReconciliationReport, type SourceObservation } from "@specforge/core";
+import { evaluateObservation, reconcileFacts, type ArchitectureScopeRef, type CandidateFactStatus, type ConnectorCapability, type ConnectorStatus, type DesignChangeSession, type DesignChangeSessionStatus, type FactAuthority, type FederatedFactEnvelope, type ReconciliationReport, type SourceObservation } from "@specforge/core";
 import { Prisma } from "@prisma/client";
 import { prisma, readableScope, resolveWritableScope, writableActor } from "../persistence";
 
@@ -39,6 +39,8 @@ export interface PromoteCandidateInput {
   candidateId: string;
   architectureScope: ArchitectureScopeRef;
   fact: Omit<FederatedFactEnvelope, "architectureScope" | "status">;
+  fieldPath?: string;
+  humanFacing?: boolean;
 }
 
 export interface CreateDesignChangeSessionInput extends Omit<DesignChangeSession, "architectureScope" | "openedAt" | "updatedAt"> {
@@ -94,7 +96,9 @@ export async function recordObservation(input: RecordObservationInput): Promise<
     const tx = transaction as FederationTransaction;
     const existing = await tx.sourceObservation.findUnique({ where: { applicationServiceId_scopePath_idempotencyKey: { ...scope, idempotencyKey: input.idempotencyKey } } });
     if (existing) return observation(existing);
-    const persisted = await tx.sourceObservation.create({
+    let persisted;
+    try {
+      persisted = await tx.sourceObservation.create({
       data: {
         ...scope,
         id: input.id,
@@ -110,7 +114,13 @@ export async function recordObservation(input: RecordObservationInput): Promise<
         provenance: json(input.provenance),
         idempotencyKey: input.idempotencyKey
       }
-    });
+      });
+    } catch (error) {
+      if (!isUniqueConstraint(error)) throw error;
+      const concurrent = await tx.sourceObservation.findUnique({ where: { applicationServiceId_scopePath_idempotencyKey: { ...scope, idempotencyKey: input.idempotencyKey } } });
+      if (!concurrent) throw error;
+      return observation(concurrent);
+    }
     await createOutbox(tx, {
       eventType: "FEDERATION_OBSERVATION_RECORDED",
       payload: { observationId: input.id, connectorId: input.connectorId, normalizedDigest: input.normalizedDigest },
@@ -124,7 +134,30 @@ export async function recordObservation(input: RecordObservationInput): Promise<
 export async function promoteCandidate(input: PromoteCandidateInput): Promise<FederatedFactEnvelope> {
   const scope = writableScope(input.architectureScope);
   const candidate = await prisma.sourceObservation.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.candidateId } } });
-  if (!candidate) throw new Error("CANDIDATE_NOT_FOUND");
+  if (!candidate) {
+    const candidateInAnotherScope = await prisma.sourceObservation.findFirst({ where: { id: input.candidateId } });
+    if (candidateInAnotherScope) throw new Error("SCOPE_MISMATCH");
+    throw new Error("CANDIDATE_NOT_FOUND");
+  }
+  if (candidate.status !== "CANDIDATE") throw new Error("CANDIDATE_STATUS_INVALID");
+  const mappingIdentity = { connectorId: candidate.connectorId, sourceNamespace: candidate.sourceNamespace, externalAssetType: candidate.externalAssetType, externalId: candidate.externalId };
+  const mapping = await prisma.externalIdentityMapping.findUnique({ where: { applicationServiceId_scopePath_connectorId_sourceNamespace_externalAssetType_externalId: { ...scope, ...mappingIdentity } } });
+  if (!mapping) {
+    const mappingInAnotherScope = await prisma.externalIdentityMapping.findFirst({ where: mappingIdentity });
+    if (mappingInAnotherScope) throw new Error("SCOPE_MISMATCH");
+    throw new Error("IDENTITY_MAPPING_MISSING");
+  }
+  if (mapping.applicationServiceId !== scope.applicationServiceId || mapping.scopePath !== scope.scopePath) throw new Error("SCOPE_MISMATCH");
+  if (mapping.assetType !== input.fact.assetType || (mapping.assetId && mapping.assetId !== input.fact.id)) throw new Error("IDENTITY_MAPPING_INVALID");
+  const policy = await prisma.authorityPolicy.findFirst({ where: { ...scope, assetType: input.fact.assetType, fieldPath: input.fieldPath ?? "$" }, orderBy: { policyVersion: "desc" } });
+  const decision = evaluateObservation({
+    authority: policy?.authority as FactAuthority | undefined,
+    identityMatch: mapping.matchStatus as "UNMATCHED" | "UNAMBIGUOUS" | "AMBIGUOUS",
+    policyAllowsPromotion: policy?.promotionMode === "AUTO",
+    humanFacing: input.humanFacing,
+    hasCompleteChineseLocalization: hasCompleteChineseLocalization(input.fact)
+  });
+  if (decision.action !== "PROMOTE") throw new Error(decision.reason);
   await prisma.sourceObservation.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.candidateId } }, data: { status: "PROMOTED" } });
   return { ...input.fact, architectureScope: scope, status: "PROMOTED", provenance: { ...input.fact.provenance, connectorInstanceId: candidate.connectorId, observedAt: candidate.observedAt.toISOString() } };
 }
@@ -141,7 +174,7 @@ export async function createDesignChangeSession(input: CreateDesignChangeSession
 
 export async function appendFederationOutbox(input: AppendFederationOutboxInput): Promise<FederationOutboxRecord> {
   const scope = writableScope(input.architectureScope);
-  return createOutbox(prisma, { ...input, architectureScope: scope });
+  return prisma.$transaction((transaction) => createOutbox(transaction as FederationTransaction, { ...input, architectureScope: scope }));
 }
 
 export async function reconcilePersistedScope(input: ReconcilePersistedScopeInput): Promise<ReconciliationReport> {
@@ -159,6 +192,12 @@ export async function reconcilePersistedScope(input: ReconcilePersistedScopeInpu
     evidenceDrift: input.evidenceDrift,
     localizationDrift: input.localizationDrift
   });
+  return report;
+}
+
+export async function persistReconciliationSnapshot(input: ReconcilePersistedScopeInput): Promise<ReconciliationReport> {
+  const scope = writableScope(input.architectureScope);
+  const report = await reconcilePersistedScope({ ...input, architectureScope: scope });
   await prisma.reconciliationSnapshot.upsert({
     where: { applicationServiceId_scopePath_root: { ...scope, root: report.root } },
     create: { ...scope, root: report.root, issues: json(report.issues), status: report.status, factDigests: json(report.factDigests) },
@@ -177,12 +216,32 @@ function readableExactScope(scope: ArchitectureScopeRef): ArchitectureScopeRef {
   return readable;
 }
 
-async function createOutbox(client: Pick<FederationTransaction, "federationOutbox"> | typeof prisma, input: AppendFederationOutboxInput): Promise<FederationOutboxRecord> {
+async function createOutbox(client: Pick<FederationTransaction, "federationOutbox" | "designChangeSession"> | typeof prisma, input: AppendFederationOutboxInput): Promise<FederationOutboxRecord> {
   const scope = input.architectureScope;
+  if (input.designChangeSessionId) {
+    const session = await client.designChangeSession.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.designChangeSessionId } } });
+    if (!session) throw new Error("DESIGN_CHANGE_SESSION_SCOPE_MISMATCH");
+  }
   const existing = await client.federationOutbox.findUnique({ where: { applicationServiceId_scopePath_idempotencyKey: { ...scope, idempotencyKey: input.idempotencyKey } } });
   if (existing) return outbox(existing);
-  const row = await client.federationOutbox.create({ data: { ...scope, eventType: input.eventType, payload: json(input.payload), idempotencyKey: input.idempotencyKey, status: "PENDING", availableAt: input.availableAt ? new Date(input.availableAt) : undefined, designChangeSessionId: input.designChangeSessionId ?? null } });
+  let row;
+  try {
+    row = await client.federationOutbox.create({ data: { ...scope, eventType: input.eventType, payload: json(input.payload), idempotencyKey: input.idempotencyKey, status: "PENDING", availableAt: input.availableAt ? new Date(input.availableAt) : undefined, designChangeSessionId: input.designChangeSessionId ?? null } });
+  } catch (error) {
+    if (!isUniqueConstraint(error)) throw error;
+    const concurrent = await client.federationOutbox.findUnique({ where: { applicationServiceId_scopePath_idempotencyKey: { ...scope, idempotencyKey: input.idempotencyKey } } });
+    if (!concurrent) throw error;
+    return outbox(concurrent);
+  }
   return outbox(row);
+}
+
+function hasCompleteChineseLocalization(fact: Omit<FederatedFactEnvelope, "architectureScope" | "status">): boolean {
+  return Object.values(fact.localizedContent.zh ?? {}).some((value) => typeof value === "string" && value.trim().length > 0);
+}
+
+function isUniqueConstraint(error: unknown): error is { code: string } {
+  return typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "P2002";
 }
 
 function connector(row: { id: string; kind: string; capabilities: Prisma.JsonValue; status: string; secretReference: string | null; applicationServiceId: string; scopePath: string }): ConnectorInstance {
