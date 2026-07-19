@@ -50,6 +50,7 @@ let failPromotionUpdate = false;
 let observationUpsertCalls = 0;
 let outboxUpsertCalls = 0;
 let promotionLockCalls = 0;
+let advisoryLockKeys: string[] = [];
 let transactionTail = Promise.resolve();
 const candidateFact = {
   id: "fact-1", assetType: "api", schemaVersion: "1", payload: { name: "Payments API" }, localizedContent: { en: { name: "Payments API", description: "Payments interface" }, zh: { name: "支付 API", description: "支付接口" } }, normalizedDigest: observation.normalizedDigest, authority: "EXTERNAL", confidence: 1,
@@ -78,6 +79,7 @@ beforeEach(() => {
   observationUpsertCalls = 0;
   outboxUpsertCalls = 0;
   promotionLockCalls = 0;
+  advisoryLockKeys = [];
   transactionTail = Promise.resolve();
   const client = prisma as unknown as Record<string, unknown>;
   client.connectorInstance = {
@@ -198,8 +200,9 @@ beforeEach(() => {
     authorityPolicy: {
       findMany: vi.fn(async ({ where }: { where: Row }) => rows.policies.filter((row) => Object.entries(where).every(([name, value]) => row[name] === value)))
     },
-    $executeRawUnsafe: vi.fn(async () => {
+    $executeRawUnsafe: vi.fn(async (...args: unknown[]) => {
       promotionLockCalls++;
+      advisoryLockKeys.push(String(args[1]));
       return [];
     }),
     federationOutbox: {
@@ -303,6 +306,22 @@ describe("federation persistence", () => {
 
     await expect(recordObservation({ ...observation, connectorId: connector.id, architectureScope: designerScope })).resolves.toMatchObject({ id: observation.id });
     expect(rows.observations).toHaveLength(1);
+  });
+
+  it("serializes a concurrent revoke before observation and records no invalid observation", async () => {
+    await registerConnector({ ...connector, architectureScope: designerScope });
+    advisoryLockKeys = [];
+
+    const [revoke, observe] = await Promise.allSettled([
+      registerConnector({ ...connector, status: "REVOKED", architectureScope: designerScope }),
+      recordObservation({ ...observation, connectorId: connector.id, architectureScope: designerScope })
+    ]);
+
+    expect(revoke.status).toBe("fulfilled");
+    expect(observe).toMatchObject({ status: "rejected", reason: expect.objectContaining({ message: "CONNECTOR_NOT_ACTIVE" }) });
+    expect(rows.connectors).toEqual([expect.objectContaining({ id: connector.id, status: "REVOKED", ...designerScope })]);
+    expect(rows.observations).toHaveLength(0);
+    expect(advisoryLockKeys.filter((key) => key.endsWith(`|connector|${connector.id}`))).toHaveLength(2);
   });
 
   it("rejects an observation whose Scope differs from the connector Scope", async () => {
@@ -551,6 +570,17 @@ describe("federation persistence", () => {
       scopePath: designerScope.scopePath,
       idempotencyKey: expect.stringContaining("FEDERATION_CANDIDATE_PROMOTED")
     })]);
+  });
+
+  it("replays an already promoted candidate as the same receipt without another delivery event", async () => {
+    arrangePromotion();
+
+    const first = await promoteCandidate(promotionInput());
+    const replay = await promoteCandidate(promotionInput());
+
+    expect(replay).toEqual(first);
+    expect(rows.outbox.filter((row) => row.eventType === "FEDERATION_CANDIDATE_PROMOTED")).toHaveLength(1);
+    expect(rows.observations).toEqual([expect.objectContaining({ id: observation.id, status: "PROMOTED" })]);
   });
 
   it("rolls back candidate promotion when its delivery event fails", async () => {

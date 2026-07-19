@@ -68,6 +68,7 @@ export async function registerConnector(input: RegisterConnectorInput): Promise<
   const scope = writableScope(input.architectureScope);
   return prisma.$transaction(async (transaction) => {
     const tx = transaction as FederationTransaction;
+    await tx.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1))", connectorLockKey(scope, input.id));
     const row = await tx.connectorInstance.upsert({
       where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } },
       create: { ...scope, id: input.id, kind: input.kind, capabilities: json(input.capabilities), status: input.status, secretReference: input.secretReference ?? null },
@@ -145,6 +146,16 @@ async function promoteCandidateInTransaction(transaction: Prisma.TransactionClie
     const candidateInAnotherScope = await transaction.sourceObservation.findFirst({ where: { id: input.candidateId } });
     if (candidateInAnotherScope) throw new Error("SCOPE_MISMATCH");
     throw new Error("CANDIDATE_NOT_FOUND");
+  }
+  if (candidate.status === "PROMOTED") {
+    const promotedFact = persistedCanonicalFact(candidate.payload);
+    if (!promotedFact) throw new Error("CANONICAL_FACT_INVALID");
+    if (promotedFact.architectureScope.applicationServiceId !== scope.applicationServiceId || promotedFact.architectureScope.scopePath !== scope.scopePath) {
+      throw new Error("SCOPE_MISMATCH");
+    }
+    if (contentDigest(promotedFact.payload) !== promotedFact.normalizedDigest) throw new Error("CANDIDATE_DIGEST_INVALID");
+    if (!hasCompleteBilingualLocalization(promotedFact.localizedContent)) throw new Error("LOCALIZATION_INCOMPLETE");
+    return promotedFact;
   }
   if (candidate.status !== "CANDIDATE") throw new Error("CANDIDATE_STATUS_INVALID");
   const candidateEnvelope = candidateEnvelopeFromPayload(candidate.payload);
