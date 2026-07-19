@@ -57,6 +57,16 @@ interface ParsedAdr {
   zh: AdrFields;
 }
 
+const supportedManifestLocalizedFields = new Set([
+  "status",
+  "owner",
+  "reason",
+  "retryTrigger",
+  "auditFailureCode",
+  "auditDiagnosticReference",
+  "auditSecurityContract"
+]);
+
 export async function synchronizeDesignFacts(input: {
   callTool: CallTool;
   manifest: DesignFactManifest;
@@ -259,29 +269,42 @@ function buildAdr(decision: DesignFactManifestDecision, parsed: ParsedAdr) {
     owner: "SpecForge Architecture",
     createdAt: now,
     updatedAt: now,
-    localizedContent: {
-      en: {
-        name: parsed.en.title,
-        description: parsed.en.description,
-        title: parsed.en.title,
-        context: parsed.en.context,
-        decision: parsed.en.decision,
-        alternatives: parsed.en.alternatives,
-        consequences: parsed.en.consequences,
-        constraints: parsed.en.constraints
-      },
-      zh: {
-        name: parsed.zh.title,
-        description: parsed.zh.description,
-        title: parsed.zh.title,
-        context: parsed.zh.context,
-        decision: parsed.zh.decision,
-        alternatives: parsed.zh.alternatives,
-        consequences: parsed.zh.consequences,
-        constraints: parsed.zh.constraints
-      }
+    localizedContent: mergeAdrLocalizedContent(decision, parsed)
+  };
+}
+
+function mergeAdrLocalizedContent(decision: DesignFactManifestDecision, parsed: ParsedAdr) {
+  const canonical = {
+    en: {
+      name: parsed.en.title,
+      description: parsed.en.description,
+      title: parsed.en.title,
+      context: parsed.en.context,
+      decision: parsed.en.decision,
+      alternatives: parsed.en.alternatives,
+      consequences: parsed.en.consequences,
+      constraints: parsed.en.constraints
+    },
+    zh: {
+      name: parsed.zh.title,
+      description: parsed.zh.description,
+      title: parsed.zh.title,
+      context: parsed.zh.context,
+      decision: parsed.zh.decision,
+      alternatives: parsed.zh.alternatives,
+      consequences: parsed.zh.consequences,
+      constraints: parsed.zh.constraints
     }
   };
+  return {
+    en: { ...canonical.en, ...supportedManifestOverlay(decision.localizedContent?.en) },
+    zh: { ...canonical.zh, ...supportedManifestOverlay(decision.localizedContent?.zh) }
+  };
+}
+
+function supportedManifestOverlay(value: Record<string, string> | undefined): Record<string, string> {
+  if (!value) return {};
+  return Object.fromEntries(Object.entries(value).filter(([key]) => supportedManifestLocalizedFields.has(key)));
 }
 
 function parseAdrSource(source: AdrSource): ParsedAdr {

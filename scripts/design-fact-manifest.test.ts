@@ -36,4 +36,17 @@ it("records the blocked federated sync fact with complete English and Chinese ov
   };
   expect(decision.localizedContent?.en).toEqual(expect.objectContaining({ owner: expect.any(String), reason: expect.any(String), retryTrigger: expect.any(String) }));
   expect(decision.localizedContent?.zh).toEqual(expect.objectContaining({ owner: expect.any(String), reason: expect.any(String), retryTrigger: expect.any(String) }));
+  expect(decision.localizedContent?.en).toEqual(expect.objectContaining({
+    auditFailureCode: "FEDERATION_TOOL_ERROR",
+    auditDiagnosticReference: expect.stringContaining("64-hex SHA-256"),
+    auditSecurityContract: expect.stringContaining("raw exceptions")
+  }));
+  expect(decision.localizedContent?.zh).toEqual(expect.objectContaining({
+    auditFailureCode: "FEDERATION_TOOL_ERROR",
+    auditDiagnosticReference: expect.stringContaining("64 位十六进制"),
+    auditSecurityContract: expect.stringContaining("原始异常")
+  }));
+  expect(decision.evidence).toHaveLength(6);
+  expect(decision.evidence[5]?.command).toContain("apps\\mcp-server\\src\\federation\\tools.test.ts");
+  expect(decision.evidence[5]?.result).toContain("raw exception and credential text are absent");
 });

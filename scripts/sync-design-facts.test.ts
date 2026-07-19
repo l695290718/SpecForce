@@ -355,4 +355,72 @@ describe("synchronizeDesignFacts", () => {
       })
     }));
   });
+
+  it("merges supported manifest audit overlays and emits the sixth VALIDATES link", async () => {
+    const callTool = vi.fn().mockResolvedValue({ ok: true });
+    const evidence = Array.from({ length: 6 }, (_, index) => ({ command: `node test-${index + 1}`, result: `result-${index + 1}` }));
+    await synchronizeDesignFacts({
+      callTool,
+      manifest: {
+        decisions: [{
+          ...federatedDecision,
+          evidence,
+          localizedContent: {
+            en: {
+              status: "MCP synchronization blocked",
+              owner: "SpecForge Architecture",
+              reason: "DATABASE_URL and exact Scope are unavailable.",
+              retryTrigger: "Configure PostgreSQL and Scope, then run sync and read back.",
+              auditFailureCode: "FEDERATION_TOOL_ERROR",
+              auditDiagnosticReference: "diagnosticRef=<64-hex SHA-256 digest>",
+              auditSecurityContract: "Raw exceptions and credential text are never persisted.",
+              title: "Unsupported caller title",
+              unsupported: "must not reach MCP"
+            },
+            zh: {
+              status: "MCP 同步受阻",
+              owner: "SpecForge Architecture",
+              reason: "当前缺少 DATABASE_URL 和精确 Scope。",
+              retryTrigger: "配置 PostgreSQL 和 Scope 后运行同步并回读。",
+              auditFailureCode: "FEDERATION_TOOL_ERROR",
+              auditDiagnosticReference: "diagnosticRef=<64 位十六进制 SHA-256 摘要>",
+              auditSecurityContract: "不会持久化原始异常或凭据文本。",
+              title: "不应覆盖的标题",
+              unsupported: "不得写入 MCP"
+            }
+          }
+        }]
+      },
+      readAdr: async () => ({ title: "Federated Design-Fact Synchronization", english: federatedEnglishAdr, chinese: federatedChineseAdr }),
+      readExisting: async () => undefined
+    });
+
+    const adrCall = callTool.mock.calls.find(([name]) => name === "create_adr");
+    const adr = adrCall?.[1]?.adr as { title: string; localizedContent: { en: Record<string, unknown>; zh: Record<string, unknown> } };
+    expect(adr.title).toBe("Federated Design-Fact Synchronization");
+    expect(adr.localizedContent.en).toMatchObject({
+      status: "MCP synchronization blocked",
+      owner: "SpecForge Architecture",
+      auditFailureCode: "FEDERATION_TOOL_ERROR",
+      auditDiagnosticReference: "diagnosticRef=<64-hex SHA-256 digest>",
+      auditSecurityContract: "Raw exceptions and credential text are never persisted."
+    });
+    expect(adr.localizedContent.zh).toMatchObject({
+      status: "MCP 同步受阻",
+      auditFailureCode: "FEDERATION_TOOL_ERROR",
+      auditSecurityContract: "不会持久化原始异常或凭据文本。"
+    });
+    expect(adr.localizedContent.en.title).toBe("Federated Design-Fact Synchronization");
+    expect(adr.localizedContent.en).not.toHaveProperty("unsupported");
+    expect(adr.localizedContent.en).not.toHaveProperty("title", "Unsupported caller title");
+
+    expect(callTool).toHaveBeenCalledWith("link_assets", expect.objectContaining({
+      sourceType: "evidence",
+      sourceId: "evidence-adr-federated-design-fact-synchronization-6",
+      targetType: "adr",
+      targetId: federatedDecision.mcpAdrId,
+      relationType: "VALIDATES",
+      architectureScope: scope
+    }));
+  });
 });
