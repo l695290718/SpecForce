@@ -80,6 +80,7 @@ PostgreSQL 是所选应用服务范围内的事务权威存储。MCP、解析器
 
 - `pnpm --filter @specforge/core test` — local core tests cover scoped persistence semantics, relationship extraction, graph-store contracts, and impact analysis.
 - `pnpm --filter @specforge/graph-store test` — local graph-store tests cover PostgreSQL traversal/projection behavior through the adapter contract.
+- `DATABASE_URL=postgresql://admin:admin@localhost:5433/specforge?schema=public SPECFORGE_PG_INTEGRATION=1 pnpm --filter @specforge/graph-store test -- postgres.integration.test.ts` — completed on 2026-07-19 against the local PostgreSQL database; 3 test files and 51 tests passed, including disposable-schema traversal and relationship integration coverage.
 - `pnpm --filter @specforge/mcp-server smoke` — local MCP smoke path exercises scoped reads, persisted writes, graph resources, and relationship evidence when the configured database is available.
 - `prisma/schema.prisma` — PostgreSQL is the configured Prisma provider and models include persisted assets and relationship/projection records.
 
@@ -87,6 +88,7 @@ PostgreSQL 是所选应用服务范围内的事务权威存储。MCP、解析器
 
 - `pnpm --filter @specforge/core test` — 本地 Core 测试覆盖范围持久化语义、关系提取、图存储契约和影响分析。
 - `pnpm --filter @specforge/graph-store test` — 本地图存储测试通过适配器契约覆盖 PostgreSQL 遍历和投影行为。
+- `DATABASE_URL=postgresql://admin:admin@localhost:5433/specforge?schema=public SPECFORGE_PG_INTEGRATION=1 pnpm --filter @specforge/graph-store test -- postgres.integration.test.ts` — 已于 2026-07-19 在本地 PostgreSQL 数据库完成；3 个测试文件和 51 个测试通过，其中包含可自动清理 schema 的遍历和关系集成覆盖。
 - `pnpm --filter @specforge/mcp-server smoke` — 在配置的数据库可用时，本地 MCP 冒烟路径验证有范围读取、持久化写入、图资源和关系证据。
 - `prisma/schema.prisma` — Prisma 配置的提供程序是 PostgreSQL，模型包含持久化资产以及关系或投影记录。
 

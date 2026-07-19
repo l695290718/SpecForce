@@ -36,11 +36,11 @@ Implement the NebulaGraph 3.8.0 projection path described in the enterprise impa
 
 ### PostgreSQL graph traversal final regression
 
-**Status:** Pending environment verification.
+**Status:** Complete (locally verified on 2026-07-19).
 
-Re-run the complete PostgreSQL-backed GraphStore suite after the final deterministic root-ordering change, against the local `specforge` PostgreSQL database.
+The complete PostgreSQL-backed GraphStore suite was run after the final deterministic root-ordering change against the local `specforge` PostgreSQL database.
 
-**Completion evidence:** the PostgreSQL integration suite exits successfully with all GraphStore traversal and relationship tests passing.
+**Completion evidence:** `DATABASE_URL=postgresql://admin:admin@localhost:5433/specforge?schema=public SPECFORGE_PG_INTEGRATION=1 pnpm --filter @specforge/graph-store test -- postgres.integration.test.ts` passed 3 test files and 51 tests, including the disposable PostgreSQL integration suite.
 
 ## Deferred product capability
 
