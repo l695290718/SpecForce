@@ -229,8 +229,10 @@ async function createOutbox(client: Pick<FederationTransaction, "federationOutbo
 
 function hasCompleteChineseLocalization(fact: Omit<FederatedFactEnvelope, "architectureScope" | "status">): boolean {
   const zh = fact.localizedContent.zh;
+  const english = fact.localizedContent.en;
+  if (!isRecord(english) || Object.keys(english).length === 0 || !hasOnlyCompleteLocalizedValues(english)) return false;
   if (!isRecord(zh) || Object.keys(zh).length === 0 || !hasOnlyCompleteLocalizedValues(zh)) return false;
-  return fact.localizedContent.en === undefined || hasChineseOverlayForEnglish(fact.localizedContent.en, zh);
+  return hasChineseOverlayForEnglish(english, zh);
 }
 
 function hasChineseOverlayForEnglish(english: unknown, chinese: unknown): boolean {

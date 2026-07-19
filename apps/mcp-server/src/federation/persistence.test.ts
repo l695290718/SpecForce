@@ -250,6 +250,11 @@ describe("federation persistence", () => {
     await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: { ...candidateFact, localizedContent: { en: candidateFact.localizedContent.en, zh: { name: "支付 API" } } } })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
   });
 
+  it("rejects a human-facing fact without an English canonical overlay", async () => {
+    arrangePromotion();
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: { ...candidateFact, localizedContent: { zh: candidateFact.localizedContent.zh } } })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
+  });
+
   it("rejects promotion without an explicit humanFacing signal", async () => {
     arrangePromotion();
     await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, fact: candidateFact } as unknown as Parameters<typeof promoteCandidate>[0])).rejects.toThrow("HUMAN_FACING_REQUIRED");
