@@ -40,7 +40,7 @@ export interface PromoteCandidateInput {
   architectureScope: ArchitectureScopeRef;
   fact: Omit<FederatedFactEnvelope, "architectureScope" | "status">;
   fieldPath?: string;
-  humanFacing?: boolean;
+  humanFacing: boolean;
 }
 
 export interface CreateDesignChangeSessionInput extends Omit<DesignChangeSession, "architectureScope" | "openedAt" | "updatedAt"> {
@@ -96,10 +96,9 @@ export async function recordObservation(input: RecordObservationInput): Promise<
     const tx = transaction as FederationTransaction;
     const existing = await tx.sourceObservation.findUnique({ where: { applicationServiceId_scopePath_idempotencyKey: { ...scope, idempotencyKey: input.idempotencyKey } } });
     if (existing) return observation(existing);
-    let persisted;
-    try {
-      persisted = await tx.sourceObservation.create({
-      data: {
+    const persisted = await tx.sourceObservation.upsert({
+      where: { applicationServiceId_scopePath_idempotencyKey: { ...scope, idempotencyKey: input.idempotencyKey } },
+      create: {
         ...scope,
         id: input.id,
         connectorId: input.connectorId,
@@ -113,14 +112,9 @@ export async function recordObservation(input: RecordObservationInput): Promise<
         status: input.status,
         provenance: json(input.provenance),
         idempotencyKey: input.idempotencyKey
-      }
-      });
-    } catch (error) {
-      if (!isUniqueConstraint(error)) throw error;
-      const concurrent = await tx.sourceObservation.findUnique({ where: { applicationServiceId_scopePath_idempotencyKey: { ...scope, idempotencyKey: input.idempotencyKey } } });
-      if (!concurrent) throw error;
-      return observation(concurrent);
-    }
+      },
+      update: {}
+    });
     await createOutbox(tx, {
       eventType: "FEDERATION_OBSERVATION_RECORDED",
       payload: { observationId: input.id, connectorId: input.connectorId, normalizedDigest: input.normalizedDigest },
@@ -133,6 +127,7 @@ export async function recordObservation(input: RecordObservationInput): Promise<
 
 export async function promoteCandidate(input: PromoteCandidateInput): Promise<FederatedFactEnvelope> {
   const scope = writableScope(input.architectureScope);
+  if (typeof input.humanFacing !== "boolean") throw new Error("HUMAN_FACING_REQUIRED");
   const candidate = await prisma.sourceObservation.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.candidateId } } });
   if (!candidate) {
     const candidateInAnotherScope = await prisma.sourceObservation.findFirst({ where: { id: input.candidateId } });
@@ -149,7 +144,9 @@ export async function promoteCandidate(input: PromoteCandidateInput): Promise<Fe
   }
   if (mapping.applicationServiceId !== scope.applicationServiceId || mapping.scopePath !== scope.scopePath) throw new Error("SCOPE_MISMATCH");
   if (mapping.assetType !== input.fact.assetType || (mapping.assetId && mapping.assetId !== input.fact.id)) throw new Error("IDENTITY_MAPPING_INVALID");
-  const policy = await prisma.authorityPolicy.findFirst({ where: { ...scope, assetType: input.fact.assetType, fieldPath: input.fieldPath ?? "$" }, orderBy: { policyVersion: "desc" } });
+  const policies = await prisma.authorityPolicy.findMany({ where: { ...scope, assetType: input.fact.assetType, fieldPath: input.fieldPath ?? "$" } });
+  if (policies.length > 1) throw new Error("AUTHORITY_POLICY_AMBIGUOUS");
+  const policy = policies[0];
   const decision = evaluateObservation({
     authority: policy?.authority as FactAuthority | undefined,
     identityMatch: mapping.matchStatus as "UNMATCHED" | "UNAMBIGUOUS" | "AMBIGUOUS",
@@ -222,26 +219,35 @@ async function createOutbox(client: Pick<FederationTransaction, "federationOutbo
     const session = await client.designChangeSession.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.designChangeSessionId } } });
     if (!session) throw new Error("DESIGN_CHANGE_SESSION_SCOPE_MISMATCH");
   }
-  const existing = await client.federationOutbox.findUnique({ where: { applicationServiceId_scopePath_idempotencyKey: { ...scope, idempotencyKey: input.idempotencyKey } } });
-  if (existing) return outbox(existing);
-  let row;
-  try {
-    row = await client.federationOutbox.create({ data: { ...scope, eventType: input.eventType, payload: json(input.payload), idempotencyKey: input.idempotencyKey, status: "PENDING", availableAt: input.availableAt ? new Date(input.availableAt) : undefined, designChangeSessionId: input.designChangeSessionId ?? null } });
-  } catch (error) {
-    if (!isUniqueConstraint(error)) throw error;
-    const concurrent = await client.federationOutbox.findUnique({ where: { applicationServiceId_scopePath_idempotencyKey: { ...scope, idempotencyKey: input.idempotencyKey } } });
-    if (!concurrent) throw error;
-    return outbox(concurrent);
-  }
+  const row = await client.federationOutbox.upsert({
+    where: { applicationServiceId_scopePath_idempotencyKey: { ...scope, idempotencyKey: input.idempotencyKey } },
+    create: { ...scope, eventType: input.eventType, payload: json(input.payload), idempotencyKey: input.idempotencyKey, status: "PENDING", availableAt: input.availableAt ? new Date(input.availableAt) : undefined, designChangeSessionId: input.designChangeSessionId ?? null },
+    update: {}
+  });
   return outbox(row);
 }
 
 function hasCompleteChineseLocalization(fact: Omit<FederatedFactEnvelope, "architectureScope" | "status">): boolean {
-  return Object.values(fact.localizedContent.zh ?? {}).some((value) => typeof value === "string" && value.trim().length > 0);
+  const zh = fact.localizedContent.zh;
+  if (!isRecord(zh) || Object.keys(zh).length === 0 || !hasOnlyCompleteLocalizedValues(zh)) return false;
+  return fact.localizedContent.en === undefined || hasChineseOverlayForEnglish(fact.localizedContent.en, zh);
 }
 
-function isUniqueConstraint(error: unknown): error is { code: string } {
-  return typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "P2002";
+function hasChineseOverlayForEnglish(english: unknown, chinese: unknown): boolean {
+  if (typeof english === "string") return typeof chinese === "string" && chinese.trim().length > 0;
+  if (Array.isArray(english)) return Array.isArray(chinese) && english.length === chinese.length && english.every((value, index) => hasChineseOverlayForEnglish(value, chinese[index]));
+  if (isRecord(english)) return isRecord(chinese) && Object.entries(english).every(([key, value]) => key in chinese && hasChineseOverlayForEnglish(value, chinese[key]));
+  return chinese !== undefined && chinese !== null;
+}
+
+function hasOnlyCompleteLocalizedValues(value: unknown): boolean {
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0 && value.every(hasOnlyCompleteLocalizedValues);
+  return isRecord(value) && Object.keys(value).length > 0 && Object.values(value).every(hasOnlyCompleteLocalizedValues);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function connector(row: { id: string; kind: string; capabilities: Prisma.JsonValue; status: string; secretReference: string | null; applicationServiceId: string; scopePath: string }): ConnectorInstance {

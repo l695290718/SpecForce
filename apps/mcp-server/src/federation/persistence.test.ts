@@ -43,9 +43,10 @@ const observation = {
 type Row = Record<string, unknown>;
 const rows = { connectors: [] as Row[], observations: [] as Row[], outbox: [] as Row[], mappings: [] as Row[], policies: [] as Row[], sessions: [] as Row[] };
 let failOutbox = false;
-let duplicateObservationCreate = false;
+let observationUpsertCalls = 0;
+let outboxUpsertCalls = 0;
 const candidateFact = {
-  id: "fact-1", assetType: "api", schemaVersion: "1", payload: { name: "Payments API" }, localizedContent: { zh: { name: "支付 API" } }, normalizedDigest: "digest-1", authority: "EXTERNAL", confidence: 1,
+  id: "fact-1", assetType: "api", schemaVersion: "1", payload: { name: "Payments API" }, localizedContent: { en: { name: "Payments API", description: "Payments interface" }, zh: { name: "支付 API", description: "支付接口" } }, normalizedDigest: "digest-1", authority: "EXTERNAL", confidence: 1,
   provenance: { sourceSystem: "github", connectorInstanceId: connector.id, observedAt: observation.observedAt }
 } as const;
 
@@ -58,7 +59,8 @@ beforeEach(() => {
   rows.policies.length = 0;
   rows.sessions.length = 0;
   failOutbox = false;
-  duplicateObservationCreate = false;
+  observationUpsertCalls = 0;
+  outboxUpsertCalls = 0;
   const client = prisma as unknown as Record<string, unknown>;
   client.connectorInstance = {
     upsert: vi.fn(async ({ create, update, where }: { create: Row; update: Row; where: { applicationServiceId_scopePath_id: Row } }) => {
@@ -83,7 +85,10 @@ beforeEach(() => {
     findFirst: vi.fn(async ({ where }: { where: Row }) => rows.mappings.find((row) => Object.entries(where).every(([name, value]) => row[name] === value)) ?? null),
     findMany: vi.fn(async ({ where }: { where: Row }) => rows.mappings.filter((row) => row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath))
   };
-  client.authorityPolicy = { findFirst: vi.fn(async ({ where }: { where: Row }) => rows.policies.find((row) => Object.entries(where).every(([name, value]) => row[name] === value)) ?? null) };
+  client.authorityPolicy = {
+    findFirst: vi.fn(async ({ where }: { where: Row }) => rows.policies.find((row) => Object.entries(where).every(([name, value]) => row[name] === value)) ?? null),
+    findMany: vi.fn(async ({ where }: { where: Row }) => rows.policies.filter((row) => Object.entries(where).every(([name, value]) => row[name] === value)))
+  };
   client.designChangeSession = { findUnique: vi.fn(async ({ where }: { where: { applicationServiceId_scopePath_id: Row } }) => {
     const key = where.applicationServiceId_scopePath_id;
     return rows.sessions.find((row) => row.id === key.id && row.applicationServiceId === key.applicationServiceId && row.scopePath === key.scopePath) ?? null;
@@ -99,12 +104,27 @@ beforeEach(() => {
     update: vi.fn(async ({ where, data }: { where: { applicationServiceId_scopePath_id: Row }; data: Row }) => {
       const row = rows.observations.find((candidate) => Object.entries(where.applicationServiceId_scopePath_id).every(([name, value]) => candidate[name] === value));
       return Object.assign(row!, data);
+    }),
+    upsert: vi.fn(async ({ where, create }: { where: { applicationServiceId_scopePath_idempotencyKey: Row }; create: Row }) => {
+      const key = where.applicationServiceId_scopePath_idempotencyKey;
+      const existing = rows.observations.find((row) => Object.entries(key).every(([name, value]) => row[name] === value));
+      if (existing) return existing;
+      rows.observations.push(create);
+      return create;
     })
   };
   client.federationOutbox = {
     findUnique: vi.fn(async ({ where }: { where: { applicationServiceId_scopePath_idempotencyKey: Row } }) => rows.outbox.find((row) => Object.entries(where.applicationServiceId_scopePath_idempotencyKey).every(([name, value]) => row[name] === value)) ?? null),
     create: vi.fn(async ({ data }: { data: Row }) => {
       const row = { ...data, dbId: `outbox-${rows.outbox.length + 1}`, availableAt: data.availableAt ?? new Date(), sentAt: null, attemptCount: 0, lastError: null };
+      rows.outbox.push(row);
+      return row;
+    }),
+    upsert: vi.fn(async ({ where, create }: { where: { applicationServiceId_scopePath_idempotencyKey: Row }; create: Row }) => {
+      const key = where.applicationServiceId_scopePath_idempotencyKey;
+      const existing = rows.outbox.find((row) => Object.entries(key).every(([name, value]) => row[name] === value));
+      if (existing) return existing;
+      const row = { ...create, dbId: `outbox-${rows.outbox.length + 1}`, availableAt: create.availableAt ?? new Date(), sentAt: null, attemptCount: 0, lastError: null };
       rows.outbox.push(row);
       return row;
     })
@@ -114,9 +134,13 @@ beforeEach(() => {
     try { return await operation({
     sourceObservation: {
       findUnique: vi.fn(async ({ where }: { where: { applicationServiceId_scopePath_idempotencyKey: Row } }) => rows.observations.find((row) => row.idempotencyKey === where.applicationServiceId_scopePath_idempotencyKey.idempotencyKey && row.applicationServiceId === where.applicationServiceId_scopePath_idempotencyKey.applicationServiceId && row.scopePath === where.applicationServiceId_scopePath_idempotencyKey.scopePath) ?? null),
-      create: vi.fn(async ({ data }: { data: Row }) => {
-        if (duplicateObservationCreate) { duplicateObservationCreate = false; rows.observations.push(data); throw Object.assign(new Error("unique"), { code: "P2002" }); }
-        rows.observations.push(data); return data;
+      create: vi.fn(async ({ data }: { data: Row }) => { rows.observations.push(data); return data; }),
+      upsert: vi.fn(async ({ where, create }: { where: { applicationServiceId_scopePath_idempotencyKey: Row }; create: Row }) => {
+        observationUpsertCalls++;
+        const key = where.applicationServiceId_scopePath_idempotencyKey;
+        const existing = rows.observations.find((row) => Object.entries(key).every(([name, value]) => row[name] === value));
+        if (existing) return existing;
+        rows.observations.push(create); return create;
       }),
       update: vi.fn(async ({ data }: { data: Row }) => data)
     },
@@ -125,6 +149,16 @@ beforeEach(() => {
       create: vi.fn(async ({ data }: { data: Row }) => {
         if (failOutbox) throw new Error("OUTBOX_WRITE_FAILED");
         const row = { ...data, dbId: `outbox-${rows.outbox.length + 1}`, availableAt: data.availableAt ?? new Date(), sentAt: null, attemptCount: 0, lastError: null };
+        rows.outbox.push(row);
+        return row;
+      }),
+      upsert: vi.fn(async ({ where, create }: { where: { applicationServiceId_scopePath_idempotencyKey: Row }; create: Row }) => {
+        outboxUpsertCalls++;
+        const key = where.applicationServiceId_scopePath_idempotencyKey;
+        const existing = rows.outbox.find((row) => Object.entries(key).every(([name, value]) => row[name] === value));
+        if (existing) return existing;
+        if (failOutbox) throw new Error("OUTBOX_WRITE_FAILED");
+        const row = { ...create, dbId: `outbox-${rows.outbox.length + 1}`, availableAt: create.availableAt ?? new Date(), sentAt: null, attemptCount: 0, lastError: null };
         rows.outbox.push(row);
         return row;
       })
@@ -175,11 +209,14 @@ describe("federation persistence", () => {
     expect(rows.outbox).toHaveLength(1);
   });
 
-  it("recovers a concurrent duplicate observation without another outbox event", async () => {
+  it("concurrently upserts one observation and one outbox receipt", async () => {
     await registerConnector({ ...connector, architectureScope: designerScope });
-    duplicateObservationCreate = true;
-    await expect(recordObservation({ ...observation, connectorId: connector.id, architectureScope: designerScope })).resolves.toMatchObject({ id: observation.id });
-    expect(rows.outbox).toHaveLength(0);
+    const [first, replay] = await Promise.all([recordObservation({ ...observation, connectorId: connector.id, architectureScope: designerScope }), recordObservation({ ...observation, connectorId: connector.id, architectureScope: designerScope })]);
+    expect(replay).toEqual(first);
+    expect(rows.observations).toHaveLength(1);
+    expect(rows.outbox).toHaveLength(1);
+    expect(observationUpsertCalls).toBeGreaterThan(0);
+    expect(outboxUpsertCalls).toBeGreaterThan(0);
   });
 
   it("rolls back the observation when its outbox write fails", async () => {
@@ -205,28 +242,56 @@ describe("federation persistence", () => {
 
   it("rejects promotion without complete Chinese localization", async () => {
     arrangePromotion();
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: { ...candidateFact, localizedContent: { zh: {} } } })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: { ...candidateFact, localizedContent: { en: candidateFact.localizedContent.en, zh: {} } } })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
+  });
+
+  it("rejects a partial Chinese localization overlay for a human-facing fact", async () => {
+    arrangePromotion();
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: { ...candidateFact, localizedContent: { en: candidateFact.localizedContent.en, zh: { name: "支付 API" } } } })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
+  });
+
+  it("rejects promotion without an explicit humanFacing signal", async () => {
+    arrangePromotion();
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, fact: candidateFact } as unknown as Parameters<typeof promoteCandidate>[0])).rejects.toThrow("HUMAN_FACING_REQUIRED");
   });
 
   it("rejects promotion when authority policy disables it", async () => {
     arrangePromotion({ promotionMode: "DISABLED" });
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, fact: candidateFact })).rejects.toThrow("POLICY_DISABLED");
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("POLICY_DISABLED");
   });
 
   it("rejects promotion with an ambiguous identity mapping", async () => {
     arrangePromotion({ matchStatus: "AMBIGUOUS" });
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, fact: candidateFact })).rejects.toThrow("IDENTITY_CONFLICT");
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("IDENTITY_CONFLICT");
   });
 
   it("rejects a candidate whose Scope differs from the requested Scope", async () => {
     arrangePromotion();
     Object.assign(rows.mappings[0]!, policyScope);
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, fact: candidateFact })).rejects.toThrow("SCOPE_MISMATCH");
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("SCOPE_MISMATCH");
   });
 
   it.each(["REJECTED", "TOMBSTONED", "CONFLICTED"])('rejects a %s candidate', async (status) => {
     arrangePromotion({ status });
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, fact: candidateFact })).rejects.toThrow("CANDIDATE_STATUS_INVALID");
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("CANDIDATE_STATUS_INVALID");
+  });
+
+  it("rejects multiple applicable authority policies", async () => {
+    arrangePromotion();
+    rows.policies.push({ ...rows.policies[0]!, id: "policy-2", policyVersion: "2" });
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("AUTHORITY_POLICY_AMBIGUOUS");
+  });
+
+  it("rejects promotion without an applicable authority policy", async () => {
+    arrangePromotion();
+    rows.policies.length = 0;
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("AUTHORITY_MISSING");
+  });
+
+  it("promotes a valid scoped candidate", async () => {
+    arrangePromotion();
+    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).resolves.toMatchObject({ id: candidateFact.id, status: "PROMOTED", architectureScope: designerScope });
+    expect(rows.observations[0]).toMatchObject({ status: "PROMOTED", ...designerScope });
   });
 });
 
