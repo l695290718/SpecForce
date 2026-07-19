@@ -67,7 +67,7 @@ Tradeoffs:
 - Matching Context Pack: `context-pack-federated-design-fact-governance`
 - Related assets: `api-specforge-mcp-tools`, `data-specforge-assets`, `data-specforge-asset-graph`, and `adr-design-fact-dual-record-governance`.
 - Typed links: Proposal `--IMPLEMENTS_DECISION-->` ADR; Context Pack `--IMPLEMENTS_CONTEXT_FOR-->` Proposal; ADR `--DECIDES-->` each related asset (`api`, `dataModel`, and `adr` targets); each Evidence asset `--VALIDATES-->` ADR.
-- Evidence IDs: `evidence-adr-federated-design-fact-synchronization-1` through `evidence-adr-federated-design-fact-synchronization-3`.
+- Evidence IDs: `evidence-adr-federated-design-fact-synchronization-1` through `evidence-adr-federated-design-fact-synchronization-6`; each is linked to this ADR with `VALIDATES` by the manifest-driven sync.
 - **MCP synchronization blocked:** Owner: SpecForge Architecture. The matching records are manifest-driven, but synchronization is blocked because `DATABASE_URL`, `SPECFORGE_APPLICATION_SERVICE_ID`, and `SPECFORGE_SCOPE_PATH` are unavailable in this worktree environment. Retry trigger: configure reachable PostgreSQL plus the exact Designer Scope variables, run `pnpm design-facts:sync`, then `pnpm design-facts:check` and the configured-scope federation check, and read back the persisted IDs, Scope, canonical English fields, Chinese overlays, links, and evidence.
 
 ## Integration Hardening Update (2026-07-19)
@@ -87,6 +87,26 @@ Local evidence: the focused MCP federation command passed 2 files and 76 tests; 
 The protected `retry_federation_audit_finalization` MCP maintenance tool now invokes the repair consumer through the audited federation wrapper. It requires `asset:read`, `asset:write`, and `governance:run`, exact application-service Scope grants, and a persisted audit input summary whose Scope matches the requested Scope; unscoped or cross-Scope audit IDs fail closed. The maintenance operation is idempotent after success.
 
 Local evidence: focused federation/MCP and manifest tests passed; core and MCP typechecks passed; `git diff --check` passed. **MCP synchronization blocked:** Owner: SpecForge Architecture. Reason: `DATABASE_URL`, `SPECFORGE_APPLICATION_SERVICE_ID`, and `SPECFORGE_SCOPE_PATH` are unavailable. Retry trigger: configure PostgreSQL and exact Scope variables, run `pnpm design-facts:sync`, `pnpm design-facts:check`, and the federation check, then read back sync receipts. No synchronization success is claimed.
+
+## Integration Hardening Slice 3C (2026-07-19)
+
+Federation failures now have an explicit audit-security contract. A failed federation call persists only the stable code `FEDERATION_TOOL_ERROR` plus a deterministic `diagnosticRef=<64-hex SHA-256 digest>` in `AuditLog.errorMessage`. The digest is derived from the action, target identifiers, and private exception detail for correlation; raw exception messages, passwords, tokens, secret references, and other credential text are never persisted. Client responses continue to expose only the existing safe stable error code and message.
+
+The baseline manifest records this contract in complete English and Chinese localized fields. It also adds `evidence-adr-federated-design-fact-synchronization-6`; the existing manifest-driven sync convention will create its `VALIDATES` link to this ADR together with the existing Proposal, Context Pack, related-asset, and Evidence links. The repository record is locally updated only; PostgreSQL/MCP persistence and read-back remain unverified.
+
+Local evidence: `node .\\node_modules\\.pnpm\\vitest@2.1.9_@types+node@22.20.1\\node_modules\\vitest\\vitest.mjs run apps\\mcp-server\\src\\federation\\tools.test.ts apps\\mcp-server\\src\\federation\\persistence.test.ts` passed 2 files and 96 tests; core and MCP typechecks passed; `git diff --check` passed.
+
+**MCP synchronization blocked:** Owner: SpecForge Architecture. Reason: `DATABASE_URL`, `SPECFORGE_APPLICATION_SERVICE_ID`, and `SPECFORGE_SCOPE_PATH` are unavailable. Retry trigger: configure reachable PostgreSQL and the exact Designer Scope variables, run `pnpm design-facts:sync`, `pnpm design-facts:check`, and the configured-scope federation check, then read back the sixth Evidence receipt and all IDs, Scope, canonical English fields, Chinese overlays, typed links, and diagnostics. No synchronization success is claimed.
+
+### Slice 3C Chinese Localization
+
+联邦失败现在具有明确的审计安全契约。失败的联邦调用只在 `AuditLog.errorMessage` 中保存稳定代码 `FEDERATION_TOOL_ERROR` 和确定性的 `diagnosticRef=<64 位十六进制 SHA-256 摘要>`。摘要由操作、目标标识符和私有异常细节生成，用于关联诊断；不会持久化原始异常消息、密码、令牌、密钥引用或其他凭据文本。客户端仍只获得现有的安全稳定错误代码和消息。
+
+基线清单以完整的英文规范字段和中文本地化字段记录该契约，并新增 `evidence-adr-federated-design-fact-synchronization-6`；现有清单驱动同步约定会为该证据创建指向本 ADR 的 `VALIDATES` 关系，同时保留既有 Proposal、Context Pack、相关资产和 Evidence 关系。本次仅完成仓库记录更新，PostgreSQL/MCP 持久化和回读仍未核验。
+
+本地证据：`node .\\node_modules\\.pnpm\\vitest@2.1.9_@types+node@22.20.1\\node_modules\\vitest\\vitest.mjs run apps\\mcp-server\\src\\federation\\tools.test.ts apps\\mcp-server\\src\\federation\\persistence.test.ts` 通过 2 个文件、96 个测试；core 和 MCP 类型检查通过；`git diff --check` 通过。
+
+**MCP synchronization blocked：** 负责人：SpecForge Architecture。原因：当前环境缺少 `DATABASE_URL`、`SPECFORGE_APPLICATION_SERVICE_ID` 和 `SPECFORGE_SCOPE_PATH`。重试触发条件：配置可访问的 PostgreSQL 和精确 Designer Scope 变量，运行 `pnpm design-facts:sync`、`pnpm design-facts:check` 和配置 Scope 的联邦检查，然后回读第六个 Evidence 收据以及全部 ID、Scope、英文规范字段、中文覆盖、类型关系和诊断引用。本轮不声明同步成功。
 
 ### Slice 2D Chinese Localization
 
@@ -165,7 +185,7 @@ MCP 仍是已编写 SpecForge 设计事实的唯一写入边界。PostgreSQL 是
 - 匹配 Context Pack：`context-pack-federated-design-fact-governance`
 - 相关资产：`api-specforge-mcp-tools`、`data-specforge-assets`、`data-specforge-asset-graph` 和 `adr-design-fact-dual-record-governance`。
 - 有类型关系：Proposal `--IMPLEMENTS_DECISION-->` ADR；Context Pack `--IMPLEMENTS_CONTEXT_FOR-->` Proposal；ADR `--DECIDES-->` 每个相关资产（目标类型为 `api`、`dataModel` 和 `adr`）；每个 Evidence 资产 `--VALIDATES-->` ADR。
-- Evidence ID：`evidence-adr-federated-design-fact-synchronization-1` 至 `evidence-adr-federated-design-fact-synchronization-3`。
+- Evidence ID：`evidence-adr-federated-design-fact-synchronization-1` 至 `evidence-adr-federated-design-fact-synchronization-6`；每个 Evidence 资产都通过清单驱动同步以 `VALIDATES` 关系指向本 ADR。
 - **MCP 同步受阻：** 匹配记录由清单驱动，但只有在 `pnpm design-facts:sync` 通过 MCP 持久化并由 `pnpm design-facts:check` 回读后才完整。重试触发条件：使用可访问且已配置的 `DATABASE_URL` 运行这两个命令，然后运行精确 Designer Scope 的联邦对账命令。
 
 ### 集成加固更新（2026-07-19）

@@ -11,7 +11,7 @@ The digest is derived from the action, target identifiers, and private exception
 ## Evidence
 
 - Updated the unknown-runtime regression to assert the credential-bearing exception text is absent from both the client response and `AuditLog.errorMessage`, while the stable code and 64-hex diagnostic reference remain.
-- `node $vitest run src/federation/tools.test.ts src/federation/persistence.test.ts --root apps/mcp-server`: **2 files, 96 tests passed**.
+- `node .\\node_modules\\.pnpm\\vitest@2.1.9_@types+node@22.20.1\\node_modules\\vitest\\vitest.mjs run apps\\mcp-server\\src\\federation\\tools.test.ts apps\\mcp-server\\src\\federation\\persistence.test.ts`: **2 files, 96 tests passed**.
 - `pnpm --filter @specforge/core typecheck`: passed.
 - `pnpm --filter @specforge/mcp-server typecheck`: passed.
 - `git diff --check`: passed; only normal LF-to-CRLF working-copy warnings were reported.
