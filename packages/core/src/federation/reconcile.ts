@@ -1,4 +1,4 @@
-import { contentDigest } from "./digest";
+import { compareCanonical, contentDigest } from "./digest";
 import type { FactAuthority, ReconciliationInput, ReconciliationReport } from "./types";
 
 export type ObservationDecision = {
@@ -82,7 +82,7 @@ export function reconcileFacts(input: ReconciliationInput): ReconciliationReport
   if (input.evidenceDrift) issues.push({ code: "EVIDENCE_DRIFT", message: "Evidence differs from the accepted fact." });
 
   const factDigests = input.acceptedFacts.map((fact) => ({ factId: fact.id, digest: fact.normalizedDigest }));
-  const root = contentDigest({ architectureScope: input.architectureScope, factDigests: factDigests.sort((a, b) => a.factId.localeCompare(b.factId)), issues });
+  const root = contentDigest({ architectureScope: input.architectureScope, factDigests: factDigests.sort((a, b) => compareCanonical(a.factId, b.factId)), issues });
   const blocked = issues.some((issue) =>
     issue.code === "IDENTITY_CONFLICT" || issue.code === "SCOPE_DRIFT" ||
     issue.code === "DELIVERY_BLOCKED" || issue.code === "SOURCE_UNREACHABLE"

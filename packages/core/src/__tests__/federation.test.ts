@@ -115,6 +115,29 @@ describe("federation domain", () => {
     );
   });
 
+  it("uses locale-independent ordering when building the reconciliation root", () => {
+    const fixture = createReconciliationFixture();
+    const acceptedFact = fixture.acceptedFacts[0]!;
+    const acceptedFacts = [
+      { ...acceptedFact, id: "a" },
+      { ...acceptedFact, id: "Z" }
+    ];
+    const report = reconcileFacts({
+      ...fixture,
+      acceptedFacts,
+      observations: [],
+      identityMappings: []
+    });
+    expect(report.root).toBe(contentDigest({
+      architectureScope: fixture.architectureScope,
+      factDigests: [
+        { factId: "Z", digest: acceptedFact.normalizedDigest },
+        { factId: "a", digest: acceptedFact.normalizedDigest }
+      ],
+      issues: []
+    }));
+  });
+
   it("does not promote an ambiguous identity match", () => {
     expect(evaluateObservation({ authority: "EXTERNAL", identityMatch: "AMBIGUOUS", policyAllowsPromotion: true }))
       .toEqual({ action: "CONFLICT", reason: "IDENTITY_CONFLICT" });

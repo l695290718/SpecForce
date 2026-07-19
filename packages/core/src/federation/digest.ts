@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-function compareCanonical(left: string, right: string): number {
+export function compareCanonical(left: string, right: string): number {
   return left === right ? 0 : left < right ? -1 : 1;
 }
 
