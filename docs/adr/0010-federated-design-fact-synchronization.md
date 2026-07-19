@@ -65,12 +65,16 @@ Tradeoffs:
 - Exact owning `architectureScope`: `com.huawei.celon.desiner` / `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - Matching Proposal: `proposal-federated-design-fact-governance-core`
 - Matching Context Pack: `context-pack-federated-design-fact-governance`
-- Related assets: `api-specforge-mcp-tools`, `data-specforge-assets`, and `data-specforge-asset-graph`.
-- Typed links: Proposal `--IMPLEMENTS_DECISION-->` ADR; Context Pack `--IMPLEMENTS_CONTEXT_FOR-->` Proposal; ADR `--DECIDES-->` each related asset; each Evidence asset `--VALIDATES-->` ADR.
+- Related assets: `api-specforge-mcp-tools`, `data-specforge-assets`, `data-specforge-asset-graph`, and `adr-design-fact-dual-record-governance`.
+- Typed links: Proposal `--IMPLEMENTS_DECISION-->` ADR; Context Pack `--IMPLEMENTS_CONTEXT_FOR-->` Proposal; ADR `--DECIDES-->` each related asset (`api`, `dataModel`, and `adr` targets); each Evidence asset `--VALIDATES-->` ADR.
 - Evidence IDs: `evidence-adr-federated-design-fact-synchronization-1` through `evidence-adr-federated-design-fact-synchronization-3`.
 - **MCP synchronization blocked:** the matching records are manifest-driven, but they are not complete until `pnpm design-facts:sync` persists them and `pnpm design-facts:check` reads them back through MCP. Retry trigger: run both commands with a reachable configured `DATABASE_URL`, then run the exact Designer Scope federation reconciliation command.
 
 ## 中文本地化 / Chinese Localization
+
+### 标题
+
+联邦设计事实同步
 
 ### 状态
 
@@ -129,7 +133,7 @@ MCP 仍是已编写 SpecForge 设计事实的唯一写入边界。PostgreSQL 是
 - 精确所属 `architectureScope`：`com.huawei.celon.desiner` / `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - 匹配 Proposal：`proposal-federated-design-fact-governance-core`
 - 匹配 Context Pack：`context-pack-federated-design-fact-governance`
-- 相关资产：`api-specforge-mcp-tools`、`data-specforge-assets` 和 `data-specforge-asset-graph`。
-- 有类型关系：Proposal `--IMPLEMENTS_DECISION-->` ADR；Context Pack `--IMPLEMENTS_CONTEXT_FOR-->` Proposal；ADR `--DECIDES-->` 每个相关资产；每个 Evidence 资产 `--VALIDATES-->` ADR。
+- 相关资产：`api-specforge-mcp-tools`、`data-specforge-assets`、`data-specforge-asset-graph` 和 `adr-design-fact-dual-record-governance`。
+- 有类型关系：Proposal `--IMPLEMENTS_DECISION-->` ADR；Context Pack `--IMPLEMENTS_CONTEXT_FOR-->` Proposal；ADR `--DECIDES-->` 每个相关资产（目标类型为 `api`、`dataModel` 和 `adr`）；每个 Evidence 资产 `--VALIDATES-->` ADR。
 - Evidence ID：`evidence-adr-federated-design-fact-synchronization-1` 至 `evidence-adr-federated-design-fact-synchronization-3`。
 - **MCP 同步受阻：** 匹配记录由清单驱动，但只有在 `pnpm design-facts:sync` 通过 MCP 持久化并由 `pnpm design-facts:check` 回读后才完整。重试触发条件：使用可访问且已配置的 `DATABASE_URL` 运行这两个命令，然后运行精确 Designer Scope 的联邦对账命令。

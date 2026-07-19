@@ -2,7 +2,11 @@
 
 ## Status
 
-Approved design. Implementation remains pending.
+Governance-core implementation is complete locally. MCP persistence/read-back and real PostgreSQL verification are blocked pending a configured environment.
+
+- Implemented locally: scoped governance contracts, MCP governance tools, manifest-driven ADR/Proposal/Context Pack/Evidence builders, typed links, and read-only Designer Scope reconciliation.
+- MCP persistence status: blocked until `DATABASE_URL`, `SPECFORGE_APPLICATION_SERVICE_ID`, and `SPECFORGE_SCOPE_PATH` are configured and reachable; retry with `pnpm design-facts:sync`, `pnpm design-facts:check`, and the configured federation check.
+- Deferred: legacy scanners, continuous inbound synchronization, continuous outbound synchronization, and external `APPLY`.
 
 - Owning `architectureScope.applicationServiceId`: `com.huawei.celon.desiner`
 - Owning `architectureScope.scopePath`: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
@@ -218,6 +222,14 @@ The first implementation plan must cover only increment 1. Each later increment 
 On 2026-07-19, the governance-core increment was verified locally with `node .\\node_modules\\vitest\\vitest.mjs run scripts/design-fact-manifest.test.ts` (2 tests), `node .\\node_modules\\vitest\\vitest.mjs run packages\\core\\src\\__tests__` (12 files, 126 tests), and `node .\\node_modules\\vitest\\vitest.mjs run apps\\mcp-server\\src` (12 files, 144 tests; 9 PostgreSQL integration tests skipped because `DATABASE_URL` was absent). `pnpm --filter @specforge/core typecheck` and `pnpm --filter @specforge/mcp-server typecheck` also passed.
 
 ## Chinese Localization / 中文本地化
+
+### 状态
+
+治理核心已在本地实现。MCP 持久化/回读和真实 PostgreSQL 验证因等待已配置环境而受阻。
+
+- 本地已实现：Scope 约束的治理契约、MCP 治理工具、由清单驱动的 ADR/Proposal/Context Pack/Evidence 构建器、有类型关系以及只读 Designer Scope 对账。
+- MCP 持久化状态：在配置并可访问 `DATABASE_URL`、`SPECFORGE_APPLICATION_SERVICE_ID` 和 `SPECFORGE_SCOPE_PATH` 前保持阻塞；重试命令为 `pnpm design-facts:sync`、`pnpm design-facts:check` 和配置的联邦检查。
+- 延期能力：存量扫描器、持续入站同步、持续出站同步和外部 `APPLY`。
 
 ### 目的
 

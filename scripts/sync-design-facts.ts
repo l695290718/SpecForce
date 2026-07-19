@@ -37,6 +37,22 @@ export function designEvidenceId(decisionId: string, index: number): string {
 type CallTool = (name: string, input: Record<string, unknown>) => Promise<{ ok?: boolean; isError?: boolean; message?: string }>;
 type ExistingRecordType = "proposal" | "contextPack";
 
+interface AdrFields {
+  title: string;
+  description: string;
+  context: string;
+  decision: string;
+  alternatives: string[];
+  consequences: string[];
+  constraints: string[];
+  evidence: string[];
+}
+
+interface ParsedAdr {
+  en: AdrFields;
+  zh: AdrFields;
+}
+
 export async function synchronizeDesignFacts(input: {
   callTool: CallTool;
   manifest: DesignFactManifest;
@@ -53,7 +69,7 @@ export async function synchronizeDesignFacts(input: {
     const result = await input.callTool("create_adr", {
       applicationServiceId: decision.scope.applicationServiceId,
       architectureScope: decision.scope,
-      adr: buildAdr(decision, source)
+      adr: buildAdr(decision, parseAdrSource(source))
     });
     if (result.isError || result.ok === false) {
       throw new Error(`DESIGN_FACT_MCP_WRITE_FAILED: ${decision.id}${result.message ? `: ${result.message}` : ""}`);
@@ -62,8 +78,9 @@ export async function synchronizeDesignFacts(input: {
     if (input.readExisting) {
       const proposal = await input.readExisting("proposal", decision.proposalId, decision.scope);
       const contextPack = await input.readExisting("contextPack", decision.contextPackId, decision.scope);
-      const syncedProposal = proposal ?? buildProposal(decision, source);
-      const syncedContextPack = contextPack ?? buildContextPack(decision, source);
+      const parsed = parseAdrSource(source);
+      const syncedProposal = proposal ?? buildProposal(decision, parsed);
+      const syncedContextPack = contextPack ?? buildContextPack(decision, parsed);
       await callOrThrow(input.callTool, "upsert_proposal", { proposal: syncedProposal, architectureScope: decision.scope }, decision.id);
       await callOrThrow(input.callTool, "upsert_context_pack", { contextPack: syncedContextPack, architectureScope: decision.scope }, decision.id);
       await callOrThrow(input.callTool, "link_assets", link("proposal", decision.proposalId, "adr", decision.mcpAdrId, "IMPLEMENTS_DECISION", decision.scope), decision.id);
@@ -77,7 +94,7 @@ export async function synchronizeDesignFacts(input: {
       const evidenceId = designEvidenceId(decision.id, index);
       await callOrThrow(input.callTool, "upsert_design_asset", {
         assetType: "evidence",
-        asset: buildEvidence(decision, source, evidenceId, evidence),
+        asset: buildEvidence(decision, parseAdrSource(source), evidenceId, evidence),
         architectureScope: decision.scope
       }, decision.id);
       await callOrThrow(input.callTool, "link_assets", link("evidence", evidenceId, "adr", decision.mcpAdrId, "VALIDATES", decision.scope), decision.id);
@@ -89,25 +106,85 @@ export async function synchronizeDesignFacts(input: {
   return receipts;
 }
 
-function buildProposal(decision: DesignFactManifestDecision, source: AdrSource) {
+function buildProposal(decision: DesignFactManifestDecision, parsed: ParsedAdr) {
   const now = new Date().toISOString();
-  return { id: decision.proposalId, name: source.title, title: source.title, description: source.english, background: source.english, goal: source.english, nonGoal: "No additional product behavior.", scope: source.english, impactedAssets: [], specChanges: [], risks: [], rolloutPlan: "Maintain through MCP.", status: "implemented", createdAt: now, updatedAt: now, localizedContent: { zh: { name: localizedTitle(source.chinese), title: localizedTitle(source.chinese), description: source.chinese, background: source.chinese, goal: source.chinese, nonGoal: "不增加额外产品行为。", scope: source.chinese, specChanges: [], risks: [], rolloutPlan: "通过 MCP 维护。" } } };
+  return {
+    id: decision.proposalId,
+    name: parsed.en.title,
+    title: parsed.en.title,
+    description: parsed.en.description,
+    background: parsed.en.context,
+    goal: parsed.en.decision,
+    nonGoal: "Deferred connector delivery and external APPLY remain outside this increment.",
+    scope: parsed.en.constraints.join(" "),
+    impactedAssets: decision.relatedAssetIds.map((id) => assetRefFor(id)),
+    specChanges: [parsed.en.decision],
+    risks: parsed.en.consequences,
+    rolloutPlan: parsed.en.evidence.join(" "),
+    status: "implemented",
+    createdAt: now,
+    updatedAt: now,
+    localizedContent: {
+      en: {
+        name: parsed.en.title,
+        title: parsed.en.title,
+        description: parsed.en.description,
+        background: parsed.en.context,
+        goal: parsed.en.decision,
+        nonGoal: "Deferred connector delivery and external APPLY remain outside this increment.",
+        scope: parsed.en.constraints.join(" "),
+        specChanges: [parsed.en.decision],
+        risks: parsed.en.consequences,
+        rolloutPlan: parsed.en.evidence.join(" ")
+      },
+      zh: {
+        name: parsed.zh.title,
+        title: parsed.zh.title,
+        description: parsed.zh.description,
+        background: parsed.zh.context,
+        goal: parsed.zh.decision,
+        nonGoal: "连接器交付和外部 APPLY 在本增量之外延期。",
+        scope: parsed.zh.constraints.join(" "),
+        specChanges: [parsed.zh.decision],
+        risks: parsed.zh.consequences,
+        rolloutPlan: parsed.zh.evidence.join(" ")
+      }
+    }
+  };
 }
 
-function buildContextPack(decision: DesignFactManifestDecision, source: AdrSource) {
+function buildContextPack(decision: DesignFactManifestDecision, parsed: ParsedAdr) {
   const now = new Date().toISOString();
-  return { id: decision.contextPackId, name: `${source.title} Context Pack`, proposalId: decision.proposalId, targetAgent: "generic", summary: source.english, includedAssets: [], constraints: [], instructions: [], generatedMarkdown: source.english, createdAt: now, architectureScope: decision.scope, localizedContent: { zh: { name: `${localizedTitle(source.chinese)} 上下文包`, summary: source.chinese, constraints: [], instructions: [], generatedMarkdown: source.chinese } } };
+  const generatedMarkdown = renderContextMarkdown(parsed.en);
+  const generatedChineseMarkdown = renderContextMarkdown(parsed.zh);
+  return {
+    id: decision.contextPackId,
+    name: `${parsed.en.title} Context Pack`,
+    proposalId: decision.proposalId,
+    targetAgent: "generic",
+    summary: parsed.en.description,
+    includedAssets: decision.relatedAssetIds.map((id) => assetRefFor(id)),
+    constraints: parsed.en.constraints,
+    instructions: [parsed.en.decision],
+    generatedMarkdown,
+    createdAt: now,
+    architectureScope: decision.scope,
+    localizedContent: {
+      en: { name: `${parsed.en.title} Context Pack`, summary: parsed.en.description, constraints: parsed.en.constraints, instructions: [parsed.en.decision], generatedMarkdown },
+      zh: { name: `${parsed.zh.title} 上下文包`, summary: parsed.zh.description, constraints: parsed.zh.constraints, instructions: [parsed.zh.decision], generatedMarkdown: generatedChineseMarkdown }
+    }
+  };
 }
 
 function buildEvidence(
   decision: DesignFactManifestDecision,
-  source: AdrSource,
+  parsed: ParsedAdr,
   id: string,
   evidence: DesignFactManifestDecision["evidence"][number]
 ) {
   const now = new Date().toISOString();
-  const name = `${source.title} verification evidence`;
-  const description = `Verification evidence for ${source.title}.`;
+  const name = `${parsed.en.title} verification evidence`;
+  const description = `Verification evidence for ${parsed.en.title}.`;
   return {
     id,
     name,
@@ -120,9 +197,10 @@ function buildEvidence(
     createdAt: now,
     updatedAt: now,
     localizedContent: {
+      en: { name, description, command: evidence.command, result: evidence.result },
       zh: {
-        name: `${localizedTitle(source.chinese)} 验证证据`,
-        description: `用于验证 ${localizedTitle(source.chinese)} 的证据。`,
+        name: `${parsed.zh.title} 验证证据`,
+        description: `用于验证 ${parsed.zh.title} 的证据。`,
         command: evidence.command,
         result: evidence.result
       }
@@ -148,42 +226,144 @@ function assetTypeFor(id: string): string {
   return "api";
 }
 
+function assetRefFor(id: string) {
+  return { type: assetTypeFor(id), id, label: id };
+}
+
 function assertDecision(decision: DesignFactManifestDecision): void {
   if (!decision.scope?.applicationServiceId || !decision.scope.scopePath) {
     throw new Error(`DESIGN_FACT_SCOPE_MISSING: ${decision.id}`);
   }
 }
 
-function buildAdr(decision: DesignFactManifestDecision, source: AdrSource) {
+function buildAdr(decision: DesignFactManifestDecision, parsed: ParsedAdr) {
   const now = new Date().toISOString();
   return {
     id: decision.mcpAdrId,
-    name: source.title,
-    title: source.title,
-    description: source.english,
+    name: parsed.en.title,
+    title: parsed.en.title,
+    description: parsed.en.description,
     status: "accepted",
-    context: source.english,
-    decision: source.english,
-    alternatives: [],
-    consequences: [],
-    constraints: [],
-    relatedAssets: decision.relatedAssetIds.map((id) => ({ type: "api", id, label: id })),
+    context: parsed.en.context,
+    decision: parsed.en.decision,
+    alternatives: parsed.en.alternatives,
+    consequences: parsed.en.consequences,
+    constraints: parsed.en.constraints,
+    evidence: parsed.en.evidence,
+    relatedAssets: decision.relatedAssetIds.map((id) => assetRefFor(id)),
     owner: "SpecForge Architecture",
     createdAt: now,
     updatedAt: now,
     localizedContent: {
+      en: {
+        name: parsed.en.title,
+        description: parsed.en.description,
+        title: parsed.en.title,
+        context: parsed.en.context,
+        decision: parsed.en.decision,
+        alternatives: parsed.en.alternatives,
+        consequences: parsed.en.consequences,
+        constraints: parsed.en.constraints,
+        evidence: parsed.en.evidence
+      },
       zh: {
-        name: localizedTitle(source.chinese),
-        description: source.chinese,
-        title: localizedTitle(source.chinese),
-        context: source.chinese,
-        decision: source.chinese,
-        alternatives: [],
-        consequences: [],
-        constraints: []
+        name: parsed.zh.title,
+        description: parsed.zh.description,
+        title: parsed.zh.title,
+        context: parsed.zh.context,
+        decision: parsed.zh.decision,
+        alternatives: parsed.zh.alternatives,
+        consequences: parsed.zh.consequences,
+        constraints: parsed.zh.constraints,
+        evidence: parsed.zh.evidence
       }
     }
   };
+}
+
+function parseAdrSource(source: AdrSource): ParsedAdr {
+  return {
+    en: parseAdrFields(source.english, source.title, {
+      context: ["context"],
+      decision: ["decision"],
+      alternatives: ["alternatives"],
+      consequences: ["consequences"],
+      constraints: ["constraints"],
+      evidence: ["evidence"]
+    }, false),
+    zh: parseAdrFields(source.chinese, source.title, {
+      context: ["背景"],
+      decision: ["决策"],
+      alternatives: ["备选方案"],
+      consequences: ["后果"],
+      constraints: ["约束"],
+      evidence: ["证据"]
+    }, true)
+  };
+}
+
+function parseAdrFields(markdown: string, fallbackTitle: string, headings: Record<Exclude<keyof AdrFields, "title" | "description">, string[]>, localized: boolean): AdrFields {
+  const sections = extractMarkdownSections(markdown, localized ? 3 : 2);
+  const context = sectionValue(sections, headings.context, markdown, "context");
+  const decision = sectionValue(sections, headings.decision, markdown, "decision");
+  const alternatives = listValue(sectionValue(sections, headings.alternatives, markdown, "alternatives"));
+  const consequences = listValue(sectionValue(sections, headings.consequences, markdown, "consequences"));
+  const constraints = listValue(sectionValue(sections, headings.constraints, markdown, "constraints"));
+  const evidence = listValue(sectionValue(sections, headings.evidence, markdown, "evidence"));
+  const title = localized
+    ? sections.find(([heading]) => ["标题", "title"].includes(heading.toLowerCase()))?.[1].trim() || localizedTitle(markdown)
+    : fallbackTitle;
+  return { title, description: firstParagraph(context), context, decision, alternatives, consequences, constraints, evidence };
+}
+
+function extractMarkdownSections(markdown: string, level: 2 | 3): Array<[string, string]> {
+  const headingPattern = new RegExp(`^#{${level}}\\s+(.+?)\\s*$`, "gm");
+  const headings = [...markdown.matchAll(headingPattern)];
+  return headings.map((heading, index) => [heading[1].trim(), markdown.slice(heading.index! + heading[0].length, headings[index + 1]?.index ?? markdown.length).trim()] as [string, string]);
+}
+
+function sectionValue(sections: Array<[string, string]>, aliases: string[], fallback: string, field: string): string {
+  const match = sections.find(([heading]) => aliases.includes(heading.trim().toLowerCase()));
+  if (match?.[1].trim()) return match[1].trim();
+  const fallbackText = localizedFallback(fallback);
+  if (fallbackText) return fallbackText;
+  throw new Error(`DESIGN_FACT_SECTION_MISSING: ${field}`);
+}
+
+function listValue(value: string): string[] {
+  const entries: string[] = [];
+  for (const line of value.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const listItem = trimmed.match(/^(?:[-*+]\s+|\d+[.)]\s+)(.+)$/);
+    if (listItem) entries.push(listItem[1].trim());
+    else if (entries.length) entries[entries.length - 1] = `${entries[entries.length - 1]} ${trimmed}`;
+    else entries.push(trimmed);
+  }
+  return entries.length ? entries : [value.trim()];
+}
+
+function firstParagraph(value: string): string {
+  return value.split(/\r?\n\s*\r?\n/)[0].replace(/^[-*+]\s+/, "").trim();
+}
+
+function localizedFallback(markdown: string): string {
+  return markdown.split(/\r?\n/).map((line) => line.trim()).find((line) => line && /[\u4e00-\u9fff]/u.test(line) && !line.startsWith("#")) ?? "";
+}
+
+function renderContextMarkdown(fields: AdrFields): string {
+  return [
+    `# ${fields.title}`,
+    "",
+    "## Context",
+    fields.context,
+    "",
+    "## Decision",
+    fields.decision,
+    "",
+    "## Constraints",
+    fields.constraints.map((item) => `- ${item}`).join("\n")
+  ].join("\n");
 }
 
 async function readRepositoryAdr(path: string): Promise<AdrSource> {
@@ -198,7 +378,11 @@ async function readRepositoryAdr(path: string): Promise<AdrSource> {
 }
 
 function localizedTitle(content: string): string {
-  return content.replace(/\s+/g, " ").slice(0, 80);
+  return content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line && !line.startsWith("#") && /[\u4e00-\u9fff]/u.test(line))
+    ?.slice(0, 80) ?? "Localized architecture decision";
 }
 
 async function main(): Promise<void> {

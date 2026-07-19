@@ -2,47 +2,52 @@
 
 ## Implementation
 
-Recorded ADR adr-federated-design-fact-synchronization for the first federated governance-core increment. The ADR has the required English canonical sections and complete Chinese localization, names the exact Designer Scope, distinguishes implemented contracts from deferred connector capabilities, and records the unavailable MCP synchronization/read-back as blocked.
+Recorded `adr-federated-design-fact-synchronization` with explicit English canonical Context, Decision, Alternatives, Consequences, Constraints, and Evidence fields plus complete Chinese localization. The ADR, manifest, Proposal, Context Pack, typed links, and Evidence records use the exact Designer Scope and stable IDs.
 
-Added the ADR to the baseline manifest with its dedicated Proposal (proposal-federated-design-fact-governance-core), Context Pack (context-pack-federated-design-fact-governance), DECIDES targets, and three Evidence records. The existing manifest-driven synchronizeDesignFacts builder maintains the required ADR, Proposal, Context Pack, directional links, and Evidence records through MCP for this new decision; no parallel synchronization path was added.
+Fixed the existing manifest-driven `synchronizeDesignFacts` MCP builder to parse structured ADR sections, preserve non-empty canonical fields, emit `localizedContent.en` and `localizedContent.zh`, map `data-*` references to `dataModel`, and generate Proposal, Context Pack, typed `IMPLEMENTS_DECISION`, `IMPLEMENTS_CONTEXT_FOR`, `DECIDES`, `VALIDATES`, and Evidence calls through the same MCP path. The federated ADR covers valid `DECIDES` target types `api`, `dataModel`, and `adr`; no parallel sync path was added.
 
-Updated repository governance, the ADR index rules, the federation design specification's verified evidence, and a scoped backlog fact. No legacy scanner, continuous inbound connector, outbound proposal, or external APPLY capability is claimed.
+Aligned the design specification status: governance-core implementation is complete locally; MCP persistence/read-back and real PostgreSQL verification are blocked pending environment configuration; legacy scanners, continuous inbound/outbound synchronization, and external `APPLY` remain deferred. No Task 6 or unrelated UI work is included.
 
 ## Files
 
-- AGENTS.md
-- docs/TODO.md
-- docs/adr/README.md
-- docs/adr/0010-federated-design-fact-synchronization.md
-- docs/design-facts/baseline-manifest.json
-- docs/superpowers/specs/2026-07-19-federated-design-fact-synchronization-design.md
-- scripts/design-fact-manifest.test.ts
-- .superpowers/sdd/task-5-report.md
+Task 5 deliverable files:
+
+- `AGENTS.md`
+- `docs/TODO.md`
+- `docs/adr/README.md`
+- `docs/adr/0010-federated-design-fact-synchronization.md`
+- `docs/design-facts/baseline-manifest.json`
+- `docs/superpowers/specs/2026-07-19-federated-design-fact-synchronization-design.md`
+- `scripts/design-fact-manifest.test.ts`
+- `scripts/sync-design-facts.ts`
+- `scripts/sync-design-facts.test.ts`
+- `.superpowers/sdd/task-5-report.md`
 
 ## TDD Evidence
 
-RED: node node_modules/vitest/vitest.mjs run scripts/design-fact-manifest.test.ts
+RED: `node .\\node_modules\\vitest\\vitest.mjs run scripts\\sync-design-facts.test.ts`
 
-The new assertion failed as intended: adr-federated-design-fact-synchronization was absent from the baseline manifest.
+The review-focused test failed as intended before implementation: canonical section fields were empty/whole-Markdown values, `localizedContent.en` was absent, and all related assets were emitted as `api`.
 
-GREEN: node node_modules/vitest/vitest.mjs run scripts/design-fact-manifest.test.ts
+GREEN: `node .\\node_modules\\vitest\\vitest.mjs run scripts\\design-fact-manifest.test.ts scripts\\sync-design-facts.test.ts scripts\\reconcile-design-facts.test.ts scripts\\reconcile-federated-facts.test.ts`
 
-Result: 1 file passed, 2 tests passed.
+Result: 4 files passed, 19 tests passed.
 
 ## Verification
 
-- node node_modules/vitest/vitest.mjs run scripts/design-fact-manifest.test.ts scripts/sync-design-facts.test.ts scripts/reconcile-design-facts.test.ts scripts/reconcile-federated-facts.test.ts: 4 files passed, 18 tests passed.
-- node node_modules/vitest/vitest.mjs run packages/core/src/__tests__: 12 files passed, 126 tests passed.
-- node node_modules/vitest/vitest.mjs run apps/mcp-server/src: 12 files passed, 144 tests passed; 9 PostgreSQL integration tests skipped because DATABASE_URL was absent.
-- pnpm --filter @specforge/core typecheck: exit 0.
-- pnpm --filter @specforge/mcp-server typecheck: exit 0.
+- `node .\\node_modules\\vitest\\vitest.mjs run scripts\\design-fact-manifest.test.ts scripts\\sync-design-facts.test.ts scripts\\reconcile-design-facts.test.ts scripts\\reconcile-federated-facts.test.ts`: 4 files passed, 19 tests passed.
+- `node .\\node_modules\\vitest\\vitest.mjs run packages\\core\\src\\__tests__`: 12 files passed, 126 tests passed.
+- `node .\\node_modules\\vitest\\vitest.mjs run apps\\mcp-server\\src`: 12 files passed, 144 tests passed; 9 PostgreSQL integration tests skipped without `DATABASE_URL`.
+- `pnpm --filter @specforge/core typecheck`: exit 0.
+- `pnpm --filter @specforge/mcp-server typecheck`: exit 0.
+- `git diff --check`: exit 0; only expected Git LF/CRLF normalization warnings.
 
 ## Concerns
 
-- DATABASE_URL, SPECFORGE_APPLICATION_SERVICE_ID, and SPECFORGE_SCOPE_PATH were absent. Per task instruction, pnpm design-facts:sync, pnpm design-facts:check, and pnpm design-facts:federation:check were not run.
-- The exact package test commands were attempted. pnpm --filter @specforge/core test is blocked before collection by Vitest 2.1/esbuild config loading in this Windows sandbox; pnpm --filter @specforge/mcp-server exec vitest run cannot resolve the worktree's generated Vitest command shim. The workspace-level Vitest commands above passed instead.
-- MCP synchronization remains blocked until a reachable configured PostgreSQL database is available. docs/TODO.md records the owner, rationale, and retry trigger.
+- `DATABASE_URL`, `SPECFORGE_APPLICATION_SERVICE_ID`, and `SPECFORGE_SCOPE_PATH` are absent. `pnpm design-facts:sync`, `pnpm design-facts:check`, and the configured federation check were not run.
+- MCP synchronization/read-back remains blocked until a reachable configured PostgreSQL/MCP environment is available. `docs/TODO.md` records the owner, rationale, and retry trigger.
+- Exact package test entrypoints remain affected by the known Windows Vitest/esbuild config/shim issue; direct workspace Vitest commands above passed.
 
 ## Commit
 
-docs: record federated design fact governance
+`fix: make federated design-fact sync payloads canonical`
