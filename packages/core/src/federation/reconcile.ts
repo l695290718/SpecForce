@@ -11,6 +11,8 @@ export type ObservationDecisionInput = {
   identityMatch?: "UNMATCHED" | "UNAMBIGUOUS" | "AMBIGUOUS";
   policyAllowsPromotion: boolean;
   sharedFieldChanged?: boolean;
+  humanFacing?: boolean;
+  hasCompleteChineseLocalization?: boolean;
 };
 
 export function evaluateObservation(input: ObservationDecisionInput): ObservationDecision {
@@ -18,6 +20,9 @@ export function evaluateObservation(input: ObservationDecisionInput): Observatio
   if (!input.authority) return { action: "CONFLICT", reason: "AUTHORITY_MISSING" };
   if (input.sharedFieldChanged) return { action: "CONFLICT", reason: "SHARED_CONCURRENT_EDIT" };
   if (!input.policyAllowsPromotion) return { action: "CONFLICT", reason: "POLICY_DISABLED" };
+  if (input.humanFacing && !input.hasCompleteChineseLocalization) {
+    return { action: "CANDIDATE", reason: "LOCALIZATION_INCOMPLETE" };
+  }
   if (input.identityMatch !== "UNAMBIGUOUS") return { action: "CANDIDATE", reason: "IDENTITY_REVIEW" };
   if (input.authority === "EXTERNAL") return { action: "PROMOTE", reason: "EXTERNAL_AUTHORITY" };
   return { action: "CANDIDATE", reason: `${input.authority}_AUTHORITY` };
@@ -34,7 +39,16 @@ export function reconcileFacts(input: ReconciliationInput): ReconciliationReport
       candidate.externalAssetType === observation.externalAssetType &&
       candidate.externalId === observation.externalId
     );
-    if (!mapping || !mapping.assetId || mapping.matchStatus === "UNMATCHED") {
+    if (!mapping) {
+      issues.push({ code: "UNDECLARED_CHANGE", message: `No identity correspondence exists for ${observation.externalId}`, externalId: observation.externalId });
+      continue;
+    }
+    if (mapping.architectureScope.applicationServiceId !== input.architectureScope.applicationServiceId ||
+      mapping.architectureScope.scopePath !== input.architectureScope.scopePath) {
+      issues.push({ code: "SCOPE_DRIFT", message: `Identity mapping is outside the reconciliation Scope for ${observation.externalId}`, externalId: observation.externalId });
+      continue;
+    }
+    if (!mapping.assetId || mapping.matchStatus === "UNMATCHED") {
       issues.push({ code: "MISSING_FACT", message: `No accepted fact matches ${observation.externalId}`, externalId: observation.externalId });
       continue;
     }

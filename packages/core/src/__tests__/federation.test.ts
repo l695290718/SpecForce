@@ -6,6 +6,7 @@ import {
   type ReconciliationInput,
   type SourceObservation,
   type ExternalIdentityMapping,
+  normalizeForDigest,
   contentDigest,
   evaluateObservation,
   reconcileFacts
@@ -32,6 +33,8 @@ type DriftOptions = {
   relationshipDrift?: boolean;
   evidenceDrift?: boolean;
   scopeDrift?: boolean;
+  mappingScopeDrift?: boolean;
+  undeclaredChange?: boolean;
 };
 
 function createReconciliationFixture(options: DriftOptions = {}): ReconciliationInput {
@@ -76,7 +79,7 @@ function createReconciliationFixture(options: DriftOptions = {}): Reconciliation
   };
   const identityMapping: ExternalIdentityMapping = {
     id: "mapping-orders-api",
-    architectureScope: designerScope,
+    architectureScope: options.mappingScopeDrift ? siblingScope : designerScope,
     connectorInstanceId: "openapi-orders",
     sourceNamespace: "orders-service",
     externalAssetType: "path",
@@ -90,7 +93,7 @@ function createReconciliationFixture(options: DriftOptions = {}): Reconciliation
     architectureScope: designerScope,
     acceptedFacts: [acceptedFact],
     observations: [sourceObservation],
-    identityMappings: [identityMapping],
+    identityMappings: options.undeclaredChange ? [] : [identityMapping],
     relationshipDrift: options.relationshipDrift ?? false,
     evidenceDrift: options.evidenceDrift ?? false,
     localizationDrift: options.localizationDrift ?? false
@@ -110,6 +113,40 @@ describe("federation domain", () => {
   it("promotes only an unambiguous externally authoritative observation", () => {
     expect(evaluateObservation({ authority: "EXTERNAL", identityMatch: "UNAMBIGUOUS", policyAllowsPromotion: true }))
       .toEqual({ action: "PROMOTE", reason: "EXTERNAL_AUTHORITY" });
+  });
+
+  it("keeps a human-facing observation as a candidate until Chinese localization is complete", () => {
+    expect(evaluateObservation({
+      authority: "EXTERNAL",
+      identityMatch: "UNAMBIGUOUS",
+      policyAllowsPromotion: true,
+      humanFacing: true,
+      hasCompleteChineseLocalization: false
+    })).toEqual({ action: "CANDIDATE", reason: "LOCALIZATION_INCOMPLETE" });
+  });
+
+  it("conflicts when authority is missing or promotion policy is disabled", () => {
+    expect(evaluateObservation({ identityMatch: "UNAMBIGUOUS", policyAllowsPromotion: true }))
+      .toEqual({ action: "CONFLICT", reason: "AUTHORITY_MISSING" });
+    expect(evaluateObservation({ authority: "EXTERNAL", identityMatch: "UNAMBIGUOUS", policyAllowsPromotion: false }))
+      .toEqual({ action: "CONFLICT", reason: "POLICY_DISABLED" });
+  });
+
+  it("diagnoses an identity mapping that crosses the reconciliation Scope", () => {
+    const report = reconcileFacts(createReconciliationFixture({ mappingScopeDrift: true }));
+    expect(report.issues.map((issue) => issue.code)).toEqual(["SCOPE_DRIFT"]);
+    expect(report.status).toBe("BLOCKED");
+  });
+
+  it("reports an observation without correspondence as an undeclared change", () => {
+    const report = reconcileFacts(createReconciliationFixture({ undeclaredChange: true }));
+    expect(report.issues.map((issue) => issue.code)).toEqual(["UNDECLARED_CHANGE"]);
+  });
+
+  it("normalizes undefined and unsupported values deterministically for digests", () => {
+    expect(normalizeForDigest(undefined)).toBe('{"$type":"undefined"}');
+    expect(normalizeForDigest(1n)).toBe('{"$type":"bigint","value":"1"}');
+    expect(contentDigest(Symbol("scope"))).toBe(contentDigest(Symbol("scope")));
   });
 
   it("reports content and localization drift without changing inputs", () => {
