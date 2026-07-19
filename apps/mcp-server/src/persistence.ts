@@ -57,7 +57,7 @@ export function resolveWritableScope(actor: ScopedActor, scope: ArchitectureScop
   return assertWritableApplicationService(actor, applicationService);
 }
 
-function writableActor(): ScopedActor {
+export function writableActor(): ScopedActor {
   return process.env.SPECFORGE_MCP_SEED === "1" ? seedHuaweiActor : defaultHuaweiActor;
 }
 
@@ -65,7 +65,7 @@ export function isSeedMode(): boolean {
   return process.env.SPECFORGE_MCP_SEED === "1";
 }
 
-function readableScope(applicationServiceId: string): ArchitectureScopeRef {
+export function readableScope(applicationServiceId: string): ArchitectureScopeRef {
   const scope = scopeById(applicationServiceId);
   if (!scope || scope.level !== "applicationService" || !hasScopeAccess(defaultHuaweiActor, scope, "read")) throw new Error("Scope read is not authorized.");
   return { applicationServiceId: scope.id, scopePath: scope.scopePath };
