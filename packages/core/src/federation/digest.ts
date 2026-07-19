@@ -1,38 +1,47 @@
 import { createHash } from "node:crypto";
 
+function compareCanonical(left: string, right: string): number {
+  return left === right ? 0 : left < right ? -1 : 1;
+}
+
 function sortValue(value: unknown, seen = new WeakSet<object>()): unknown {
   if (value === undefined) return { $type: "undefined" };
   if (typeof value === "bigint") return { $type: "bigint", value: value.toString() };
   if (typeof value === "symbol") return { $type: "symbol", value: String(value) };
   if (typeof value === "function") return { $type: "function", value: value.name || "anonymous" };
   if (typeof value !== "object" || value === null) return value;
-  if (value instanceof Date) return { $type: "date", value: value.toISOString() };
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime())
+      ? { $type: "invalid-date" }
+      : { $type: "date", value: value.toISOString() };
+  }
   if (seen.has(value)) return { $type: "circular" };
   seen.add(value);
-  if (Array.isArray(value)) return value.map((item) => sortValue(item, seen));
-  if (value instanceof Map) {
-    return {
+  let normalized: unknown;
+  if (Array.isArray(value)) {
+    normalized = value.map((item) => sortValue(item, seen));
+  } else if (value instanceof Map) {
+    normalized = {
       $type: "map",
       value: Array.from(value.entries())
         .map(([key, item]) => [sortValue(key, seen), sortValue(item, seen)])
-        .sort(([left], [right]) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
+        .sort(([left], [right]) => compareCanonical(JSON.stringify(left), JSON.stringify(right)))
     };
-  }
-  if (value instanceof Set) {
-    return {
+  } else if (value instanceof Set) {
+    normalized = {
       $type: "set",
       value: Array.from(value.values()).map((item) => sortValue(item, seen))
-        .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
+        .sort((left, right) => compareCanonical(JSON.stringify(left), JSON.stringify(right)))
     };
-  }
-  if (value !== null && typeof value === "object") {
-    return Object.fromEntries(
+  } else {
+    normalized = Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => compareCanonical(left, right))
         .map(([key, item]) => [key, sortValue(item, seen)])
     );
   }
-  return { $type: "unsupported", value: String(value) };
+  seen.delete(value);
+  return normalized;
 }
 
 export function normalizeForDigest(value: unknown): string {

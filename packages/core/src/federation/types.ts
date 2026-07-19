@@ -35,13 +35,18 @@ export interface FactProvenance {
   repositoryCommit?: string;
 }
 
+export interface FederatedFactLocalizedContent {
+  en?: Record<string, unknown>;
+  zh: Record<string, unknown>;
+}
+
 export interface FederatedFactEnvelope {
   id: string;
   architectureScope: ArchitectureScopeRef;
   assetType: AssetType | string;
   schemaVersion: string;
   payload: Record<string, unknown>;
-  localizedContent?: { en?: Record<string, unknown>; zh?: Record<string, unknown> };
+  localizedContent: FederatedFactLocalizedContent;
   normalizedDigest: string;
   provenance: FactProvenance;
   authority: FactAuthority;

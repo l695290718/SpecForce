@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   huaweiArchitectureScopes,
   type ArchitectureScopeRef,
@@ -35,6 +35,7 @@ type DriftOptions = {
   scopeDrift?: boolean;
   mappingScopeDrift?: boolean;
   undeclaredChange?: boolean;
+  observationScopeDrift?: boolean;
 };
 
 function createReconciliationFixture(options: DriftOptions = {}): ReconciliationInput {
@@ -47,6 +48,7 @@ function createReconciliationFixture(options: DriftOptions = {}): Reconciliation
     schemaVersion: "1",
     payload,
     normalizedDigest: contentDigest(payload),
+    localizedContent: { zh: { name: "订单 API" } },
     provenance: {
       sourceSystem: "SpecForge",
       connectorInstanceId: "specforge-core",
@@ -58,7 +60,7 @@ function createReconciliationFixture(options: DriftOptions = {}): Reconciliation
   };
   const sourceObservation: SourceObservation = {
     id: "observation-orders-api",
-    architectureScope: designerScope,
+    architectureScope: options.observationScopeDrift ? siblingScope : designerScope,
     connectorInstanceId: "openapi-orders",
     sourceNamespace: "orders-service",
     externalAssetType: "path",
@@ -105,6 +107,14 @@ describe("federation domain", () => {
     expect(contentDigest({ b: 2, a: 1 })).toBe(contentDigest({ a: 1, b: 2 }));
   });
 
+  it("uses locale-independent key ordering and preserves repeated references", () => {
+    expect(normalizeForDigest({ a: 1, Z: 2 })).toBe('{"Z":2,"a":1}');
+    const shared = { value: 1 };
+    expect(contentDigest({ left: shared, right: shared })).toBe(
+      contentDigest({ left: { value: 1 }, right: { value: 1 } })
+    );
+  });
+
   it("does not promote an ambiguous identity match", () => {
     expect(evaluateObservation({ authority: "EXTERNAL", identityMatch: "AMBIGUOUS", policyAllowsPromotion: true }))
       .toEqual({ action: "CONFLICT", reason: "IDENTITY_CONFLICT" });
@@ -125,6 +135,15 @@ describe("federation domain", () => {
     })).toEqual({ action: "CANDIDATE", reason: "LOCALIZATION_INCOMPLETE" });
   });
 
+  it("requires a Chinese overlay on every promoted fact envelope", () => {
+    const acceptedFact = createReconciliationFixture().acceptedFacts[0]!;
+    expect(acceptedFact.status).toBe("PROMOTED");
+    expect(acceptedFact.localizedContent.zh).toEqual({ name: "订单 API" });
+    expectTypeOf<FederatedFactEnvelope["localizedContent"]>().toMatchTypeOf<{
+      zh: Record<string, unknown>;
+    }>();
+  });
+
   it("conflicts when authority is missing or promotion policy is disabled", () => {
     expect(evaluateObservation({ identityMatch: "UNAMBIGUOUS", policyAllowsPromotion: true }))
       .toEqual({ action: "CONFLICT", reason: "AUTHORITY_MISSING" });
@@ -141,6 +160,14 @@ describe("federation domain", () => {
   it("reports an observation without correspondence as an undeclared change", () => {
     const report = reconcileFacts(createReconciliationFixture({ undeclaredChange: true }));
     expect(report.issues.map((issue) => issue.code)).toEqual(["UNDECLARED_CHANGE"]);
+  });
+
+  it("reports an out-of-scope unmatched observation as Scope drift", () => {
+    const report = reconcileFacts(createReconciliationFixture({
+      observationScopeDrift: true,
+      undeclaredChange: true
+    }));
+    expect(report.issues.map((issue) => issue.code)).toEqual(["SCOPE_DRIFT"]);
   });
 
   it("normalizes undefined and unsupported values deterministically for digests", () => {

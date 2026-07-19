@@ -31,8 +31,15 @@ export function evaluateObservation(input: ObservationDecisionInput): Observatio
 export function reconcileFacts(input: ReconciliationInput): ReconciliationReport {
   const issues = [] as ReconciliationReport["issues"];
   const factById = new Map(input.acceptedFacts.map((fact) => [fact.id, fact]));
+  const isInScope = (scope: { applicationServiceId: string; scopePath: string }) =>
+    scope.applicationServiceId === input.architectureScope.applicationServiceId &&
+    scope.scopePath === input.architectureScope.scopePath;
 
   for (const observation of input.observations) {
+    if (!isInScope(observation.architectureScope)) {
+      issues.push({ code: "SCOPE_DRIFT", message: `Observation is outside the reconciliation Scope for ${observation.externalId}`, externalId: observation.externalId });
+      continue;
+    }
     const mapping = input.identityMappings.find((candidate) =>
       candidate.connectorInstanceId === observation.connectorInstanceId &&
       candidate.sourceNamespace === observation.sourceNamespace &&
@@ -43,8 +50,7 @@ export function reconcileFacts(input: ReconciliationInput): ReconciliationReport
       issues.push({ code: "UNDECLARED_CHANGE", message: `No identity correspondence exists for ${observation.externalId}`, externalId: observation.externalId });
       continue;
     }
-    if (mapping.architectureScope.applicationServiceId !== input.architectureScope.applicationServiceId ||
-      mapping.architectureScope.scopePath !== input.architectureScope.scopePath) {
+    if (!isInScope(mapping.architectureScope)) {
       issues.push({ code: "SCOPE_DRIFT", message: `Identity mapping is outside the reconciliation Scope for ${observation.externalId}`, externalId: observation.externalId });
       continue;
     }
