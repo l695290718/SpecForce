@@ -278,7 +278,7 @@ export async function retryFederationAuditFinalization(id: string, requestedScop
 
 function summarizeAudit(value: unknown): string {
   try {
-    const text = typeof value === "string" ? value : JSON.stringify(value);
+    const text = typeof value === "string" ? value : JSON.stringify(redactAuditValue(value));
     return (text ?? "").slice(0, 500);
   } catch {
     return "[unserializable]";
@@ -290,6 +290,28 @@ function summarizeAuditInput(value: unknown): string {
     return summarizeAudit({ architectureScope: value.architectureScope, input: value });
   }
   return summarizeAudit(value);
+}
+
+function redactAuditValue(value: unknown, key?: string, seen = new WeakSet<object>()): unknown {
+  if (key && isSensitiveAuditKey(key)) return "[REDACTED]";
+  if (key === "payload") return { digest: contentDigest(value), redacted: true };
+  if (typeof value !== "object" || value === null) return value;
+  if (seen.has(value)) return "[circular]";
+  seen.add(value);
+  let result: unknown;
+  if (Array.isArray(value)) {
+    result = value.map((item) => redactAuditValue(item, undefined, seen));
+  } else {
+    result = Object.fromEntries(Object.entries(value)
+      .sort(([left], [right]) => left === right ? 0 : left < right ? -1 : 1)
+      .map(([entryKey, entryValue]) => [entryKey, redactAuditValue(entryValue, entryKey, seen)]));
+  }
+  seen.delete(value);
+  return result;
+}
+
+function isSensitiveAuditKey(key: string): boolean {
+  return /(?:secret|password|token|authorization|credential|private[-_]?key|api[-_]?key|access[-_]?key|cookie)/i.test(key);
 }
 
 function auditScopeFromSummary(value: string): ArchitectureScopeRef | undefined {

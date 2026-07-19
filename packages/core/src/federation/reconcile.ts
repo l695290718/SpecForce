@@ -1,5 +1,5 @@
 import { compareCanonical, contentDigest } from "./digest";
-import type { FactAuthority, FederatedFactLocalizedContent, ReconciliationInput, ReconciliationReport } from "./types";
+import type { ExternalIdentityMapping, FactAuthority, FederatedFactLocalizedContent, FederatedFactEnvelope, ReconciliationInput, ReconciliationReport, SourceObservation } from "./types";
 
 export type ObservationDecision = {
   action: "PROMOTE" | "CANDIDATE" | "CONFLICT" | "REJECT";
@@ -36,12 +36,15 @@ export function hasCompleteBilingualLocalization(localizedContent: FederatedFact
 
 export function reconcileFacts(input: ReconciliationInput): ReconciliationReport {
   const issues = [] as ReconciliationReport["issues"];
-  const factById = new Map(input.acceptedFacts.map((fact) => [fact.id, fact]));
+  const acceptedFacts = [...input.acceptedFacts].sort(compareFacts);
+  const observations = latestActiveObservations(input.observations);
+  const identityMappings = [...input.identityMappings].sort(compareMappings);
+  const factById = new Map(acceptedFacts.map((fact) => [fact.id, fact]));
   const isInScope = (scope: { applicationServiceId: string; scopePath: string }) =>
     scope.applicationServiceId === input.architectureScope.applicationServiceId &&
     scope.scopePath === input.architectureScope.scopePath;
 
-  for (const fact of input.acceptedFacts) {
+  for (const fact of acceptedFacts) {
     if (!isInScope(fact.architectureScope)) {
       issues.push({ code: "SCOPE_DRIFT", message: `Accepted fact is outside the reconciliation Scope for ${fact.id}`, factId: fact.id });
     }
@@ -53,12 +56,12 @@ export function reconcileFacts(input: ReconciliationInput): ReconciliationReport
     }
   }
 
-  for (const observation of input.observations) {
+  for (const observation of observations) {
     if (!isInScope(observation.architectureScope)) {
       issues.push({ code: "SCOPE_DRIFT", message: `Observation is outside the reconciliation Scope for ${observation.externalId}`, externalId: observation.externalId });
       continue;
     }
-    const mapping = input.identityMappings.find((candidate) =>
+    const mapping = identityMappings.find((candidate) =>
       candidate.connectorInstanceId === observation.connectorInstanceId &&
       candidate.sourceNamespace === observation.sourceNamespace &&
       candidate.externalAssetType === observation.externalAssetType &&
@@ -98,9 +101,86 @@ export function reconcileFacts(input: ReconciliationInput): ReconciliationReport
   if (input.localizationDrift) issues.push({ code: "LOCALIZATION_DRIFT", message: "Localized content differs from the accepted fact." });
   if (input.relationshipDrift) issues.push({ code: "RELATIONSHIP_DRIFT", message: "Relationships differ from the accepted fact." });
   if (input.evidenceDrift) issues.push({ code: "EVIDENCE_DRIFT", message: "Evidence differs from the accepted fact." });
-  const factDigests = input.acceptedFacts.map((fact) => ({ factId: fact.id, digest: fact.normalizedDigest }));
-  const root = contentDigest({ architectureScope: input.architectureScope, factDigests: factDigests.sort((a, b) => compareCanonical(a.factId, b.factId)), issues });
-  return { architectureScope: input.architectureScope, root, status: issues.length === 0 ? "CONVERGED" : "BLOCKED", issues, factDigests };
+  const factDigests = acceptedFacts
+    .map((fact) => ({ factId: fact.id, digest: fact.normalizedDigest }))
+    .sort((left, right) => compareCanonical(left.factId, right.factId) || compareCanonical(left.digest, right.digest));
+  const sortedIssues = issues.sort(compareIssues);
+  const root = contentDigest({ architectureScope: input.architectureScope, factDigests, issues: sortedIssues });
+  return { architectureScope: input.architectureScope, root, status: sortedIssues.length === 0 ? "CONVERGED" : "BLOCKED", issues: sortedIssues, factDigests };
+}
+
+function latestActiveObservations(observations: SourceObservation[]): SourceObservation[] {
+  const latest = new Map<string, SourceObservation>();
+  for (const observation of observations) {
+    if (observation.status === "TOMBSTONED") continue;
+    const key = observationIdentityKey(observation);
+    const current = latest.get(key);
+    if (!current || compareObservationFreshness(observation, current) > 0) latest.set(key, observation);
+  }
+  return [...latest.values()].sort(compareObservations);
+}
+
+function compareFacts(left: FederatedFactEnvelope, right: FederatedFactEnvelope): number {
+  return compareCanonical(left.id, right.id) || compareCanonical(left.normalizedDigest, right.normalizedDigest);
+}
+
+function compareMappings(left: ExternalIdentityMapping, right: ExternalIdentityMapping): number {
+  return compareCanonical(mappingIdentityKey(left), mappingIdentityKey(right)) ||
+    compareCanonical(left.assetId ?? "", right.assetId ?? "") ||
+    compareCanonical(left.matchStatus, right.matchStatus) ||
+    compareCanonical(left.id, right.id);
+}
+
+function compareObservations(left: SourceObservation, right: SourceObservation): number {
+  return compareCanonical(observationIdentityKey(left), observationIdentityKey(right)) ||
+    compareCanonical(left.sourceVersion, right.sourceVersion) ||
+    compareCanonical(left.id, right.id);
+}
+
+function compareIssues(left: ReconciliationReport["issues"][number], right: ReconciliationReport["issues"][number]): number {
+  return compareCanonical(left.code, right.code) ||
+    compareCanonical(left.factId ?? "", right.factId ?? "") ||
+    compareCanonical(left.externalId ?? "", right.externalId ?? "") ||
+    compareCanonical(left.message, right.message);
+}
+
+function compareObservationFreshness(left: SourceObservation, right: SourceObservation): number {
+  const leftVersion = monotonicSourceVersion(left.sourceVersion);
+  const rightVersion = monotonicSourceVersion(right.sourceVersion);
+  if (leftVersion !== undefined && rightVersion !== undefined && leftVersion !== rightVersion) {
+    return leftVersion < rightVersion ? -1 : 1;
+  }
+  const leftTime = Date.parse(left.observedAt);
+  const rightTime = Date.parse(right.observedAt);
+  if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) return leftTime < rightTime ? -1 : 1;
+  return compareCanonical(left.sourceVersion, right.sourceVersion) || compareCanonical(left.id, right.id);
+}
+
+function monotonicSourceVersion(value: string): bigint | undefined {
+  const match = /^(?:v)?(\d+)$/i.exec(value.trim());
+  return match ? BigInt(match[1]!) : undefined;
+}
+
+function observationIdentityKey(observation: SourceObservation): string {
+  return [
+    observation.architectureScope.applicationServiceId,
+    observation.architectureScope.scopePath,
+    observation.connectorInstanceId,
+    observation.sourceNamespace,
+    observation.externalAssetType,
+    observation.externalId
+  ].join("\u0000");
+}
+
+function mappingIdentityKey(mapping: ExternalIdentityMapping): string {
+  return [
+    mapping.architectureScope.applicationServiceId,
+    mapping.architectureScope.scopePath,
+    mapping.connectorInstanceId,
+    mapping.sourceNamespace,
+    mapping.externalAssetType,
+    mapping.externalId
+  ].join("\u0000");
 }
 
 function hasLocalizedOverlay(english: unknown, chinese: unknown): boolean {

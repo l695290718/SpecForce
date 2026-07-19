@@ -303,6 +303,31 @@ describe("federation MCP tools", () => {
     });
   });
 
+  it("redacts payloads, secret references, and credential-shaped fields from audit summaries", async () => {
+    await callTool("register_connector", { ...connector, architectureScope: designerScope });
+    await callTool("record_external_observation", {
+      connectorId: connector.id,
+      sourceNamespace: "github",
+      externalAssetType: "api",
+      externalId: "payments-api",
+      payload: {
+        name: "Payments API",
+        password: "plain-text-password",
+        nested: { token: "bearer-token", apiKey: "api-key-value" }
+      },
+      sourceVersion: "1",
+      architectureScope: designerScope
+    });
+
+    const summaries = persistence.prisma.auditLog.create.mock.calls.map(([call]) => String(call.data.inputSummary));
+    expect(summaries.join("\n")).not.toContain("secret://designer");
+    expect(summaries.join("\n")).not.toContain("plain-text-password");
+    expect(summaries.join("\n")).not.toContain("bearer-token");
+    expect(summaries.join("\n")).not.toContain("api-key-value");
+    expect(summaries.join("\n")).toContain('"digest"');
+    expect(summaries.join("\n")).toContain("payments-api");
+  });
+
   it("writes a durable failure audit event for a denied caller", async () => {
     await callTool("register_connector", { ...connector, architectureScope: designerScope }, readOnlyExtra);
 

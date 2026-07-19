@@ -227,7 +227,7 @@ function assetTypeFor(id: string): string {
   if (id.startsWith("rule-")) return "businessRule";
   if (id.startsWith("quality-")) return "quality";
   if (id.startsWith("adr-")) return "adr";
-  return "api";
+  throw new Error(`DESIGN_FACT_RELATED_ASSET_PREFIX_UNKNOWN: ${id}`);
 }
 
 function assetRefFor(id: string) {
@@ -238,6 +238,7 @@ function assertDecision(decision: DesignFactManifestDecision): void {
   if (!decision.scope?.applicationServiceId || !decision.scope.scopePath) {
     throw new Error(`DESIGN_FACT_SCOPE_MISSING: ${decision.id}`);
   }
+  for (const relatedAssetId of decision.relatedAssetIds) assetTypeFor(relatedAssetId);
 }
 
 function buildAdr(decision: DesignFactManifestDecision, parsed: ParsedAdr) {

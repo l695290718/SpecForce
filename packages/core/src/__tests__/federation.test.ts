@@ -138,6 +138,59 @@ describe("federation domain", () => {
     }));
   });
 
+  it("selects only the latest active source version for one external identity", () => {
+    const fixture = createReconciliationFixture();
+    const current = fixture.observations[0]!;
+    const olderPayload = { ...current.payload, path: "/v1/orders" };
+    const older: SourceObservation = {
+      ...current,
+      id: "observation-orders-api-v9",
+      sourceVersion: "9",
+      observedAt: "2026-07-18T00:00:00.000Z",
+      payload: olderPayload,
+      normalizedDigest: contentDigest(olderPayload)
+    };
+    const latest: SourceObservation = { ...current, id: "observation-orders-api-v10", sourceVersion: "10" };
+
+    const report = reconcileFacts({ ...fixture, observations: [older, latest] });
+
+    expect(report.status).toBe("CONVERGED");
+    expect(report.issues).toEqual([]);
+  });
+
+  it("produces the same reconciliation report when persisted inputs are reordered", () => {
+    const fixture = createReconciliationFixture({ contentDrift: true });
+    const secondFact = { ...fixture.acceptedFacts[0]!, id: "fact-users-api" };
+    const secondObservation: SourceObservation = {
+      ...fixture.observations[0]!,
+      id: "observation-users-api",
+      externalId: "GET /users",
+      payload: { name: "Users API", path: "/v2/users" },
+      normalizedDigest: contentDigest({ name: "Users API", path: "/v2/users" })
+    };
+    const secondMapping = {
+      ...fixture.identityMappings[0]!,
+      id: "mapping-users-api",
+      externalId: "GET /users",
+      assetId: secondFact.id,
+      normalizedDigest: contentDigest({ assetId: secondFact.id, externalId: "GET /users" })
+    };
+    const first = reconcileFacts({
+      ...fixture,
+      acceptedFacts: [fixture.acceptedFacts[0]!, secondFact],
+      observations: [fixture.observations[0]!, secondObservation],
+      identityMappings: [fixture.identityMappings[0]!, secondMapping]
+    });
+    const reordered = reconcileFacts({
+      ...fixture,
+      acceptedFacts: [secondFact, fixture.acceptedFacts[0]!],
+      observations: [secondObservation, fixture.observations[0]!],
+      identityMappings: [secondMapping, fixture.identityMappings[0]!]
+    });
+
+    expect(reordered).toEqual(first);
+  });
+
   it("does not promote an ambiguous identity match", () => {
     expect(evaluateObservation({ authority: "EXTERNAL", identityMatch: "AMBIGUOUS", policyAllowsPromotion: true }))
       .toEqual({ action: "CONFLICT", reason: "IDENTITY_CONFLICT" });

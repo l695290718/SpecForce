@@ -145,6 +145,28 @@ const simpleChineseAdr = `## 中文本地化
 `;
 
 describe("synchronizeDesignFacts", () => {
+  it("rejects related assets with unknown prefixes", async () => {
+    const callTool = vi.fn().mockResolvedValue({ ok: true });
+
+    await expect(synchronizeDesignFacts({
+      callTool,
+      manifest: {
+        decisions: [{
+          id: "adr-unknown-prefix",
+          repositoryAdr: "docs/adr/0001-scope.md",
+          mcpAdrId: "adr-unknown-prefix",
+          scope,
+          proposalId: "proposal-scope",
+          contextPackId: "ctx-scope",
+          relatedAssetIds: ["mystery-specforge-asset"],
+          evidence: []
+        }]
+      },
+      readAdr: async () => ({ title: "Scope isolation", english: simpleEnglishAdr, chinese: simpleChineseAdr })
+    })).rejects.toThrow("DESIGN_FACT_RELATED_ASSET_PREFIX_UNKNOWN");
+    expect(callTool).not.toHaveBeenCalled();
+  });
+
   it("writes every manifest ADR with exact scope and bilingual payload", async () => {
     const callTool = vi.fn().mockResolvedValue({ ok: true });
     const receipt = await synchronizeDesignFacts({

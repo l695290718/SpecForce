@@ -405,6 +405,53 @@ describe("federation persistence", () => {
     });
   });
 
+  it("ignores an older source version after a newer exact-identity observation", async () => {
+    const latestObservedAt = "2026-07-20T00:00:00.000Z";
+    const olderPayload = { name: "Payments API v1", localizedContent: candidateLocalizedContent };
+    rows.observations.push({
+      ...observation,
+      id: "older-observation",
+      connectorId: connector.id,
+      ...designerScope,
+      sourceVersion: "9",
+      observedAt: new Date("2026-07-19T00:00:00.000Z"),
+      status: "CANDIDATE",
+      payload: olderPayload,
+      normalizedDigest: contentDigest({ name: "Payments API v1" }),
+      provenance: { ...observation.provenance, externalVersion: "9", observedAt: "2026-07-19T00:00:00.000Z" }
+    });
+    rows.observations.push({
+      ...observation,
+      id: "latest-canonical-observation",
+      connectorId: connector.id,
+      ...designerScope,
+      sourceVersion: "10",
+      observedAt: new Date(latestObservedAt),
+      status: "PROMOTED",
+      payload: promotedFactPayload(),
+      provenance: { ...observation.provenance, externalVersion: "10", observedAt: latestObservedAt }
+    });
+    rows.mappings.push({
+      id: "mapping-1",
+      connectorId: connector.id,
+      sourceNamespace: observation.sourceNamespace,
+      externalAssetType: observation.externalAssetType,
+      externalId: observation.externalId,
+      assetType: "api",
+      assetId: "fact-1",
+      matchStatus: "UNAMBIGUOUS",
+      normalizedDigest: observation.normalizedDigest,
+      ...designerScope
+    });
+
+    const first = await reconcilePersistedScope({ architectureScope: designerScope });
+    rows.observations.reverse();
+    const second = await reconcilePersistedScope({ architectureScope: designerScope });
+
+    expect(first).toMatchObject({ status: "CONVERGED", issues: [] });
+    expect(second).toEqual(first);
+  });
+
   it("loads only persisted promoted canonical facts inside the exact Scope", async () => {
     rows.observations.push({
       ...observation,
