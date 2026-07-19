@@ -232,11 +232,36 @@ async function finalizeFederationAuditRecoverable(id: string, input: FederationA
     try {
       await prisma.auditLog.update({
         where: { id },
-        data: { status: "failed", errorMessage: "AUDIT_FINALIZATION_RETRY_REQUIRED" }
+        data: {
+          outputSummary: summarizeAudit(input.output),
+          status: input.status === "success" ? "SUCCESS_REPAIR_REQUIRED" : "FAILED_REPAIR_REQUIRED",
+          errorMessage: "AUDIT_FINALIZATION_RETRY_REQUIRED"
+        }
       });
     } catch {
       // The caller still receives a stable failure if the recovery marker cannot be persisted.
     }
+    throw new FederationToolError("AUDIT_PERSISTENCE_FAILED");
+  }
+}
+
+/** Repairs a durable finalization marker; repeated calls are safe after convergence. */
+export async function retryFederationAuditFinalization(id: string): Promise<void> {
+  try {
+    const row = await prisma.auditLog.findUnique({ where: { id } });
+    if (!row || (row.status !== "SUCCESS_REPAIR_REQUIRED" && row.status !== "FAILED_REPAIR_REQUIRED" && row.status !== "success" && row.status !== "failed")) {
+      throw new FederationToolError("AUDIT_PERSISTENCE_FAILED");
+    }
+    if (row.status === "success" || row.status === "failed") return;
+    await prisma.auditLog.update({
+      where: { id },
+      data: {
+        status: row.status === "SUCCESS_REPAIR_REQUIRED" ? "success" : "failed",
+        errorMessage: undefined
+      }
+    });
+  } catch (error) {
+    if (error instanceof FederationToolError) throw error;
     throw new FederationToolError("AUDIT_PERSISTENCE_FAILED");
   }
 }

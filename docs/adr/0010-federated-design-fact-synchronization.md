@@ -68,13 +68,25 @@ Tradeoffs:
 - Related assets: `api-specforge-mcp-tools`, `data-specforge-assets`, `data-specforge-asset-graph`, and `adr-design-fact-dual-record-governance`.
 - Typed links: Proposal `--IMPLEMENTS_DECISION-->` ADR; Context Pack `--IMPLEMENTS_CONTEXT_FOR-->` Proposal; ADR `--DECIDES-->` each related asset (`api`, `dataModel`, and `adr` targets); each Evidence asset `--VALIDATES-->` ADR.
 - Evidence IDs: `evidence-adr-federated-design-fact-synchronization-1` through `evidence-adr-federated-design-fact-synchronization-3`.
-- **MCP synchronization blocked:** the matching records are manifest-driven, but they are not complete until `pnpm design-facts:sync` persists them and `pnpm design-facts:check` reads them back through MCP. Retry trigger: run both commands with a reachable configured `DATABASE_URL`, then run the exact Designer Scope federation reconciliation command.
+- **MCP synchronization blocked:** Owner: SpecForge Architecture. The matching records are manifest-driven, but synchronization is blocked because `DATABASE_URL`, `SPECFORGE_APPLICATION_SERVICE_ID`, and `SPECFORGE_SCOPE_PATH` are unavailable in this worktree environment. Retry trigger: configure reachable PostgreSQL plus the exact Designer Scope variables, run `pnpm design-facts:sync`, then `pnpm design-facts:check` and the configured-scope federation check, and read back the persisted IDs, Scope, canonical English fields, Chinese overlays, links, and evidence.
 
 ## Integration Hardening Update (2026-07-19)
 
 The first hardening slice makes three governance boundaries fail closed. `reconcile_federated_scope` accepts only an exact Scope and loads promoted canonical envelopes from persisted state. Candidate promotion requires a mapped asset identity, validates the selected observation's digest and provenance, derives promoted content and policy-owned fields server-side, and always enforces complete bilingual localization. Reconciliation and its CLI gate now block every governed non-converged issue instead of allowing content-only or missing-fact drift to return success.
 
 Local evidence: the focused core/CLI command passed 30 tests; the focused MCP/persistence command passed 64 tests; both package typechecks passed. PostgreSQL integration and MCP synchronization/read-back were not run without a reachable `DATABASE_URL`. The broader integration-hardening effort remains in progress because the separately tracked second slice is still pending.
+
+## Integration Hardening Slice 2C (2026-07-19)
+
+Successful mutations whose AuditLog terminal update fails now retain the intended success `outputSummary` in a `SUCCESS_REPAIR_REQUIRED` marker with `AUDIT_FINALIZATION_RETRY_REQUIRED`. The exported `retryFederationAuditFinalization` consumer reads that marker and converges it to `success`; repeated retries after convergence are idempotent. Marker-write failure returns the stable audit persistence error and does not expose database details.
+
+Local evidence: the focused MCP federation command passed 2 files and 76 tests; core and MCP typechecks passed; `git diff --check` passed. Live PostgreSQL and MCP synchronization/read-back remain unverified. **MCP synchronization blocked:** Owner: SpecForge Architecture. Reason: `DATABASE_URL`, `SPECFORGE_APPLICATION_SERVICE_ID`, and `SPECFORGE_SCOPE_PATH` are unavailable. Retry trigger: configure PostgreSQL and the exact Designer Scope variables, run `pnpm design-facts:sync`, `pnpm design-facts:check`, and the configured-scope federation check, then read back the records.
+
+### 第2C轮中文本地化 / Slice 2C Chinese Localization
+
+成功变更的审计终结写入失败时，系统保留原始成功输出摘要，并写入可恢复的 `SUCCESS_REPAIR_REQUIRED` 标记；`retryFederationAuditFinalization` 可将该标记幂等收敛为 `success`。标记写入失败时仅返回稳定的审计持久化错误，不向客户端暴露数据库细节。
+
+**MCP synchronization blocked：** 负责人：SpecForge Architecture。原因：当前环境缺少可用的 `DATABASE_URL`、`SPECFORGE_APPLICATION_SERVICE_ID` 和 `SPECFORGE_SCOPE_PATH`。重试触发条件：配置可访问的 PostgreSQL 和精确 Designer Scope 变量，依次运行 `pnpm design-facts:sync`、`pnpm design-facts:check` 和联邦 Scope 检查，再回读 ID、范围、英文规范字段、中文覆盖、关系和证据。
 
 ## 中文本地化 / Chinese Localization
 

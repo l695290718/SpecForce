@@ -26,6 +26,8 @@ ADR-0001 through ADR-0006 now contain bilingual reconciliation updates that supe
 
 **Rationale:** ADR `adr-federated-design-fact-synchronization`, its Proposal, Context Pack, `IMPLEMENTS_DECISION`, `IMPLEMENTS_CONTEXT_FOR`, `DECIDES`, and `VALIDATES` links, and three Evidence assets are declared in the baseline manifest but cannot be written or read back without a reachable `DATABASE_URL`.
 
+**MCP synchronization blocked:** Owner: SpecForge Architecture. The configured `DATABASE_URL`, `SPECFORGE_APPLICATION_SERVICE_ID`, and `SPECFORGE_SCOPE_PATH` are unavailable in the current environment.
+
 **Retry trigger:** Configure a reachable PostgreSQL `DATABASE_URL`, then run `pnpm design-facts:sync`, `pnpm design-facts:check`, and `SPECFORGE_APPLICATION_SERVICE_ID=com.huawei.celon.desiner SPECFORGE_SCOPE_PATH=pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner pnpm design-facts:federation:check`.
 
 ### Complete federation integration hardening slice two
