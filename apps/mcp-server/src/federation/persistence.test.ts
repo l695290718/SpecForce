@@ -262,8 +262,19 @@ describe("federation persistence", () => {
     expect(rows.observations).toHaveLength(0);
   });
 
+  it("loads canonical facts inside persistence during read-only reconciliation", async () => {
+    rows.observations.push({ ...observation, ...designerScope, observedAt: new Date(observation.observedAt), status: "PROMOTED", payload: promotedFactPayload() });
+    await reconcilePersistedScope({ architectureScope: designerScope });
+    expect((prisma as unknown as { sourceObservation: { findMany: ReturnType<typeof vi.fn> } }).sourceObservation.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { ...designerScope, status: "PROMOTED" } }));
+    expect((prisma as unknown as { reconciliationSnapshot: { upsert: ReturnType<typeof vi.fn> } }).reconciliationSnapshot.upsert).not.toHaveBeenCalled();
+  });
+
+  it("does not accept caller-injected canonical facts during reconciliation", async () => {
+    await expect(reconcilePersistedScope({ architectureScope: designerScope, acceptedFacts: [{ id: "caller-injected" }] } as never)).resolves.not.toMatchObject({ factDigests: [{ factId: "caller-injected" }] });
+  });
+
   it("does not persist a snapshot during read-only reconciliation", async () => {
-    await reconcilePersistedScope({ architectureScope: designerScope, acceptedFacts: [] });
+    await reconcilePersistedScope({ architectureScope: designerScope });
     expect((prisma as unknown as { reconciliationSnapshot: { upsert: ReturnType<typeof vi.fn> } }).reconciliationSnapshot.upsert).not.toHaveBeenCalled();
   });
 
@@ -276,7 +287,7 @@ describe("federation persistence", () => {
       status: "CANDIDATE"
     });
 
-    await expect(reconcilePersistedScope({ architectureScope: designerScope, acceptedFacts: [] })).resolves.toMatchObject({
+    await expect(reconcilePersistedScope({ architectureScope: designerScope })).resolves.toMatchObject({
       issues: [expect.objectContaining({ code: "UNDECLARED_CHANGE", externalId: observation.externalId })]
     });
   });
@@ -475,7 +486,7 @@ describe("federation persistence", () => {
     const currentFacts = await listPersistedCanonicalFederatedFacts(designerScope);
     expect(currentFacts).toHaveLength(1);
     expect(currentFacts[0]).toMatchObject({ id: candidateFact.id, normalizedDigest: contentDigest({ name: "Payments API v2" }), payload: { name: "Payments API v2" } });
-    await expect(reconcilePersistedScope({ architectureScope: designerScope, acceptedFacts: currentFacts })).resolves.toMatchObject({ status: "CONVERGED", issues: [] });
+    await expect(reconcilePersistedScope({ architectureScope: designerScope })).resolves.toMatchObject({ status: "CONVERGED", issues: [] });
   });
 
   it("rolls back retirement when a replacement promotion fails", async () => {

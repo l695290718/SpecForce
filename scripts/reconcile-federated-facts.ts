@@ -76,9 +76,8 @@ export async function reconcileFederatedFacts(environment: FederationCliEnvironm
 }
 
 async function reconcileFederatedFactsForScope(architectureScope: ArchitectureScopeRef): Promise<FederatedReconciliationDiagnostics> {
-  const { listPersistedCanonicalFederatedFacts, reconcilePersistedScope } = await import("../apps/mcp-server/src/federation/persistence");
-  const acceptedFacts = await listPersistedCanonicalFederatedFacts(architectureScope);
-  const report = await reconcilePersistedScope({ architectureScope, acceptedFacts });
+  const { reconcilePersistedScope } = await import("../apps/mcp-server/src/federation/persistence");
+  const report = await reconcilePersistedScope({ architectureScope });
   return federatedReconciliationDiagnostics(report);
 }
 

@@ -6,7 +6,6 @@ import { z } from "zod";
 import { prisma, resolveWritableScope } from "../persistence";
 import {
   createDesignChangeSession,
-  listPersistedCanonicalFederatedFacts,
   promoteCandidate,
   reconcilePersistedScope,
   recordObservation,
@@ -451,8 +450,7 @@ export function registerFederationTools(server: McpServer): void {
     readOnly: true
   }, async (input, caller) => {
     const architectureScope = assertReadableExactScope(input.architectureScope, caller);
-    const acceptedFacts = await listPersistedCanonicalFederatedFacts(architectureScope);
-    return reconcilePersistedScope({ architectureScope, acceptedFacts });
+    return reconcilePersistedScope({ architectureScope });
   });
 
   registerFederationJsonTool(server, "get_federated_sync_status", {

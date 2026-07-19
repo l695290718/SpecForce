@@ -1,7 +1,6 @@
 import { expect, it, vi } from "vitest";
 
 vi.mock("../apps/mcp-server/src/federation/persistence", () => ({
-  listPersistedCanonicalFederatedFacts: vi.fn(),
   reconcilePersistedScope: vi.fn()
 }));
 
@@ -74,15 +73,13 @@ it("resolves only an exact application-service Scope from the architecture regis
 
 it("loads canonical facts and forwards the exact Scope to the sole read-only reconciliation operation", async () => {
   const persistence = await import("../apps/mcp-server/src/federation/persistence");
-  vi.mocked(persistence.listPersistedCanonicalFederatedFacts).mockResolvedValue([canonicalFact]);
   vi.mocked(persistence.reconcilePersistedScope).mockResolvedValue(convergedReport);
 
   await expect(reconcileFederatedFacts({
     SPECFORGE_APPLICATION_SERVICE_ID: designerScope.applicationServiceId,
     SPECFORGE_SCOPE_PATH: designerScope.scopePath
   })).resolves.toMatchObject({ architectureScope: designerScope, root: "root-1", verified: 1, blocking: false });
-  expect(persistence.listPersistedCanonicalFederatedFacts).toHaveBeenCalledWith(designerScope);
-  expect(persistence.reconcilePersistedScope).toHaveBeenCalledWith({ architectureScope: designerScope, acceptedFacts: [canonicalFact] });
+  expect(persistence.reconcilePersistedScope).toHaveBeenCalledWith({ architectureScope: designerScope });
   expect(persistence.reconcilePersistedScope).toHaveBeenCalledTimes(1);
 });
 
@@ -105,7 +102,7 @@ it.each([
 
 it("prints a stable JSON-shaped failure report when persistence fails", async () => {
   const persistence = await import("../apps/mcp-server/src/federation/persistence");
-  vi.mocked(persistence.listPersistedCanonicalFederatedFacts).mockRejectedValue(new Error("database unavailable"));
+  vi.mocked(persistence.reconcilePersistedScope).mockRejectedValue(new Error("database unavailable"));
 
   const result = await runReconciliationCli({ SPECFORGE_APPLICATION_SERVICE_ID: designerScope.applicationServiceId });
 

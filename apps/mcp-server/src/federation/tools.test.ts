@@ -6,7 +6,6 @@ const federationPersistence = vi.hoisted(() => ({
   recordObservation: vi.fn(),
   promoteCandidate: vi.fn(),
   createDesignChangeSession: vi.fn(),
-  listPersistedCanonicalFederatedFacts: vi.fn(),
   reconcilePersistedScope: vi.fn()
 }));
 
@@ -150,7 +149,6 @@ beforeEach(() => {
   federationPersistence.recordObservation.mockResolvedValue({ id: "observation-1", architectureScope: designerScope });
   federationPersistence.promoteCandidate.mockResolvedValue({ id: "fact-1", status: "PROMOTED", architectureScope: designerScope });
   federationPersistence.createDesignChangeSession.mockResolvedValue({ id: "session-1", architectureScope: designerScope });
-  federationPersistence.listPersistedCanonicalFederatedFacts.mockResolvedValue([]);
   federationPersistence.reconcilePersistedScope.mockResolvedValue({ architectureScope: designerScope, root: "root-1", status: "CONVERGED", issues: [], factDigests: [] });
   persistence.prisma.auditLog.create.mockResolvedValue({ id: "audit-1" });
   persistence.prisma.auditLog.update.mockResolvedValue({ id: "audit-1" });
@@ -408,28 +406,12 @@ describe("federation MCP tools", () => {
   });
 
   it("routes scoped reconciliation without a write-side snapshot", async () => {
-    const persistedFact = {
-      id: "fact-1",
-      architectureScope: designerScope,
-      assetType: "api",
-      schemaVersion: "1",
-      payload: { name: "Payments API" },
-      localizedContent: { en: { name: "Payments API" }, zh: { name: "支付 API" } },
-      normalizedDigest: "digest-1",
-      authority: "EXTERNAL",
-      confidence: 1,
-      status: "PROMOTED",
-      provenance: { sourceSystem: "github", connectorInstanceId: connector.id, observedAt: "2026-07-19T00:00:00.000Z" }
-    };
-    federationPersistence.listPersistedCanonicalFederatedFacts.mockResolvedValueOnce([persistedFact]);
-
     const tool = captureToolsWithFederationRegistration().get("reconcile_federated_scope")!;
     expect(tool.config.inputSchema).not.toHaveProperty("acceptedFacts");
     const result = await tool.handler({ architectureScope: designerScope, acceptedFacts: [{ id: "caller-controlled" }] }, authorizedExtra);
 
     expect(result.isError).not.toBe(true);
-    expect(federationPersistence.listPersistedCanonicalFederatedFacts).toHaveBeenCalledWith(designerScope);
-    expect(federationPersistence.reconcilePersistedScope).toHaveBeenCalledWith({ architectureScope: designerScope, acceptedFacts: [persistedFact] });
+    expect(federationPersistence.reconcilePersistedScope).toHaveBeenCalledWith({ architectureScope: designerScope });
     expect(JSON.parse(result.content[0]!.text)).toMatchObject({ root: "root-1", status: "CONVERGED" });
   });
 

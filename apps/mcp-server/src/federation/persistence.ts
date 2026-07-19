@@ -59,7 +59,6 @@ export interface AppendFederationOutboxInput {
 
 export interface ReconcilePersistedScopeInput {
   architectureScope: ArchitectureScopeRef;
-  acceptedFacts: FederatedFactEnvelope[];
   relationshipDrift?: boolean;
   evidenceDrift?: boolean;
   localizationDrift?: boolean;
@@ -208,13 +207,14 @@ export async function appendFederationOutbox(input: AppendFederationOutboxInput)
 
 export async function reconcilePersistedScope(input: ReconcilePersistedScopeInput): Promise<ReconciliationReport> {
   const scope = readableExactScope(input.architectureScope);
-  const [observations, mappings] = await Promise.all([
+  const [acceptedFacts, observations, mappings] = await Promise.all([
+    listPersistedCanonicalFederatedFacts(scope),
     prisma.sourceObservation.findMany({ where: { ...scope, status: { not: "TOMBSTONED" } } }),
     prisma.externalIdentityMapping.findMany({ where: scope })
   ]);
   const report = reconcileFacts({
     architectureScope: scope,
-    acceptedFacts: input.acceptedFacts,
+    acceptedFacts,
     observations: observations.map(observation),
     identityMappings: mappings.map((mapping) => ({ id: mapping.id, architectureScope: scope, connectorInstanceId: mapping.connectorId, sourceNamespace: mapping.sourceNamespace, externalAssetType: mapping.externalAssetType, externalId: mapping.externalId, assetType: mapping.assetType, assetId: mapping.assetId ?? undefined, matchStatus: mapping.matchStatus as "UNMATCHED" | "UNAMBIGUOUS" | "AMBIGUOUS", normalizedDigest: mapping.normalizedDigest })),
     relationshipDrift: input.relationshipDrift,
