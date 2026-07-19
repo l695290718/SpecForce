@@ -18,6 +18,7 @@
     "design-facts:relations:check": "tsx scripts/check-legacy-relations.ts",
     "design-facts:sync": "tsx scripts/sync-design-facts.ts",
     "design-facts:check": "tsx scripts/reconcile-design-facts.ts",
+    "design-facts:federation:check": "tsx scripts/reconcile-federated-facts.ts",
     "format": "prettier --write ."
   },
   "devDependencies": {
