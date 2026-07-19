@@ -155,8 +155,14 @@ export async function promoteCandidate(input: PromoteCandidateInput): Promise<Fe
     hasCompleteChineseLocalization: hasCompleteChineseLocalization(input.fact)
   });
   if (decision.action !== "PROMOTE") throw new Error(decision.reason);
-  await prisma.sourceObservation.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.candidateId } }, data: { status: "PROMOTED" } });
-  return { ...input.fact, architectureScope: scope, status: "PROMOTED", provenance: { ...input.fact.provenance, connectorInstanceId: candidate.connectorId, observedAt: candidate.observedAt.toISOString() } };
+  const promotedFact: FederatedFactEnvelope = {
+    ...input.fact,
+    architectureScope: scope,
+    status: "PROMOTED",
+    provenance: { ...input.fact.provenance, connectorInstanceId: candidate.connectorId, observedAt: candidate.observedAt.toISOString() }
+  };
+  await prisma.sourceObservation.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.candidateId } }, data: { status: "PROMOTED", payload: json(promotedFact) } });
+  return promotedFact;
 }
 
 export async function createDesignChangeSession(input: CreateDesignChangeSessionInput): Promise<DesignChangeSession> {
@@ -190,6 +196,19 @@ export async function reconcilePersistedScope(input: ReconcilePersistedScopeInpu
     localizationDrift: input.localizationDrift
   });
   return report;
+}
+
+export async function listPersistedCanonicalFederatedFacts(scopeInput: ArchitectureScopeRef): Promise<FederatedFactEnvelope[]> {
+  const scope = readableExactScope(scopeInput);
+  const rows = await prisma.sourceObservation.findMany({ where: { ...scope, status: "PROMOTED" }, orderBy: [{ observedAt: "asc" }, { id: "asc" }] });
+  return rows.flatMap((row) => {
+    const fact = persistedCanonicalFact(row.payload);
+    if (!fact) throw new Error("CANONICAL_FACT_INVALID");
+    if (fact.architectureScope.applicationServiceId !== scope.applicationServiceId || fact.architectureScope.scopePath !== scope.scopePath) {
+      throw new Error("SCOPE_MISMATCH");
+    }
+    return [fact];
+  });
 }
 
 export async function persistReconciliationSnapshot(input: ReconcilePersistedScopeInput): Promise<ReconciliationReport> {
@@ -250,6 +269,19 @@ function hasOnlyCompleteLocalizedValues(value: unknown): boolean {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function persistedCanonicalFact(value: Prisma.JsonValue): FederatedFactEnvelope | undefined {
+  if (!isRecord(value) || typeof value.id !== "string" || typeof value.assetType !== "string" || typeof value.schemaVersion !== "string" ||
+    !isRecord(value.payload) || !isRecord(value.localizedContent) || !isRecord(value.localizedContent.zh) || typeof value.normalizedDigest !== "string" ||
+    !isRecord(value.provenance) || typeof value.provenance.sourceSystem !== "string" || typeof value.provenance.connectorInstanceId !== "string" ||
+    typeof value.provenance.observedAt !== "string" || !isRecord(value.architectureScope) || typeof value.architectureScope.applicationServiceId !== "string" ||
+    typeof value.architectureScope.scopePath !== "string" || !["EXTERNAL", "SPECFORGE", "SHARED"].includes(String(value.authority)) ||
+    typeof value.confidence !== "number" || value.status !== "PROMOTED") {
+    return undefined;
+  }
+  if (value.localizedContent.en !== undefined && !isRecord(value.localizedContent.en)) return undefined;
+  return value as unknown as FederatedFactEnvelope;
 }
 
 function connector(row: { id: string; kind: string; capabilities: Prisma.JsonValue; status: string; secretReference: string | null; applicationServiceId: string; scopePath: string }): ConnectorInstance {

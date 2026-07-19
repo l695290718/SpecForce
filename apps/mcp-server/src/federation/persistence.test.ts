@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "../persistence";
-import { appendFederationOutbox, listConnectors, promoteCandidate, reconcilePersistedScope, recordObservation, registerConnector } from "./persistence";
+import { appendFederationOutbox, listConnectors, listPersistedCanonicalFederatedFacts, promoteCandidate, reconcilePersistedScope, recordObservation, registerConnector } from "./persistence";
 
 const designerScope = {
   applicationServiceId: "com.huawei.celon.desiner",
@@ -231,6 +231,40 @@ describe("federation persistence", () => {
     expect((prisma as unknown as { reconciliationSnapshot: { upsert: ReturnType<typeof vi.fn> } }).reconciliationSnapshot.upsert).not.toHaveBeenCalled();
   });
 
+  it("loads only persisted promoted canonical facts inside the exact Scope", async () => {
+    rows.observations.push({
+      ...observation,
+      ...designerScope,
+      status: "PROMOTED",
+      payload: {
+        id: "fact-1",
+        architectureScope: designerScope,
+        assetType: "api",
+        schemaVersion: "1",
+        payload: { name: "Payments API" },
+        localizedContent: { en: { name: "Payments API" }, zh: { name: "支付 API" } },
+        normalizedDigest: "digest-1",
+        provenance: { sourceSystem: "github", connectorInstanceId: connector.id, observedAt: observation.observedAt },
+        authority: "EXTERNAL",
+        confidence: 1,
+        status: "PROMOTED"
+      }
+    });
+    rows.observations.push({
+      ...rows.observations[0]!,
+      id: "other-scope-observation",
+      ...policyScope
+    });
+
+    await expect(listPersistedCanonicalFederatedFacts(designerScope)).resolves.toEqual([expect.objectContaining({ id: "fact-1", architectureScope: designerScope, status: "PROMOTED" })]);
+    expect((prisma as unknown as { sourceObservation: { findMany: ReturnType<typeof vi.fn> } }).sourceObservation.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { ...designerScope, status: "PROMOTED" } }));
+  });
+
+  it("fails closed when a promoted row does not contain an exact-Scope canonical envelope", async () => {
+    rows.observations.push({ ...observation, ...designerScope, status: "PROMOTED", payload: { id: "raw-observation" } });
+    await expect(listPersistedCanonicalFederatedFacts(designerScope)).rejects.toThrow("CANONICAL_FACT_INVALID");
+  });
+
   it("rejects a federation outbox session from another Scope", async () => {
     rows.sessions.push({ id: "session-1", ...policyScope });
     await expect(appendFederationOutbox({ eventType: "TEST", payload: {}, idempotencyKey: "session-outbox", designChangeSessionId: "session-1", architectureScope: designerScope })).rejects.toThrow("DESIGN_CHANGE_SESSION_SCOPE_MISMATCH");
@@ -296,7 +330,7 @@ describe("federation persistence", () => {
   it("promotes a valid scoped candidate", async () => {
     arrangePromotion();
     await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).resolves.toMatchObject({ id: candidateFact.id, status: "PROMOTED", architectureScope: designerScope });
-    expect(rows.observations[0]).toMatchObject({ status: "PROMOTED", ...designerScope });
+    expect(rows.observations[0]).toMatchObject({ status: "PROMOTED", ...designerScope, payload: expect.objectContaining({ id: candidateFact.id, status: "PROMOTED", architectureScope: designerScope }) });
   });
 });
 
