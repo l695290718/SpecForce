@@ -292,6 +292,12 @@ function summarizeAuditInput(value: unknown): string {
   return summarizeAudit(value);
 }
 
+function auditFailureDiagnostic(code: string, action: string, target: { targetType: string; targetId: string }, error: unknown): string {
+  const detail = error instanceof Error ? error.message : String(error);
+  const diagnosticRef = contentDigest({ action, targetType: target.targetType, targetId: target.targetId, detail });
+  return `${code};diagnosticRef=${diagnosticRef}`;
+}
+
 function redactAuditValue(value: unknown, key?: string, seen = new WeakSet<object>()): unknown {
   if (key && isSensitiveAuditKey(key)) return "[REDACTED]";
   if (key === "payload") return { digest: contentDigest(value), redacted: true };
@@ -403,7 +409,7 @@ function registerFederationJsonTool<T extends z.ZodRawShape>(
           return errorResult(new FederationToolError("AUDIT_PERSISTENCE_FAILED"));
         }
         try {
-          await finalizeFederationAuditRecoverable(auditId, { actor: auditIdentity, action: name, ...target, toolInput: input, output, status: "failed", errorMessage: error instanceof Error ? error.message : String(error) });
+          await finalizeFederationAuditRecoverable(auditId, { actor: auditIdentity, action: name, ...target, toolInput: input, output, status: "failed", errorMessage: auditFailureDiagnostic(errorCode(error), name, target, error) });
         } catch (auditError) {
           console.error(`[specforge-mcp] federation audit persistence failed for ${name}: ${auditError instanceof Error ? auditError.message : String(auditError)}`);
           return errorResult(new FederationToolError("AUDIT_PERSISTENCE_FAILED"));

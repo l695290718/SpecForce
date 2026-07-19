@@ -540,7 +540,7 @@ describe("federation MCP tools", () => {
     expect(result.content[0]!.text).not.toContain("Caller replacement");
   });
 
-  it("hides unknown runtime details from clients while retaining them in durable audit diagnostics", async () => {
+  it("redacts unknown runtime details from client and AuditLog failure diagnostics", async () => {
     federationPersistence.registerConnector.mockRejectedValueOnce(new Error("database password leaked"));
 
     const result = await callTool("register_connector", { ...connector, architectureScope: designerScope });
@@ -553,8 +553,11 @@ describe("federation MCP tools", () => {
     }) });
     expect(persistence.prisma.auditLog.update).toHaveBeenCalledWith({ where: { id: "audit-1" }, data: expect.objectContaining({
       status: "failed",
-      errorMessage: "database password leaked"
+      errorMessage: expect.stringMatching(/^FEDERATION_TOOL_ERROR;diagnosticRef=[a-f0-9]{64}$/)
     }) });
+    const auditErrorMessage = persistence.prisma.auditLog.update.mock.calls.at(-1)?.[0].data.errorMessage as string;
+    expect(auditErrorMessage).not.toContain("database password leaked");
+    expect(auditErrorMessage).toContain("FEDERATION_TOOL_ERROR");
   });
 
   it("normalizes authority policy failures to the stable authority conflict code", async () => {
