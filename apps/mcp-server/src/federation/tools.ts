@@ -75,6 +75,7 @@ function errorResult(error: unknown): CallToolResult {
 
 const stableErrorCodes = new Set([
   "AUTHENTICATION_REQUIRED",
+  "AUDIT_PERSISTENCE_FAILED",
   "AUTHORITY_CONFLICT",
   "AUTHORITY_MISSING",
   "AUTHORITY_POLICY_AMBIGUOUS",
@@ -107,6 +108,7 @@ function errorCode(error: unknown): string {
 function safeClientMessage(code: string): string {
   return {
     AUTHENTICATION_REQUIRED: "An authenticated MCP caller is required.",
+    AUDIT_PERSISTENCE_FAILED: "The federation audit record could not be persisted.",
     AUTHORITY_CONFLICT: "The requested fact has an authority conflict.",
     DELIVERY_BLOCKED: "Federation delivery is currently blocked.",
     FEDERATION_TOOL_ERROR: "The federation tool request could not be completed.",
@@ -192,7 +194,7 @@ function authorizeCaller(caller: FederationCaller, permissions: Permission[], in
   }
 }
 
-async function persistFederationAudit(input: {
+type FederationAuditInput = {
   actor: { actorType: FederationCaller["actorType"]; actorId: string };
   action: string;
   targetType: string;
@@ -201,8 +203,10 @@ async function persistFederationAudit(input: {
   output: unknown;
   status: "success" | "failed";
   errorMessage?: string;
-}): Promise<void> {
-  await prisma.auditLog.create({
+};
+
+async function createFederationAudit(input: FederationAuditInput): Promise<string> {
+  const row = await prisma.auditLog.create({
     data: {
       actorType: input.actor.actorType,
       actorId: input.actor.actorId,
@@ -211,6 +215,19 @@ async function persistFederationAudit(input: {
       targetType: input.targetType,
       targetId: input.targetId,
       inputSummary: summarizeAudit(input.toolInput),
+      outputSummary: summarizeAudit(input.output),
+      status: "PENDING",
+      errorMessage: undefined
+    }
+  });
+  if (!row || typeof row.id !== "string") throw new FederationToolError("AUDIT_PERSISTENCE_FAILED");
+  return row.id;
+}
+
+async function finalizeFederationAudit(id: string, input: FederationAuditInput): Promise<void> {
+  await prisma.auditLog.update({
+    where: { id },
+    data: {
       outputSummary: summarizeAudit(input.output),
       status: input.status,
       errorMessage: input.errorMessage
@@ -276,19 +293,31 @@ function registerFederationJsonTool<T extends z.ZodRawShape>(
     (async (input: unknown, extra: FederationRequestExtra) => {
       const target = federationTarget(name, input as Record<string, unknown>);
       const auditIdentity = auditActor(extra);
+      let auditId: string | undefined;
       try {
+        auditId = await createFederationAudit({ actor: auditIdentity, action: name, ...target, toolInput: input, output: "pending", status: "failed" });
         const caller = requestActor(extra);
         authorizeCaller(caller, config.permissions, input as Record<string, unknown>);
         const output = await handler(input as z.output<z.ZodObject<T>>, caller);
-        await persistFederationAudit({ actor: caller, action: name, ...target, toolInput: input, output, status: "success" });
+        try {
+          await finalizeFederationAudit(auditId, { actor: caller, action: name, ...target, toolInput: input, output, status: "success" });
+        } catch (auditError) {
+          console.error(`[specforge-mcp] federation success audit finalization failed for ${name}: ${auditError instanceof Error ? auditError.message : String(auditError)}`);
+          return errorResult(new FederationToolError("AUDIT_PERSISTENCE_FAILED"));
+        }
         return textResult(output);
       } catch (error) {
         const code = errorCode(error);
         const output = { error: { code } };
+        if (!auditId) {
+          console.error(`[specforge-mcp] federation audit creation failed for ${name}: ${error instanceof Error ? error.message : String(error)}`);
+          return errorResult(new FederationToolError("AUDIT_PERSISTENCE_FAILED"));
+        }
         try {
-          await persistFederationAudit({ actor: auditIdentity, action: name, ...target, toolInput: input, output, status: "failed", errorMessage: error instanceof Error ? error.message : String(error) });
+          await finalizeFederationAudit(auditId, { actor: auditIdentity, action: name, ...target, toolInput: input, output, status: "failed", errorMessage: error instanceof Error ? error.message : String(error) });
         } catch (auditError) {
           console.error(`[specforge-mcp] federation audit persistence failed for ${name}: ${auditError instanceof Error ? auditError.message : String(auditError)}`);
+          return errorResult(new FederationToolError("AUDIT_PERSISTENCE_FAILED"));
         }
         return errorResult(error);
       }

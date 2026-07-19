@@ -27,7 +27,7 @@ const persistence = vi.hoisted(() => ({
     return registered;
   }),
   prisma: {
-    auditLog: { create: vi.fn() },
+    auditLog: { create: vi.fn(), update: vi.fn() },
     connectorInstance: { findMany: vi.fn() },
     federationOutbox: { count: vi.fn() },
     sourceObservation: { count: vi.fn() },
@@ -144,12 +144,14 @@ function errorCode(result: { content: Array<{ text: string }> }): string | undef
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.spyOn(console, "error").mockImplementation(() => undefined);
   federationPersistence.registerConnector.mockResolvedValue({ ...connector, status: "ACTIVE", architectureScope: designerScope });
   federationPersistence.recordObservation.mockResolvedValue({ id: "observation-1", architectureScope: designerScope });
   federationPersistence.promoteCandidate.mockResolvedValue({ id: "fact-1", status: "PROMOTED", architectureScope: designerScope });
   federationPersistence.createDesignChangeSession.mockResolvedValue({ id: "session-1", architectureScope: designerScope });
   federationPersistence.reconcilePersistedScope.mockResolvedValue({ architectureScope: designerScope, root: "root-1", status: "CONVERGED", issues: [], factDigests: [] });
   persistence.prisma.auditLog.create.mockResolvedValue({ id: "audit-1" });
+  persistence.prisma.auditLog.update.mockResolvedValue({ id: "audit-1" });
   persistence.prisma.connectorInstance.findMany.mockResolvedValue([{ id: connector.id, status: "ACTIVE", applicationServiceId: designerScope.applicationServiceId, scopePath: designerScope.scopePath }]);
   persistence.prisma.federationOutbox.count.mockResolvedValue(2);
   persistence.prisma.sourceObservation.count.mockResolvedValue(1);
@@ -223,8 +225,12 @@ describe("federation MCP tools", () => {
       actorId: "caller-agent",
       channel: "mcp",
       action: "register_connector",
-      status: "success"
+      status: "PENDING"
     }) });
+    expect(persistence.prisma.auditLog.update).toHaveBeenCalledWith({
+      where: { id: "audit-1" },
+      data: expect.objectContaining({ status: "success" })
+    });
   });
 
   it("writes a durable failure audit event for a denied caller", async () => {
@@ -234,9 +240,45 @@ describe("federation MCP tools", () => {
       actorType: "user",
       actorId: "read-only-user",
       action: "register_connector",
-      status: "failed",
-      errorMessage: expect.stringContaining("PERMISSION_DENIED")
+      status: "PENDING"
     }) });
+    expect(persistence.prisma.auditLog.update).toHaveBeenCalledWith({
+      where: { id: "audit-1" },
+      data: expect.objectContaining({ status: "failed", errorMessage: expect.stringContaining("PERMISSION_DENIED") })
+    });
+  });
+
+  it("returns an audit persistence error when success finalization fails after mutation", async () => {
+    persistence.prisma.auditLog.update.mockRejectedValueOnce(new Error("AUDIT_UPDATE_FAILED"));
+
+    const result = await callTool("register_connector", { ...connector, architectureScope: designerScope });
+
+    expect(federationPersistence.registerConnector).toHaveBeenCalledOnce();
+    expect(result.isError).toBe(true);
+    expect(errorCode(result)).toBe("AUDIT_PERSISTENCE_FAILED");
+    expect(result.content[0]!.text).not.toContain("AUDIT_UPDATE_FAILED");
+  });
+
+  it("does not commit a failed mutation when failed-call audit finalization fails", async () => {
+    federationPersistence.registerConnector.mockRejectedValueOnce(new Error("CONNECTOR_WRITE_FAILED"));
+    persistence.prisma.auditLog.update.mockRejectedValueOnce(new Error("AUDIT_UPDATE_FAILED"));
+
+    const result = await callTool("register_connector", { ...connector, architectureScope: designerScope });
+
+    expect(federationPersistence.registerConnector).toHaveBeenCalledOnce();
+    expect(result.isError).toBe(true);
+    expect(errorCode(result)).toBe("AUDIT_PERSISTENCE_FAILED");
+    expect(result.content[0]!.text).not.toContain("AUDIT_UPDATE_FAILED");
+  });
+
+  it("does not invoke federation persistence when the initial audit write fails", async () => {
+    persistence.prisma.auditLog.create.mockRejectedValueOnce(new Error("AUDIT_CREATE_FAILED"));
+
+    const result = await callTool("register_connector", { ...connector, architectureScope: designerScope });
+
+    expect(federationPersistence.registerConnector).not.toHaveBeenCalled();
+    expect(result.isError).toBe(true);
+    expect(errorCode(result)).toBe("AUDIT_PERSISTENCE_FAILED");
   });
 
   it("derives a candidate observation envelope before routing its write through federation persistence", async () => {
@@ -294,6 +336,9 @@ describe("federation MCP tools", () => {
     expect(result.content[0]!.text).not.toContain("database password leaked");
     expect(errorCode(result)).toBe("FEDERATION_TOOL_ERROR");
     expect(persistence.prisma.auditLog.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      status: "PENDING"
+    }) });
+    expect(persistence.prisma.auditLog.update).toHaveBeenCalledWith({ where: { id: "audit-1" }, data: expect.objectContaining({
       status: "failed",
       errorMessage: "database password leaked"
     }) });
