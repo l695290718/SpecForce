@@ -206,6 +206,35 @@ describe("federation MCP tools", () => {
     expect(errorCode(await callTool("reconcile_federated_scope", { architectureScope: designerScope }, governanceClaimMissing))).toBe("PERMISSION_DENIED");
   });
 
+  it("does not let actor permissions replace missing authenticated claims", async () => {
+    const actorOnlyWrite = structuredClone(authorizedExtra);
+    actorOnlyWrite.authInfo!.scopes = ["asset:read", "governance:run"];
+    const actorOnlyRead = structuredClone(authorizedExtra);
+    actorOnlyRead.authInfo!.scopes = ["asset:write", "governance:run"];
+    const actorOnlyGovernance = structuredClone(authorizedExtra);
+    actorOnlyGovernance.authInfo!.scopes = ["asset:read", "asset:write"];
+
+    expect(errorCode(await callTool("register_connector", { ...connector, architectureScope: designerScope }, actorOnlyWrite))).toBe("PERMISSION_DENIED");
+    expect(errorCode(await callTool("get_federated_sync_status", { architectureScope: designerScope }, actorOnlyRead))).toBe("PERMISSION_DENIED");
+    expect(errorCode(await callTool("reconcile_federated_scope", { architectureScope: designerScope }, actorOnlyGovernance))).toBe("PERMISSION_DENIED");
+  });
+
+  it("requires an exact application-service grant for reads and writes", async () => {
+    const parentOnly = structuredClone(authorizedExtra);
+    parentOnly.authInfo!.extra = { actor: {
+      actorType: "agent",
+      actorId: "caller-agent",
+      grants: [
+        { scopeId: "module-celon-designer", action: "read" },
+        { scopeId: "module-celon-designer", action: "write" }
+      ],
+      permissions: ["asset:read", "asset:write", "governance:run"]
+    } };
+
+    expect(errorCode(await callTool("get_federated_sync_status", { architectureScope: designerScope }, parentOnly))).toBe("PERMISSION_DENIED");
+    expect(errorCode(await callTool("register_connector", { ...connector, architectureScope: designerScope }, parentOnly))).toBe("PERMISSION_DENIED");
+  });
+
   it("accepts promotion only through the candidate identifier and exact Scope", async () => {
     const tool = captureToolsWithFederationRegistration().get("promote_candidate_fact")!;
     expect(tool.config.inputSchema).not.toHaveProperty("fact");
@@ -294,6 +323,11 @@ describe("federation MCP tools", () => {
     expect(result.isError).toBe(true);
     expect(errorCode(result)).toBe("AUDIT_PERSISTENCE_FAILED");
     expect(result.content[0]!.text).not.toContain("AUDIT_UPDATE_FAILED");
+    expect(persistence.prisma.auditLog.update).toHaveBeenCalledTimes(2);
+    expect(persistence.prisma.auditLog.update).toHaveBeenLastCalledWith({
+      where: { id: "audit-1" },
+      data: { status: "failed", errorMessage: "AUDIT_FINALIZATION_RETRY_REQUIRED" }
+    });
   });
 
   it("does not commit a failed mutation when failed-call audit finalization fails", async () => {

@@ -345,161 +345,120 @@ describe("federation persistence", () => {
   it("rejects promotion without complete Chinese localization", async () => {
     arrangePromotion();
     rows.observations[0]!.payload = { name: "Payments API", localizedContent: { en: candidateLocalizedContent.en, zh: {} } };
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
+    await expect(promoteCandidate(promotionInput())).rejects.toThrow("LOCALIZATION_INCOMPLETE");
   });
 
   it("rejects a partial Chinese localization overlay for a human-facing fact", async () => {
     arrangePromotion();
     rows.observations[0]!.payload = { name: "Payments API", localizedContent: { en: candidateLocalizedContent.en, zh: { name: "支付 API" } } };
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
+    await expect(promoteCandidate(promotionInput())).rejects.toThrow("LOCALIZATION_INCOMPLETE");
   });
 
   it("rejects a human-facing fact without an English canonical overlay", async () => {
     arrangePromotion();
     rows.observations[0]!.payload = { name: "Payments API", localizedContent: { zh: candidateLocalizedContent.zh } };
-    await expect(promoteCandidate({
-      candidateId: observation.id,
-      architectureScope: designerScope,
-      humanFacing: true,
-      fact: { ...candidateFact, localizedContent: { zh: candidateLocalizedContent.zh } as unknown as typeof candidateFact.localizedContent }
-    })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
+    await expect(promoteCandidate(promotionInput())).rejects.toThrow("LOCALIZATION_INCOMPLETE");
   });
 
   it("derives localized content from the persisted candidate observation", async () => {
     arrangePromotion();
-    const promoted = await promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact });
+    const promoted = await promoteCandidate(promotionInput());
     expect(promoted.localizedContent).toEqual(candidateLocalizedContent);
     expect(promoted.payload).toEqual({ name: "Payments API" });
   });
 
-  it("rejects caller-supplied localized content that differs from the candidate", async () => {
+  it("rejects legacy caller-supplied promotion fields at the persistence boundary", async () => {
     arrangePromotion();
-    await expect(promoteCandidate({
-      candidateId: observation.id,
-      architectureScope: designerScope,
-      humanFacing: true,
-      fact: { ...candidateFact, localizedContent: { en: { name: "Caller" }, zh: { name: "调用方" } } }
-    })).rejects.toThrow("CANDIDATE_LOCALIZATION_MISMATCH");
+    await expect(promoteCandidate({ ...promotionInput(), fact: candidateFact } as never)).rejects.toThrow("PROMOTION_INPUT_INVALID");
   });
 
-  it("does not require a caller humanFacing signal", async () => {
+  it("does not require caller-owned promotion fields", async () => {
     arrangePromotion();
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, fact: candidateFact })).resolves.toMatchObject({ status: "PROMOTED" });
+    await expect(promoteCandidate(promotionInput())).resolves.toMatchObject({ status: "PROMOTED" });
   });
 
   it("does not allow humanFacing false to bypass complete bilingual localization", async () => {
     arrangePromotion();
     rows.observations[0]!.payload = { name: "Payments API", localizedContent: { en: candidateLocalizedContent.en, zh: {} } };
-    await expect(promoteCandidate({
-      candidateId: observation.id,
-      architectureScope: designerScope,
-      humanFacing: false,
-      fact: { ...candidateFact, localizedContent: { en: candidateLocalizedContent.en, zh: {} } }
-    })).rejects.toThrow("LOCALIZATION_INCOMPLETE");
+    await expect(promoteCandidate(promotionInput())).rejects.toThrow("LOCALIZATION_INCOMPLETE");
   });
 
   it("requires the candidate mapping to name the promoted asset", async () => {
     arrangePromotion();
     delete rows.mappings[0]!.assetId;
 
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("IDENTITY_MAPPING_INVALID");
+    await expect(promoteCandidate(promotionInput())).rejects.toThrow("IDENTITY_MAPPING_INVALID");
   });
 
-  it("rejects caller payload and digest that do not match the candidate observation", async () => {
+  it("rejects legacy caller payload and digest fields", async () => {
     arrangePromotion();
 
-    await expect(promoteCandidate({
-      candidateId: observation.id,
-      architectureScope: designerScope,
-      humanFacing: true,
-      fact: { ...candidateFact, payload: { name: "Caller-authored replacement" }, normalizedDigest: contentDigest({ name: "Caller-authored replacement" }) }
-    })).rejects.toThrow("CANDIDATE_CONTENT_MISMATCH");
-    await expect(promoteCandidate({
-      candidateId: observation.id,
-      architectureScope: designerScope,
-      humanFacing: true,
-      fact: { ...candidateFact, normalizedDigest: "caller-digest" }
-    })).rejects.toThrow("CANDIDATE_DIGEST_MISMATCH");
+    await expect(promoteCandidate({ ...promotionInput(), payload: { name: "Caller-authored replacement" } } as never)).rejects.toThrow("PROMOTION_INPUT_INVALID");
+    await expect(promoteCandidate({ ...promotionInput(), normalizedDigest: "caller-digest" } as never)).rejects.toThrow("PROMOTION_INPUT_INVALID");
   });
 
   it("rejects a candidate whose persisted source digest or provenance is inconsistent", async () => {
     arrangePromotion();
     rows.observations[0]!.normalizedDigest = "tampered-source-digest";
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("CANDIDATE_DIGEST_INVALID");
+    await expect(promoteCandidate(promotionInput())).rejects.toThrow("CANDIDATE_DIGEST_INVALID");
 
     rows.observations.length = 0;
     rows.mappings.length = 0;
     rows.policies.length = 0;
     arrangePromotion({ provenance: { ...observation.provenance, connectorInstanceId: "other-connector" } });
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("CANDIDATE_PROVENANCE_INVALID");
+    await expect(promoteCandidate(promotionInput())).rejects.toThrow("CANDIDATE_PROVENANCE_INVALID");
   });
 
-  it("rejects caller provenance and authority that do not match candidate-governed values", async () => {
+  it("derives authority and provenance without caller promotion fields", async () => {
     arrangePromotion();
-    await expect(promoteCandidate({
-      candidateId: observation.id,
-      architectureScope: designerScope,
-      humanFacing: true,
-      fact: { ...candidateFact, provenance: { ...candidateFact.provenance, sourceSystem: "caller" } }
-    })).rejects.toThrow("CANDIDATE_PROVENANCE_MISMATCH");
-    await expect(promoteCandidate({
-      candidateId: observation.id,
-      architectureScope: designerScope,
-      humanFacing: true,
-      fact: { ...candidateFact, authority: "SPECFORGE" }
-    })).rejects.toThrow("AUTHORITY_CONFLICT");
+    await expect(promoteCandidate(promotionInput())).resolves.toMatchObject({ authority: "EXTERNAL", provenance: candidateFact.provenance });
   });
 
   it("rejects promotion when authority policy disables it", async () => {
     arrangePromotion({ promotionMode: "DISABLED" });
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("POLICY_DISABLED");
+    await expect(promoteCandidate(promotionInput())).rejects.toThrow("POLICY_DISABLED");
   });
 
   it("rejects promotion with an ambiguous identity mapping", async () => {
     arrangePromotion({ matchStatus: "AMBIGUOUS" });
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("IDENTITY_CONFLICT");
+    await expect(promoteCandidate(promotionInput())).rejects.toThrow("IDENTITY_CONFLICT");
   });
 
   it("rejects a candidate whose Scope differs from the requested Scope", async () => {
     arrangePromotion();
     Object.assign(rows.mappings[0]!, policyScope);
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("SCOPE_MISMATCH");
+    await expect(promoteCandidate(promotionInput())).rejects.toThrow("SCOPE_MISMATCH");
   });
 
   it.each(["REJECTED", "TOMBSTONED", "CONFLICTED"])('rejects a %s candidate', async (status) => {
     arrangePromotion({ status });
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("CANDIDATE_STATUS_INVALID");
+    await expect(promoteCandidate(promotionInput())).rejects.toThrow("CANDIDATE_STATUS_INVALID");
   });
 
   it("rejects multiple applicable authority policies", async () => {
     arrangePromotion();
     rows.policies.push({ ...rows.policies[0]!, id: "policy-2", policyVersion: "2" });
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("AUTHORITY_POLICY_AMBIGUOUS");
+    await expect(promoteCandidate(promotionInput())).rejects.toThrow("AUTHORITY_POLICY_AMBIGUOUS");
   });
 
   it("rejects promotion without an applicable authority policy", async () => {
     arrangePromotion();
     rows.policies.length = 0;
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).rejects.toThrow("AUTHORITY_MISSING");
+    await expect(promoteCandidate(promotionInput())).rejects.toThrow("AUTHORITY_MISSING");
   });
 
   it("promotes a valid scoped candidate", async () => {
     arrangePromotion();
-    await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).resolves.toMatchObject({ id: candidateFact.id, status: "PROMOTED", architectureScope: designerScope });
+    await expect(promoteCandidate(promotionInput())).resolves.toMatchObject({ id: candidateFact.id, status: "PROMOTED", architectureScope: designerScope });
     expect(rows.observations[0]).toMatchObject({ status: "PROMOTED", ...designerScope, payload: expect.objectContaining({ id: candidateFact.id, status: "PROMOTED", architectureScope: designerScope }) });
   });
 
   it("retires an earlier revision and reconciles only the current canonical fact", async () => {
     arrangePromotion();
-    await promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact });
+    await promoteCandidate(promotionInput());
     rows.observations.push(secondObservation());
 
-    await promoteCandidate({
-      candidateId: "observation-2",
-      architectureScope: designerScope,
-      humanFacing: true,
-      fact: secondCandidateFact()
-    });
+    await promoteCandidate(promotionInput("observation-2"));
 
     expect(rows.observations).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: observation.id, status: "TOMBSTONED" }),
@@ -513,16 +472,11 @@ describe("federation persistence", () => {
 
   it("rolls back retirement when a replacement promotion fails", async () => {
     arrangePromotion();
-    await promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact });
+    await promoteCandidate(promotionInput());
     rows.observations.push(secondObservation());
     failPromotionUpdate = true;
 
-    await expect(promoteCandidate({
-      candidateId: "observation-2",
-      architectureScope: designerScope,
-      humanFacing: true,
-      fact: secondCandidateFact()
-    })).rejects.toThrow("PROMOTION_WRITE_FAILED");
+    await expect(promoteCandidate(promotionInput("observation-2"))).rejects.toThrow("PROMOTION_WRITE_FAILED");
     expect(rows.observations).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: observation.id, status: "PROMOTED" }),
       expect.objectContaining({ id: "observation-2", status: "CANDIDATE" })
@@ -534,13 +488,8 @@ describe("federation persistence", () => {
     rows.observations.push(secondObservation());
 
     await Promise.all([
-      promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact }),
-      promoteCandidate({
-        candidateId: "observation-2",
-        architectureScope: designerScope,
-        humanFacing: true,
-        fact: secondCandidateFact()
-      })
+      promoteCandidate(promotionInput()),
+      promoteCandidate(promotionInput("observation-2"))
     ]);
 
     expect(promotionLockCalls).toBe(2);
@@ -554,6 +503,14 @@ function arrangePromotion(overrides: Row = {}) {
   rows.observations.push({ ...observation, connectorId: connector.id, ...designerScope, observedAt: new Date(observation.observedAt), ...overrides });
   rows.mappings.push({ id: "mapping-1", connectorId: connector.id, sourceNamespace: observation.sourceNamespace, externalAssetType: observation.externalAssetType, externalId: observation.externalId, assetType: candidateFact.assetType, assetId: candidateFact.id, matchStatus: "UNAMBIGUOUS", normalizedDigest: observation.normalizedDigest, ...designerScope, ...overrides });
   rows.policies.push({ id: "policy-1", assetType: candidateFact.assetType, fieldPath: "$", authority: "EXTERNAL", promotionMode: "AUTO", policyVersion: "1", ...designerScope, ...overrides });
+}
+
+function promotionInput(candidateId: string = observation.id) {
+  return {
+    candidateId,
+    approvalReason: "Reviewed source contract.",
+    architectureScope: designerScope
+  };
 }
 
 function promotedFactPayload(overrides: Row = {}): Row {

@@ -1,4 +1,4 @@
-import { contentDigest, hasScopeAccess, scopeById, type ArchitectureScopeRef, type ConnectorCapability, type Permission, type ScopedActor } from "@specforge/core";
+import { contentDigest, scopeById, type ArchitectureScopeRef, type ConnectorCapability, type Permission, type ScopedActor } from "@specforge/core";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { randomUUID } from "node:crypto";
@@ -72,6 +72,7 @@ const stableErrorCodes = new Set([
   "IDENTITY_MAPPING_MISSING",
   "LOCALIZATION_INCOMPLETE",
   "PERMISSION_DENIED",
+  "PROMOTION_INPUT_INVALID",
   "POLICY_DISABLED",
   "SCOPE_MISMATCH"
 ]);
@@ -103,6 +104,7 @@ function safeClientMessage(code: string): string {
     IDENTITY_CONFLICT: "The requested fact has an identity conflict.",
     LOCALIZATION_INCOMPLETE: "The requested fact has incomplete localization.",
     PERMISSION_DENIED: "The authenticated caller is not authorized for this federation operation.",
+    PROMOTION_INPUT_INVALID: "Promotion input is invalid.",
     SCOPE_MISMATCH: "The requested architecture Scope is not authorized.",
   }[code] ?? "The federation tool request could not be completed.";
 }
@@ -122,10 +124,14 @@ function assertWritableExactScope(scope: ArchitectureScopeRef, caller: Federatio
 
 function assertReadableExactScope(scope: ArchitectureScopeRef, caller: FederationCaller): ArchitectureScopeRef {
   const resolved = scopeById(scope.applicationServiceId);
-  if (!resolved || resolved.level !== "applicationService" || resolved.scopePath !== scope.scopePath || !hasScopeAccess(caller, resolved, "read")) {
+  if (!resolved || resolved.level !== "applicationService" || resolved.scopePath !== scope.scopePath || !hasExactFederationScopeGrant(caller, resolved, "read")) {
     throw new FederationToolError("SCOPE_MISMATCH", "The supplied architectureScope does not match an authorized application-service Scope.");
   }
   return { applicationServiceId: resolved.id, scopePath: resolved.scopePath };
+}
+
+function hasExactFederationScopeGrant(caller: FederationCaller, scope: { id: string; scopePath: string }, action: "read" | "write"): boolean {
+  return caller.grants.some((grant) => grant.scopeId === scope.id && grant.action === action && scopeById(grant.scopeId)?.scopePath === scope.scopePath);
 }
 
 function federationTarget(name: string, input: Record<string, unknown>) {
@@ -149,10 +155,7 @@ function requestActor(extra: FederationRequestExtra | undefined): FederationCall
   if (normalizedGrants.length !== grants.length) {
     throw new FederationToolError("AUTHENTICATION_REQUIRED", "MCP authInfo.extra contains invalid scope grants.");
   }
-  const permissions = [
-    ...(claims?.scopes ?? []),
-    ...(Array.isArray(rawActor?.permissions) ? rawActor.permissions : [])
-  ].filter(isPermission);
+  const permissions = (claims?.scopes ?? []).filter(isPermission);
   return { actorType, actorId, grants: normalizedGrants, permissions: [...new Set(permissions)] };
 }
 
@@ -177,8 +180,8 @@ function authorizeCaller(caller: FederationCaller, permissions: Permission[], in
   if (permissions.some((permission) => !caller.permissions.includes(permission))) {
     throw new FederationToolError("PERMISSION_DENIED");
   }
-  if (permissions.includes("asset:write") && !hasScopeAccess(caller, registered, "write")) throw new FederationToolError("PERMISSION_DENIED");
-  if ((permissions.includes("asset:read") || permissions.includes("governance:run")) && !hasScopeAccess(caller, registered, "read")) throw new FederationToolError("PERMISSION_DENIED");
+  if (permissions.includes("asset:write") && !hasExactFederationScopeGrant(caller, registered, "write")) throw new FederationToolError("PERMISSION_DENIED");
+  if ((permissions.includes("asset:read") || permissions.includes("governance:run")) && !hasExactFederationScopeGrant(caller, registered, "read")) throw new FederationToolError("PERMISSION_DENIED");
 }
 
 type FederationAuditInput = {
@@ -220,6 +223,22 @@ async function finalizeFederationAudit(id: string, input: FederationAuditInput):
       errorMessage: input.errorMessage
     }
   });
+}
+
+async function finalizeFederationAuditRecoverable(id: string, input: FederationAuditInput): Promise<void> {
+  try {
+    await finalizeFederationAudit(id, input);
+  } catch {
+    try {
+      await prisma.auditLog.update({
+        where: { id },
+        data: { status: "failed", errorMessage: "AUDIT_FINALIZATION_RETRY_REQUIRED" }
+      });
+    } catch {
+      // The caller still receives a stable failure if the recovery marker cannot be persisted.
+    }
+    throw new FederationToolError("AUDIT_PERSISTENCE_FAILED");
+  }
 }
 
 function summarizeAudit(value: unknown): string {
@@ -292,7 +311,7 @@ function registerFederationJsonTool<T extends z.ZodRawShape>(
         authorizeCaller(caller, config.permissions, input as Record<string, unknown>);
         const output = await handler(input as z.output<z.ZodObject<T>>, caller);
         try {
-          await finalizeFederationAudit(auditId, { actor: caller, action: name, ...target, toolInput: input, output, status: "success" });
+          await finalizeFederationAuditRecoverable(auditId, { actor: caller, action: name, ...target, toolInput: input, output, status: "success" });
         } catch (auditError) {
           console.error(`[specforge-mcp] federation success audit finalization failed for ${name}: ${auditError instanceof Error ? auditError.message : String(auditError)}`);
           return errorResult(new FederationToolError("AUDIT_PERSISTENCE_FAILED"));
@@ -306,7 +325,7 @@ function registerFederationJsonTool<T extends z.ZodRawShape>(
           return errorResult(new FederationToolError("AUDIT_PERSISTENCE_FAILED"));
         }
         try {
-          await finalizeFederationAudit(auditId, { actor: auditIdentity, action: name, ...target, toolInput: input, output, status: "failed", errorMessage: error instanceof Error ? error.message : String(error) });
+          await finalizeFederationAuditRecoverable(auditId, { actor: auditIdentity, action: name, ...target, toolInput: input, output, status: "failed", errorMessage: error instanceof Error ? error.message : String(error) });
         } catch (auditError) {
           console.error(`[specforge-mcp] federation audit persistence failed for ${name}: ${auditError instanceof Error ? auditError.message : String(auditError)}`);
           return errorResult(new FederationToolError("AUDIT_PERSISTENCE_FAILED"));

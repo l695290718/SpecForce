@@ -38,10 +38,7 @@ export interface RecordObservationInput extends Omit<SourceObservation, "archite
 export interface PromoteCandidateInput {
   candidateId: string;
   architectureScope: ArchitectureScopeRef;
-  approvalReason?: string;
-  fact?: Omit<FederatedFactEnvelope, "architectureScope" | "status">;
-  fieldPath?: string;
-  humanFacing?: boolean;
+  approvalReason: string;
 }
 
 export interface CreateDesignChangeSessionInput extends Omit<DesignChangeSession, "architectureScope" | "openedAt" | "updatedAt"> {
@@ -126,6 +123,7 @@ export async function recordObservation(input: RecordObservationInput): Promise<
 }
 
 export async function promoteCandidate(input: PromoteCandidateInput): Promise<FederatedFactEnvelope> {
+  assertPromotionInput(input);
   const scope = writableScope(input.architectureScope);
   return prisma.$transaction((transaction) => promoteCandidateInTransaction(transaction as Prisma.TransactionClient, input, scope));
 }
@@ -155,14 +153,7 @@ async function promoteCandidateInTransaction(transaction: Prisma.TransactionClie
     "SELECT pg_advisory_xact_lock(hashtext($1))",
     promotionLockKey(scope, mapping.assetId)
   );
-  if (input.fact) {
-    if (input.fact.assetType !== mapping.assetType || input.fact.id !== mapping.assetId) throw new Error("IDENTITY_MAPPING_INVALID");
-    if (contentDigest(input.fact.payload) !== candidate.normalizedDigest) throw new Error("CANDIDATE_CONTENT_MISMATCH");
-    if (input.fact.normalizedDigest !== candidate.normalizedDigest) throw new Error("CANDIDATE_DIGEST_MISMATCH");
-    if (!matchesCandidateProvenance(input.fact.provenance, candidate)) throw new Error("CANDIDATE_PROVENANCE_MISMATCH");
-    if (contentDigest(input.fact.localizedContent) !== contentDigest(candidateEnvelope.localizedContent)) throw new Error("CANDIDATE_LOCALIZATION_MISMATCH");
-  }
-  const policies = await transaction.authorityPolicy.findMany({ where: { ...scope, assetType: mapping.assetType, fieldPath: input.fieldPath ?? "$" } });
+  const policies = await transaction.authorityPolicy.findMany({ where: { ...scope, assetType: mapping.assetType, fieldPath: "$" } });
   if (policies.length > 1) throw new Error("AUTHORITY_POLICY_AMBIGUOUS");
   const policy = policies[0];
   const decision = evaluateObservation({
@@ -173,7 +164,6 @@ async function promoteCandidateInTransaction(transaction: Prisma.TransactionClie
     hasCompleteChineseLocalization: hasCompleteBilingualLocalization(candidateEnvelope.localizedContent)
   });
   if (decision.action !== "PROMOTE") throw new Error(decision.reason);
-  if (input.fact && input.fact.authority !== policy?.authority) throw new Error("AUTHORITY_CONFLICT");
   const promotedFact: FederatedFactEnvelope = {
     id: mapping.assetId,
     assetType: mapping.assetType,
@@ -198,6 +188,14 @@ async function promoteCandidateInTransaction(transaction: Prisma.TransactionClie
   }
   await transaction.sourceObservation.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.candidateId } }, data: { status: "PROMOTED", payload: json(promotedFact) } });
   return promotedFact;
+}
+
+function assertPromotionInput(input: unknown): asserts input is PromoteCandidateInput {
+  if (!isRecord(input) || Object.keys(input).some((key) => !["candidateId", "approvalReason", "architectureScope"].includes(key)) ||
+    !nonEmptyString(input.candidateId) || !nonEmptyString(input.approvalReason) || !isRecord(input.architectureScope) ||
+    !nonEmptyString(input.architectureScope.applicationServiceId) || !nonEmptyString(input.architectureScope.scopePath)) {
+    throw new Error("PROMOTION_INPUT_INVALID");
+  }
 }
 
 export async function createDesignChangeSession(input: CreateDesignChangeSessionInput): Promise<DesignChangeSession> {
@@ -317,10 +315,6 @@ function canonicalCandidateProvenance(candidate: CandidateObservationRow): Feder
     externalVersion: candidate.sourceVersion,
     observedAt: candidate.observedAt.toISOString()
   };
-}
-
-function matchesCandidateProvenance(provenance: FederatedFactEnvelope["provenance"], candidate: CandidateObservationRow): boolean {
-  return contentDigest(provenance) === contentDigest(canonicalCandidateProvenance(candidate));
 }
 
 function candidateEnvelopeFromPayload(value: Prisma.JsonValue): { payload: Record<string, unknown>; localizedContent: FederatedFactEnvelope["localizedContent"] } | undefined {
