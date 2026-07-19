@@ -213,6 +213,10 @@ The first implementation plan must cover only increment 1. Each later increment 
 - Reconciliation detects content, localization, relationship, evidence, Scope, identity, and delivery drift without mutating data.
 - CI can block protected-branch completion on governed inconsistency.
 
+## Verified Implementation Evidence
+
+On 2026-07-19, the governance-core increment was verified locally with `node .\\node_modules\\vitest\\vitest.mjs run scripts/design-fact-manifest.test.ts` (2 tests), `node .\\node_modules\\vitest\\vitest.mjs run packages\\core\\src\\__tests__` (12 files, 126 tests), and `node .\\node_modules\\vitest\\vitest.mjs run apps\\mcp-server\\src` (12 files, 144 tests; 9 PostgreSQL integration tests skipped because `DATABASE_URL` was absent). `pnpm --filter @specforge/core typecheck` and `pnpm --filter @specforge/mcp-server typecheck` also passed.
+
 ## Chinese Localization / 中文本地化
 
 ### 目的
@@ -244,3 +248,7 @@ MCP 仍然是正式设计事实的唯一写入边界。PostgreSQL 保存正式�
 ### 分阶段交付
 
 第一阶段只实现治理核心：统一事实信封、连接器 SPI、候选事实、身份映射、字段级权威策略、变更会话、Outbox 和只读对账契约。后续分别实现存量扫描基线、持续入站同步，以及受控的 PR/提案回写。每一阶段独立设计、测试和评审。
+
+### 已验证的实现证据
+
+2026-07-19，治理核心增量已在本地通过以下命令验证：`node .\\node_modules\\vitest\\vitest.mjs run scripts/design-fact-manifest.test.ts`（2 个测试）、`node .\\node_modules\\vitest\\vitest.mjs run packages\\core\\src\\__tests__`（12 个文件、126 个测试）以及 `node .\\node_modules\\vitest\\vitest.mjs run apps\\mcp-server\\src`（12 个文件、144 个测试；由于缺少 `DATABASE_URL`，跳过了 9 个 PostgreSQL 集成测试）。`pnpm --filter @specforge/core typecheck` 和 `pnpm --filter @specforge/mcp-server typecheck` 也已通过。

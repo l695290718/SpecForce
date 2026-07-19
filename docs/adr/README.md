@@ -31,6 +31,10 @@ MCP is the only system-of-record write path. Verify the returned IDs, exact scop
 
 If synchronization fails, record **`MCP synchronization blocked`**, the failure reason, and a retry trigger in this ADR and create or update the tracked backlog fact. The ADR and the implementation are incomplete until the MCP record and required links are persisted and verified.
 
+## Federated Governance Facts
+
+Federated governance-core decisions must name the delivered increment separately from future connector delivery. Contract, scope, audit, durable delivery, candidate, authority, and read-only reconciliation facts may be recorded as implemented only when their focused evidence is present. Legacy discovery scanners, continuous inbound connectors, outbound proposals, and external `APPLY` remain deferred until their own scoped ADR, Proposal, Context Pack, evidence, and MCP reconciliation records exist.
+
 ## 中文本地化覆盖
 
 ### 用途
@@ -46,3 +50,7 @@ ADR 必须写明稳定 ID、精确的所属 `architectureScope`、相关资产�
 ### MCP 记录与失败处理
 
 `MCP Record` 必须包含与仓库 ADR 相同的稳定 MCP ADR ID 和精确的所属范围，并列出匹配的 Proposal、Context Pack、资产关系和证据。MCP 是唯一的系统记录写入路径；每次写入后必须核验返回的 ID、精确范围、英文规范字段、中文覆盖、关系目标和证据。PostgreSQL 对已编写资产和关系事件保持权威，图数据库仅作为派生投影。写入失败时必须记录 **`MCP synchronization blocked`**、失败原因和重试触发条件，登记待办事实。MCP 记录和必要关系写入并核验成功前，ADR 与实现都不能标记为完成。
+
+### 联邦治理事实
+
+联邦治理核心决策必须把已交付的增量与未来的连接器交付明确区分。只有在具备针对性证据时，契约、范围、审计、可靠投递、候选事实、权威策略和只读对账事实才能标记为已实现。存量发现扫描器、持续入站连接器、出站 Proposal 以及外部 `APPLY` 在拥有各自受 Scope 约束的 ADR、Proposal、Context Pack、证据和 MCP 对账记录前均保持延期。

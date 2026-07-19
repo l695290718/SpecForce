@@ -18,6 +18,16 @@ ADR-0001 through ADR-0006 now contain bilingual reconciliation updates that supe
 
 **Completion evidence:** `pnpm design-facts:sync` persists the updated bilingual ADR content and `pnpm design-facts:check` reports all seven baseline decisions verified without missing, mismatched, out-of-scope, or blocked facts.
 
+### Persist federated governance-core design fact
+
+**Status:** Blocked on configured PostgreSQL/MCP availability.
+
+**Owner:** SpecForge Architecture.
+
+**Rationale:** ADR `adr-federated-design-fact-synchronization`, its Proposal, Context Pack, `IMPLEMENTS_DECISION`, `IMPLEMENTS_CONTEXT_FOR`, `DECIDES`, and `VALIDATES` links, and three Evidence assets are declared in the baseline manifest but cannot be written or read back without a reachable `DATABASE_URL`.
+
+**Retry trigger:** Configure a reachable PostgreSQL `DATABASE_URL`, then run `pnpm design-facts:sync`, `pnpm design-facts:check`, and `SPECFORGE_APPLICATION_SERVICE_ID=com.huawei.celon.desiner SPECFORGE_SCOPE_PATH=pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner pnpm design-facts:federation:check`.
+
 ## Enterprise Impact Analysis
 
 ### NebulaGraph production projection
