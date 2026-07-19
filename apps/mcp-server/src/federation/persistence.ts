@@ -161,6 +161,13 @@ export async function promoteCandidate(input: PromoteCandidateInput): Promise<Fe
     status: "PROMOTED",
     provenance: { ...input.fact.provenance, connectorInstanceId: candidate.connectorId, observedAt: candidate.observedAt.toISOString() }
   };
+  const previousPromotedRows = await prisma.sourceObservation.findMany({ where: { ...scope, status: "PROMOTED" } });
+  for (const previousRow of previousPromotedRows) {
+    const previousFact = persistedCanonicalFact(previousRow.payload);
+    if (previousFact?.id === promotedFact.id) {
+      await prisma.sourceObservation.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: previousRow.id } }, data: { status: "TOMBSTONED" } });
+    }
+  }
   await prisma.sourceObservation.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.candidateId } }, data: { status: "PROMOTED", payload: json(promotedFact) } });
   return promotedFact;
 }
@@ -183,7 +190,7 @@ export async function appendFederationOutbox(input: AppendFederationOutboxInput)
 export async function reconcilePersistedScope(input: ReconcilePersistedScopeInput): Promise<ReconciliationReport> {
   const scope = readableExactScope(input.architectureScope);
   const [observations, mappings] = await Promise.all([
-    prisma.sourceObservation.findMany({ where: scope }),
+    prisma.sourceObservation.findMany({ where: { ...scope, status: "PROMOTED" } }),
     prisma.externalIdentityMapping.findMany({ where: scope })
   ]);
   const report = reconcileFacts({
@@ -272,16 +279,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function persistedCanonicalFact(value: Prisma.JsonValue): FederatedFactEnvelope | undefined {
-  if (!isRecord(value) || typeof value.id !== "string" || typeof value.assetType !== "string" || typeof value.schemaVersion !== "string" ||
-    !isRecord(value.payload) || !isRecord(value.localizedContent) || !isRecord(value.localizedContent.zh) || typeof value.normalizedDigest !== "string" ||
-    !isRecord(value.provenance) || typeof value.provenance.sourceSystem !== "string" || typeof value.provenance.connectorInstanceId !== "string" ||
-    typeof value.provenance.observedAt !== "string" || !isRecord(value.architectureScope) || typeof value.architectureScope.applicationServiceId !== "string" ||
-    typeof value.architectureScope.scopePath !== "string" || !["EXTERNAL", "SPECFORGE", "SHARED"].includes(String(value.authority)) ||
-    typeof value.confidence !== "number" || value.status !== "PROMOTED") {
+  if (!isRecord(value) || !nonEmptyString(value.id) || !nonEmptyString(value.assetType) || !nonEmptyString(value.schemaVersion) ||
+    !isRecord(value.payload) || !isRecord(value.localizedContent) || !isRecord(value.localizedContent.zh) || !nonEmptyString(value.normalizedDigest) ||
+    !isRecord(value.provenance) || !nonEmptyString(value.provenance.sourceSystem) || !nonEmptyString(value.provenance.connectorInstanceId) ||
+    !nonEmptyString(value.provenance.observedAt) || !isRecord(value.architectureScope) || !nonEmptyString(value.architectureScope.applicationServiceId) ||
+    !nonEmptyString(value.architectureScope.scopePath) || !["EXTERNAL", "SPECFORGE", "SHARED"].includes(String(value.authority)) ||
+    typeof value.confidence !== "number" || !Number.isFinite(value.confidence) || value.confidence < 0 || value.confidence > 1 || value.status !== "PROMOTED") {
     return undefined;
   }
   if (value.localizedContent.en !== undefined && !isRecord(value.localizedContent.en)) return undefined;
+  if (!optionalString(value.designChangeSessionId) || !stringArray(value.relationshipRefs) || !stringArray(value.evidenceRefs)) return undefined;
+  if (!optionalString(value.provenance.externalIdentity) || !optionalString(value.provenance.externalVersion) ||
+    !optionalString(value.provenance.sourceTimestamp) || !optionalString(value.provenance.repositoryCommit)) return undefined;
   return value as unknown as FederatedFactEnvelope;
+}
+
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function optionalString(value: unknown): boolean {
+  return value === undefined || nonEmptyString(value);
+}
+
+function stringArray(value: unknown): boolean {
+  return value === undefined || (Array.isArray(value) && value.every(nonEmptyString));
 }
 
 function connector(row: { id: string; kind: string; capabilities: Prisma.JsonValue; status: string; secretReference: string | null; applicationServiceId: string; scopePath: string }): ConnectorInstance {

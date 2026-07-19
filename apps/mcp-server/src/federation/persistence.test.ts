@@ -100,7 +100,7 @@ beforeEach(() => {
       return rows.observations.find((row) => Object.entries(key).every(([name, value]) => row[name] === value)) ?? null;
     }),
     findFirst: vi.fn(async ({ where }: { where: Row }) => rows.observations.find((row) => Object.entries(where).every(([name, value]) => row[name] === value)) ?? null),
-    findMany: vi.fn(async ({ where }: { where: Row }) => rows.observations.filter((row) => row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath)),
+    findMany: vi.fn(async ({ where }: { where: Row }) => rows.observations.filter((row) => row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath && (where.status === undefined || row.status === where.status))),
     update: vi.fn(async ({ where, data }: { where: { applicationServiceId_scopePath_id: Row }; data: Row }) => {
       const row = rows.observations.find((candidate) => Object.entries(where.applicationServiceId_scopePath_id).every(([name, value]) => candidate[name] === value));
       return Object.assign(row!, data);
@@ -236,19 +236,7 @@ describe("federation persistence", () => {
       ...observation,
       ...designerScope,
       status: "PROMOTED",
-      payload: {
-        id: "fact-1",
-        architectureScope: designerScope,
-        assetType: "api",
-        schemaVersion: "1",
-        payload: { name: "Payments API" },
-        localizedContent: { en: { name: "Payments API" }, zh: { name: "支付 API" } },
-        normalizedDigest: "digest-1",
-        provenance: { sourceSystem: "github", connectorInstanceId: connector.id, observedAt: observation.observedAt },
-        authority: "EXTERNAL",
-        confidence: 1,
-        status: "PROMOTED"
-      }
+      payload: promotedFactPayload()
     });
     rows.observations.push({
       ...rows.observations[0]!,
@@ -262,6 +250,21 @@ describe("federation persistence", () => {
 
   it("fails closed when a promoted row does not contain an exact-Scope canonical envelope", async () => {
     rows.observations.push({ ...observation, ...designerScope, status: "PROMOTED", payload: { id: "raw-observation" } });
+    await expect(listPersistedCanonicalFederatedFacts(designerScope)).rejects.toThrow("CANONICAL_FACT_INVALID");
+  });
+
+  it.each([
+    ["relationshipRefs", { relationshipRefs: ["valid", 42] }],
+    ["evidenceRefs", { evidenceRefs: ["valid", null] }],
+    ["designChangeSessionId", { designChangeSessionId: 42 }],
+    ["provenance externalIdentity", { provenance: { ...promotedFactPayload().provenance as Row, externalIdentity: 42 } }],
+    ["provenance externalVersion", { provenance: { ...promotedFactPayload().provenance as Row, externalVersion: 42 } }],
+    ["provenance sourceTimestamp", { provenance: { ...promotedFactPayload().provenance as Row, sourceTimestamp: 42 } }],
+    ["provenance repositoryCommit", { provenance: { ...promotedFactPayload().provenance as Row, repositoryCommit: 42 } }],
+    ["localized English content", { localizedContent: { en: "invalid", zh: { name: "支付 API" } } }],
+    ["confidence", { confidence: 2 }]
+  ] as const)("rejects malformed %s in persisted canonical envelopes", async (_field, overrides) => {
+    rows.observations.push({ ...observation, ...designerScope, status: "PROMOTED", payload: promotedFactPayload(overrides) });
     await expect(listPersistedCanonicalFederatedFacts(designerScope)).rejects.toThrow("CANONICAL_FACT_INVALID");
   });
 
@@ -332,10 +335,59 @@ describe("federation persistence", () => {
     await expect(promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact })).resolves.toMatchObject({ id: candidateFact.id, status: "PROMOTED", architectureScope: designerScope });
     expect(rows.observations[0]).toMatchObject({ status: "PROMOTED", ...designerScope, payload: expect.objectContaining({ id: candidateFact.id, status: "PROMOTED", architectureScope: designerScope }) });
   });
+
+  it("retires an earlier revision and reconciles only the current canonical fact", async () => {
+    arrangePromotion();
+    await promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact });
+    rows.observations.push({
+      ...observation,
+      id: "observation-2",
+      connectorId: connector.id,
+      sourceVersion: "def456",
+      idempotencyKey: "observation:github:payments-api:def456",
+      normalizedDigest: "digest-2",
+      payload: { version: 2 },
+      observedAt: new Date("2026-07-20T00:00:00.000Z"),
+      ...designerScope
+    });
+
+    await promoteCandidate({
+      candidateId: "observation-2",
+      architectureScope: designerScope,
+      humanFacing: true,
+      fact: { ...candidateFact, payload: { name: "Payments API v2" }, normalizedDigest: "digest-2" }
+    });
+
+    expect(rows.observations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: observation.id, status: "TOMBSTONED" }),
+      expect.objectContaining({ id: "observation-2", status: "PROMOTED" })
+    ]));
+    const currentFacts = await listPersistedCanonicalFederatedFacts(designerScope);
+    expect(currentFacts).toHaveLength(1);
+    expect(currentFacts[0]).toMatchObject({ id: candidateFact.id, normalizedDigest: "digest-2", payload: { name: "Payments API v2" } });
+    await expect(reconcilePersistedScope({ architectureScope: designerScope, acceptedFacts: currentFacts })).resolves.toMatchObject({ status: "CONVERGED", issues: [] });
+  });
 });
 
 function arrangePromotion(overrides: Row = {}) {
   rows.observations.push({ ...observation, connectorId: connector.id, ...designerScope, observedAt: new Date(observation.observedAt), ...overrides });
   rows.mappings.push({ id: "mapping-1", connectorId: connector.id, sourceNamespace: observation.sourceNamespace, externalAssetType: observation.externalAssetType, externalId: observation.externalId, assetType: candidateFact.assetType, assetId: candidateFact.id, matchStatus: "UNAMBIGUOUS", normalizedDigest: observation.normalizedDigest, ...designerScope, ...overrides });
   rows.policies.push({ id: "policy-1", assetType: candidateFact.assetType, fieldPath: "$", authority: "EXTERNAL", promotionMode: "AUTO", policyVersion: "1", ...designerScope, ...overrides });
+}
+
+function promotedFactPayload(overrides: Row = {}): Row {
+  return {
+    id: "fact-1",
+    architectureScope: designerScope,
+    assetType: "api",
+    schemaVersion: "1",
+    payload: { name: "Payments API" },
+    localizedContent: { en: { name: "Payments API" }, zh: { name: "支付 API" } },
+    normalizedDigest: "digest-1",
+    provenance: { sourceSystem: "github", connectorInstanceId: connector.id, observedAt: observation.observedAt },
+    authority: "EXTERNAL",
+    confidence: 1,
+    status: "PROMOTED",
+    ...overrides
+  };
 }
