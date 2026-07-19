@@ -153,7 +153,7 @@ beforeEach(() => {
   federationPersistence.reconcilePersistedScope.mockResolvedValue({ architectureScope: designerScope, root: "root-1", status: "CONVERGED", issues: [], factDigests: [] });
   persistence.prisma.auditLog.create.mockResolvedValue({ id: "audit-1" });
   persistence.prisma.auditLog.update.mockResolvedValue({ id: "audit-1" });
-  persistence.prisma.auditLog.findUnique.mockResolvedValue({ id: "audit-1", status: "SUCCESS_REPAIR_REQUIRED", outputSummary: "{\"ok\":true}" });
+  persistence.prisma.auditLog.findUnique.mockResolvedValue({ id: "audit-1", status: "SUCCESS_REPAIR_REQUIRED", outputSummary: "{\"ok\":true}", inputSummary: JSON.stringify({ architectureScope: designerScope }) });
   persistence.prisma.connectorInstance.findMany.mockResolvedValue([{ id: connector.id, status: "ACTIVE", applicationServiceId: designerScope.applicationServiceId, scopePath: designerScope.scopePath }]);
   persistence.prisma.federationOutbox.count.mockResolvedValue(2);
   persistence.prisma.sourceObservation.count.mockResolvedValue(1);
@@ -171,10 +171,12 @@ describe("federation MCP tools", () => {
       "promote_candidate_fact",
       "create_design_change_session",
       "reconcile_federated_scope",
+      "retry_federated_audit_finalization",
       "get_federated_sync_status"
     ]));
     expect((tools.get("reconcile_federated_scope")!.config.annotations as { readOnlyHint: boolean }).readOnlyHint).toBe(true);
     expect((tools.get("get_federated_sync_status")!.config.annotations as { readOnlyHint: boolean }).readOnlyHint).toBe(true);
+    expect((tools.get("retry_federated_audit_finalization")!.config.annotations as { readOnlyHint: boolean }).readOnlyHint).toBe(false);
     expect(tools.get("promote_candidate_fact")!.config.inputSchema).not.toHaveProperty("humanFacing");
   });
 
@@ -183,6 +185,7 @@ describe("federation MCP tools", () => {
     expect((tools.get("register_connector")!.config._meta as { permissions: string[] }).permissions).toEqual(["asset:write"]);
     expect((tools.get("reconcile_federated_scope")!.config._meta as { permissions: string[] }).permissions).toEqual(["asset:read", "governance:run"]);
     expect((tools.get("get_federated_sync_status")!.config._meta as { permissions: string[] }).permissions).toEqual(["asset:read"]);
+    expect((tools.get("retry_federated_audit_finalization")!.config._meta as { permissions: string[] }).permissions).toEqual(["asset:read", "asset:write", "governance:run"]);
   });
 
   it("requires every declared permission claim in addition to the exact Scope grant", async () => {
@@ -336,7 +339,7 @@ describe("federation MCP tools", () => {
   });
 
   it("repairs a successful mutation audit to its original terminal success", async () => {
-    await retryFederationAuditFinalization("audit-1");
+    await retryFederationAuditFinalization("audit-1", designerScope);
 
     expect(persistence.prisma.auditLog.findUnique).toHaveBeenCalledWith({ where: { id: "audit-1" } });
     expect(persistence.prisma.auditLog.update).toHaveBeenCalledWith({
@@ -347,13 +350,70 @@ describe("federation MCP tools", () => {
 
   it("makes repeated successful audit repair idempotent", async () => {
     persistence.prisma.auditLog.findUnique
-      .mockResolvedValueOnce({ id: "audit-1", status: "SUCCESS_REPAIR_REQUIRED", outputSummary: "{\"ok\":true}" })
-      .mockResolvedValueOnce({ id: "audit-1", status: "success", outputSummary: "{\"ok\":true}" });
-    await retryFederationAuditFinalization("audit-1");
-    await retryFederationAuditFinalization("audit-1");
+      .mockResolvedValueOnce({ id: "audit-1", status: "SUCCESS_REPAIR_REQUIRED", outputSummary: "{\"ok\":true}", inputSummary: JSON.stringify({ architectureScope: designerScope }) })
+      .mockResolvedValueOnce({ id: "audit-1", status: "success", outputSummary: "{\"ok\":true}", inputSummary: JSON.stringify({ architectureScope: designerScope }) });
+    await retryFederationAuditFinalization("audit-1", designerScope);
+    await retryFederationAuditFinalization("audit-1", designerScope);
 
     expect(persistence.prisma.auditLog.findUnique).toHaveBeenCalledTimes(2);
     expect(persistence.prisma.auditLog.update).toHaveBeenCalledOnce();
+  });
+
+  it("retries a repair marker through the protected audited maintenance tool", async () => {
+    persistence.prisma.auditLog.create.mockResolvedValueOnce({ id: "maintenance-audit" });
+    persistence.prisma.auditLog.findUnique.mockResolvedValueOnce({
+      id: "target-audit",
+      status: "SUCCESS_REPAIR_REQUIRED",
+      outputSummary: "{\"id\":\"designer-connector\"}",
+      inputSummary: JSON.stringify({ architectureScope: designerScope })
+    });
+
+    const result = await callTool("retry_federated_audit_finalization", { auditId: "target-audit", architectureScope: designerScope });
+
+    expect(result.isError).not.toBe(true);
+    expect(persistence.prisma.auditLog.create).toHaveBeenCalledWith({ data: expect.objectContaining({ action: "retry_federated_audit_finalization", status: "PENDING" }) });
+    expect(persistence.prisma.auditLog.findUnique).toHaveBeenCalledWith({ where: { id: "target-audit" } });
+    expect(persistence.prisma.auditLog.update).toHaveBeenCalledWith({ where: { id: "target-audit" }, data: { status: "success", errorMessage: undefined } });
+  });
+
+  it("makes repeated maintenance retries idempotent after the first convergence", async () => {
+    persistence.prisma.auditLog.create.mockResolvedValueOnce({ id: "maintenance-audit-1" }).mockResolvedValueOnce({ id: "maintenance-audit-2" });
+    persistence.prisma.auditLog.findUnique
+      .mockResolvedValueOnce({ id: "target-audit", status: "SUCCESS_REPAIR_REQUIRED", outputSummary: "{\"ok\":true}", inputSummary: JSON.stringify({ architectureScope: designerScope }) })
+      .mockResolvedValueOnce({ id: "target-audit", status: "success", outputSummary: "{\"ok\":true}", inputSummary: JSON.stringify({ architectureScope: designerScope }) });
+
+    const firstResult = await callTool("retry_federated_audit_finalization", { auditId: "target-audit", architectureScope: designerScope });
+    const secondResult = await callTool("retry_federated_audit_finalization", { auditId: "target-audit", architectureScope: designerScope });
+    expect(firstResult.isError).not.toBe(true);
+    expect(secondResult.isError).not.toBe(true);
+
+    expect(persistence.prisma.auditLog.findUnique).toHaveBeenCalledTimes(2);
+    expect(persistence.prisma.auditLog.update).toHaveBeenCalledWith({ where: { id: "target-audit" }, data: { status: "success", errorMessage: undefined } });
+  });
+
+  it("denies maintenance retry without all permissions or with a parent-only Scope grant", async () => {
+    const missingGovernance = structuredClone(authorizedExtra);
+    missingGovernance.authInfo!.scopes = ["asset:read", "asset:write"];
+    const parentOnly = structuredClone(authorizedExtra);
+    parentOnly.authInfo!.extra = { actor: {
+      actorType: "agent", actorId: "caller-agent",
+      grants: [{ scopeId: "module-celon-designer", action: "read" }, { scopeId: "module-celon-designer", action: "write" }],
+      permissions: ["asset:read", "asset:write", "governance:run"]
+    } };
+
+    expect(errorCode(await callTool("retry_federated_audit_finalization", { auditId: "target-audit", architectureScope: designerScope }, missingGovernance))).toBe("PERMISSION_DENIED");
+    expect(errorCode(await callTool("retry_federated_audit_finalization", { auditId: "target-audit", architectureScope: designerScope }, parentOnly))).toBe("PERMISSION_DENIED");
+  });
+
+  it("rejects a repair marker persisted under a different Scope", async () => {
+    persistence.prisma.auditLog.findUnique.mockResolvedValueOnce({
+      id: "target-audit",
+      status: "SUCCESS_REPAIR_REQUIRED",
+      outputSummary: "{\"ok\":true}",
+      inputSummary: JSON.stringify({ architectureScope: siblingScope })
+    });
+
+    expect(errorCode(await callTool("retry_federated_audit_finalization", { auditId: "target-audit", architectureScope: designerScope }))).toBe("SCOPE_MISMATCH");
   });
 
   it("keeps the client result safe when the recoverable audit marker cannot be written", async () => {

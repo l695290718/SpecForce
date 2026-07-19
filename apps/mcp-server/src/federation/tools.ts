@@ -135,6 +135,7 @@ function hasExactFederationScopeGrant(caller: FederationCaller, scope: { id: str
 }
 
 function federationTarget(name: string, input: Record<string, unknown>) {
+  if ("auditId" in input) return { targetType: "federation-audit", targetId: String(input.auditId) };
   if ("connectorId" in input) return { targetType: "federation-connector", targetId: String(input.connectorId) };
   if ("candidateId" in input) return { targetType: "federation-candidate", targetId: String(input.candidateId) };
   if ("id" in input) return { targetType: "federation-connector", targetId: String(input.id) };
@@ -204,7 +205,7 @@ async function createFederationAudit(input: FederationAuditInput): Promise<strin
       action: input.action,
       targetType: input.targetType,
       targetId: input.targetId,
-      inputSummary: summarizeAudit(input.toolInput),
+      inputSummary: summarizeAuditInput(input.toolInput),
       outputSummary: summarizeAudit(input.output),
       status: "PENDING",
       errorMessage: undefined
@@ -246,11 +247,16 @@ async function finalizeFederationAuditRecoverable(id: string, input: FederationA
 }
 
 /** Repairs a durable finalization marker; repeated calls are safe after convergence. */
-export async function retryFederationAuditFinalization(id: string): Promise<void> {
+export async function retryFederationAuditFinalization(id: string, requestedScope: ArchitectureScopeRef): Promise<void> {
   try {
+    if (!isArchitectureScope(requestedScope)) throw new FederationToolError("SCOPE_MISMATCH");
     const row = await prisma.auditLog.findUnique({ where: { id } });
     if (!row || (row.status !== "SUCCESS_REPAIR_REQUIRED" && row.status !== "FAILED_REPAIR_REQUIRED" && row.status !== "success" && row.status !== "failed")) {
       throw new FederationToolError("AUDIT_PERSISTENCE_FAILED");
+    }
+    const persistedScope = auditScopeFromSummary(row.inputSummary);
+    if (!persistedScope || persistedScope.applicationServiceId !== requestedScope.applicationServiceId || persistedScope.scopePath !== requestedScope.scopePath) {
+      throw new FederationToolError("SCOPE_MISMATCH");
     }
     if (row.status === "success" || row.status === "failed") return;
     await prisma.auditLog.update({
@@ -272,6 +278,27 @@ function summarizeAudit(value: unknown): string {
     return (text ?? "").slice(0, 500);
   } catch {
     return "[unserializable]";
+  }
+}
+
+function summarizeAuditInput(value: unknown): string {
+  if (isRecord(value) && isArchitectureScope(value.architectureScope)) {
+    return summarizeAudit({ architectureScope: value.architectureScope, input: value });
+  }
+  return summarizeAudit(value);
+}
+
+function auditScopeFromSummary(value: string): ArchitectureScopeRef | undefined {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!isRecord(parsed)) return undefined;
+    const directScope = parsed.architectureScope;
+    if (isArchitectureScope(directScope)) return directScope;
+    const nestedInput = parsed.input;
+    if (isRecord(nestedInput) && isArchitectureScope(nestedInput.architectureScope)) return nestedInput.architectureScope;
+    return undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -479,6 +506,21 @@ export function registerFederationTools(server: McpServer): void {
   }, async (input, caller) => {
     const architectureScope = assertReadableExactScope(input.architectureScope, caller);
     return reconcilePersistedScope({ architectureScope });
+  });
+
+  registerFederationJsonTool(server, "retry_federated_audit_finalization", {
+    title: "Retry federation audit finalization",
+    description: "Repairs one persisted federation audit marker in the exact authorized architecture Scope.",
+    inputSchema: {
+      auditId: z.string().min(1),
+      architectureScope: architectureScopeSchema
+    },
+    permissions: ["asset:read", "asset:write", "governance:run"],
+    readOnly: false
+  }, async (input, caller) => {
+    const architectureScope = assertWritableExactScope(input.architectureScope, caller);
+    await retryFederationAuditFinalization(input.auditId, architectureScope);
+    return { auditId: input.auditId, status: "success", architectureScope };
   });
 
   registerFederationJsonTool(server, "get_federated_sync_status", {

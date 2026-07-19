@@ -12,6 +12,10 @@ export interface DesignFactManifestDecision {
   contextPackId: string;
   relatedAssetIds: string[];
   evidence: Array<{ command: string; result: string }>;
+  localizedContent?: {
+    en: Record<string, string>;
+    zh: Record<string, string>;
+  };
 }
 
 export interface DesignFactManifest {

@@ -82,6 +82,18 @@ Successful mutations whose AuditLog terminal update fails now retain the intende
 
 Local evidence: the focused MCP federation command passed 2 files and 76 tests; core and MCP typechecks passed; `git diff --check` passed. Live PostgreSQL and MCP synchronization/read-back remain unverified. **MCP synchronization blocked:** Owner: SpecForge Architecture. Reason: `DATABASE_URL`, `SPECFORGE_APPLICATION_SERVICE_ID`, and `SPECFORGE_SCOPE_PATH` are unavailable. Retry trigger: configure PostgreSQL and the exact Designer Scope variables, run `pnpm design-facts:sync`, `pnpm design-facts:check`, and the configured-scope federation check, then read back the records.
 
+## Integration Hardening Slice 2D (2026-07-19)
+
+The protected `retry_federation_audit_finalization` MCP maintenance tool now invokes the repair consumer through the audited federation wrapper. It requires `asset:read`, `asset:write`, and `governance:run`, exact application-service Scope grants, and a persisted audit input summary whose Scope matches the requested Scope; unscoped or cross-Scope audit IDs fail closed. The maintenance operation is idempotent after success.
+
+Local evidence: focused federation/MCP and manifest tests passed; core and MCP typechecks passed; `git diff --check` passed. **MCP synchronization blocked:** Owner: SpecForge Architecture. Reason: `DATABASE_URL`, `SPECFORGE_APPLICATION_SERVICE_ID`, and `SPECFORGE_SCOPE_PATH` are unavailable. Retry trigger: configure PostgreSQL and exact Scope variables, run `pnpm design-facts:sync`, `pnpm design-facts:check`, and the federation check, then read back sync receipts. No synchronization success is claimed.
+
+### Slice 2D Chinese Localization
+
+受保护的 `retry_federation_audit_finalization` MCP 维护工具通过可审计的联邦包装器调用审计修复。它要求 `asset:read`、`asset:write` 和 `governance:run` 权限、精确的应用服务 Scope 授权，以及与请求 Scope 完全匹配的持久化审计 Scope；无 Scope 或跨 Scope 的审计 ID 会安全拒绝。成功后的重复维护调用是幂等的。
+
+**MCP synchronization blocked：** 负责人：SpecForge Architecture。原因：当前环境缺少 `DATABASE_URL`、`SPECFORGE_APPLICATION_SERVICE_ID` 和 `SPECFORGE_SCOPE_PATH`。重试触发条件：配置 PostgreSQL 和精确 Scope 变量，运行 `pnpm design-facts:sync`、`pnpm design-facts:check` 和联邦检查，再回读同步收据。本轮不声明同步成功。
+
 ### 第2C轮中文本地化 / Slice 2C Chinese Localization
 
 成功变更的审计终结写入失败时，系统保留原始成功输出摘要，并写入可恢复的 `SUCCESS_REPAIR_REQUIRED` 标记；`retryFederationAuditFinalization` 可将该标记幂等收敛为 `success`。标记写入失败时仅返回稳定的审计持久化错误，不向客户端暴露数据库细节。

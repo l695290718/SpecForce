@@ -29,3 +29,11 @@ it("maps every baseline decision to a complete repository and MCP record", () =>
 it("includes federated design-fact governance in the baseline", () => {
   expect(manifest.decisions.some((decision) => decision.mcpAdrId === "adr-federated-design-fact-synchronization")).toBe(true);
 });
+
+it("records the blocked federated sync fact with complete English and Chinese overlays", () => {
+  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-federated-design-fact-synchronization") as typeof manifest.decisions[number] & {
+    localizedContent?: { en?: Record<string, unknown>; zh?: Record<string, unknown> };
+  };
+  expect(decision.localizedContent?.en).toEqual(expect.objectContaining({ owner: expect.any(String), reason: expect.any(String), retryTrigger: expect.any(String) }));
+  expect(decision.localizedContent?.zh).toEqual(expect.objectContaining({ owner: expect.any(String), reason: expect.any(String), retryTrigger: expect.any(String) }));
+});

@@ -28,6 +28,8 @@ ADR-0001 through ADR-0006 now contain bilingual reconciliation updates that supe
 
 **MCP synchronization blocked:** Owner: SpecForge Architecture. The configured `DATABASE_URL`, `SPECFORGE_APPLICATION_SERVICE_ID`, and `SPECFORGE_SCOPE_PATH` are unavailable in the current environment.
 
+**中文本地化：** 状态为 MCP 同步受阻；负责人为 SpecForge Architecture；原因是当前环境缺少 `DATABASE_URL` 以及精确 Scope 变量 `SPECFORGE_APPLICATION_SERVICE_ID` 和 `SPECFORGE_SCOPE_PATH`。重试触发条件是配置 PostgreSQL 和精确 Scope，运行 `pnpm design-facts:sync`、`pnpm design-facts:check` 和联邦检查，再回读同步收据。
+
 **Retry trigger:** Configure a reachable PostgreSQL `DATABASE_URL`, then run `pnpm design-facts:sync`, `pnpm design-facts:check`, and `SPECFORGE_APPLICATION_SERVICE_ID=com.huawei.celon.desiner SPECFORGE_SCOPE_PATH=pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner pnpm design-facts:federation:check`.
 
 ### Complete federation integration hardening slice two
