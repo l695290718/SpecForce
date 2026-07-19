@@ -356,7 +356,88 @@ describe("synchronizeDesignFacts", () => {
     }));
   });
 
-  it("merges supported manifest audit overlays and emits the sixth VALIDATES link", async () => {
+  it("rejects unsupported localization overlays and canonical title overrides", async () => {
+    const callTool = vi.fn().mockResolvedValue({ ok: true });
+    await expect(synchronizeDesignFacts({
+      callTool,
+      manifest: {
+        decisions: [{
+          ...federatedDecision,
+          localizedContent: { en: { status: "must fail" }, zh: { status: "must fail" } }
+        }]
+      },
+      readAdr: async () => ({ title: "Federated Design-Fact Synchronization", english: federatedEnglishAdr, chinese: federatedChineseAdr }),
+      readExisting: async () => undefined
+    })).rejects.toThrow("DESIGN_FACT_LOCALIZATION_KEY_UNSUPPORTED: adr-federated-design-fact-synchronization:en.status");
+
+    await expect(synchronizeDesignFacts({
+      callTool,
+      manifest: {
+        decisions: [{
+          ...federatedDecision,
+          localizedContent: { en: { title: "Unsupported caller title" }, zh: { title: "Unsupported caller title" } }
+        }]
+      },
+      readAdr: async () => ({ title: "Federated Design-Fact Synchronization", english: federatedEnglishAdr, chinese: federatedChineseAdr }),
+      readExisting: async () => undefined
+    })).rejects.toThrow("DESIGN_FACT_LOCALIZATION_CANONICAL_OVERRIDE");
+  });
+
+  it("merges validator-supported bilingual contract overlays and emits the sixth VALIDATES link", async () => {
+    const callTool = vi.fn().mockResolvedValue({ ok: true });
+    const evidence = Array.from({ length: 6 }, (_, index) => ({ command: `node test-${index + 1}`, result: `result-${index + 1}` }));
+    await synchronizeDesignFacts({
+      callTool,
+      manifest: {
+        decisions: [{
+          ...federatedDecision,
+          evidence,
+          status: "MCP synchronization blocked",
+          owner: "SpecForge Architecture",
+          reason: "DATABASE_URL and exact Scope are unavailable.",
+          retryTrigger: "Configure PostgreSQL and exact Scope, then run sync and read back.",
+          auditFailureCode: "FEDERATION_TOOL_ERROR",
+          auditDiagnosticReference: "diagnosticRef=<64-hex SHA-256 digest>",
+          auditSecurityContract: "Raw exceptions and credential text are never persisted.",
+          localizedContent: {
+            en: {
+              decision: "Audit failure contract: FEDERATION_TOOL_ERROR with diagnosticRef=<64-hex SHA-256 digest>; raw exceptions and credential text are never persisted.",
+              constraints: ["MCP synchronization blocked. Owner: SpecForge Architecture. Reason: DATABASE_URL and exact Scope are unavailable. Retry trigger: configure PostgreSQL and exact Scope, run design-facts:sync, design-facts:check, federation check, then read back receipts."]
+            },
+            zh: {
+              decision: "审计失败合同：FEDERATION_TOOL_ERROR 及 diagnosticRef=SHA-256 摘要；不得持久化原始异常或凭据文本。",
+              constraints: ["MCP 同步受阻。负责人：SpecForge Architecture。原因：缺少 DATABASE_URL 和精确 Scope。重试触发：配置 PostgreSQL 和精确 Scope，运行 design-facts:sync、design-facts:check、联邦检查，然后读回回执。"]
+            }
+          }
+        }]
+      },
+      readAdr: async () => ({ title: "Federated Design-Fact Synchronization", english: federatedEnglishAdr, chinese: federatedChineseAdr }),
+      readExisting: async () => undefined
+    });
+
+    const adrCall = callTool.mock.calls.find(([name]) => name === "create_adr");
+    const adr = adrCall?.[1]?.adr as { title: string; decision: string; constraints: string[]; localizedContent: { en: Record<string, unknown>; zh: Record<string, unknown> } };
+    expect(adr.title).toBe("Federated Design-Fact Synchronization");
+    expect(adr.decision).toContain("FEDERATION_TOOL_ERROR");
+    expect(adr.constraints[0]).toContain("MCP synchronization blocked");
+    expect(adr.localizedContent.en.decision).toContain("raw exceptions and credential text are never persisted");
+    expect(adr.localizedContent.zh.decision).toContain("不得持久化原始异常或凭据文本");
+    expect(Object.keys(adr.localizedContent.en).sort()).toEqual(["alternatives", "consequences", "constraints", "context", "decision", "description", "name", "title"]);
+    expect(Object.keys(adr.localizedContent.zh).sort()).toEqual(["alternatives", "consequences", "constraints", "context", "decision", "description", "name", "title"]);
+    expect(() => validateAssetLocalization("adr", adr as unknown as Asset)).not.toThrow();
+
+    expect(callTool).toHaveBeenCalledWith("link_assets", expect.objectContaining({
+      sourceType: "evidence",
+      sourceId: "evidence-adr-federated-design-fact-synchronization-6",
+      targetType: "adr",
+      targetId: federatedDecision.mcpAdrId,
+      relationType: "VALIDATES",
+      architectureScope: scope
+    }));
+  });
+
+  /* Legacy unsupported manifest overlay fixture retained in Slice 3D history.
+  it.skip("legacy unsupported manifest overlay fixture", async () => {
     const callTool = vi.fn().mockResolvedValue({ ok: true });
     const evidence = Array.from({ length: 6 }, (_, index) => ({ command: `node test-${index + 1}`, result: `result-${index + 1}` }));
     await synchronizeDesignFacts({
@@ -422,5 +503,5 @@ describe("synchronizeDesignFacts", () => {
       relationType: "VALIDATES",
       architectureScope: scope
     }));
-  });
+  }); */
 });

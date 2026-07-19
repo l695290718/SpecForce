@@ -12,9 +12,16 @@ export interface DesignFactManifestDecision {
   contextPackId: string;
   relatedAssetIds: string[];
   evidence: Array<{ command: string; result: string }>;
+  status?: string;
+  owner?: string;
+  reason?: string;
+  retryTrigger?: string;
+  auditFailureCode?: string;
+  auditDiagnosticReference?: string;
+  auditSecurityContract?: string;
   localizedContent?: {
-    en: Record<string, string>;
-    zh: Record<string, string>;
+    en: Record<string, string | string[]>;
+    zh: Record<string, string | string[]>;
   };
 }
 
@@ -58,14 +65,18 @@ interface ParsedAdr {
 }
 
 const supportedManifestLocalizedFields = new Set([
-  "status",
-  "owner",
-  "reason",
-  "retryTrigger",
-  "auditFailureCode",
-  "auditDiagnosticReference",
-  "auditSecurityContract"
+  "name",
+  "title",
+  "description",
+  "context",
+  "decision",
+  "alternatives",
+  "consequences",
+  "constraints"
 ]);
+
+const canonicalStringFields = new Set(["name", "title", "description", "context", "decision"]);
+const canonicalArrayFields = new Set(["alternatives", "consequences", "constraints"]);
 
 export async function synchronizeDesignFacts(input: {
   callTool: CallTool;
@@ -253,23 +264,25 @@ function assertDecision(decision: DesignFactManifestDecision): void {
 
 function buildAdr(decision: DesignFactManifestDecision, parsed: ParsedAdr) {
   const now = new Date().toISOString();
+  const localizedContent = mergeAdrLocalizedContent(decision, parsed);
+  const english = localizedContent.en;
   return {
     id: decision.mcpAdrId,
-    name: parsed.en.title,
-    title: parsed.en.title,
-    description: parsed.en.description,
+    name: english.name,
+    title: english.title,
+    description: english.description,
     status: "accepted",
-    context: parsed.en.context,
-    decision: parsed.en.decision,
-    alternatives: parsed.en.alternatives,
-    consequences: parsed.en.consequences,
-    constraints: parsed.en.constraints,
+    context: english.context,
+    decision: english.decision,
+    alternatives: english.alternatives,
+    consequences: english.consequences,
+    constraints: english.constraints,
     evidence: parsed.en.evidence,
     relatedAssets: decision.relatedAssetIds.map((id) => assetRefFor(id)),
-    owner: "SpecForge Architecture",
+    owner: decision.owner ?? "SpecForge Architecture",
     createdAt: now,
     updatedAt: now,
-    localizedContent: mergeAdrLocalizedContent(decision, parsed)
+    localizedContent
   };
 }
 
@@ -297,14 +310,35 @@ function mergeAdrLocalizedContent(decision: DesignFactManifestDecision, parsed: 
     }
   };
   return {
-    en: { ...canonical.en, ...supportedManifestOverlay(decision.localizedContent?.en) },
-    zh: { ...canonical.zh, ...supportedManifestOverlay(decision.localizedContent?.zh) }
+    en: { ...canonical.en, ...supportedManifestOverlay(decision.id, "en", decision.localizedContent?.en, canonical.en) },
+    zh: { ...canonical.zh, ...supportedManifestOverlay(decision.id, "zh", decision.localizedContent?.zh, canonical.zh) }
   };
 }
 
-function supportedManifestOverlay(value: Record<string, string> | undefined): Record<string, string> {
+function supportedManifestOverlay(
+  decisionId: string,
+  locale: "en" | "zh",
+  value: Record<string, string | string[]> | undefined,
+  canonical: Record<string, string | string[]>
+): Record<string, string | string[]> {
   if (!value) return {};
-  return Object.fromEntries(Object.entries(value).filter(([key]) => supportedManifestLocalizedFields.has(key)));
+  const overlay: Record<string, string | string[]> = {};
+  for (const [key, candidate] of Object.entries(value)) {
+    if (!supportedManifestLocalizedFields.has(key)) {
+      throw new Error(`DESIGN_FACT_LOCALIZATION_KEY_UNSUPPORTED: ${decisionId}:${locale}.${key}`);
+    }
+    if (canonicalStringFields.has(key) && typeof candidate !== "string") {
+      throw new Error(`DESIGN_FACT_LOCALIZATION_VALUE_INVALID: ${decisionId}:${locale}.${key}`);
+    }
+    if (canonicalArrayFields.has(key) && (!Array.isArray(candidate) || candidate.some((item) => typeof item !== "string"))) {
+      throw new Error(`DESIGN_FACT_LOCALIZATION_VALUE_INVALID: ${decisionId}:${locale}.${key}`);
+    }
+    if ((key === "name" || key === "title" || key === "description" || key === "context") && candidate !== canonical[key]) {
+      throw new Error(`DESIGN_FACT_LOCALIZATION_CANONICAL_OVERRIDE: ${decisionId}:${locale}.${key}`);
+    }
+    overlay[key] = candidate;
+  }
+  return overlay;
 }
 
 function parseAdrSource(source: AdrSource): ParsedAdr {

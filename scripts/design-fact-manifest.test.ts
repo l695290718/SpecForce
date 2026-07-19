@@ -30,22 +30,25 @@ it("includes federated design-fact governance in the baseline", () => {
   expect(manifest.decisions.some((decision) => decision.mcpAdrId === "adr-federated-design-fact-synchronization")).toBe(true);
 });
 
-it("records the blocked federated sync fact with complete English and Chinese overlays", () => {
-  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-federated-design-fact-synchronization") as typeof manifest.decisions[number] & {
-    localizedContent?: { en?: Record<string, unknown>; zh?: Record<string, unknown> };
-  };
-  expect(decision.localizedContent?.en).toEqual(expect.objectContaining({ owner: expect.any(String), reason: expect.any(String), retryTrigger: expect.any(String) }));
-  expect(decision.localizedContent?.zh).toEqual(expect.objectContaining({ owner: expect.any(String), reason: expect.any(String), retryTrigger: expect.any(String) }));
+it("records the blocked federated sync fact with canonical metadata and valid bilingual ADR overlays", () => {
+  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-federated-design-fact-synchronization") as typeof manifest.decisions[number];
+  expect(decision.status).toBe("MCP synchronization blocked");
+  expect(decision.owner).toBe("SpecForge Architecture");
+  expect(decision.reason).toContain("DATABASE_URL");
+  expect(decision.retryTrigger).toContain("design-facts:sync");
+  expect(decision.auditFailureCode).toBe("FEDERATION_TOOL_ERROR");
+  expect(decision.auditDiagnosticReference).toContain("64-hex SHA-256");
+  expect(decision.auditSecurityContract).toContain("raw exceptions");
   expect(decision.localizedContent?.en).toEqual(expect.objectContaining({
-    auditFailureCode: "FEDERATION_TOOL_ERROR",
-    auditDiagnosticReference: expect.stringContaining("64-hex SHA-256"),
-    auditSecurityContract: expect.stringContaining("raw exceptions")
+    decision: expect.stringContaining("FEDERATION_TOOL_ERROR"),
+    constraints: expect.arrayContaining([expect.stringContaining("MCP synchronization blocked")])
   }));
   expect(decision.localizedContent?.zh).toEqual(expect.objectContaining({
-    auditFailureCode: "FEDERATION_TOOL_ERROR",
-    auditDiagnosticReference: expect.stringContaining("64 位十六进制"),
-    auditSecurityContract: expect.stringContaining("原始异常")
+    decision: expect.stringContaining("FEDERATION_TOOL_ERROR"),
+    constraints: expect.arrayContaining([expect.stringContaining("MCP 同步受阻")])
   }));
+  expect(Object.keys(decision.localizedContent?.en ?? {}).sort()).toEqual(["constraints", "decision"]);
+  expect(Object.keys(decision.localizedContent?.zh ?? {}).sort()).toEqual(["constraints", "decision"]);
   expect(decision.evidence).toHaveLength(6);
   expect(decision.evidence[5]?.command).toContain("apps\\mcp-server\\src\\federation\\tools.test.ts");
   expect(decision.evidence[5]?.result).toContain("raw exception and credential text are absent");
