@@ -12,11 +12,11 @@ The baseline ADR records, matching Proposals, Context Packs, typed ADR-to-asset 
 
 ### Reconcile historical ADR status text
 
-**Status:** Pending.
+**Status:** Complete (locally verified on 2026-07-19).
 
-Update ADR-0001 through ADR-0006 so their MCP Record and Evidence sections distinguish the completed baseline ADR synchronization from still-deferred Proposal, Context Pack, link, and production-runtime work. Keep English canonical text and Chinese overlays aligned.
+ADR-0001 through ADR-0006 now contain bilingual reconciliation updates that supersede historical MCP synchronization deferrals while preserving their real production-runtime and product-capability deferrals.
 
-**Completion evidence:** ADR repository records and their persisted MCP ADR payloads have matching current synchronization status and bilingual content.
+**Completion evidence:** `pnpm design-facts:sync` persists the updated bilingual ADR content and `pnpm design-facts:check` reports all seven baseline decisions verified without missing, mismatched, out-of-scope, or blocked facts.
 
 ## Enterprise Impact Analysis
 

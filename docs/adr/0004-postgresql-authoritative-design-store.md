@@ -90,6 +90,14 @@ PostgreSQL 是所选应用服务范围内的事务权威存储。MCP、解析器
 - `pnpm --filter @specforge/mcp-server smoke` — 在配置的数据库可用时，本地 MCP 冒烟路径验证有范围读取、持久化写入、图资源和关系证据。
 - `prisma/schema.prisma` — Prisma 配置的提供程序是 PostgreSQL，模型包含持久化资产以及关系或投影记录。
 
+## Reconciliation Update (2026-07-19)
+
+This update supersedes earlier baseline-governance synchronization deferrals. The ADR, matching Proposal/Context Pack, typed links, and Evidence are persisted and read back through MCP in the exact Designer scope. Production-scale operational hardening and explicitly authorized cross-service comparison remain deferred.
+
+### 对账更新（2026-07-19）
+
+本更新覆盖此前基线治理同步延期的描述。ADR、关联 Proposal/Context Pack、类型化关系和 Evidence 现已在精确 Designer Scope 中通过 MCP 持久化并回读。生产级运维加固和经明确授权的跨服务比较仍保持延期。
+
 ## MCP Record
 
 - Matching MCP ADR ID: `adr-postgresql-authoritative-design-store`

@@ -86,6 +86,14 @@ The write contract is centralized and auditable, and agent and human paths conve
 - `rg -n "createAdr|upsert.*Proposal|upsert.*Context|link_assets|architectureScope" apps/mcp-server/src`：本地检查 MCP 优先的写入边界。
 - 本 ADR 的生产 MCP 写入和回读：延期，不声称已验证。
 
+## Reconciliation Update (2026-07-19)
+
+This update supersedes earlier statements that MCP persistence or read-back for this baseline ADR was deferred. The ADR, matching Proposal/Context Pack, typed links, and Evidence are now synchronized and verified through MCP in the exact Designer scope. Real AI-provider model execution remains outside this completed governance baseline.
+
+### 对账更新（2026-07-19）
+
+本更新覆盖此前将本基线 ADR 的 MCP 持久化或回读标记为延期的描述。ADR、关联 Proposal/Context Pack、类型化关系和 Evidence 现已在精确 Designer Scope 中通过 MCP 同步并验证。真实 AI Provider 模型执行仍不属于本次已完成的治理基线。
+
 ## MCP Record
 
 - **MCP ADR ID:** `adr-mcp-first-architecture` (existing stable ID supplied for this decision).

@@ -93,6 +93,14 @@ The system gains predictable isolation, consistent authorization, and auditable 
 - `pnpm exec vitest run packages/core/src/__tests__/mcp-services.test.ts`：同样因缺少该二进制而在测试启动前阻塞。
 - `git log --oneline --all -- apps/web/lib/scope.ts apps/mcp-server/src/tools.ts apps/mcp-server/src/persistence.ts`：当前仓库包含对应实现历史。
 
+## Reconciliation Update (2026-07-19)
+
+This update supersedes earlier statements that this ADR, its matching Proposal/Context Pack, typed links, or evidence were deferred solely because MCP synchronization had not run. The baseline record is now persisted and read back through MCP in its exact Designer scope. Cross-service aggregation and production identity/authorization remain deferred.
+
+### 对账更新（2026-07-19）
+
+本更新覆盖此前仅因未执行 MCP 同步而将本 ADR、关联 Proposal/Context Pack、类型化关系或证据标记为延期的描述。基线记录现已在精确 Designer Scope 中通过 MCP 持久化并回读验证。跨服务聚合和生产身份/授权仍保持延期。
+
 ## MCP Record
 
 - **MCP ADR ID:** `adr-application-service-scope-isolation`

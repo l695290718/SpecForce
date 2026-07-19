@@ -59,6 +59,14 @@ Tradeoffs:
 - **Locally verified when enabled:** `packages/graph-store/src/postgres.integration.test.ts` creates a disposable schema and exercises the PostgreSQL graph-store contract when `SPECFORGE_PG_INTEGRATION=1` and `DATABASE_URL` are present.
 - **Deferred:** `docs/TODO.md` records the NebulaGraph 3.8.0 projection path, idempotent outbox projector, checkpointing, retry handling, and graph health telemetry as future work.
 
+## Reconciliation Update (2026-07-19)
+
+This update supersedes earlier baseline-governance synchronization deferrals. The ADR, matching Proposal/Context Pack, typed links, and Evidence are now synchronized and read back through MCP in the exact Designer scope. Production projector deployment and end-to-end NebulaGraph runtime verification remain deferred.
+
+### 对账更新（2026-07-19）
+
+本更新覆盖此前基线治理同步延期的描述。ADR、关联 Proposal/Context Pack、类型化关系和 Evidence 现已在精确 Designer Scope 中通过 MCP 同步并回读。生产投影器部署和端到端 NebulaGraph 运行时验证仍保持延期。
+
 ## MCP Record
 
 - Matching MCP ADR ID: `adr-transactional-outbox-graph-projection`

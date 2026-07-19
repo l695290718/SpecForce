@@ -98,6 +98,14 @@ Keep `PostgresGraphStore` as the local, development, test, and small-installatio
 - `docs/TODO.md` — 记录 NebulaGraph 3.8.0 Go 客户端、拓扑、集成和冒烟套件的延期工作。
 - 没有本地证据证明正在运行的 NebulaGraph 3.8.0 集群或官方客户端兼容性；这些能力仍然延期。
 
+## Reconciliation Update (2026-07-19)
+
+This update supersedes the prior statement that MCP synchronization for this ADR was blocked. The ADR, matching Proposal/Context Pack, typed links, and Evidence are now synchronized and read back in the exact Designer scope. NebulaGraph 3.8.0 production projection, official-client compatibility, topology, and enterprise capacity evidence remain deferred.
+
+### 对账更新（2026-07-19）
+
+本更新覆盖此前本 ADR 的 MCP 同步受阻描述。ADR、关联 Proposal/Context Pack、类型化关系和 Evidence 现已在精确 Designer Scope 中同步并回读。NebulaGraph 3.8.0 生产投影、官方客户端兼容性、部署拓扑和企业容量证据仍保持延期。
+
 ## MCP Record
 
 - Matching MCP ADR ID: `adr-nebulagraph-derived-impact-runtime`

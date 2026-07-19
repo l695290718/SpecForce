@@ -86,6 +86,14 @@ Canonical comparisons, synchronization, and agent consumption remain determinist
 - `pnpm exec vitest run apps/web/lib/__tests__/assets-scope.test.ts`：因当前工作区缺少 `vitest`，测试在启动前阻塞。
 - `rg -n "localized|locale|canonical|bilingual" apps/mcp-server/src packages/core/src apps/web/lib`：本地检查规范字段和覆盖内容的处理。
 
+## Reconciliation Update (2026-07-19)
+
+This update supersedes earlier statements that focused bilingual verification could not run or that MCP persistence/read-back for this baseline ADR was deferred. The baseline design facts are now synchronized and verified through MCP in the exact Designer scope. Translation workflow automation and locales beyond English and Chinese remain deferred.
+
+### 对账更新（2026-07-19）
+
+本更新覆盖此前关于双语验证无法运行、或本基线 ADR 的 MCP 持久化/回读延期的描述。基线设计事实现已在精确 Designer Scope 中通过 MCP 同步并验证。翻译工作流自动化以及英中以外语种仍保持延期。
+
 ## MCP Record
 
 - **MCP ADR ID:** `adr-canonical-english-localized-overlay` (existing stable ID supplied for this decision).
