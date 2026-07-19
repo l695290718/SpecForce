@@ -17,11 +17,6 @@ const persistence = vi.hoisted(() => ({
   upsertContextPack: vi.fn(),
   upsertDesignAsset: vi.fn(),
   upsertProposal: vi.fn(),
-  readableScope: vi.fn((applicationServiceId: string) => {
-    if (applicationServiceId === designerScope.applicationServiceId) return designerScope;
-    if (applicationServiceId === siblingScope.applicationServiceId) return siblingScope;
-    throw new Error("Scope read is not authorized.");
-  }),
   resolveWritableScope: vi.fn((_actor: unknown, scope: ArchitectureScope) => {
     const registered = scope.applicationServiceId === designerScope.applicationServiceId
       ? designerScope
@@ -31,8 +26,8 @@ const persistence = vi.hoisted(() => ({
     if (!registered || registered.scopePath !== scope.scopePath) throw new Error("Scope write is not authorized.");
     return registered;
   }),
-  writableActor: vi.fn(() => ({ actorType: "agent", actorId: "local-mcp-agent", grants: [] })),
   prisma: {
+    auditLog: { create: vi.fn() },
     connectorInstance: { findMany: vi.fn() },
     federationOutbox: { count: vi.fn() },
     sourceObservation: { count: vi.fn() },
@@ -60,9 +55,18 @@ type ArchitectureScope = {
   scopePath: string;
 };
 
+type ToolExtra = {
+  authInfo?: {
+    token: string;
+    clientId: string;
+    scopes: string[];
+    extra?: Record<string, unknown>;
+  };
+};
+
 type RegisteredTool = {
   config: Record<string, unknown>;
-  handler: (input: unknown) => Promise<{ isError?: boolean; content: Array<{ type: string; text: string }> }>;
+  handler: (input: unknown, extra?: ToolExtra) => Promise<{ isError?: boolean; content: Array<{ type: string; text: string }> }>;
 };
 
 const designerScope = {
@@ -81,6 +85,41 @@ const connector = {
   secretReference: "secret://designer"
 } as const;
 
+const authorizedExtra: ToolExtra = {
+  authInfo: {
+    token: "test-token",
+    clientId: "test-client",
+    scopes: ["governance:run"],
+    extra: {
+      actor: {
+        actorType: "agent",
+        actorId: "caller-agent",
+        grants: [
+          { scopeId: designerScope.applicationServiceId, action: "read" },
+          { scopeId: designerScope.applicationServiceId, action: "write" }
+        ],
+        permissions: ["governance:run"]
+      }
+    }
+  }
+};
+
+const readOnlyExtra: ToolExtra = {
+  authInfo: {
+    token: "read-token",
+    clientId: "read-client",
+    scopes: [],
+    extra: {
+      actor: {
+        actorType: "user",
+        actorId: "read-only-user",
+        grants: [{ scopeId: designerScope.applicationServiceId, action: "read" }],
+        permissions: []
+      }
+    }
+  }
+};
+
 function captureToolsWithFederationRegistration(): Map<string, RegisteredTool> {
   const tools = new Map<string, RegisteredTool>();
   const server = {
@@ -93,10 +132,10 @@ function captureToolsWithFederationRegistration(): Map<string, RegisteredTool> {
   return tools;
 }
 
-async function callTool(name: string, input: unknown) {
+async function callTool(name: string, input: unknown, extra: ToolExtra = authorizedExtra) {
   const tool = captureToolsWithFederationRegistration().get(name);
   if (!tool) throw new Error(`Tool not registered: ${name}`);
-  return tool.handler(input);
+  return tool.handler(input, extra);
 }
 
 function errorCode(result: { content: Array<{ text: string }> }): string | undefined {
@@ -110,6 +149,7 @@ beforeEach(() => {
   federationPersistence.promoteCandidate.mockResolvedValue({ id: "fact-1", status: "PROMOTED", architectureScope: designerScope });
   federationPersistence.createDesignChangeSession.mockResolvedValue({ id: "session-1", architectureScope: designerScope });
   federationPersistence.reconcilePersistedScope.mockResolvedValue({ architectureScope: designerScope, root: "root-1", status: "CONVERGED", issues: [], factDigests: [] });
+  persistence.prisma.auditLog.create.mockResolvedValue({ id: "audit-1" });
   persistence.prisma.connectorInstance.findMany.mockResolvedValue([{ id: connector.id, status: "ACTIVE", applicationServiceId: designerScope.applicationServiceId, scopePath: designerScope.scopePath }]);
   persistence.prisma.federationOutbox.count.mockResolvedValue(2);
   persistence.prisma.sourceObservation.count.mockResolvedValue(1);
@@ -156,6 +196,47 @@ describe("federation MCP tools", () => {
 
     expect(result.isError).not.toBe(true);
     expect(federationPersistence.registerConnector).toHaveBeenCalledWith({ ...connector, status: "ACTIVE", architectureScope: designerScope });
+    expect(persistence.resolveWritableScope).toHaveBeenCalledWith(expect.objectContaining({ actorId: "caller-agent" }), designerScope);
+  });
+
+  it("denies a connector write when the caller has only a read grant", async () => {
+    const result = await callTool("register_connector", { ...connector, architectureScope: designerScope }, readOnlyExtra);
+
+    expect(result.isError).toBe(true);
+    expect(errorCode(result)).toBe("PERMISSION_DENIED");
+    expect(federationPersistence.registerConnector).not.toHaveBeenCalled();
+  });
+
+  it("denies reconciliation when governance permission is absent", async () => {
+    const result = await callTool("reconcile_federated_scope", { architectureScope: designerScope }, readOnlyExtra);
+
+    expect(result.isError).toBe(true);
+    expect(errorCode(result)).toBe("PERMISSION_DENIED");
+    expect(federationPersistence.reconcilePersistedScope).not.toHaveBeenCalled();
+  });
+
+  it("writes a durable success audit event with the authenticated caller", async () => {
+    await callTool("register_connector", { ...connector, architectureScope: designerScope });
+
+    expect(persistence.prisma.auditLog.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      actorType: "agent",
+      actorId: "caller-agent",
+      channel: "mcp",
+      action: "register_connector",
+      status: "success"
+    }) });
+  });
+
+  it("writes a durable failure audit event for a denied caller", async () => {
+    await callTool("register_connector", { ...connector, architectureScope: designerScope }, readOnlyExtra);
+
+    expect(persistence.prisma.auditLog.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      actorType: "user",
+      actorId: "read-only-user",
+      action: "register_connector",
+      status: "failed",
+      errorMessage: expect.stringContaining("PERMISSION_DENIED")
+    }) });
   });
 
   it("derives a candidate observation envelope before routing its write through federation persistence", async () => {
@@ -202,6 +283,20 @@ describe("federation MCP tools", () => {
 
     expect(result.isError).toBe(true);
     expect(errorCode(result)).toBe("IDENTITY_CONFLICT");
+  });
+
+  it("hides unknown runtime details from clients while retaining them in durable audit diagnostics", async () => {
+    federationPersistence.registerConnector.mockRejectedValueOnce(new Error("database password leaked"));
+
+    const result = await callTool("register_connector", { ...connector, architectureScope: designerScope });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]!.text).not.toContain("database password leaked");
+    expect(errorCode(result)).toBe("FEDERATION_TOOL_ERROR");
+    expect(persistence.prisma.auditLog.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      status: "failed",
+      errorMessage: "database password leaked"
+    }) });
   });
 
   it("normalizes authority policy failures to the stable authority conflict code", async () => {

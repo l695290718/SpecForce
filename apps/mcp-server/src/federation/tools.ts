@@ -1,11 +1,9 @@
-import { contentDigest, type ArchitectureScopeRef, type ConnectorCapability, type FederatedFactEnvelope, type Permission } from "@specforge/core";
+import { contentDigest, hasScopeAccess, scopeById, type ArchitectureScopeRef, type ConnectorCapability, type FederatedFactEnvelope, type Permission, type ScopedActor } from "@specforge/core";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { auditToolCall } from "../audit";
-import { allowAllPolicy, getDefaultActor } from "../auth";
-import { prisma, readableScope, resolveWritableScope, writableActor } from "../persistence";
+import { prisma, resolveWritableScope } from "../persistence";
 import {
   createDesignChangeSession,
   promoteCandidate,
@@ -46,7 +44,19 @@ const federatedFactSchema = z.object({
   designChangeSessionId: z.string().optional()
 });
 
-type ToolHandler<T> = (input: T) => Promise<unknown>;
+type FederationRequestExtra = {
+  authInfo?: {
+    clientId: string;
+    scopes?: string[];
+    extra?: Record<string, unknown>;
+  };
+};
+
+type FederationCaller = ScopedActor & {
+  permissions: Permission[];
+};
+
+type ToolHandler<T> = (input: T, caller: FederationCaller) => Promise<unknown>;
 
 class FederationToolError extends Error {
   constructor(readonly code: string, message = code) {
@@ -60,23 +70,56 @@ function textResult(value: unknown): CallToolResult {
 
 function errorResult(error: unknown): CallToolResult {
   const code = errorCode(error);
-  const message = error instanceof Error ? error.message : "Unknown federation tool error";
-  return { isError: true, content: [{ type: "text", text: JSON.stringify({ error: { code, message } }) }] };
+  return { isError: true, content: [{ type: "text", text: JSON.stringify({ error: { code, message: safeClientMessage(code) } }) }] };
 }
+
+const stableErrorCodes = new Set([
+  "AUTHENTICATION_REQUIRED",
+  "AUTHORITY_CONFLICT",
+  "AUTHORITY_MISSING",
+  "AUTHORITY_POLICY_AMBIGUOUS",
+  "CANDIDATE_NOT_FOUND",
+  "CANDIDATE_STATUS_INVALID",
+  "CONNECTOR_NOT_FOUND",
+  "DELIVERY_BLOCKED",
+  "DESIGN_CHANGE_SESSION_SCOPE_MISMATCH",
+  "FEDERATION_TOOL_ERROR",
+  "HUMAN_FACING_REQUIRED",
+  "IDENTITY_CONFLICT",
+  "IDENTITY_MAPPING_INVALID",
+  "IDENTITY_MAPPING_MISSING",
+  "LOCALIZATION_INCOMPLETE",
+  "PERMISSION_DENIED",
+  "POLICY_DISABLED",
+  "SCOPE_MISMATCH"
+]);
 
 function errorCode(error: unknown): string {
   if (error instanceof FederationToolError) return error.code;
   if (error instanceof Error) {
     if (["AUTHORITY_MISSING", "AUTHORITY_POLICY_AMBIGUOUS", "POLICY_DISABLED"].includes(error.message)) return "AUTHORITY_CONFLICT";
     if (["OUTBOX_WRITE_FAILED", "DESIGN_CHANGE_SESSION_SCOPE_MISMATCH"].includes(error.message)) return "DELIVERY_BLOCKED";
-    if (/^[A-Z][A-Z0-9_]+$/.test(error.message)) return error.message;
+    if (stableErrorCodes.has(error.message)) return error.message;
   }
   return "FEDERATION_TOOL_ERROR";
 }
 
-function assertWritableExactScope(scope: ArchitectureScopeRef): ArchitectureScopeRef {
+function safeClientMessage(code: string): string {
+  return {
+    AUTHENTICATION_REQUIRED: "An authenticated MCP caller is required.",
+    AUTHORITY_CONFLICT: "The requested fact has an authority conflict.",
+    DELIVERY_BLOCKED: "Federation delivery is currently blocked.",
+    FEDERATION_TOOL_ERROR: "The federation tool request could not be completed.",
+    IDENTITY_CONFLICT: "The requested fact has an identity conflict.",
+    LOCALIZATION_INCOMPLETE: "The requested fact has incomplete localization.",
+    PERMISSION_DENIED: "The authenticated caller is not authorized for this federation operation.",
+    SCOPE_MISMATCH: "The requested architecture Scope is not authorized.",
+  }[code] ?? "The federation tool request could not be completed.";
+}
+
+function assertWritableExactScope(scope: ArchitectureScopeRef, caller: FederationCaller): ArchitectureScopeRef {
   try {
-    const resolved = resolveWritableScope(writableActor(), scope);
+    const resolved = resolveWritableScope(caller, scope);
     if (resolved.applicationServiceId !== scope.applicationServiceId || resolved.scopePath !== scope.scopePath) {
       throw new FederationToolError("SCOPE_MISMATCH");
     }
@@ -87,15 +130,12 @@ function assertWritableExactScope(scope: ArchitectureScopeRef): ArchitectureScop
   }
 }
 
-function assertReadableExactScope(scope: ArchitectureScopeRef): ArchitectureScopeRef {
-  try {
-    const resolved = readableScope(scope.applicationServiceId);
-    if (resolved.scopePath !== scope.scopePath) throw new FederationToolError("SCOPE_MISMATCH");
-    return resolved;
-  } catch (error) {
-    if (error instanceof FederationToolError) throw error;
+function assertReadableExactScope(scope: ArchitectureScopeRef, caller: FederationCaller): ArchitectureScopeRef {
+  const resolved = scopeById(scope.applicationServiceId);
+  if (!resolved || resolved.level !== "applicationService" || resolved.scopePath !== scope.scopePath || !hasScopeAccess(caller, resolved, "read")) {
     throw new FederationToolError("SCOPE_MISMATCH", "The supplied architectureScope does not match an authorized application-service Scope.");
   }
+  return { applicationServiceId: resolved.id, scopePath: resolved.scopePath };
 }
 
 function federationTarget(name: string, input: Record<string, unknown>) {
@@ -103,6 +143,113 @@ function federationTarget(name: string, input: Record<string, unknown>) {
   if ("candidateId" in input) return { targetType: "federation-candidate", targetId: String(input.candidateId) };
   if ("id" in input) return { targetType: "federation-connector", targetId: String(input.id) };
   return { targetType: "federation-scope", targetId: String((input.architectureScope as ArchitectureScopeRef | undefined)?.applicationServiceId ?? name) };
+}
+
+function requestActor(extra: FederationRequestExtra | undefined): FederationCaller {
+  const claims = extra?.authInfo;
+  const rawClaims = claims?.extra;
+  const rawActor = isRecord(rawClaims?.actor) ? rawClaims.actor : rawClaims;
+  const actorType = rawActor?.actorType;
+  const actorId = rawActor?.actorId ?? rawClaims?.subject ?? claims?.clientId;
+  const grants = rawActor?.grants;
+  if ((actorType !== "agent" && actorType !== "user" && actorType !== "system") || typeof actorId !== "string" || !Array.isArray(grants)) {
+    throw new FederationToolError("AUTHENTICATION_REQUIRED", "MCP authInfo.extra must contain a repository-compatible actor and scope grants.");
+  }
+  const normalizedGrants = grants.filter(isScopeGrant);
+  if (normalizedGrants.length !== grants.length) {
+    throw new FederationToolError("AUTHENTICATION_REQUIRED", "MCP authInfo.extra contains invalid scope grants.");
+  }
+  const permissions = [
+    ...(claims?.scopes ?? []),
+    ...(Array.isArray(rawActor?.permissions) ? rawActor.permissions : [])
+  ].filter(isPermission);
+  return { actorType, actorId, grants: normalizedGrants, permissions: [...new Set(permissions)] };
+}
+
+function auditActor(extra: FederationRequestExtra | undefined): { actorType: FederationCaller["actorType"]; actorId: string } {
+  const claims = extra?.authInfo;
+  const rawClaims = claims?.extra;
+  const rawActor = isRecord(rawClaims?.actor) ? rawClaims.actor : rawClaims;
+  const actorType = rawActor?.actorType;
+  return {
+    actorType: actorType === "user" || actorType === "system" || actorType === "agent" ? actorType : "agent",
+    actorId: typeof rawActor?.actorId === "string" ? rawActor.actorId : claims?.clientId ?? "unauthenticated"
+  };
+}
+
+function authorizeCaller(caller: FederationCaller, permissions: Permission[], input: Record<string, unknown>): void {
+  const scope = input.architectureScope;
+  if (!isArchitectureScope(scope)) throw new FederationToolError("SCOPE_MISMATCH");
+  const registered = scopeById(scope.applicationServiceId);
+  if (!registered || registered.level !== "applicationService" || registered.scopePath !== scope.scopePath) {
+    throw new FederationToolError("SCOPE_MISMATCH");
+  }
+  const requiredAction = permissions.includes("asset:write") ? "write" : "read";
+  if (!hasScopeAccess(caller, registered, requiredAction)) throw new FederationToolError("PERMISSION_DENIED");
+  const nonScopePermissions = permissions.filter((permission) => permission !== "asset:read" && permission !== "asset:write");
+  if (nonScopePermissions.some((permission) => !caller.permissions.includes(permission))) {
+    throw new FederationToolError("PERMISSION_DENIED");
+  }
+}
+
+async function persistFederationAudit(input: {
+  actor: { actorType: FederationCaller["actorType"]; actorId: string };
+  action: string;
+  targetType: string;
+  targetId: string;
+  toolInput: unknown;
+  output: unknown;
+  status: "success" | "failed";
+  errorMessage?: string;
+}): Promise<void> {
+  await prisma.auditLog.create({
+    data: {
+      actorType: input.actor.actorType,
+      actorId: input.actor.actorId,
+      channel: "mcp",
+      action: input.action,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      inputSummary: summarizeAudit(input.toolInput),
+      outputSummary: summarizeAudit(input.output),
+      status: input.status,
+      errorMessage: input.errorMessage
+    }
+  });
+}
+
+function summarizeAudit(value: unknown): string {
+  try {
+    const text = typeof value === "string" ? value : JSON.stringify(value);
+    return (text ?? "").slice(0, 500);
+  } catch {
+    return "[unserializable]";
+  }
+}
+
+function isArchitectureScope(value: unknown): value is ArchitectureScopeRef {
+  return isRecord(value) && typeof value.applicationServiceId === "string" && typeof value.scopePath === "string";
+}
+
+function isScopeGrant(value: unknown): value is ScopedActor["grants"][number] {
+  return isRecord(value) && typeof value.scopeId === "string" && (value.action === "read" || value.action === "write");
+}
+
+function isPermission(value: unknown): value is Permission {
+  return typeof value === "string" && [
+    "asset:read",
+    "asset:write",
+    "proposal:read",
+    "proposal:write",
+    "context-pack:generate",
+    "governance:run",
+    "adr:write",
+    "graph:read"
+  ].includes(value);
+}
+
+function isRecord(value: unknown): value is Record<string, any> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function registerFederationJsonTool<T extends z.ZodRawShape>(
@@ -126,21 +273,26 @@ function registerFederationJsonTool<T extends z.ZodRawShape>(
       },
       _meta: { permissions: config.permissions, write: !config.readOnly }
     } as Parameters<McpServer["registerTool"]>[1],
-    async (input: unknown) => {
-      const actor = getDefaultActor();
+    (async (input: unknown, extra: FederationRequestExtra) => {
       const target = federationTarget(name, input as Record<string, unknown>);
+      const auditIdentity = auditActor(extra);
       try {
-        await allowAllPolicy.authorize(actor, config.permissions);
-        const output = await handler(input as z.output<z.ZodObject<T>>);
-        auditToolCall({ actor, action: name, ...target, toolInput: input, output, status: "success" });
+        const caller = requestActor(extra);
+        authorizeCaller(caller, config.permissions, input as Record<string, unknown>);
+        const output = await handler(input as z.output<z.ZodObject<T>>, caller);
+        await persistFederationAudit({ actor: caller, action: name, ...target, toolInput: input, output, status: "success" });
         return textResult(output);
       } catch (error) {
         const code = errorCode(error);
         const output = { error: { code } };
-        auditToolCall({ actor, action: name, ...target, toolInput: input, output, status: "failed", errorMessage: error instanceof Error ? error.message : String(error) });
+        try {
+          await persistFederationAudit({ actor: auditIdentity, action: name, ...target, toolInput: input, output, status: "failed", errorMessage: error instanceof Error ? error.message : String(error) });
+        } catch (auditError) {
+          console.error(`[specforge-mcp] federation audit persistence failed for ${name}: ${auditError instanceof Error ? auditError.message : String(auditError)}`);
+        }
         return errorResult(error);
       }
-    }
+    }) as Parameters<McpServer["registerTool"]>[2]
   );
 }
 
@@ -158,11 +310,11 @@ export function registerFederationTools(server: McpServer): void {
     },
     permissions: ["asset:write"],
     readOnly: false
-  }, async (input) => registerConnector({
+  }, async (input, caller) => registerConnector({
     ...input,
     capabilities: input.capabilities as ConnectorCapability[],
     status: input.status ?? "ACTIVE",
-    architectureScope: assertWritableExactScope(input.architectureScope)
+    architectureScope: assertWritableExactScope(input.architectureScope, caller)
   }));
 
   registerFederationJsonTool(server, "record_external_observation", {
@@ -180,8 +332,8 @@ export function registerFederationTools(server: McpServer): void {
     },
     permissions: ["asset:write"],
     readOnly: false
-  }, async (input) => {
-    const architectureScope = assertWritableExactScope(input.architectureScope);
+  }, async (input, caller) => {
+    const architectureScope = assertWritableExactScope(input.architectureScope, caller);
     const normalizedDigest = contentDigest(input.payload);
     const identity = `${input.connectorId}:${input.sourceNamespace}:${input.externalAssetType}:${input.externalId}:${input.sourceVersion}:${normalizedDigest}`;
     const observedAt = input.observedAt ?? new Date().toISOString();
@@ -221,9 +373,9 @@ export function registerFederationTools(server: McpServer): void {
     },
     permissions: ["asset:write"],
     readOnly: false
-  }, async (input) => promoteCandidate({
+  }, async (input, caller) => promoteCandidate({
     candidateId: input.candidateId,
-    architectureScope: assertWritableExactScope(input.architectureScope),
+    architectureScope: assertWritableExactScope(input.architectureScope, caller),
     humanFacing: input.humanFacing,
     fieldPath: input.fieldPath,
     fact: input.fact as Omit<FederatedFactEnvelope, "architectureScope" | "status">
@@ -240,14 +392,14 @@ export function registerFederationTools(server: McpServer): void {
     },
     permissions: ["asset:write"],
     readOnly: false
-  }, async (input) => createDesignChangeSession({
+  }, async (input, caller) => createDesignChangeSession({
     id: `design-change-session:${randomUUID()}`,
-    actorId: getDefaultActor().actorId,
+    actorId: caller.actorId,
     intent: input.intent,
     affectedFactIds: input.affectedFactIds,
     expectedEvidenceRefs: input.expectedEvidenceRefs ?? [],
     status: "OPEN",
-    architectureScope: assertWritableExactScope(input.architectureScope)
+    architectureScope: assertWritableExactScope(input.architectureScope, caller)
   }));
 
   registerFederationJsonTool(server, "reconcile_federated_scope", {
@@ -259,8 +411,8 @@ export function registerFederationTools(server: McpServer): void {
     },
     permissions: ["asset:read", "governance:run"],
     readOnly: true
-  }, async (input) => reconcilePersistedScope({
-    architectureScope: assertReadableExactScope(input.architectureScope),
+  }, async (input, caller) => reconcilePersistedScope({
+    architectureScope: assertReadableExactScope(input.architectureScope, caller),
     acceptedFacts: (input.acceptedFacts ?? []) as FederatedFactEnvelope[]
   }));
 
@@ -270,8 +422,8 @@ export function registerFederationTools(server: McpServer): void {
     inputSchema: { architectureScope: architectureScopeSchema },
     permissions: ["asset:read"],
     readOnly: true
-  }, async (input) => {
-    const architectureScope = assertReadableExactScope(input.architectureScope);
+  }, async (input, caller) => {
+    const architectureScope = assertReadableExactScope(input.architectureScope, caller);
     const [connectors, pendingDelivery, conflicts, latestReconciliation] = await Promise.all([
       prisma.connectorInstance.findMany({ where: architectureScope, orderBy: { id: "asc" } }),
       prisma.federationOutbox.count({ where: { ...architectureScope, status: "PENDING" } }),
