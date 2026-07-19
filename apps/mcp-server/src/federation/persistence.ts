@@ -128,23 +128,32 @@ export async function recordObservation(input: RecordObservationInput): Promise<
 export async function promoteCandidate(input: PromoteCandidateInput): Promise<FederatedFactEnvelope> {
   const scope = writableScope(input.architectureScope);
   if (typeof input.humanFacing !== "boolean") throw new Error("HUMAN_FACING_REQUIRED");
-  const candidate = await prisma.sourceObservation.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.candidateId } } });
+  return prisma.$transaction((transaction) => promoteCandidateInTransaction(transaction as Prisma.TransactionClient, input, scope));
+}
+
+async function promoteCandidateInTransaction(transaction: Prisma.TransactionClient, input: PromoteCandidateInput, scope: ArchitectureScopeRef): Promise<FederatedFactEnvelope> {
+  await transaction.$executeRawUnsafe(
+    "SELECT pg_advisory_xact_lock(hashtext($1))",
+    promotionLockKey(scope, input.fact.id)
+  );
+
+  const candidate = await transaction.sourceObservation.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.candidateId } } });
   if (!candidate) {
-    const candidateInAnotherScope = await prisma.sourceObservation.findFirst({ where: { id: input.candidateId } });
+    const candidateInAnotherScope = await transaction.sourceObservation.findFirst({ where: { id: input.candidateId } });
     if (candidateInAnotherScope) throw new Error("SCOPE_MISMATCH");
     throw new Error("CANDIDATE_NOT_FOUND");
   }
   if (candidate.status !== "CANDIDATE") throw new Error("CANDIDATE_STATUS_INVALID");
   const mappingIdentity = { connectorId: candidate.connectorId, sourceNamespace: candidate.sourceNamespace, externalAssetType: candidate.externalAssetType, externalId: candidate.externalId };
-  const mapping = await prisma.externalIdentityMapping.findUnique({ where: { applicationServiceId_scopePath_connectorId_sourceNamespace_externalAssetType_externalId: { ...scope, ...mappingIdentity } } });
+  const mapping = await transaction.externalIdentityMapping.findUnique({ where: { applicationServiceId_scopePath_connectorId_sourceNamespace_externalAssetType_externalId: { ...scope, ...mappingIdentity } } });
   if (!mapping) {
-    const mappingInAnotherScope = await prisma.externalIdentityMapping.findFirst({ where: mappingIdentity });
+    const mappingInAnotherScope = await transaction.externalIdentityMapping.findFirst({ where: mappingIdentity });
     if (mappingInAnotherScope) throw new Error("SCOPE_MISMATCH");
     throw new Error("IDENTITY_MAPPING_MISSING");
   }
   if (mapping.applicationServiceId !== scope.applicationServiceId || mapping.scopePath !== scope.scopePath) throw new Error("SCOPE_MISMATCH");
   if (mapping.assetType !== input.fact.assetType || (mapping.assetId && mapping.assetId !== input.fact.id)) throw new Error("IDENTITY_MAPPING_INVALID");
-  const policies = await prisma.authorityPolicy.findMany({ where: { ...scope, assetType: input.fact.assetType, fieldPath: input.fieldPath ?? "$" } });
+  const policies = await transaction.authorityPolicy.findMany({ where: { ...scope, assetType: input.fact.assetType, fieldPath: input.fieldPath ?? "$" } });
   if (policies.length > 1) throw new Error("AUTHORITY_POLICY_AMBIGUOUS");
   const policy = policies[0];
   const decision = evaluateObservation({
@@ -161,14 +170,14 @@ export async function promoteCandidate(input: PromoteCandidateInput): Promise<Fe
     status: "PROMOTED",
     provenance: { ...input.fact.provenance, connectorInstanceId: candidate.connectorId, observedAt: candidate.observedAt.toISOString() }
   };
-  const previousPromotedRows = await prisma.sourceObservation.findMany({ where: { ...scope, status: "PROMOTED" } });
+  const previousPromotedRows = await transaction.sourceObservation.findMany({ where: { ...scope, status: "PROMOTED" } });
   for (const previousRow of previousPromotedRows) {
     const previousFact = persistedCanonicalFact(previousRow.payload);
     if (previousFact?.id === promotedFact.id) {
-      await prisma.sourceObservation.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: previousRow.id } }, data: { status: "TOMBSTONED" } });
+      await transaction.sourceObservation.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: previousRow.id } }, data: { status: "TOMBSTONED" } });
     }
   }
-  await prisma.sourceObservation.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.candidateId } }, data: { status: "PROMOTED", payload: json(promotedFact) } });
+  await transaction.sourceObservation.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.candidateId } }, data: { status: "PROMOTED", payload: json(promotedFact) } });
   return promotedFact;
 }
 
@@ -190,7 +199,7 @@ export async function appendFederationOutbox(input: AppendFederationOutboxInput)
 export async function reconcilePersistedScope(input: ReconcilePersistedScopeInput): Promise<ReconciliationReport> {
   const scope = readableExactScope(input.architectureScope);
   const [observations, mappings] = await Promise.all([
-    prisma.sourceObservation.findMany({ where: { ...scope, status: "PROMOTED" } }),
+    prisma.sourceObservation.findMany({ where: { ...scope, status: { not: "TOMBSTONED" } } }),
     prisma.externalIdentityMapping.findMany({ where: scope })
   ]);
   const report = reconcileFacts({
@@ -237,6 +246,10 @@ function readableExactScope(scope: ArchitectureScopeRef): ArchitectureScopeRef {
   const readable = readableScope(scope.applicationServiceId);
   if (readable.scopePath !== scope.scopePath) throw new Error("SCOPE_MISMATCH");
   return readable;
+}
+
+function promotionLockKey(scope: ArchitectureScopeRef, factId: string): string {
+  return `${scope.applicationServiceId}|${scope.scopePath}|${factId}`;
 }
 
 async function createOutbox(client: Pick<FederationTransaction, "federationOutbox" | "designChangeSession"> | typeof prisma, input: AppendFederationOutboxInput): Promise<FederationOutboxRecord> {

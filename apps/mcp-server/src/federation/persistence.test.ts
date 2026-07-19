@@ -43,8 +43,11 @@ const observation = {
 type Row = Record<string, unknown>;
 const rows = { connectors: [] as Row[], observations: [] as Row[], outbox: [] as Row[], mappings: [] as Row[], policies: [] as Row[], sessions: [] as Row[] };
 let failOutbox = false;
+let failPromotionUpdate = false;
 let observationUpsertCalls = 0;
 let outboxUpsertCalls = 0;
+let promotionLockCalls = 0;
+let transactionTail = Promise.resolve();
 const candidateFact = {
   id: "fact-1", assetType: "api", schemaVersion: "1", payload: { name: "Payments API" }, localizedContent: { en: { name: "Payments API", description: "Payments interface" }, zh: { name: "支付 API", description: "支付接口" } }, normalizedDigest: "digest-1", authority: "EXTERNAL", confidence: 1,
   provenance: { sourceSystem: "github", connectorInstanceId: connector.id, observedAt: observation.observedAt }
@@ -59,8 +62,11 @@ beforeEach(() => {
   rows.policies.length = 0;
   rows.sessions.length = 0;
   failOutbox = false;
+  failPromotionUpdate = false;
   observationUpsertCalls = 0;
   outboxUpsertCalls = 0;
+  promotionLockCalls = 0;
+  transactionTail = Promise.resolve();
   const client = prisma as unknown as Record<string, unknown>;
   client.connectorInstance = {
     upsert: vi.fn(async ({ create, update, where }: { create: Row; update: Row; where: { applicationServiceId_scopePath_id: Row } }) => {
@@ -100,7 +106,7 @@ beforeEach(() => {
       return rows.observations.find((row) => Object.entries(key).every(([name, value]) => row[name] === value)) ?? null;
     }),
     findFirst: vi.fn(async ({ where }: { where: Row }) => rows.observations.find((row) => Object.entries(where).every(([name, value]) => row[name] === value)) ?? null),
-    findMany: vi.fn(async ({ where }: { where: Row }) => rows.observations.filter((row) => row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath && (where.status === undefined || row.status === where.status))),
+    findMany: vi.fn(async ({ where }: { where: Row }) => rows.observations.filter((row) => row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath && statusMatches(row.status, where.status))),
     update: vi.fn(async ({ where, data }: { where: { applicationServiceId_scopePath_id: Row }; data: Row }) => {
       const row = rows.observations.find((candidate) => Object.entries(where.applicationServiceId_scopePath_id).every(([name, value]) => candidate[name] === value));
       return Object.assign(row!, data);
@@ -130,10 +136,19 @@ beforeEach(() => {
     })
   };
   client.$transaction = vi.fn(async (operation: (transaction: Row) => Promise<unknown>) => {
+    const predecessor = transactionTail;
+    let release!: () => void;
+    transactionTail = new Promise<void>((resolve) => { release = resolve; });
+    await predecessor;
     const snapshot = structuredClone(rows);
     try { return await operation({
     sourceObservation: {
-      findUnique: vi.fn(async ({ where }: { where: { applicationServiceId_scopePath_idempotencyKey: Row } }) => rows.observations.find((row) => row.idempotencyKey === where.applicationServiceId_scopePath_idempotencyKey.idempotencyKey && row.applicationServiceId === where.applicationServiceId_scopePath_idempotencyKey.applicationServiceId && row.scopePath === where.applicationServiceId_scopePath_idempotencyKey.scopePath) ?? null),
+      findUnique: vi.fn(async ({ where }: { where: Row }) => {
+        const key = (where.applicationServiceId_scopePath_id ?? where.applicationServiceId_scopePath_idempotencyKey) as Row;
+        return rows.observations.find((row) => Object.entries(key).every(([name, value]) => row[name] === value)) ?? null;
+      }),
+      findFirst: vi.fn(async ({ where }: { where: Row }) => rows.observations.find((row) => Object.entries(where).every(([name, value]) => row[name] === value)) ?? null),
+      findMany: vi.fn(async ({ where }: { where: Row }) => rows.observations.filter((row) => row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath && statusMatches(row.status, where.status))),
       create: vi.fn(async ({ data }: { data: Row }) => { rows.observations.push(data); return data; }),
       upsert: vi.fn(async ({ where, create }: { where: { applicationServiceId_scopePath_idempotencyKey: Row }; create: Row }) => {
         observationUpsertCalls++;
@@ -142,8 +157,26 @@ beforeEach(() => {
         if (existing) return existing;
         rows.observations.push(create); return create;
       }),
-      update: vi.fn(async ({ data }: { data: Row }) => data)
+      update: vi.fn(async ({ where, data }: { where: { applicationServiceId_scopePath_id: Row }; data: Row }) => {
+        if (failPromotionUpdate && data.status === "PROMOTED") throw new Error("PROMOTION_WRITE_FAILED");
+        const row = rows.observations.find((candidate) => Object.entries(where.applicationServiceId_scopePath_id).every(([name, value]) => candidate[name] === value));
+        return Object.assign(row!, data);
+      })
     },
+    externalIdentityMapping: {
+      findUnique: vi.fn(async ({ where }: { where: Row }) => {
+        const key = where.applicationServiceId_scopePath_connectorId_sourceNamespace_externalAssetType_externalId as Row;
+        return rows.mappings.find((row) => Object.entries(key).every(([name, value]) => row[name] === value)) ?? null;
+      }),
+      findFirst: vi.fn(async ({ where }: { where: Row }) => rows.mappings.find((row) => Object.entries(where).every(([name, value]) => row[name] === value)) ?? null)
+    },
+    authorityPolicy: {
+      findMany: vi.fn(async ({ where }: { where: Row }) => rows.policies.filter((row) => Object.entries(where).every(([name, value]) => row[name] === value)))
+    },
+    $executeRawUnsafe: vi.fn(async () => {
+      promotionLockCalls++;
+      return [];
+    }),
     federationOutbox: {
       findUnique: vi.fn(async ({ where }: { where: { applicationServiceId_scopePath_idempotencyKey: Row } }) => rows.outbox.find((row) => row.idempotencyKey === where.applicationServiceId_scopePath_idempotencyKey.idempotencyKey && row.applicationServiceId === where.applicationServiceId_scopePath_idempotencyKey.applicationServiceId && row.scopePath === where.applicationServiceId_scopePath_idempotencyKey.scopePath) ?? null),
       create: vi.fn(async ({ data }: { data: Row }) => {
@@ -169,7 +202,7 @@ beforeEach(() => {
         return rows.sessions.find((row) => row.id === key.id && row.applicationServiceId === key.applicationServiceId && row.scopePath === key.scopePath) ?? null;
       })
     }
-    }); } catch (error) { Object.assign(rows, snapshot); throw error; }
+    }); } catch (error) { Object.assign(rows, snapshot); throw error; } finally { release(); }
   });
 });
 
@@ -229,6 +262,20 @@ describe("federation persistence", () => {
   it("does not persist a snapshot during read-only reconciliation", async () => {
     await reconcilePersistedScope({ architectureScope: designerScope, acceptedFacts: [] });
     expect((prisma as unknown as { reconciliationSnapshot: { upsert: ReturnType<typeof vi.fn> } }).reconciliationSnapshot.upsert).not.toHaveBeenCalled();
+  });
+
+  it("reconciles active candidate observations as external changes", async () => {
+    rows.observations.push({
+      ...observation,
+      connectorId: connector.id,
+      ...designerScope,
+      observedAt: new Date(observation.observedAt),
+      status: "CANDIDATE"
+    });
+
+    await expect(reconcilePersistedScope({ architectureScope: designerScope, acceptedFacts: [] })).resolves.toMatchObject({
+      issues: [expect.objectContaining({ code: "UNDECLARED_CHANGE", externalId: observation.externalId })]
+    });
   });
 
   it("loads only persisted promoted canonical facts inside the exact Scope", async () => {
@@ -367,6 +414,64 @@ describe("federation persistence", () => {
     expect(currentFacts[0]).toMatchObject({ id: candidateFact.id, normalizedDigest: "digest-2", payload: { name: "Payments API v2" } });
     await expect(reconcilePersistedScope({ architectureScope: designerScope, acceptedFacts: currentFacts })).resolves.toMatchObject({ status: "CONVERGED", issues: [] });
   });
+
+  it("rolls back retirement when a replacement promotion fails", async () => {
+    arrangePromotion();
+    await promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact });
+    rows.observations.push({
+      ...observation,
+      id: "observation-2",
+      connectorId: connector.id,
+      sourceVersion: "def456",
+      idempotencyKey: "observation:github:payments-api:def456",
+      normalizedDigest: "digest-2",
+      payload: { version: 2 },
+      observedAt: new Date("2026-07-20T00:00:00.000Z"),
+      ...designerScope
+    });
+    failPromotionUpdate = true;
+
+    await expect(promoteCandidate({
+      candidateId: "observation-2",
+      architectureScope: designerScope,
+      humanFacing: true,
+      fact: { ...candidateFact, payload: { name: "Payments API v2" }, normalizedDigest: "digest-2" }
+    })).rejects.toThrow("PROMOTION_WRITE_FAILED");
+    expect(rows.observations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: observation.id, status: "PROMOTED" }),
+      expect.objectContaining({ id: "observation-2", status: "CANDIDATE" })
+    ]));
+  });
+
+  it("serializes concurrent same-fact promotions to one current revision", async () => {
+    arrangePromotion();
+    rows.observations.push({
+      ...observation,
+      id: "observation-2",
+      connectorId: connector.id,
+      sourceVersion: "def456",
+      idempotencyKey: "observation:github:payments-api:def456",
+      normalizedDigest: "digest-2",
+      payload: { version: 2 },
+      observedAt: new Date("2026-07-20T00:00:00.000Z"),
+      ...designerScope
+    });
+
+    await Promise.all([
+      promoteCandidate({ candidateId: observation.id, architectureScope: designerScope, humanFacing: true, fact: candidateFact }),
+      promoteCandidate({
+        candidateId: "observation-2",
+        architectureScope: designerScope,
+        humanFacing: true,
+        fact: { ...candidateFact, payload: { name: "Payments API v2" }, normalizedDigest: "digest-2" }
+      })
+    ]);
+
+    expect(promotionLockCalls).toBe(2);
+    expect(rows.observations.filter((row) => row.status === "PROMOTED")).toHaveLength(1);
+    expect(rows.observations).toEqual(expect.arrayContaining([expect.objectContaining({ id: "observation-2", status: "PROMOTED" })]));
+    await expect(listPersistedCanonicalFederatedFacts(designerScope)).resolves.toHaveLength(1);
+  });
 });
 
 function arrangePromotion(overrides: Row = {}) {
@@ -390,4 +495,10 @@ function promotedFactPayload(overrides: Row = {}): Row {
     status: "PROMOTED",
     ...overrides
   };
+}
+
+function statusMatches(rowStatus: unknown, requestedStatus: unknown): boolean {
+  if (requestedStatus === undefined) return true;
+  if (requestedStatus && typeof requestedStatus === "object" && "not" in requestedStatus) return rowStatus !== (requestedStatus as { not: unknown }).not;
+  return rowStatus === requestedStatus;
 }
