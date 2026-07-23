@@ -1,0 +1,8 @@
+services:
+  postgres: !reset null
+  web:
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in deploy/.env for external PostgreSQL mode}
+      PGHOST: ${SPECFORGE_EXTERNAL_PG_HOST:?Set SPECFORGE_EXTERNAL_PG_HOST in deploy/.env for external PostgreSQL mode}
+      PGPORT: ${SPECFORGE_EXTERNAL_PG_PORT:-5432}
+    depends_on: !reset []
