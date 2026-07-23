@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerPrompts } from "./prompts";
 import { registerResources } from "./resources";
+import { registerFederationTools } from "./federation/tools";
 import { registerTools } from "./tools";
 
 export interface SpecForgeMcpConfig {
@@ -35,6 +36,7 @@ export function createSpecForgeMcpServer(config: SpecForgeMcpConfig = loadConfig
 
   registerResources(server);
   registerTools(server);
+  registerFederationTools(server);
   registerPrompts(server);
 
   return server;

@@ -2,7 +2,11 @@
 
 ## Status
 
-Approved design. Implementation remains pending.
+Governance-core implementation is complete locally. MCP persistence/read-back and real PostgreSQL verification are blocked pending a configured environment.
+
+- Implemented locally: scoped governance contracts, MCP governance tools, manifest-driven ADR/Proposal/Context Pack/Evidence builders, typed links, and read-only Designer Scope reconciliation.
+- MCP persistence status: blocked until `DATABASE_URL`, `SPECFORGE_APPLICATION_SERVICE_ID`, and `SPECFORGE_SCOPE_PATH` are configured and reachable; retry with `pnpm design-facts:sync`, `pnpm design-facts:check`, and the configured federation check.
+- Deferred: legacy scanners, continuous inbound synchronization, continuous outbound synchronization, and external `APPLY`.
 
 - Owning `architectureScope.applicationServiceId`: `com.huawei.celon.desiner`
 - Owning `architectureScope.scopePath`: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
@@ -91,6 +95,8 @@ Every accepted fact, candidate fact, and observation uses a common envelope:
 
 External identities are mapped through a durable key consisting of connector instance, source namespace, external asset type, and external ID. Display names are never identity keys.
 
+Candidate promotion is bound to the selected persisted observation. The server requires an exact-Scope identity mapping with an `assetId`, validates the observation payload digest and provenance, rejects caller payload/digest/provenance substitutions, derives the promoted envelope from persisted state and policy, and conservatively requires complete English/Chinese localization. No public caller flag may disable that localization policy.
+
 ## Authority and Conflict Model
 
 Authority is configurable by Scope, asset type, and field path. The default policy is:
@@ -156,6 +162,8 @@ Each Scope receives a deterministic reconciliation snapshot and Merkle root buil
 
 Local checks provide fast feedback. CI performs the authoritative read-only gate against the configured SpecForge environment. Protected branches reject missing Change Session references, unresolved blocking drift, incomplete evidence, missing bilingual human-facing content, or required undelivered Outbox records.
 
+The public reconciliation tool accepts only the exact `architectureScope`; it loads promoted canonical facts from PostgreSQL and does not accept a caller-supplied accepted-fact snapshot. Every governed non-converged issue is blocking, including content or missing-fact drift, undeclared changes, Scope or identity conflicts, incomplete localization, pending required delivery, and unavailable connectors.
+
 ## Scope Isolation and Security
 
 - Every connector instance belongs to one exact application-service Scope.
@@ -213,7 +221,21 @@ The first implementation plan must cover only increment 1. Each later increment 
 - Reconciliation detects content, localization, relationship, evidence, Scope, identity, and delivery drift without mutating data.
 - CI can block protected-branch completion on governed inconsistency.
 
+## Verified Implementation Evidence
+
+On 2026-07-19, the governance-core increment was verified locally with `node .\\node_modules\\vitest\\vitest.mjs run scripts/design-fact-manifest.test.ts` (2 tests), `node .\\node_modules\\vitest\\vitest.mjs run packages\\core\\src\\__tests__` (12 files, 126 tests), and `node .\\node_modules\\vitest\\vitest.mjs run apps\\mcp-server\\src` (12 files, 144 tests; 9 PostgreSQL integration tests skipped because `DATABASE_URL` was absent). `pnpm --filter @specforge/core typecheck` and `pnpm --filter @specforge/mcp-server typecheck` also passed.
+
+The first integration-hardening slice was locally verified with `node .\\node_modules\\vitest\\vitest.mjs run packages\\core\\src\\__tests__\\federation.test.ts scripts\\reconcile-federated-facts.test.ts` (2 files, 30 tests) and `node .\\node_modules\\vitest\\vitest.mjs run apps\\mcp-server\\src\\federation\\persistence.test.ts apps\\mcp-server\\src\\federation\\tools.test.ts` (2 files, 64 tests). Both package typechecks passed. Live PostgreSQL and MCP synchronization/read-back were not run because no reachable `DATABASE_URL` was available.
+
 ## Chinese Localization / 中文本地化
+
+### 状态
+
+治理核心已在本地实现。MCP 持久化/回读和真实 PostgreSQL 验证因等待已配置环境而受阻。
+
+- 本地已实现：Scope 约束的治理契约、MCP 治理工具、由清单驱动的 ADR/Proposal/Context Pack/Evidence 构建器、有类型关系以及只读 Designer Scope 对账。
+- MCP 持久化状态：在配置并可访问 `DATABASE_URL`、`SPECFORGE_APPLICATION_SERVICE_ID` 和 `SPECFORGE_SCOPE_PATH` 前保持阻塞；重试命令为 `pnpm design-facts:sync`、`pnpm design-facts:check` 和配置的联邦检查。
+- 延期能力：存量扫描器、持续入站同步、持续出站同步和外部 `APPLY`。
 
 ### 目的
 
@@ -241,6 +263,14 @@ MCP 仍然是正式设计事实的唯一写入边界。PostgreSQL 保存正式�
 
 对账检查必须只读，不能在检查过程中自动修复。系统检查英文规范内容、中文翻译、关系、证据、Scope、身份映射和投递状态，并按 Scope 生成确定性的摘要树根。Git 提交号用于追踪，规范化内容摘要才是主要一致性依据。本地检查负责快速反馈，CI 对受保护主干执行权威门禁；缺少变更会话、存在阻断漂移、证据不完整、双语内容缺失或 Outbox 未完成时，禁止合入。
 
+候选提升必须绑定到已持久化的选定观察。服务端要求精确 Scope 的身份映射及其 `assetId`，校验观察内容摘要和来源，拒绝调用方替换内容、摘要或来源，并根据持久化状态和策略生成正式信封。公共调用方不能关闭完整中英文覆盖要求。公共对账工具只接收精确 `architectureScope`，正式事实必须从 PostgreSQL 加载；任何受治理的不收敛问题都必须阻断完成。
+
 ### 分阶段交付
 
 第一阶段只实现治理核心：统一事实信封、连接器 SPI、候选事实、身份映射、字段级权威策略、变更会话、Outbox 和只读对账契约。后续分别实现存量扫描基线、持续入站同步，以及受控的 PR/提案回写。每一阶段独立设计、测试和评审。
+
+### 已验证的实现证据
+
+2026-07-19，治理核心增量已在本地通过以下命令验证：`node .\\node_modules\\vitest\\vitest.mjs run scripts/design-fact-manifest.test.ts`（2 个测试）、`node .\\node_modules\\vitest\\vitest.mjs run packages\\core\\src\\__tests__`（12 个文件、126 个测试）以及 `node .\\node_modules\\vitest\\vitest.mjs run apps\\mcp-server\\src`（12 个文件、144 个测试；由于缺少 `DATABASE_URL`，跳过了 9 个 PostgreSQL 集成测试）。`pnpm --filter @specforge/core typecheck` 和 `pnpm --filter @specforge/mcp-server typecheck` 也已通过。
+
+第一轮集成加固已在本地通过 30 个 core/CLI 测试、64 个 MCP/持久化测试及两个包的类型检查。由于没有可访问的 `DATABASE_URL`，本轮未运行真实 PostgreSQL 检查及 MCP 同步/回读，整体集成加固仍未完成。

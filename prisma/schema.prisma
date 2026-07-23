@@ -163,6 +163,139 @@ model AuditLog {
   @@index([createdAt])
 }
 
+model ConnectorInstance {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  kind                 String
+  capabilities         Json     @default("[]") @db.JsonB
+  status               String
+  secretReference      String?
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "ConnectorInstance_scope_id_key")
+  @@index([applicationServiceId, scopePath, status], map: "ConnectorInstance_scope_status_idx")
+}
+
+model SourceObservation {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  connectorId          String
+  sourceNamespace      String
+  externalAssetType    String
+  externalId           String
+  payload              Json     @default("{}") @db.JsonB
+  normalizedDigest     String
+  sourceVersion        String
+  observedAt           DateTime
+  status               String
+  provenance           Json     @default("{}") @db.JsonB
+  idempotencyKey       String
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "SourceObservation_scope_id_key")
+  @@unique([applicationServiceId, scopePath, idempotencyKey], map: "SourceObservation_scope_idempotency_key")
+  @@unique([applicationServiceId, scopePath, connectorId, sourceNamespace, externalAssetType, externalId, sourceVersion], map: "SourceObservation_scope_external_identity_key")
+  @@index([applicationServiceId, scopePath, connectorId, observedAt], map: "SourceObservation_scope_connector_observed_idx")
+}
+
+model ExternalIdentityMapping {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  connectorId          String
+  sourceNamespace      String
+  externalAssetType    String
+  externalId           String
+  assetType            String
+  assetId              String?
+  matchStatus          String
+  normalizedDigest     String
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "ExternalIdentityMapping_scope_id_key")
+  @@unique([applicationServiceId, scopePath, connectorId, sourceNamespace, externalAssetType, externalId], map: "ExternalIdentityMapping_scope_external_identity_key")
+  @@index([applicationServiceId, scopePath, assetType, assetId], map: "ExternalIdentityMapping_scope_asset_idx")
+}
+
+model AuthorityPolicy {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  assetType            String
+  fieldPath            String
+  authority            String
+  promotionMode        String
+  policyVersion        String
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "AuthorityPolicy_scope_id_key")
+  @@unique([applicationServiceId, scopePath, assetType, fieldPath, policyVersion], map: "AuthorityPolicy_scope_field_version_key")
+  @@index([applicationServiceId, scopePath, assetType, fieldPath], map: "AuthorityPolicy_scope_field_idx")
+}
+
+model DesignChangeSession {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  actorId              String
+  intent               String
+  affectedFactIds      Json     @default("[]") @db.JsonB
+  expectedEvidenceRefs Json     @default("[]") @db.JsonB
+  status               String
+  openedAt             DateTime @default(now())
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "DesignChangeSession_scope_id_key")
+  @@index([applicationServiceId, scopePath, status, openedAt], map: "DesignChangeSession_scope_status_idx")
+}
+
+model FederationOutbox {
+  dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventType             String
+  payload               Json     @default("{}") @db.JsonB
+  idempotencyKey        String
+  status                String
+  availableAt           DateTime @default(now())
+  sentAt                DateTime?
+  attemptCount          Int      @default(0)
+  lastError             String?
+  designChangeSessionId String?
+  applicationServiceId  String
+  scopePath             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, idempotencyKey], map: "FederationOutbox_scope_idempotency_key")
+  @@index([applicationServiceId, scopePath, status, availableAt], map: "FederationOutbox_scope_pending_idx")
+  @@index([applicationServiceId, scopePath, designChangeSessionId], map: "FederationOutbox_scope_session_idx")
+}
+
+model ReconciliationSnapshot {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  root                 String
+  issues               Json     @default("[]") @db.JsonB
+  status               String
+  factDigests          Json     @default("[]") @db.JsonB
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, root], map: "ReconciliationSnapshot_scope_root_key")
+  @@index([applicationServiceId, scopePath, status, createdAt], map: "ReconciliationSnapshot_scope_status_idx")
+}
+
 model AssetNode {
   dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   enterpriseId         String
