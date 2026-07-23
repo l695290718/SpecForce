@@ -76,7 +76,7 @@ Expected: FAIL because `apps/web/app/healthz/route.ts` does not exist.
 
 ```ts
 import { NextResponse } from "next/server";
-import { prisma } from "../../lib/prisma";
+import { prisma } from "../../lib/db";
 
 export async function GET() {
   try {
@@ -199,9 +199,11 @@ git commit -m "feat: package single-host Docker deployment"
 
 ```powershell
 docker compose --env-file deploy/.env -f deploy/compose.yaml up -d --build
-Invoke-WebRequest "http://localhost:$env:SPECFORGE_WEB_PORT/healthz" -UseBasicParsing | Should -HaveStatusCode 200
+$first = Invoke-WebRequest "http://localhost:$env:SPECFORGE_WEB_PORT/healthz" -UseBasicParsing
+if ($first.StatusCode -ne 200) { throw "Web health check failed: $($first.StatusCode)" }
 docker compose --env-file deploy/.env -f deploy/compose.yaml restart web
-Invoke-WebRequest "http://localhost:$env:SPECFORGE_WEB_PORT/healthz" -UseBasicParsing | Should -HaveStatusCode 200
+$second = Invoke-WebRequest "http://localhost:$env:SPECFORGE_WEB_PORT/healthz" -UseBasicParsing
+if ($second.StatusCode -ne 200) { throw "Web health check after restart failed: $($second.StatusCode)" }
 ```
 
 Before the restart, insert a scoped disposable test asset through the MCP seed/client boundary, then read it after restart. Clean up only that exact disposable asset through the same authorized boundary.
