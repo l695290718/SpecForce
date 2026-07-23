@@ -107,6 +107,10 @@ describe("federation domain", () => {
     expect(contentDigest({ b: 2, a: 1 })).toBe(contentDigest({ a: 1, b: 2 }));
   });
 
+  it("uses the standard SHA-256 digest for canonical serialization", () => {
+    expect(contentDigest("abc")).toBe("6cc43f858fbb763301637b5af970e2a46b46f461f27e5a0f41e009c59b827b25");
+  });
+
   it("uses locale-independent key ordering and preserves repeated references", () => {
     expect(normalizeForDigest({ a: 1, Z: 2 })).toBe('{"Z":2,"a":1}');
     const shared = { value: 1 };
