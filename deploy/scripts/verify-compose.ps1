@@ -47,4 +47,46 @@ if ($ConfigurationOnly) {
   exit 0
 }
 
-throw "Live verification is not implemented yet."
+$deploymentEnvironmentFile = Join-Path $deployDirectory ".env"
+if (-not (Test-Path $deploymentEnvironmentFile)) {
+  throw "Live verification requires $deploymentEnvironmentFile. Copy deploy/.env.example first."
+}
+
+function Invoke-Compose([string[]]$Arguments) {
+  & docker compose --env-file $deploymentEnvironmentFile -f $composeFile @Arguments
+  if ($LASTEXITCODE -ne 0) { throw "docker compose $($Arguments -join ' ') failed." }
+}
+
+$deploymentEnvironment = @{}
+Get-Content $deploymentEnvironmentFile | ForEach-Object {
+  if ($_ -match '^([^#=]+)=(.*)$') { $deploymentEnvironment[$matches[1]] = $matches[2] }
+}
+$webPort = if ($deploymentEnvironment.SPECFORGE_WEB_PORT) { $deploymentEnvironment.SPECFORGE_WEB_PORT } else { "3000" }
+$databaseUser = $deploymentEnvironment.POSTGRES_USER
+$databaseName = $deploymentEnvironment.POSTGRES_DB
+
+Invoke-Compose @("up", "-d", "--build")
+
+function Assert-WebHealth([string]$Stage) {
+  for ($attempt = 1; $attempt -le 30; $attempt++) {
+    try {
+      $response = Invoke-WebRequest "http://localhost:$webPort/healthz" -UseBasicParsing -TimeoutSec 3
+      if ($response.StatusCode -eq 200) { return }
+    } catch {
+      Start-Sleep -Seconds 2
+    }
+  }
+  throw "Web health check did not pass during $Stage."
+}
+
+Assert-WebHealth "initial startup"
+$before = (& docker compose --env-file $deploymentEnvironmentFile -f $composeFile exec -T postgres psql -U $databaseUser -d $databaseName -tAc 'SELECT count(*) FROM "DesignAsset"') | Select-Object -Last 1
+if ($LASTEXITCODE -ne 0) { throw "Unable to read DesignAsset count before restart." }
+
+Invoke-Compose @("restart", "web")
+Assert-WebHealth "web restart"
+$after = (& docker compose --env-file $deploymentEnvironmentFile -f $composeFile exec -T postgres psql -U $databaseUser -d $databaseName -tAc 'SELECT count(*) FROM "DesignAsset"') | Select-Object -Last 1
+if ($LASTEXITCODE -ne 0) { throw "Unable to read DesignAsset count after restart." }
+if ($before.Trim() -ne $after.Trim()) { throw "DesignAsset count changed across Web restart: $before -> $after" }
+
+Write-Output "Live deployment verification passed."

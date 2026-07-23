@@ -215,6 +215,19 @@ pnpm --filter @specforge/mcp-server smoke
 
 Open [http://localhost:3000](http://localhost:3000). The selected application service is carried in the `scope` query parameter and restored from the validated application-service cookie; the locale is restored independently from `specforge-locale`.
 
+## Single-Host Docker Deployment
+
+Deploy the Web console and PostgreSQL on one Linux host with Docker Compose. PostgreSQL remains private to the Compose network; MCP stays a client-side stdio process and is not deployed as a network container.
+
+```bash
+cp deploy/.env.example deploy/.env
+# Set a strong POSTGRES_PASSWORD in deploy/.env.
+docker compose --env-file deploy/.env -f deploy/compose.yaml up -d --build
+curl --fail http://localhost:3000/healthz
+```
+
+See [Single-Host Docker Compose Operations](docs/operations/single-host-docker-compose.md) for upgrades, backup/restore, verification, and external PostgreSQL mode.
+
 ## Specifications
 
 - [Product and architecture specification](docs/specforge-design-center-spec.md)
