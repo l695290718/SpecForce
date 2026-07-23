@@ -30,22 +30,22 @@ it("includes federated design-fact governance in the baseline", () => {
   expect(manifest.decisions.some((decision) => decision.mcpAdrId === "adr-federated-design-fact-synchronization")).toBe(true);
 });
 
-it("records the blocked federated sync fact with canonical metadata and valid bilingual ADR overlays", () => {
+it("records the verified federated sync fact with canonical metadata and valid bilingual ADR overlays", () => {
   const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-federated-design-fact-synchronization") as typeof manifest.decisions[number];
-  expect(decision.status).toBe("MCP synchronization blocked");
+  expect(decision.status).toBe("MCP synchronized and read back");
   expect(decision.owner).toBe("SpecForge Architecture");
-  expect(decision.reason).toContain("DATABASE_URL");
-  expect(decision.retryTrigger).toContain("design-facts:sync");
+  expect(decision.reason).toContain("localhost:5433");
+  expect(decision.retryTrigger).toContain("re-run design-facts:sync");
   expect(decision.auditFailureCode).toBe("FEDERATION_TOOL_ERROR");
   expect(decision.auditDiagnosticReference).toContain("64-hex SHA-256");
   expect(decision.auditSecurityContract).toContain("raw exceptions");
   expect(decision.localizedContent?.en).toEqual(expect.objectContaining({
     decision: expect.stringContaining("FEDERATION_TOOL_ERROR"),
-    constraints: expect.arrayContaining([expect.stringContaining("MCP synchronization blocked")])
+    constraints: expect.arrayContaining([expect.stringContaining("MCP synchronization and read-back are verified")])
   }));
   expect(decision.localizedContent?.zh).toEqual(expect.objectContaining({
     decision: expect.stringContaining("FEDERATION_TOOL_ERROR"),
-    constraints: expect.arrayContaining([expect.stringContaining("MCP 同步受阻")])
+    constraints: expect.arrayContaining([expect.stringContaining("MCP 同步与回读已在")])
   }));
   expect(Object.keys(decision.localizedContent?.en ?? {}).sort()).toEqual(["constraints", "decision"]);
   expect(Object.keys(decision.localizedContent?.zh ?? {}).sort()).toEqual(["constraints", "decision"]);

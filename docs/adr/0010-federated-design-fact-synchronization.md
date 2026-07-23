@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted. Governance core is implemented; MCP synchronization and read-back remain pending the configured PostgreSQL/MCP environment.**
+**Accepted. Governance core is implemented; MCP synchronization and read-back are verified against the configured Docker PostgreSQL authority at `localhost:5433`.**
 
 - Stable ADR/MCP ID: `adr-federated-design-fact-synchronization`
 - Owning `architectureScope.applicationServiceId`: `com.huawei.celon.desiner`
@@ -29,17 +29,12 @@ This decision implements governance core only. Git, OpenAPI, and PostgreSQL disc
 
 ## Consequences
 
-Positive consequences:
-
-- Federation records are isolated to their exact application-service Scope and have durable provenance, audit, and delivery state.
-- Ambiguous identity, missing authority, Scope drift, localization drift, and blocked delivery can stop automatic promotion or protected completion.
-- Future connectors can target the stable contract without changing governance ownership or the MCP authoring boundary.
-
-Tradeoffs:
-
-- The current increment has no legacy scanner, continuous inbound connector, outbound proposal, or production `APPLY` capability.
-- PostgreSQL/MCP availability is required to persist and reconcile the matching operational design records.
-- New connector capabilities require separate scope-safe design records, evidence, and MCP reconciliation before they can be claimed.
+- Positive: Federation records are isolated to their exact application-service Scope and have durable provenance, audit, and delivery state.
+- Positive: Ambiguous identity, missing authority, Scope drift, localization drift, and blocked delivery can stop automatic promotion or protected completion.
+- Positive: Future connectors can target the stable contract without changing governance ownership or the MCP authoring boundary.
+- Tradeoff: The current increment has no legacy scanner, continuous inbound connector, outbound proposal, or production `APPLY` capability.
+- Tradeoff: PostgreSQL/MCP availability is required to persist and reconcile the matching operational design records.
+- Tradeoff: New connector capabilities require separate scope-safe design records, evidence, and MCP reconciliation before they can be claimed.
 
 ## Constraints
 
@@ -96,7 +91,9 @@ The baseline manifest records this contract in complete English and Chinese loca
 
 Local evidence: `node .\\node_modules\\.pnpm\\vitest@2.1.9_@types+node@22.20.1\\node_modules\\vitest\\vitest.mjs run apps\\mcp-server\\src\\federation\\tools.test.ts apps\\mcp-server\\src\\federation\\persistence.test.ts` passed 2 files and 96 tests; core and MCP typechecks passed; `git diff --check` passed.
 
-**MCP synchronization blocked:** Owner: SpecForge Architecture. Reason: `DATABASE_URL`, `SPECFORGE_APPLICATION_SERVICE_ID`, and `SPECFORGE_SCOPE_PATH` are unavailable. Retry trigger: configure reachable PostgreSQL and the exact Designer Scope variables, run `pnpm design-facts:sync`, `pnpm design-facts:check`, and the configured-scope federation check, then read back the sixth Evidence receipt and all IDs, Scope, canonical English fields, Chinese overlays, typed links, and diagnostics. No synchronization success is claimed.
+## Docker PostgreSQL Synchronization Verification (2026-07-23)
+
+The configured Docker PostgreSQL authority at `localhost:5433/specforge` is reachable. `pnpm design-facts:sync` persisted the complete eight-decision baseline through MCP; `pnpm design-facts:check` read back all eight decisions with no missing, mismatched, out-of-scope, or blocked records. The exact Designer Scope federation reconciliation returned `blocking: false`, zero verified federated facts, and no issue counts. This verification supersedes the earlier environment-blocked notes above, which remain as historical implementation evidence.
 
 ### Slice 3C Chinese Localization
 
@@ -128,11 +125,15 @@ Local evidence: `node .\\node_modules\\.pnpm\\vitest@2.1.9_@types+node@22.20.1\\
 
 ### 状态
 
-**已接受。治理核心已实现；MCP 同步和回读仍等待已配置的 PostgreSQL/MCP 环境。**
+**已接受。治理核心已实现；已在 `localhost:5433` 的 Docker PostgreSQL 权威库完成 MCP 同步和回读核验。**
 
 - 稳定 ADR/MCP ID：`adr-federated-design-fact-synchronization`
 - 所属 `architectureScope.applicationServiceId`：`com.huawei.celon.desiner`
 - 所属 `architectureScope.scopePath`：`pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
+
+### Docker PostgreSQL 同步核验（2026-07-23）
+
+已配置的 Docker PostgreSQL 权威库 `localhost:5433/specforge` 可访问。`pnpm design-facts:sync` 已通过 MCP 持久化完整的 8 项决策基线；`pnpm design-facts:check` 回读全部 8 项决策，未发现缺失、不匹配、越界或受阻记录。精确 Designer Scope 的联邦对账返回 `blocking: false`、零项已核验联邦事实和空问题计数。该核验结果取代上文历史实现记录中的环境受阻说明。
 
 ### 背景
 
@@ -155,9 +156,12 @@ MCP 仍是已编写 SpecForge 设计事实的唯一写入边界。PostgreSQL 是
 
 ### 后果
 
-积极后果：联邦记录被隔离在精确应用服务 Scope 内，拥有可靠的来源、审计和投递状态；模糊身份、缺少权威、Scope 漂移、本地化漂移和投递受阻可以停止自动提升或受保护完成；未来连接器可以使用稳定契约，而无需改变治理所有权或 MCP 编写边界。
-
-权衡：当前增量没有存量扫描器、持续入站连接器、出站 Proposal 或生产 `APPLY` 能力；需要 PostgreSQL/MCP 可用性来持久化和对账匹配的运行设计记录；新增连接器能力在被声明前需要独立且 Scope 安全的设计记录、证据和 MCP 对账。
+- 积极影响：联邦记录被隔离在精确应用服务 Scope 内，拥有可靠的来源、审计和投递状态。
+- 积极影响：模糊身份、缺少权威、Scope 漂移、本地化漂移和投递受阻可以停止自动提升或受保护完成。
+- 积极影响：未来连接器可以使用稳定契约，而无需改变治理所有权或 MCP 编写边界。
+- 权衡：当前增量没有存量扫描器、持续入站连接器、出站 Proposal 或生产 `APPLY` 能力。
+- 权衡：需要 PostgreSQL/MCP 可用性来持久化和对账匹配的运行设计记录。
+- 权衡：新增连接器能力在被声明前需要独立且 Scope 安全的设计记录、证据和 MCP 对账。
 
 ### 约束
 
@@ -175,7 +179,7 @@ MCP 仍是已编写 SpecForge 设计事实的唯一写入边界。PostgreSQL 是
 - **已本地验证：** 在基线清单加入此稳定 ADR 后，`node .\\node_modules\\vitest\\vitest.mjs run scripts/design-fact-manifest.test.ts` 通过。
 - **已本地验证：** `node .\\node_modules\\vitest\\vitest.mjs run packages\\core\\src\\__tests__` 通过，共 12 个文件和 126 个测试；`pnpm --filter @specforge/core typecheck` 通过。
 - **已本地验证：** `node .\\node_modules\\vitest\\vitest.mjs run apps\\mcp-server\\src` 通过，共 12 个文件和 144 个测试；由于没有 `DATABASE_URL`，9 个 PostgreSQL 集成测试被跳过；`pnpm --filter @specforge/mcp-server typecheck` 通过。
-- **等待环境验证：** `pnpm design-facts:sync`、`pnpm design-facts:check` 和已配置 Scope 的联邦对账检查需要可访问且已配置的 PostgreSQL 数据库；在实际运行前不得声明其结果。
+- **已验证：** `pnpm design-facts:sync` 与 `pnpm design-facts:check` 已针对 `localhost:5433/specforge` 通过 MCP 持久化并回读全部 8 个基线 ADR；没有缺失、不匹配、越界或受阻记录。精确 Designer Scope 的联邦对账返回 `blocking: false`，没有问题计数。
 
 ### MCP 记录
 
@@ -186,7 +190,7 @@ MCP 仍是已编写 SpecForge 设计事实的唯一写入边界。PostgreSQL 是
 - 相关资产：`api-specforge-mcp-tools`、`data-specforge-assets`、`data-specforge-asset-graph` 和 `adr-design-fact-dual-record-governance`。
 - 有类型关系：Proposal `--IMPLEMENTS_DECISION-->` ADR；Context Pack `--IMPLEMENTS_CONTEXT_FOR-->` Proposal；ADR `--DECIDES-->` 每个相关资产（目标类型为 `api`、`dataModel` 和 `adr`）；每个 Evidence 资产 `--VALIDATES-->` ADR。
 - Evidence ID：`evidence-adr-federated-design-fact-synchronization-1` 至 `evidence-adr-federated-design-fact-synchronization-6`；每个 Evidence 资产都通过清单驱动同步以 `VALIDATES` 关系指向本 ADR。
-- **MCP 同步受阻：** 匹配记录由清单驱动，但只有在 `pnpm design-facts:sync` 通过 MCP 持久化并由 `pnpm design-facts:check` 回读后才完整。重试触发条件：使用可访问且已配置的 `DATABASE_URL` 运行这两个命令，然后运行精确 Designer Scope 的联邦对账命令。
+- **MCP 同步已核验：** 匹配记录已由清单驱动通过 MCP 持久化，并由 `pnpm design-facts:check` 回读。后续设计事实变更必须重新运行 `pnpm design-facts:sync`、`pnpm design-facts:check` 和精确 Designer Scope 的联邦对账命令后才能完成。
 
 ### 集成加固更新（2026-07-19）
 

@@ -29,18 +29,13 @@ The normal production traversal runtime is NebulaGraph behind its gateway; Postg
 
 ## Consequences
 
-Positive consequences:
-
-- Relationship writes remain transactional and auditable in PostgreSQL.
-- Projection retries and replay can converge on the same graph version without duplicating logical nodes or edges.
-- Exact scope keys make cross-service contamination testable and prevent accidental global graph views.
-- Impact analysis can wait for and record a persisted projection checkpoint.
-
-Tradeoffs:
-
-- Graph views are eventually consistent and require checkpoint-aware consumers.
-- Outbox retention, retry scheduling, dead-letter handling, and telemetry add operational work.
-- The current repository proves the PostgreSQL-compatible contract locally, but does not yet prove a live NebulaGraph deployment.
+- Positive: Relationship writes remain transactional and auditable in PostgreSQL.
+- Positive: Projection retries and replay can converge on the same graph version without duplicating logical nodes or edges.
+- Positive: Exact scope keys make cross-service contamination testable and prevent accidental global graph views.
+- Positive: Impact analysis can wait for and record a persisted projection checkpoint.
+- Tradeoff: Graph views are eventually consistent and require checkpoint-aware consumers.
+- Tradeoff: Outbox retention, retry scheduling, dead-letter handling, and telemetry add operational work.
+- Tradeoff: The current repository proves the PostgreSQL-compatible contract locally, but does not yet prove a live NebulaGraph deployment.
 
 ## Constraints
 
@@ -106,9 +101,13 @@ PostgreSQL 是关系命令、当前关系、关系事件、outbox 行、投影�
 
 ### 后果
 
-积极后果：关系写入在 PostgreSQL 中保持事务性和可审计性；投影重试与重放可以在不重复逻辑节点或边的情况下收敛到同一图版本；精确 Scope 键使跨服务污染可测试并防止意外的全局图视图；影响分析可以等待并记录持久化投影检查点。
-
-权衡：图视图最终一致，消费者必须理解检查点；outbox 保留、重试调度、死信处理和遥测增加运维工作；当前仓库在本地证明了 PostgreSQL 兼容契约，但尚未证明在线 NebulaGraph 部署。
+- 积极影响：关系写入在 PostgreSQL 中保持事务性和可审计性。
+- 积极影响：投影重试与重放可以在不重复逻辑节点或边的情况下收敛到同一图版本。
+- 积极影响：精确 Scope 键使跨服务污染可测试，并防止意外的全局图视图。
+- 积极影响：影响分析可以等待并记录持久化投影检查点。
+- 权衡：图视图最终一致，消费者必须理解检查点。
+- 权衡：Outbox 保留、重试调度、死信处理和遥测增加运维工作。
+- 权衡：当前仓库在本地证明了 PostgreSQL 兼容契约，但尚未证明在线 NebulaGraph 部署。
 
 ### 约束
 

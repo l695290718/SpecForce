@@ -29,18 +29,13 @@ English fields are canonical. Chinese localized sections are complete human-faci
 
 ## Consequences
 
-Positive consequences:
-
-- Reviewers and agents see the same stable decision identity and canonical content.
-- Scope, localization, links, and evidence become explicit acceptance criteria rather than tribal knowledge.
-- Deferred capability remains discoverable with an owner, rationale, and retry trigger.
-- Impact analysis and Context Pack generation can trace decisions to assets and implementation evidence.
-
-Tradeoffs:
-
-- Every non-trivial change has synchronization and verification work in addition to code review.
-- MCP outages or missing connectors block full completion and require backlog hygiene.
-- Reconciliation tooling must detect missing, mismatched, and out-of-scope facts as the inventory grows.
+- Positive: Reviewers and agents see the same stable decision identity and canonical content.
+- Positive: Scope, localization, links, and evidence become explicit acceptance criteria rather than tribal knowledge.
+- Positive: Deferred capability remains discoverable with an owner, rationale, and retry trigger.
+- Positive: Impact analysis and Context Pack generation can trace decisions to assets and implementation evidence.
+- Tradeoff: Every non-trivial change has synchronization and verification work in addition to code review.
+- Tradeoff: MCP outages or missing connectors block full completion and require backlog hygiene.
+- Tradeoff: Reconciliation tooling must detect missing, mismatched, and out-of-scope facts as the inventory grows.
 
 ## Constraints
 
@@ -104,9 +99,13 @@ SpecForge 同时通过 Git 面向评审者、通过 MCP 面向代理公开架构
 
 ### 后果
 
-积极后果：评审者和代理看到相同的稳定决策身份及规范内容；Scope、本地化、链接和证据成为明确验收标准而非口头知识；延期能力带着负责人、理由和重试触发条件保持可发现；影响分析和 Context Pack 生成可以从决策追踪到资产和实现证据。
-
-权衡：每个非平凡变更除代码评审外还需要同步与核验工作；MCP 中断或缺少连接器会阻止完全完成并要求维护待办；随着事实清单增长，必须有对账工具发现缺失、不匹配和越界事实。
+- 积极影响：评审者和代理看到相同的稳定决策身份及规范内容。
+- 积极影响：Scope、本地化、链接和证据成为明确验收标准，而非口头知识。
+- 积极影响：延期能力带着负责人、理由和重试触发条件保持可发现。
+- 积极影响：影响分析和 Context Pack 生成可以从决策追踪到资产和实现证据。
+- 权衡：每个非平凡变更除代码评审外还需要同步与核验工作。
+- 权衡：MCP 中断或缺少连接器会阻止完全完成，并要求维护待办。
+- 权衡：随着事实清单增长，必须有对账工具发现缺失、不匹配和越界事实。
 
 ### 约束
 

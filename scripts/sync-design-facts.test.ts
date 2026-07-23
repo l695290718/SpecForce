@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFile } from "node:fs/promises";
 
-import { synchronizeDesignFacts } from "./sync-design-facts";
+import { splitAdrSource, synchronizeDesignFacts } from "./sync-design-facts";
 import { validateAssetLocalization } from "../packages/core/src/localization/assets";
 import type { Asset } from "../packages/core/src/types";
 
@@ -145,6 +146,58 @@ const simpleChineseAdr = `## 中文本地化
 `;
 
 describe("synchronizeDesignFacts", () => {
+  it.each([
+    "adr-application-service-scope-isolation",
+    "adr-mcp-first-architecture",
+    "adr-canonical-english-localized-overlay",
+    "adr-postgresql-authoritative-design-store",
+    "adr-nebulagraph-derived-impact-runtime",
+    "adr-transactional-outbox-graph-projection",
+    "adr-design-fact-dual-record-governance",
+    "adr-federated-design-fact-synchronization"
+  ])("validates repository bilingual structure for %s", async (id) => {
+    const manifest = JSON.parse(await readFile("docs/design-facts/baseline-manifest.json", "utf8")) as {
+      decisions: Array<{
+        id: string;
+        repositoryAdr: string;
+        mcpAdrId: string;
+        scope: typeof scope;
+        proposalId: string;
+        contextPackId: string;
+        relatedAssetIds: string[];
+        evidence: Array<{ command: string; result: string }>;
+      }>;
+    };
+    const decision = manifest.decisions.find((candidate) => candidate.id === id);
+    if (!decision) throw new Error(`Missing manifest decision: ${id}`);
+    const callTool = vi.fn(async (name: string, input: Record<string, unknown>) => {
+      if (name === "create_adr") validateAssetLocalization("adr", input.adr as Asset);
+      return { ok: true };
+    });
+
+    await expect(synchronizeDesignFacts({
+      callTool,
+      manifest: { decisions: [decision] },
+      readAdr: async () => splitAdrSource(await readFile(decision.repositoryAdr, "utf8"))
+    })).resolves.toEqual([{ id: decision.id, mcpAdrId: decision.mcpAdrId, status: "complete" }]);
+  });
+
+  it("splits repository ADRs at the bold Chinese localization marker", async () => {
+    const source = splitAdrSource(await readFile("docs/adr/0001-application-service-scope-isolation.md", "utf8"));
+
+    expect(source.english).toContain("## Alternatives");
+    expect(source.chinese).toContain("### 备选方案");
+    expect(source.chinese).toContain("将每个请求隐式默认为 Designer 服务");
+  });
+
+  it("splits repository ADRs at legacy Chinese localization labels", async () => {
+    const source = splitAdrSource(await readFile("docs/adr/0004-postgresql-authoritative-design-store.md", "utf8"));
+
+    expect(source.english).toContain("## Alternatives");
+    expect(source.chinese).toContain("### 备选方案");
+    expect(source.chinese).toContain("使用图数据库作为系统记录源");
+  });
+
   it("rejects related assets with unknown prefixes", async () => {
     const callTool = vi.fn().mockResolvedValue({ ok: true });
 
@@ -199,6 +252,84 @@ describe("synchronizeDesignFacts", () => {
         localizedContent: expect.objectContaining({ zh: expect.objectContaining({ title: expect.stringContaining("中文") }) })
       })
     }));
+  });
+
+  it("preserves localized narrative arrays from bold Chinese ADR section markers", async () => {
+    const english = `# Scope isolation
+
+## Context
+
+English canonical context.
+
+## Decision
+
+English canonical decision.
+
+## Alternatives
+
+1. **Global scope.** Rejected.
+2. **Web-only authorization.** Rejected.
+
+## Consequences
+
+- Scope remains explicit.
+- MCP shares the boundary.
+
+## Constraints
+
+- Every write has a Scope.
+- PostgreSQL remains authoritative.
+
+## Evidence
+
+- **Verified:** Focused test.
+`;
+    const chinese = `**中文本地化覆盖：**
+
+**背景：** 中文规范背景。
+
+**决策：** 中文规范决策。
+
+**备选方案：**
+
+1. **全局范围。** 拒绝。
+2. **仅 Web 授权。** 拒绝。
+
+**后果：**
+
+- 范围保持明确。
+- MCP 共享边界。
+
+**约束：**
+
+- 每次写入都有范围。
+- PostgreSQL 保持权威。
+
+**证据：**
+
+- **已验证：** 针对性测试。
+`;
+    const callTool = vi.fn(async (name: string, input: Record<string, unknown>) => {
+      if (name === "create_adr") validateAssetLocalization("adr", input.adr as Asset);
+      return { ok: true };
+    });
+
+    await expect(synchronizeDesignFacts({
+      callTool,
+      manifest: {
+        decisions: [{
+          id: "adr-bold-zh-sections",
+          repositoryAdr: "docs/adr/0001-scope.md",
+          mcpAdrId: "adr-bold-zh-sections",
+          scope,
+          proposalId: "proposal-scope",
+          contextPackId: "ctx-scope",
+          relatedAssetIds: ["api-specforge-mcp-tools"],
+          evidence: []
+        }]
+      },
+      readAdr: async () => ({ title: "Scope isolation", english, chinese })
+    })).resolves.toEqual([{ id: "adr-bold-zh-sections", mcpAdrId: "adr-bold-zh-sections", status: "complete" }]);
   });
 
   it("preserves existing proposal and Context Pack payloads before linking ADR evidence", async () => {

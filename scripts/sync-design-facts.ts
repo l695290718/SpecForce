@@ -363,7 +363,9 @@ function parseAdrSource(source: AdrSource): ParsedAdr {
 }
 
 function parseAdrFields(markdown: string, fallbackTitle: string, headings: Record<Exclude<keyof AdrFields, "title" | "description">, string[]>, localized: boolean): AdrFields {
-  const sections = extractMarkdownSections(markdown, localized ? 3 : 2);
+  const sections = localized
+    ? [...extractMarkdownSections(markdown, 3), ...extractBoldLocalizedSections(markdown)]
+    : extractMarkdownSections(markdown, 2);
   const context = sectionValue(sections, headings.context, markdown, "context");
   const decision = sectionValue(sections, headings.decision, markdown, "decision");
   const alternatives = listValue(sectionValue(sections, headings.alternatives, markdown, "alternatives"));
@@ -378,6 +380,12 @@ function parseAdrFields(markdown: string, fallbackTitle: string, headings: Recor
 
 function extractMarkdownSections(markdown: string, level: 2 | 3): Array<[string, string]> {
   const headingPattern = new RegExp(`^#{${level}}\\s+(.+?)\\s*$`, "gm");
+  const headings = [...markdown.matchAll(headingPattern)];
+  return headings.map((heading, index) => [heading[1].trim(), markdown.slice(heading.index! + heading[0].length, headings[index + 1]?.index ?? markdown.length).trim()] as [string, string]);
+}
+
+function extractBoldLocalizedSections(markdown: string): Array<[string, string]> {
+  const headingPattern = /^\*\*(.+?)[：:]\*\*\s*$/gm;
   const headings = [...markdown.matchAll(headingPattern)];
   return headings.map((heading, index) => [heading[1].trim(), markdown.slice(heading.index! + heading[0].length, headings[index + 1]?.index ?? markdown.length).trim()] as [string, string]);
 }
@@ -427,12 +435,61 @@ function renderContextMarkdown(fields: AdrFields): string {
 }
 
 async function readRepositoryAdr(path: string): Promise<AdrSource> {
-  const content = await readFile(path, "utf8");
+  return splitAdrSource(await readFile(path, "utf8"));
+}
+
+export function splitAdrSource(content: string): AdrSource {
+  const boldLocalizationMarkers = [...content.matchAll(/^(?:\*\*中文本地化覆盖[：:]\*\*|中文本地化[^\r\n]*[：:])\s*$/gm)];
+  if (boldLocalizationMarkers.length) {
+    const englishParts: string[] = [];
+    const chineseParts: string[] = [];
+    let cursor = 0;
+
+    for (const marker of boldLocalizationMarkers) {
+      const markerStart = marker.index!;
+      const markerEnd = markerStart + marker[0].length;
+      englishParts.push(content.slice(cursor, markerStart));
+      const nextEnglishHeading = nextEnglishHeadingIndex(content, markerEnd);
+      const localizedSection = content.slice(markerEnd, nextEnglishHeading < 0 ? content.length : nextEnglishHeading).trim();
+      chineseParts.push(`### ${localizedHeadingFor(precedingEnglishHeading(content, markerStart))}\n\n${localizedSection}`);
+      cursor = nextEnglishHeading < 0 ? content.length : nextEnglishHeading;
+    }
+
+    englishParts.push(content.slice(cursor));
+    return adrSource(englishParts.join(""), chineseParts.join("\n\n"));
+  }
+
   const chineseHeading = content.search(/^##\s+[^\x00-\x7F]/m);
   const [english, headedChinese = ""] = chineseHeading >= 0
     ? [content.slice(0, chineseHeading), content.slice(chineseHeading)]
     : content.split(/## .*Chinese Localization/);
-  const chinese = headedChinese || content.match(/[\u4e00-\u9fff][\s\S]*/)?.[0] || "";
+  return adrSource(english, headedChinese || content.match(/[\u4e00-\u9fff][\s\S]*/)?.[0] || "");
+}
+
+function nextEnglishHeadingIndex(content: string, start: number): number {
+  const heading = /^#{1,2}\s+[A-Za-z]/gm;
+  heading.lastIndex = start;
+  const match = heading.exec(content);
+  return match?.index ?? -1;
+}
+
+function precedingEnglishHeading(content: string, end: number): string {
+  const headings = [...content.slice(0, end).matchAll(/^##\s+([A-Za-z][^\r\n]*)$/gm)];
+  return headings.at(-1)?.[1].trim() ?? "Localized content";
+}
+
+function localizedHeadingFor(heading: string): string {
+  return ({
+    Context: "背景",
+    Decision: "决策",
+    Alternatives: "备选方案",
+    Consequences: "后果",
+    Constraints: "约束",
+    Evidence: "证据"
+  } as Record<string, string>)[heading] ?? heading;
+}
+
+function adrSource(english: string, chinese: string): AdrSource {
   const title = english.match(/^#\s+(?:ADR[- ]?\d+:?\s*)?(.+)$/m)?.[1]?.trim() ?? "Architecture decision";
   return { title, english: english.trim(), chinese: chinese.trim() };
 }
