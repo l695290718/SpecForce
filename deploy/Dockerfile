@@ -2,7 +2,10 @@ FROM node:22-bookworm-slim AS builder
 
 WORKDIR /workspace
 
-RUN corepack enable
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/* \
+  && corepack enable
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/web/package.json apps/web/package.json
@@ -11,17 +14,20 @@ COPY apps/impact-worker/package.json apps/impact-worker/package.json
 COPY packages/core/package.json packages/core/package.json
 COPY packages/graph-store/package.json packages/graph-store/package.json
 COPY prisma ./prisma
-
-RUN pnpm install --frozen-lockfile
-
 COPY apps ./apps
 COPY packages ./packages
+
+RUN pnpm install --frozen-lockfile
 
 RUN pnpm db:generate && pnpm --filter @specforge/web build
 
 FROM node:22-bookworm-slim AS runtime
 
 WORKDIR /app
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
