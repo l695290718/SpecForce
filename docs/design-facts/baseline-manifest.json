@@ -215,6 +215,35 @@
           "result": "Slice 3B audit failure diagnostic redaction regression passes: 2 files and 96 tests; raw exception and credential text are absent from AuditLog.errorMessage."
         }
       ]
+    },
+    {
+      "id": "adr-single-host-docker-compose-deployment",
+      "repositoryAdr": "docs/adr/0011-single-host-docker-compose-deployment.md",
+      "mcpAdrId": "adr-single-host-docker-compose-deployment",
+      "scope": {
+        "applicationServiceId": "com.huawei.celon.desiner",
+        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+      },
+      "proposalId": "proposal-single-host-docker-deployment",
+      "contextPackId": "context-pack-single-host-docker-deployment",
+      "relatedAssetIds": [
+        "data-specforge-assets",
+        "api-specforge-mcp-tools"
+      ],
+      "evidence": [
+        {
+          "command": "powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -ConfigurationOnly",
+          "result": "Bundled and external PostgreSQL Compose topology checks passed."
+        },
+        {
+          "command": "docker compose --env-file deploy/.env.example -f deploy/compose.yaml build web",
+          "result": "Standalone production Web image built successfully."
+        },
+        {
+          "command": "powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -Live",
+          "result": "Isolated deployment stack passed health and Web restart persistence verification on port 3010."
+        }
+      ]
     }
   ]
 }

@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(8);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(8);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(8);
+  expect(manifest.decisions).toHaveLength(9);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(9);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(9);
 
   for (const decision of manifest.decisions) {
     expect(decision.id).toMatch(/^adr-/);
@@ -28,6 +28,13 @@ it("maps every baseline decision to a complete repository and MCP record", () =>
 
 it("includes federated design-fact governance in the baseline", () => {
   expect(manifest.decisions.some((decision) => decision.mcpAdrId === "adr-federated-design-fact-synchronization")).toBe(true);
+});
+
+it("includes the single-host Docker deployment decision in the baseline", () => {
+  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-single-host-docker-compose-deployment");
+  expect(decision?.proposalId).toBe("proposal-single-host-docker-deployment");
+  expect(decision?.contextPackId).toBe("context-pack-single-host-docker-deployment");
+  expect(decision?.evidence).toHaveLength(3);
 });
 
 it("records the verified federated sync fact with canonical metadata and valid bilingual ADR overlays", () => {
