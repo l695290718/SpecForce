@@ -1,0 +1,75 @@
+package httpapi
+
+import "context"
+
+// Scope is the complete identity boundary for every graph operation.
+type Scope struct {
+	EnterpriseID           string `json:"enterpriseId"`
+	ApplicationServiceID   string `json:"applicationServiceId"`
+	ScopePath              string `json:"scopePath"`
+}
+
+type Node struct {
+	Scope
+	NodeType       string `json:"nodeType"`
+	LogicalID      string `json:"logicalId"`
+	RootAssetType  string `json:"rootAssetType"`
+	RootAssetID    string `json:"rootAssetId"`
+	ParentLogicalID string `json:"parentLogicalId,omitempty"`
+}
+
+type Edge struct {
+	ID         string  `json:"id"`
+	Code       string  `json:"code"`
+	Source     Node    `json:"source"`
+	Target     Node    `json:"target"`
+	Strength   string  `json:"strength"`
+	Confidence float64 `json:"confidence"`
+	Version    string  `json:"version"`
+}
+
+type ProjectionRequest struct {
+	Scope        Scope  `json:"scope"`
+	GraphVersion string `json:"graphVersion"`
+	Nodes        []Node `json:"nodes"`
+	Edges        []Edge `json:"edges"`
+}
+
+type ProjectionReceipt struct {
+	GraphVersion       string `json:"graphVersion"`
+	ProjectedNodeCount int    `json:"projectedNodeCount"`
+	ProjectedEdgeCount int    `json:"projectedEdgeCount"`
+}
+
+type TraversalRequest struct {
+	Scope         Scope   `json:"scope"`
+	StartNodes    []Node  `json:"startNodes"`
+	RelationCodes []string `json:"relationCodes"`
+	MaxDepth      int     `json:"maxDepth"`
+	MaxNodes      int     `json:"maxNodes"`
+	MaxPaths      int     `json:"maxPaths"`
+	TimeoutMS     int     `json:"timeoutMs"`
+	GraphVersion  string  `json:"graphVersion,omitempty"`
+}
+
+type TraversalResult struct {
+	Status            string `json:"status"`
+	Nodes             []Node `json:"nodes"`
+	Edges             []Edge `json:"edges"`
+	GraphVersion      string `json:"graphVersion"`
+	ElapsedMS         int64  `json:"elapsedMs"`
+	TruncationReasons []string `json:"truncationReasons"`
+}
+
+type Health struct {
+	GraphSchemaReady bool `json:"graphSchemaReady"`
+}
+
+// NebulaClient is the only dependency of the HTTP boundary. Implementations
+// may use the official client, but callers cannot submit nGQL through this API.
+type NebulaClient interface {
+	Project(context.Context, ProjectionRequest) (ProjectionReceipt, error)
+	Traverse(context.Context, TraversalRequest) (TraversalResult, error)
+	Checkpoint(context.Context, Scope) (string, error)
+	Health(context.Context) (Health, error)
+}
