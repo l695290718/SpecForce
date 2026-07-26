@@ -1,0 +1,97 @@
+# Optional compatibility profile. Apply this file only for local NebulaGraph
+# verification; the base compose file remains the external-cluster topology.
+services:
+  nebula-metad:
+    image: vesoft/nebula-metad:v3.8.0
+    restart: unless-stopped
+    command:
+      - --meta_server_addrs=nebula-metad:9559
+      - --local_ip=nebula-metad
+      - --ws_ip=nebula-metad
+      - --port=9559
+      - --ws_http_port=19559
+      - --data_path=/data/meta
+    volumes:
+      - specforge_nebula_meta:/data/meta
+    healthcheck:
+      test: ["CMD-SHELL", "test -S /tmp/nebula-metad.pid -o -f /proc/1/cmdline"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  nebula-storaged:
+    image: vesoft/nebula-storaged:v3.8.0
+    restart: unless-stopped
+    command:
+      - --meta_server_addrs=nebula-metad:9559
+      - --local_ip=nebula-storaged
+      - --ws_ip=nebula-storaged
+      - --port=9779
+      - --ws_http_port=19779
+      - --data_path=/data/storage
+    volumes:
+      - specforge_nebula_storage:/data/storage
+    depends_on:
+      nebula-metad:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /proc/1/cmdline"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  nebula-graphd:
+    image: vesoft/nebula-graphd:v3.8.0
+    restart: unless-stopped
+    command:
+      - --meta_server_addrs=nebula-metad:9559
+      - --local_ip=nebula-graphd
+      - --ws_ip=nebula-graphd
+      - --port=9669
+      - --ws_http_port=19669
+    depends_on:
+      nebula-metad:
+        condition: service_healthy
+      nebula-storaged:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /proc/1/cmdline"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  graph-gateway:
+    image: ${SPECFORGE_GRAPH_GATEWAY_IMAGE:?Set SPECFORGE_GRAPH_GATEWAY_IMAGE in deploy/graph/.env}
+    restart: unless-stopped
+    environment:
+      SPECFORGE_GRAPH_GATEWAY_PORT: "8088"
+      SPECFORGE_NEBULA_ADDRESS: nebula-graphd:9669
+      SPECFORGE_NEBULA_USER: ${SPECFORGE_NEBULA_USER:?Set SPECFORGE_NEBULA_USER in deploy/graph/.env}
+      SPECFORGE_NEBULA_PASSWORD: ${SPECFORGE_NEBULA_PASSWORD:?Set SPECFORGE_NEBULA_PASSWORD in deploy/graph/.env}
+      SPECFORGE_NEBULA_SPACE: ${SPECFORGE_NEBULA_SPACE:-specforge_graph}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nebula-graphd:
+        condition: service_healthy
+
+  graph-projector:
+    image: ${SPECFORGE_GRAPH_PROJECTOR_IMAGE:?Set SPECFORGE_GRAPH_PROJECTOR_IMAGE in deploy/graph/.env}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in deploy/.env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in deploy/.env}?schema=public
+      SPECFORGE_GRAPH_GATEWAY_URL: http://graph-gateway:8088
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nebula-graphd:
+        condition: service_healthy
+      graph-gateway:
+        condition: service_started
+
+volumes:
+  specforge_nebula_meta:
+  specforge_nebula_storage:
