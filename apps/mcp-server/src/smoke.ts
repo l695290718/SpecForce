@@ -114,6 +114,11 @@ async function main() {
   const scopedDomainText = scopedDomainResource.contents.map((content) => "text" in content ? content.text : "").join("\n");
   const governanceText = requireSuccess("run_governance_checks", governance);
   const linkText = requireSuccess("link_assets", link);
+  const graphScopeIsolated = graphZhEnvelope.graph.nodes.every(
+    (node: { applicationServiceId?: string }) => node.applicationServiceId === applicationServiceId
+  ) && graphZhEnvelope.graph.edges.every(
+    (edge: { applicationServiceId?: string }) => edge.applicationServiceId === applicationServiceId
+  );
 
   if (!tools.tools.some((tool) => tool.name === "search_design_assets")) throw new Error("search_design_assets tool missing");
   if (!tools.tools.some((tool) => tool.name === "upsert_design_asset")) throw new Error("upsert_design_asset tool missing");
@@ -132,6 +137,7 @@ async function main() {
   if (!scopedDomainText.includes("Canonical Source JSON")) throw new Error("scoped domain resource missing canonical source");
   if (!missingScopeFailure) throw new Error("missing scope was not rejected");
   if (!deniedScopeFailure) throw new Error("denied scope was not rejected");
+  if (!graphScopeIsolated) throw new Error("scoped graph returned sibling application-service data");
   if (!governanceText.includes("results")) throw new Error("governance result missing");
   if (!linkText.includes("quality-specforge-impact-ready")) throw new Error("MCP persisted link result missing");
 
@@ -149,6 +155,7 @@ async function main() {
         localizedGraphWorked: graphZhEnvelope.graph.nodes.some((node: { logicalId?: string; id: string; label: string }) => canonicalLabels.get(node.logicalId ?? node.id) !== node.label),
         missingScopeRejected: Boolean(missingScopeFailure),
         deniedScopeRejected: Boolean(deniedScopeFailure),
+        graphScopeIsolated,
         governanceReturnedResults: governanceText.includes("results"),
         persistedLinkToolWorked: linkText.includes("quality-specforge-impact-ready")
       },

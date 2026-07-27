@@ -152,7 +152,9 @@ describe("NebulaGatewayGraphStore", () => {
   });
 
   it("encodes the exact scope in the checkpoint path", async () => {
-    const fetch = vi.fn(async () => jsonResponse({ graphVersion: "19" })) as typeof globalThis.fetch;
+    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      jsonResponse({ graphVersion: "19" })
+    );
     const store = new NebulaGatewayGraphStore({ baseUrl: "http://gateway.internal", enterpriseId, fetch });
 
     await expect(store.checkpoint(scope)).resolves.toBe(19n);

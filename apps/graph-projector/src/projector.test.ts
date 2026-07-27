@@ -69,6 +69,39 @@ describe("GraphProjector", () => {
     expect(repository.retries.map((event) => event.id)).toEqual([lower.id]);
     expect(gateway.deliveries.map((event) => event.graphVersion)).toEqual([3n]);
   });
+
+  it("advances sibling application-service checkpoints independently", async () => {
+    const designer = projection({ id: "outbox-designer", graphVersion: 7n });
+    const policy = projection({
+      id: "outbox-policy",
+      applicationServiceId: "com.huawei.celon.policyhub",
+      scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.policyhub",
+      graphVersion: 11n
+    });
+    const repository = new MemoryRepository([designer, policy]);
+    const gateway = new RecordingGateway();
+    const projector = new GraphProjector(repository, gateway, { now: () => now });
+
+    await projector.processOnce();
+
+    expect(repository.checkpoints).toEqual(new Map([
+      [scopeKey(designer), 7n],
+      [scopeKey(policy), 11n]
+    ]));
+    expect(gateway.deliveries.map((event) => ({
+      applicationServiceId: event.applicationServiceId,
+      scopePath: event.scopePath
+    }))).toEqual([
+      {
+        applicationServiceId: designer.applicationServiceId,
+        scopePath: designer.scopePath
+      },
+      {
+        applicationServiceId: policy.applicationServiceId,
+        scopePath: policy.scopePath
+      }
+    ]);
+  });
 });
 
 class RecordingGateway implements GraphGateway {

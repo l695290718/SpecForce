@@ -68,6 +68,21 @@ describe("graphStoreConfigFromEnvironment", () => {
     expect(graphStoreOf(worker)).toBeInstanceOf(PostgresGraphStore);
   });
 
+  it("reads PostgreSQL only when the fallback selector is explicit", async () => {
+    const query = vi.fn(async () => [{ graph_version: 23n }]);
+    const worker = createImpactAnalysisWorkerFromEnvironment(
+      { $queryRawUnsafe: query } as unknown as PrismaClient,
+      {
+        NODE_ENV: "production",
+        SPECFORGE_GRAPH_STORE: "postgres",
+        SPECFORGE_ENTERPRISE_ID: enterpriseId
+      }
+    );
+
+    await expect(graphStoreOf(worker).checkpoint(scope)).resolves.toBe(23n);
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
   it("defaults to PostgreSQL only in local development", () => {
     expect(graphStoreConfigFromEnvironment({
       NODE_ENV: "development",

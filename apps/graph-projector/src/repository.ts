@@ -135,7 +135,7 @@ function scopeKey(event: ClaimedProjection): string {
   return `${event.enterpriseId}:${event.applicationServiceId}:${event.scopePath}`;
 }
 
-function isRecord(value: Prisma.JsonValue): value is Record<string, unknown> {
+function isRecord(value: Prisma.JsonValue): value is Prisma.JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
