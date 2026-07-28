@@ -1,7 +1,7 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import type { ClaimedProjection, ProjectionClaimOptions, ProjectionRepository } from "./projector.js";
 import type { ProjectionPayload } from "./gateway.js";
-import type { ProjectionHealthSnapshot } from "./runtime.js";
+import { ProjectionHealthError, type ProjectionHealthSnapshot } from "./runtime.js";
 
 type PrismaTransactionClient = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">;
 type PrismaRepositoryClient = PrismaClient | PrismaTransactionClient;
@@ -15,13 +15,21 @@ export class PrismaProjectionRepository implements ProjectionRepository {
     scope: { enterpriseId: string; applicationServiceId: string; scopePath: string },
     now: Date
   ): Promise<ProjectionHealthSnapshot> {
-    const rows = await this.prisma.$queryRawUnsafe<HealthRow[]>(
-      HEALTH_SQL,
-      scope.enterpriseId,
-      scope.applicationServiceId,
-      scope.scopePath,
-      now
-    );
+    let rows: HealthRow[];
+    try {
+      rows = await this.prisma.$queryRawUnsafe<HealthRow[]>(
+        HEALTH_SQL,
+        scope.enterpriseId,
+        scope.applicationServiceId,
+        scope.scopePath,
+        now
+      );
+    } catch (error) {
+      if (isUndefinedTableError(error)) {
+        throw new ProjectionHealthError("PROJECTOR_SCHEMA_NOT_READY");
+      }
+      throw error;
+    }
     const row = rows[0];
     if (row === undefined) throw new Error("PROJECTOR_HEALTH_QUERY_EMPTY");
     return {
@@ -175,6 +183,16 @@ type HealthRow = {
   retry_count: number;
   dead_letter_count: number;
 };
+
+function isUndefinedTableError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null || !("code" in error) || error.code !== "P2010") {
+    return false;
+  }
+  if (!("meta" in error) || typeof error.meta !== "object" || error.meta === null || !("code" in error.meta)) {
+    return false;
+  }
+  return error.meta.code === "42P01";
+}
 
 function toClaimedProjection(row: OutboxRow): ClaimedProjection {
   return {

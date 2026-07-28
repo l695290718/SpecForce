@@ -13,6 +13,14 @@ export interface ProjectionHealthRepository {
   health(scope: ProjectionScope, now: Date): Promise<ProjectionHealthSnapshot>;
 }
 
+export class ProjectionHealthError extends Error {
+  readonly name = "ProjectionHealthError";
+
+  constructor(readonly code: "PROJECTOR_SCHEMA_NOT_READY") {
+    super(code);
+  }
+}
+
 export interface ProjectorProcessor {
   processOnce(): Promise<ProcessSummary>;
 }
@@ -113,10 +121,10 @@ export function createProjectorRuntime(options: ProjectorRuntimeOptions): Projec
         retryCount: health.retryCount,
         deadLetterCount: health.deadLetterCount
       });
-    } catch {
+    } catch (error) {
       writeJson(response, 503, {
         status: "unavailable",
-        code: "PROJECTOR_HEALTH_UNAVAILABLE"
+        code: projectionHealthErrorCode(error)
       });
     }
   });
@@ -156,6 +164,20 @@ function boundedInteger(value: string | undefined, fallback: number, minimum: nu
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) throw new Error(code);
   return parsed;
+}
+
+function projectionHealthErrorCode(error: unknown): string {
+  if (
+    typeof error === "object"
+    && error !== null
+    && "name" in error
+    && error.name === "ProjectionHealthError"
+    && "code" in error
+    && error.code === "PROJECTOR_SCHEMA_NOT_READY"
+  ) {
+    return error.code;
+  }
+  return "PROJECTOR_HEALTH_UNAVAILABLE";
 }
 
 function writeJson(response: ServerResponse, status: number, body: unknown): void {

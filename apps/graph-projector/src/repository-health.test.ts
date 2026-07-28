@@ -36,4 +36,25 @@ describe("PrismaProjectionRepository health", () => {
       now
     );
   });
+
+  it("classifies an absent projection schema without exposing database diagnostics", async () => {
+    const query = vi.fn(async () => {
+      throw {
+        code: "P2010",
+        meta: {
+          code: "42P01",
+          message: 'relation "RelationshipOutbox" does not exist'
+        }
+      };
+    });
+    const repository = new PrismaProjectionRepository({
+      $queryRawUnsafe: query
+    } as never);
+
+    await expect(repository.health(scope, new Date("2026-07-28T10:00:00.000Z"))).rejects.toMatchObject({
+      name: "ProjectionHealthError",
+      code: "PROJECTOR_SCHEMA_NOT_READY",
+      message: "PROJECTOR_SCHEMA_NOT_READY"
+    });
+  });
 });

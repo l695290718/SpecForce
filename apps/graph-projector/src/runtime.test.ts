@@ -121,6 +121,32 @@ describe("graph projector HTTP runtime", () => {
     expect(body).not.toContain("postgresql://");
   });
 
+  it("reports a sanitized schema-not-ready health code", async () => {
+    const healthRepository: ProjectionHealthRepository = {
+      async health() {
+        throw Object.assign(new Error("PROJECTOR_SCHEMA_NOT_READY"), {
+          name: "ProjectionHealthError",
+          code: "PROJECTOR_SCHEMA_NOT_READY"
+        });
+      }
+    };
+    const runtime = createProjectorRuntime({
+      projector: new IdleProjector(),
+      healthRepository,
+      pollIntervalMs: 60_000
+    });
+    running.push(runtime);
+    const { url } = await runtime.listen();
+
+    const response = await fetch(`${url}/health?${scopeSearchParams()}`);
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      status: "unavailable",
+      code: "PROJECTOR_SCHEMA_NOT_READY"
+    });
+  });
+
   it("does not leak another scope's loop retry into exact-scope health", async () => {
     const runtime = createProjectorRuntime({
       projector: {
