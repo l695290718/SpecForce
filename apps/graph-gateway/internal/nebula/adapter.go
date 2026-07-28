@@ -144,7 +144,7 @@ func (c *OfficialClient) Checkpoint(ctx context.Context, scope httpapi.Scope) (s
 }
 
 func (c *OfficialClient) Health(ctx context.Context) (httpapi.Health, error) {
-	if err := c.useSpace(ctx); err != nil {
+	if err := c.ensureSchema(ctx); err != nil {
 		return httpapi.Health{}, err
 	}
 	if err := c.execute(ctx, "SHOW TAGS;"); err != nil {

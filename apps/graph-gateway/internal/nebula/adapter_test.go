@@ -71,6 +71,37 @@ func TestOfficialClientConsumesNebulaV3ResultSet(t *testing.T) {
 	}
 }
 
+func TestOfficialClientHealthInitializesSchemaBeforeReadingTags(t *testing.T) {
+	t.Parallel()
+
+	executor := &recordingExecutor{}
+	client := nebula.NewOfficialClient(executor, "specforge_graph")
+
+	if _, err := client.Health(context.Background()); err != nil {
+		t.Fatalf("health: %v", err)
+	}
+
+	if len(executor.statements) == 0 {
+		t.Fatal("expected health to execute schema statements")
+	}
+	if !strings.HasPrefix(executor.statements[0], "CREATE SPACE IF NOT EXISTS") {
+		t.Fatalf("health must initialize the graph space before using it, got first statement %q", executor.statements[0])
+	}
+	showTags := -1
+	for index, statement := range executor.statements {
+		if statement == "SHOW TAGS;" {
+			showTags = index
+			break
+		}
+	}
+	if showTags < 0 {
+		t.Fatalf("expected health to verify tags, got %v", executor.statements)
+	}
+	if showTags == 0 {
+		t.Fatalf("health read tags before initializing schema: %v", executor.statements)
+	}
+}
+
 type recordingExecutor struct {
 	statements []string
 }
