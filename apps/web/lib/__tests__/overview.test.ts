@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
 
 import { messages } from "../i18n";
 import { overviewDestinations } from "../overview";
@@ -27,5 +28,15 @@ describe("overview localization", () => {
 
     expect(overviewKeys.length).toBeGreaterThan(12);
     expect(overviewKeys.every((key) => key in messages.zh)).toBe(true);
+  });
+});
+
+describe("overview route isolation", () => {
+  it("keeps the root route free of scoped data loaders", async () => {
+    const source = await readFile(new URL("../../app/page.tsx", import.meta.url), "utf8");
+
+    expect(source).not.toContain("getScopedAssetCatalog");
+    expect(source).not.toContain("getAgentServiceWorkspace");
+    expect(source).not.toContain("getScopedGovernanceOverview");
   });
 });
