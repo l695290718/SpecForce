@@ -101,27 +101,37 @@ func (c *OfficialClient) Traverse(ctx context.Context, traversal httpapi.Travers
 	for _, node := range traversal.StartNodes {
 		vertexIDs = append(vertexIDs, literal(vertexID(node)))
 	}
-	response, err := c.executeResponse(ctx, "traversal", fmt.Sprintf("GO 1 TO %d STEPS FROM %s OVER specforge_relation YIELD $$.specforge_node.node_key, $$.specforge_node.node_type, $$.specforge_node.logical_id, $$.specforge_node.root_asset_type, $$.specforge_node.root_asset_id, $$.specforge_node.parent_logical_id;", traversal.MaxDepth, strings.Join(vertexIDs, ", ")))
+	response, err := c.executeResponse(ctx, "traversal", fmt.Sprintf("GO 1 TO %d STEPS FROM %s OVER specforge_relation YIELD $^.specforge_node.node_key, $^.specforge_node.node_type, $^.specforge_node.logical_id, $^.specforge_node.root_asset_type, $^.specforge_node.root_asset_id, $^.specforge_node.parent_logical_id, $$.specforge_node.node_key, $$.specforge_node.node_type, $$.specforge_node.logical_id, $$.specforge_node.root_asset_type, $$.specforge_node.root_asset_id, $$.specforge_node.parent_logical_id, specforge_relation.edge_id, specforge_relation.code, specforge_relation.strength, specforge_relation.confidence, specforge_relation.version;", traversal.MaxDepth, strings.Join(vertexIDs, ", ")))
 	if err != nil {
 		return httpapi.TraversalResult{}, err
 	}
 	nodeByKey := make(map[string]httpapi.Node, len(traversal.StartNodes)+len(response.GetRows()))
+	edgeByID := make(map[string]httpapi.Edge, len(response.GetRows()))
 	for _, node := range traversal.StartNodes {
 		nodeByKey[nodeKey(node)] = node
 	}
 	for _, row := range response.GetRows() {
 		columns := row.GetValues()
-		if len(columns) < 5 {
+		if len(columns) < 17 {
 			continue
 		}
-		nodeByKey[string(columns[0].GetSVal())] = httpapi.Node{
-			Scope:           traversal.Scope,
-			NodeType:        string(columns[1].GetSVal()),
-			LogicalID:       string(columns[2].GetSVal()),
-			RootAssetType:   string(columns[3].GetSVal()),
-			RootAssetID:     string(columns[4].GetSVal()),
-			ParentLogicalID: columnString(columns, 5),
+		source, sourceKey, sourceOK := traversalNode(traversal.Scope, columns, 0)
+		target, targetKey, targetOK := traversalNode(traversal.Scope, columns, 6)
+		if !sourceOK || !targetOK {
+			continue
 		}
+		nodeByKey[sourceKey] = source
+		nodeByKey[targetKey] = target
+		edge := httpapi.Edge{
+			ID:         columnString(columns, 12),
+			Code:       columnString(columns, 13),
+			Source:     source,
+			Target:     target,
+			Strength:   columnString(columns, 14),
+			Confidence: columns[15].GetFVal(),
+			Version:    columnString(columns, 16),
+		}
+		edgeByID[edge.ID] = edge
 	}
 	keys := make([]string, 0, len(nodeByKey))
 	for key := range nodeByKey {
@@ -132,7 +142,16 @@ func (c *OfficialClient) Traverse(ctx context.Context, traversal httpapi.Travers
 	for _, key := range keys {
 		nodes = append(nodes, nodeByKey[key])
 	}
-	return httpapi.TraversalResult{Status: "COMPLETE", Nodes: nodes, Edges: []httpapi.Edge{}, GraphVersion: traversal.GraphVersion, TruncationReasons: []string{}}, nil
+	edgeIDs := make([]string, 0, len(edgeByID))
+	for edgeID := range edgeByID {
+		edgeIDs = append(edgeIDs, edgeID)
+	}
+	sort.Strings(edgeIDs)
+	edges := make([]httpapi.Edge, 0, len(edgeIDs))
+	for _, edgeID := range edgeIDs {
+		edges = append(edges, edgeByID[edgeID])
+	}
+	return httpapi.TraversalResult{Status: "COMPLETE", Nodes: nodes, Edges: edges, GraphVersion: traversal.GraphVersion, TruncationReasons: []string{}}, nil
 }
 
 func (c *OfficialClient) Checkpoint(ctx context.Context, scope httpapi.Scope) (string, error) {
@@ -298,4 +317,23 @@ func columnString(columns []*ngtypes.Value, index int) string {
 		return ""
 	}
 	return string(columns[index].GetSVal())
+}
+
+func traversalNode(scope httpapi.Scope, columns []*ngtypes.Value, offset int) (httpapi.Node, string, bool) {
+	if offset+5 >= len(columns) {
+		return httpapi.Node{}, "", false
+	}
+	key := columnString(columns, offset)
+	node := httpapi.Node{
+		Scope:           scope,
+		NodeType:        columnString(columns, offset+1),
+		LogicalID:       columnString(columns, offset+2),
+		RootAssetType:   columnString(columns, offset+3),
+		RootAssetID:     columnString(columns, offset+4),
+		ParentLogicalID: columnString(columns, offset+5),
+	}
+	if key == "" || key != nodeKey(node) {
+		return httpapi.Node{}, "", false
+	}
+	return node, key, true
 }
