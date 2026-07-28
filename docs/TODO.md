@@ -2,6 +2,18 @@
 
 ## Design-Fact Governance
 
+### Synchronize architecture overview design facts
+
+**Status:** MCP synchronization blocked (2026-07-28).
+
+**Owner:** SpecForge Architecture.
+
+**Reason:** `pnpm design-facts:sync` and `pnpm design-facts:check` cannot start the MCP server. `apps/mcp-server/src/persistence.ts:1` imports `PrismaClient`, while the generated `@prisma/client` module does not export it; the MCP client receives `MCP error -32000: Connection closed`. No `adr-architecture-overview-home`, `proposal-architecture-overview-home`, `ctx-architecture-overview-home`, Evidence, or typed links were persisted or read back.
+
+**Retry trigger:** Regenerate or repair the Prisma Client in the configured runtime. Then run `pnpm design-facts:sync` and `pnpm design-facts:check` using the exact Designer Scope, and verify the IDs, English canonical fields, Chinese overlays, `IMPLEMENTS_DECISION`, `IMPLEMENTS_CONTEXT_FOR`, `DECIDES`, and `VALIDATES` links.
+
+**中文本地化：** MCP 同步受阻（2026-07-28）。负责人为 SpecForge Architecture。`apps/mcp-server/src/persistence.ts:1` 导入 `PrismaClient`，而生成的 `@prisma/client` 未导出该符号，导致 `pnpm design-facts:sync` 和 `pnpm design-facts:check` 无法启动 MCP 服务，客户端收到 `MCP error -32000: Connection closed`。尚未持久化或回读 ADR、Proposal、Context Pack、Evidence 和类型化链接。修复已配置运行环境中的 Prisma Client 后，必须在精确 Designer Scope 下重新运行同步与对账并核验完整记录。
+
 ### Complete dual-record synchronization
 
 **Status:** Complete (locally verified on 2026-07-17).

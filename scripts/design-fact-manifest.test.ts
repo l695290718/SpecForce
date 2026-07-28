@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(9);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(9);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(9);
+  expect(manifest.decisions).toHaveLength(10);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(10);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(10);
 
   for (const decision of manifest.decisions) {
     expect(decision.id).toMatch(/^adr-/);
@@ -35,6 +35,16 @@ it("includes the single-host Docker deployment decision in the baseline", () => 
   expect(decision?.proposalId).toBe("proposal-single-host-docker-deployment");
   expect(decision?.contextPackId).toBe("context-pack-single-host-docker-deployment");
   expect(decision?.evidence).toHaveLength(3);
+});
+
+it("includes the scope-safe architecture overview decision with bilingual governance metadata", () => {
+  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-architecture-overview-home");
+  expect(decision?.proposalId).toBe("proposal-architecture-overview-home");
+  expect(decision?.contextPackId).toBe("ctx-architecture-overview-home");
+  expect(decision?.relatedAssetIds).toEqual(["data-specforge-assets", "adr-design-fact-dual-record-governance"]);
+  expect(decision?.localizedContent?.en.decision).toContain("static bilingual architecture orientation");
+  expect(decision?.localizedContent?.zh.decision).toContain("静态双语架构定位页");
+  expect(decision?.evidence).toHaveLength(2);
 });
 
 it("records the verified federated sync fact with canonical metadata and valid bilingual ADR overlays", () => {
