@@ -4,7 +4,7 @@ import {
   type ClaimedProjection,
   type GraphGateway,
   type ProjectionRepository
-} from "./projector";
+} from "./projector.js";
 
 const now = new Date("2026-07-26T00:00:00.000Z");
 const scope = {
@@ -101,6 +101,36 @@ describe("GraphProjector", () => {
         scopePath: policy.scopePath
       }
     ]);
+  });
+
+  it("continues a sibling scope after another scope fails", async () => {
+    const failedDesigner = projection({ id: "outbox-designer-failed", graphVersion: 3n });
+    const policy = projection({
+      id: "outbox-policy",
+      applicationServiceId: "com.huawei.celon.policyhub",
+      scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.policyhub",
+      graphVersion: 11n
+    });
+    const blockedDesigner = projection({ id: "outbox-designer-blocked", graphVersion: 4n });
+    const repository = new MemoryRepository([failedDesigner, policy, blockedDesigner]);
+    const gateway = new RecordingGateway((event) =>
+      event.id === failedDesigner.id ? new Error("designer unavailable") : undefined
+    );
+    const projector = new GraphProjector(repository, gateway, { now: () => now });
+
+    await expect(projector.processOnce()).resolves.toEqual({
+      claimed: 3,
+      completed: 1,
+      retried: 1,
+      deadLettered: 0
+    });
+
+    expect(gateway.deliveries.map((event) => event.id)).toEqual([
+      failedDesigner.id,
+      policy.id
+    ]);
+    expect(repository.checkpoints.get(scopeKey(policy))).toBe(11n);
+    expect(repository.checkpoints.get(scopeKey(failedDesigner))).toBeUndefined();
   });
 });
 

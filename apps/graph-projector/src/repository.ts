@@ -1,5 +1,7 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import type { ClaimedProjection, ProjectionClaimOptions, ProjectionRepository } from "./projector";
+import type { ClaimedProjection, ProjectionClaimOptions, ProjectionRepository } from "./projector.js";
+import type { ProjectionPayload } from "./gateway.js";
+import type { ProjectionHealthSnapshot } from "./runtime.js";
 
 type PrismaTransactionClient = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">;
 type PrismaRepositoryClient = PrismaClient | PrismaTransactionClient;
@@ -8,6 +10,83 @@ const checkpointPartitionId = "relationship-outbox";
 
 export class PrismaProjectionRepository implements ProjectionRepository {
   constructor(private readonly prisma: PrismaClient) {}
+
+  async health(
+    scope: { enterpriseId: string; applicationServiceId: string; scopePath: string },
+    now: Date
+  ): Promise<ProjectionHealthSnapshot> {
+    const rows = await this.prisma.$queryRawUnsafe<HealthRow[]>(
+      HEALTH_SQL,
+      scope.enterpriseId,
+      scope.applicationServiceId,
+      scope.scopePath,
+      now
+    );
+    const row = rows[0];
+    if (row === undefined) throw new Error("PROJECTOR_HEALTH_QUERY_EMPTY");
+    return {
+      backlog: Number(row.backlog),
+      oldestPendingAgeSeconds: row.oldest_pending_age_seconds === null
+        ? null
+        : Math.max(0, Math.floor(Number(row.oldest_pending_age_seconds))),
+      lastCheckpoint: row.last_checkpoint,
+      retryCount: Number(row.retry_count),
+      deadLetterCount: Number(row.dead_letter_count)
+    };
+  }
+
+  async projectionPayload(event: ClaimedProjection): Promise<ProjectionPayload> {
+    const canonicalNodes = jsonRecordArray(event.payload.nodes);
+    const canonicalEdges = jsonRecordArray(event.payload.edges);
+    if (canonicalNodes !== undefined && canonicalEdges !== undefined) {
+      return { nodes: canonicalNodes, edges: canonicalEdges };
+    }
+
+    const subject = jsonRecord(event.payload.subject);
+    if (subject === undefined) throw new Error("GRAPH_PROJECTION_PAYLOAD_INVALID");
+    if (event.eventType === "ASSET_NODE_UPSERT") {
+      return { nodes: [nodeFromRecord(subject)], edges: [] };
+    }
+    if (event.eventType !== "RELATIONSHIP_UPSERT" || subject.lifecycleStatus !== "ACTIVE") {
+      throw new Error("GRAPH_PROJECTION_EVENT_UNSUPPORTED");
+    }
+
+    const sourceNodeId = requiredString(subject.sourceNodeId);
+    const targetNodeId = requiredString(subject.targetNodeId);
+    const rows = await this.prisma.assetNode.findMany({
+      where: {
+        enterpriseId: event.enterpriseId,
+        applicationServiceId: event.applicationServiceId,
+        scopePath: event.scopePath,
+        dbId: { in: [sourceNodeId, targetNodeId] }
+      },
+      select: {
+        dbId: true,
+        nodeType: true,
+        logicalId: true,
+        rootAssetType: true,
+        rootAssetId: true,
+        parent: { select: { logicalId: true } }
+      }
+    });
+    const byId = new Map(rows.map((row) => [row.dbId, nodeFromAssetNode(row)]));
+    const source = byId.get(sourceNodeId);
+    const target = byId.get(targetNodeId);
+    if (source === undefined || target === undefined) throw new Error("GRAPH_PROJECTION_ENDPOINT_NOT_FOUND");
+    const nodes = sourceNodeId === targetNodeId ? [source] : [source, target];
+    return {
+      nodes,
+      edges: [{
+        id: requiredString(subject.relationshipId),
+        code: requiredString(subject.relationType),
+        source,
+        target,
+        strength: requiredString(subject.strength),
+        confidence: requiredNumber(subject.confidence),
+        version: requiredString(subject.version)
+      }]
+    };
+  }
 
   async claim(input: ProjectionClaimOptions): Promise<ClaimedProjection[]> {
     const leaseExpiresAt = new Date(input.now.getTime() + input.leaseDurationMs);
@@ -89,6 +168,14 @@ type OutboxRow = {
   leaseExpiresAt: Date | null;
 };
 
+type HealthRow = {
+  backlog: number;
+  oldest_pending_age_seconds: number | null;
+  last_checkpoint: bigint | null;
+  retry_count: number;
+  dead_letter_count: number;
+};
+
 function toClaimedProjection(row: OutboxRow): ClaimedProjection {
   return {
     id: row.dbId,
@@ -137,6 +224,56 @@ function scopeKey(event: ClaimedProjection): string {
 
 function isRecord(value: Prisma.JsonValue): value is Prisma.JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function jsonRecord(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
+function jsonRecordArray(value: unknown): Array<Record<string, unknown>> | undefined {
+  return Array.isArray(value) && value.every((item) => jsonRecord(item) !== undefined)
+    ? value as Array<Record<string, unknown>>
+    : undefined;
+}
+
+function nodeFromRecord(value: Record<string, unknown>): Record<string, unknown> {
+  return {
+    nodeType: requiredString(value.nodeType),
+    logicalId: requiredString(value.logicalId),
+    rootAssetType: requiredString(value.rootAssetType),
+    rootAssetId: requiredString(value.rootAssetId),
+    ...(typeof value.parentLogicalId === "string" && value.parentLogicalId.trim()
+      ? { parentLogicalId: value.parentLogicalId }
+      : {})
+  };
+}
+
+function nodeFromAssetNode(value: {
+  nodeType: string;
+  logicalId: string;
+  rootAssetType: string;
+  rootAssetId: string;
+  parent: { logicalId: string } | null;
+}): Record<string, unknown> {
+  return {
+    nodeType: value.nodeType,
+    logicalId: value.logicalId,
+    rootAssetType: value.rootAssetType,
+    rootAssetId: value.rootAssetId,
+    ...(value.parent === null ? {} : { parentLogicalId: value.parent.logicalId })
+  };
+}
+
+function requiredString(value: unknown): string {
+  if (typeof value !== "string" || !value.trim()) throw new Error("GRAPH_PROJECTION_PAYLOAD_INVALID");
+  return value;
+}
+
+function requiredNumber(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error("GRAPH_PROJECTION_PAYLOAD_INVALID");
+  return value;
 }
 
 const CLAIM_SQL = `
@@ -194,4 +331,34 @@ const CHECKPOINT_SQL = `
       END,
       status = 'HEALTHY',
       error = NULL;
+`;
+
+const HEALTH_SQL = `
+  SELECT
+    COUNT(*) FILTER (
+      WHERE outbox.status IN ('PENDING', 'DELIVERING')
+    )::integer AS backlog,
+    EXTRACT(EPOCH FROM (
+      $4::timestamptz - MIN(outbox."createdAt") FILTER (
+        WHERE outbox.status IN ('PENDING', 'DELIVERING')
+      )
+    ))::double precision AS oldest_pending_age_seconds,
+    COALESCE(SUM(GREATEST(outbox."attemptCount" - 1, 0)) FILTER (
+      WHERE outbox.status IN ('PENDING', 'DELIVERING')
+    ), 0)::integer AS retry_count,
+    COUNT(*) FILTER (
+      WHERE outbox.status = 'DEAD_LETTER'
+    )::integer AS dead_letter_count,
+    (
+      SELECT MAX(checkpoint."projectionVersion")
+      FROM "ProjectionCheckpoint" AS checkpoint
+      WHERE checkpoint."enterpriseId" = $1
+        AND checkpoint."applicationServiceId" = $2
+        AND checkpoint."scopePath" = $3
+        AND checkpoint."partitionId" = 'relationship-outbox'
+    ) AS last_checkpoint
+  FROM "RelationshipOutbox" AS outbox
+  WHERE outbox."enterpriseId" = $1
+    AND outbox."applicationServiceId" = $2
+    AND outbox."scopePath" = $3;
 `;

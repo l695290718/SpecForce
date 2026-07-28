@@ -82,12 +82,16 @@ export class GraphProjector {
       limit: this.batchSize
     });
     const summary: ProcessSummary = { claimed: claimed.length, completed: 0, retried: 0, deadLettered: 0 };
+    const blockedScopes = new Set<string>();
 
     for (const event of claimed) {
+      const eventScopeKey = projectionScopeKey(event);
+      if (blockedScopes.has(eventScopeKey)) continue;
       try {
         await this.gateway.project(event);
         if (await this.repository.complete(event, { owner: this.workerId, now: this.now() })) summary.completed += 1;
       } catch (error) {
+        blockedScopes.add(eventScopeKey);
         const diagnostic = sanitizeDiagnostic(error);
         const diagnosticRef = diagnosticReference(error);
         if (event.attemptCount >= this.maxAttempts) {
@@ -102,12 +106,15 @@ export class GraphProjector {
         })) {
           summary.retried += 1;
         }
-        break;
       }
     }
 
     return summary;
   }
+}
+
+function projectionScopeKey(scope: ProjectionScope): string {
+  return `${scope.enterpriseId}:${scope.applicationServiceId}:${scope.scopePath}`;
 }
 
 function retryDelayMs(attemptCount: number, baseDelayMs: number): number {
