@@ -7,19 +7,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
-	ngdb "github.com/vesoft-inc/nebula-go"
-	graph "github.com/vesoft-inc/nebula-go/nebula/graph"
 	"github.com/l695290718/specforge/apps/graph-gateway/internal/httpapi"
+	ngdb "github.com/vesoft-inc/nebula-go/v3"
+	ngtypes "github.com/vesoft-inc/nebula-go/v3/nebula"
 )
 
 const defaultSpace = "specforge_graph"
 
 type executor interface {
-	Execute(string) (*graph.ExecutionResponse, error)
+	Execute(string) (*ngdb.ResultSet, error)
 }
 
 // OfficialClient is the only production adapter that imports Nebula's official
@@ -37,14 +39,26 @@ func NewOfficialClient(executor executor, space string) *OfficialClient {
 }
 
 func Connect(address, username, password, space string, timeout time.Duration) (*OfficialClient, func(), error) {
-	client, err := ngdb.NewClient(address, ngdb.WithTimeout(timeout))
+	host, err := parseHostAddress(address)
 	if err != nil {
-		return nil, nil, fmt.Errorf("create nebula client: %w", err)
+		return nil, nil, fmt.Errorf("parse nebula address: %w", err)
 	}
-	if err := client.Connect(username, password); err != nil {
+	config := ngdb.GetDefaultConf()
+	config.TimeOut = timeout
+	pool, err := ngdb.NewConnectionPool([]ngdb.HostAddress{host}, config, ngdb.DefaultLogger{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("create nebula connection pool: %w", err)
+	}
+	session, err := pool.GetSession(username, password)
+	if err != nil {
+		pool.Close()
 		return nil, nil, errors.New("NEBULA_CONNECTION_FAILED")
 	}
-	return NewOfficialClient(client, space), client.Disconnect, nil
+	closeClient := func() {
+		session.Release()
+		pool.Close()
+	}
+	return NewOfficialClient(session, space), closeClient, nil
 }
 
 func (c *OfficialClient) Project(ctx context.Context, projection httpapi.ProjectionRequest) (httpapi.ProjectionReceipt, error) {
@@ -90,16 +104,16 @@ func (c *OfficialClient) Traverse(ctx context.Context, traversal httpapi.Travers
 		nodeByKey[nodeKey(node)] = node
 	}
 	for _, row := range response.GetRows() {
-		columns := row.GetColumns()
+		columns := row.GetValues()
 		if len(columns) < 5 {
 			continue
 		}
-		nodeByKey[string(columns[0].GetStr())] = httpapi.Node{
-			Scope:          traversal.Scope,
-			NodeType:       string(columns[1].GetStr()),
-			LogicalID:      string(columns[2].GetStr()),
-			RootAssetType:  string(columns[3].GetStr()),
-			RootAssetID:    string(columns[4].GetStr()),
+		nodeByKey[string(columns[0].GetSVal())] = httpapi.Node{
+			Scope:           traversal.Scope,
+			NodeType:        string(columns[1].GetSVal()),
+			LogicalID:       string(columns[2].GetSVal()),
+			RootAssetType:   string(columns[3].GetSVal()),
+			RootAssetID:     string(columns[4].GetSVal()),
 			ParentLogicalID: columnString(columns, 5),
 		}
 	}
@@ -123,10 +137,10 @@ func (c *OfficialClient) Checkpoint(ctx context.Context, scope httpapi.Scope) (s
 	if err != nil {
 		return "", err
 	}
-	if len(response.GetRows()) == 0 || len(response.GetRows()[0].GetColumns()) == 0 {
+	if len(response.GetRows()) == 0 || len(response.GetRows()[0].GetValues()) == 0 {
 		return "0", nil
 	}
-	return string(response.GetRows()[0].GetColumns()[0].GetStr()), nil
+	return string(response.GetRows()[0].GetValues()[0].GetSVal()), nil
 }
 
 func (c *OfficialClient) Health(ctx context.Context) (httpapi.Health, error) {
@@ -167,15 +181,30 @@ func (c *OfficialClient) execute(ctx context.Context, statement string) error {
 	return err
 }
 
-func (c *OfficialClient) executeResponse(ctx context.Context, statement string) (*graph.ExecutionResponse, error) {
+func (c *OfficialClient) executeResponse(ctx context.Context, statement string) (*ngdb.ResultSet, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	response, err := c.executor.Execute(statement)
-	if err != nil || response == nil || ngdb.IsError(response) {
+	if err != nil || response == nil || !response.IsSucceed() {
 		return nil, errors.New("NEBULA_QUERY_FAILED")
 	}
 	return response, nil
+}
+
+func parseHostAddress(address string) (ngdb.HostAddress, error) {
+	host, portText, err := net.SplitHostPort(address)
+	if err != nil {
+		return ngdb.HostAddress{}, err
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil || port < 1 || port > 65535 {
+		return ngdb.HostAddress{}, fmt.Errorf("invalid port %q", portText)
+	}
+	if host == "" {
+		return ngdb.HostAddress{}, errors.New("host is required")
+	}
+	return ngdb.HostAddress{Host: host, Port: port}, nil
 }
 
 func nodeStatement(node httpapi.Node) string {
@@ -211,9 +240,9 @@ func literal(value string) string {
 	return string(encoded)
 }
 
-func columnString(columns []*graph.ColumnValue, index int) string {
+func columnString(columns []*ngtypes.Value, index int) string {
 	if index >= len(columns) || columns[index] == nil {
 		return ""
 	}
-	return string(columns[index].GetStr())
+	return string(columns[index].GetSVal())
 }

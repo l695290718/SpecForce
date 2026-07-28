@@ -111,6 +111,36 @@ Fresh repository-only checks on 2026-07-27:
 - Persisted/read-back status: none in this repository-only task.
 - **MCP synchronization blocked** as described in `Completion Blockers`; no synchronization success is claimed.
 
+## Protocol Compatibility Amendment (2026-07-28)
+
+The Gateway dependency `github.com/vesoft-inc/nebula-go v1.1.0` used Thrift types that are incompatible with the deployed NebulaGraph 3.8.0 Graphd and failed during authentication with `unable to skip over unknown type id 116`.
+
+The Gateway now uses the official `github.com/vesoft-inc/nebula-go/v3 v3.8.0` module. `Connect` uses `HostAddress`, `GetDefaultConf`, `NewConnectionPool`, and `GetSession`; query execution consumes `ResultSet`, checks `IsSucceed`, and reads v3 row values through `Row.GetValues` and `Value.GetSVal`. HTTP contracts, exact-scope validation, typed nGQL construction, and sanitized external errors are unchanged.
+
+Evidence:
+
+- A focused `ResultSet` compatibility test failed before the module upgrade because `github.com/vesoft-inc/nebula-go/v3` was not provided, then passed after the adapter migration.
+- `$env:GOCACHE=<worktree>/.tmp/go-build-v3-all; go test ./...` from `apps/graph-gateway` passed all Gateway packages.
+- The Gateway image built from the updated `go.mod` and `go.sum`; Docker resolved the v3 module dependencies during `go mod download`.
+- Against the local NebulaGraph 3.8.0 Compose network, the v3 client authenticated and executed `SHOW HOSTS`, and the rebuilt Gateway remained `healthy` without the Thrift type error.
+- The broader opt-in two-hop compatibility test still returned `NEBULA_QUERY_FAILED` during projection. Local diagnostics also found pre-existing cluster initialization state (`Host not enough!` before storaged registration). Therefore end-to-end projection completion remains blocked and is not claimed by this amendment.
+- MCP synchronization remains blocked because no SpecForge MCP write tool is exposed in this execution context. Retry trigger: expose the scoped MCP write surface, persist this amendment under `adr-nebulagraph-production-projection`, and read it back in the exact Designer scope.
+
+## 协议兼容性补充（2026-07-28）
+
+Gateway 原先依赖 `github.com/vesoft-inc/nebula-go v1.1.0`。该版本的 Thrift 类型与当前 NebulaGraph 3.8.0 Graphd 不兼容，认证阶段会出现 `unable to skip over unknown type id 116`。
+
+Gateway 现已升级到官方模块 `github.com/vesoft-inc/nebula-go/v3 v3.8.0`。连接流程改为 `HostAddress`、`GetDefaultConf`、`NewConnectionPool` 和 `GetSession`；查询结果改为使用 `ResultSet`、`IsSucceed`、`Row.GetValues` 与 `Value.GetSVal`。HTTP 契约、精确 Scope 校验、有类型 nGQL 构造和外部错误脱敏保持不变。
+
+验证结果：
+
+- 聚焦 `ResultSet` 兼容性测试在升级前因缺少 `/v3` 模块按预期失败，适配完成后通过。
+- 在 `apps/graph-gateway` 运行 `$env:GOCACHE=<worktree>/.tmp/go-build-v3-all; go test ./...`，所有 Gateway 包通过。
+- Gateway 镜像使用更新后的 `go.mod` 和 `go.sum` 构建成功；Docker 在 `go mod download` 阶段解析了 v3 依赖。
+- 在本地 NebulaGraph 3.8.0 Compose 网络中，v3 客户端完成认证并成功执行 `SHOW HOSTS`；重建后的 Gateway 保持 `healthy`，未再出现 Thrift 类型错误。
+- 更完整的两跳兼容性测试仍在投影阶段返回 `NEBULA_QUERY_FAILED`。本地诊断还发现既有集群初始化状态问题（登记 storaged 前返回 `Host not enough!`）。因此本补充不声明端到端生产投影已经完成。
+- 当前执行环境未暴露 SpecForge MCP 写入工具，所以 MCP 同步仍处于阻塞状态。重试条件：提供精确 Scope 的 MCP 写入能力，将本补充写入 `adr-nebulagraph-production-projection`，并在 Designer Scope 下完成回读核验。
+
 ## 中文本地化
 
 ### 状态

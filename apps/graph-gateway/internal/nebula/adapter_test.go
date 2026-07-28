@@ -5,18 +5,20 @@ import (
 	"strings"
 	"testing"
 
-	graph "github.com/vesoft-inc/nebula-go/nebula/graph"
 	"github.com/l695290718/specforge/apps/graph-gateway/internal/httpapi"
 	"github.com/l695290718/specforge/apps/graph-gateway/internal/nebula"
+	ngdb "github.com/vesoft-inc/nebula-go/v3"
+	ngtypes "github.com/vesoft-inc/nebula-go/v3/nebula"
+	graph "github.com/vesoft-inc/nebula-go/v3/nebula/graph"
 )
 
 func TestScopeKeyRoundTripsExactScope(t *testing.T) {
 	t.Parallel()
 
 	original := httpapi.Scope{
-		EnterpriseID: "huawei",
+		EnterpriseID:         "huawei",
 		ApplicationServiceID: "com.huawei.celon.desiner",
-		ScopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner",
+		ScopePath:            "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner",
 	}
 
 	decoded, err := httpapi.DecodeScopeKey(httpapi.EncodeScopeKey(original))
@@ -54,11 +56,26 @@ func TestOfficialClientOwnsEscapingForProjection(t *testing.T) {
 	}
 }
 
+func TestOfficialClientConsumesNebulaV3ResultSet(t *testing.T) {
+	t.Parallel()
+
+	executor := &recordingExecutor{}
+	client := nebula.NewOfficialClient(executor, "specforge_graph")
+
+	health, err := client.Health(context.Background())
+	if err != nil {
+		t.Fatalf("health: %v", err)
+	}
+	if !health.GraphSchemaReady {
+		t.Fatal("expected graph schema to be ready")
+	}
+}
+
 type recordingExecutor struct {
 	statements []string
 }
 
-func (r *recordingExecutor) Execute(statement string) (*graph.ExecutionResponse, error) {
+func (r *recordingExecutor) Execute(statement string) (*ngdb.ResultSet, error) {
 	r.statements = append(r.statements, statement)
-	return &graph.ExecutionResponse{ErrorCode: graph.ErrorCode_SUCCEEDED}, nil
+	return ngdb.GenResultSet(&graph.ExecutionResponse{ErrorCode: ngtypes.ErrorCode_SUCCEEDED})
 }
