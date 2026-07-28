@@ -64,7 +64,11 @@ services:
       start_period: 20s
 
   graph-gateway:
-    image: ${SPECFORGE_GRAPH_GATEWAY_IMAGE:?Set SPECFORGE_GRAPH_GATEWAY_IMAGE in deploy/graph/.env}
+    image: ${SPECFORGE_GRAPH_GATEWAY_IMAGE:-specforge/graph-gateway:local}
+    pull_policy: build
+    build:
+      context: ..
+      dockerfile: deploy/graph-gateway.Dockerfile
     restart: unless-stopped
     environment:
       SPECFORGE_GRAPH_GATEWAY_PORT: "8088"
@@ -77,20 +81,52 @@ services:
         condition: service_healthy
       nebula-graphd:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/graph-gateway-healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
   graph-projector:
-    image: ${SPECFORGE_GRAPH_PROJECTOR_IMAGE:?Set SPECFORGE_GRAPH_PROJECTOR_IMAGE in deploy/graph/.env}
+    image: ${SPECFORGE_GRAPH_PROJECTOR_IMAGE:-specforge/graph-projector:local}
+    pull_policy: build
+    build:
+      context: ..
+      dockerfile: deploy/graph-projector.Dockerfile
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in deploy/.env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in deploy/.env}?schema=public
       SPECFORGE_GRAPH_GATEWAY_URL: http://graph-gateway:8088
+      SPECFORGE_GRAPH_HEALTH_ENTERPRISE_ID: ${SPECFORGE_GRAPH_HEALTH_ENTERPRISE_ID:?Set SPECFORGE_GRAPH_HEALTH_ENTERPRISE_ID in deploy/graph/.env}
+      SPECFORGE_GRAPH_HEALTH_APPLICATION_SERVICE_ID: ${SPECFORGE_GRAPH_HEALTH_APPLICATION_SERVICE_ID:?Set SPECFORGE_GRAPH_HEALTH_APPLICATION_SERVICE_ID in deploy/graph/.env}
+      SPECFORGE_GRAPH_HEALTH_SCOPE_PATH: ${SPECFORGE_GRAPH_HEALTH_SCOPE_PATH:?Set SPECFORGE_GRAPH_HEALTH_SCOPE_PATH in deploy/graph/.env}
     depends_on:
       postgres:
         condition: service_healthy
       nebula-graphd:
         condition: service_healthy
       graph-gateway:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          const http=require('node:http');
+          const query=new URLSearchParams({
+            enterpriseId:process.env.SPECFORGE_GRAPH_HEALTH_ENTERPRISE_ID,
+            applicationServiceId:process.env.SPECFORGE_GRAPH_HEALTH_APPLICATION_SERVICE_ID,
+            scopePath:process.env.SPECFORGE_GRAPH_HEALTH_SCOPE_PATH
+          }).toString();
+          http.get('http://127.0.0.1:8090/health?'+query,
+            response=>process.exit(response.statusCode===200?0:1))
+            .on('error',()=>process.exit(1));
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
 volumes:
   specforge_nebula_meta:
