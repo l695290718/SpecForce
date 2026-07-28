@@ -39,4 +39,11 @@ describe("overview route isolation", () => {
     expect(source).not.toContain("getAgentServiceWorkspace");
     expect(source).not.toContain("getScopedGovernanceOverview");
   });
+
+  it("uses a responsive, optional-motion conceptual fact flow", async () => {
+    const source = await readFile(new URL("../../app/page.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain('className="sf-overview-flow"');
+    expect(source).toContain("data-motion");
+  });
 });

@@ -61,13 +61,13 @@ export default function ArchitectureOverviewPage() {
           <div><p className="font-mono text-[11px] font-semibold uppercase text-rule">SYSTEM OF DESIGN</p><h2 className="mt-2 text-xl font-semibold text-ink"><T k="overview.flowTitle" /></h2></div>
           <span className="hidden font-mono text-xs text-muted sm:block">MCP -&gt; PG -&gt; GRAPH</span>
         </div>
-        <ol className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6" data-testid="architecture-fact-flow">
+        <ol className="sf-overview-flow" data-testid="architecture-fact-flow">
           {factFlow.map(([labelKey, Icon], index) => (
-            <li className="relative border border-border bg-white px-4 py-4 shadow-sm" key={labelKey}>
+            <li className="sf-overview-flow-step relative border border-border bg-white px-4 py-4 shadow-sm" key={labelKey}>
               <span className="font-mono text-[11px] font-semibold text-rule">0{index + 1}</span>
               <Icon className="mt-5 text-accent" size={20} />
               <div className="mt-3 text-sm font-semibold text-ink"><T k={labelKey} /></div>
-              {index < factFlow.length - 1 ? <ArrowRight aria-hidden className="absolute -right-2 top-1/2 z-10 hidden -translate-y-1/2 bg-surface text-rule xl:block" size={16} /> : null}
+              {index < factFlow.length - 1 ? <ArrowRight aria-hidden className="sf-overview-flow-connector absolute -right-2 top-1/2 z-10 hidden -translate-y-1/2 bg-surface text-rule xl:block" data-motion size={16} /> : null}
             </li>
           ))}
         </ol>
