@@ -244,6 +244,54 @@
           "result": "Isolated deployment stack passed health and Web restart persistence verification on port 3010."
         }
       ]
+    },
+    {
+      "id": "adr-nebulagraph-production-projection",
+      "repositoryAdr": "docs/adr/0012-nebulagraph-production-projection.md",
+      "mcpAdrId": "adr-nebulagraph-production-projection",
+      "scope": {
+        "applicationServiceId": "com.huawei.celon.desiner",
+        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+      },
+      "proposalId": "proposal-nebulagraph-production-projection",
+      "contextPackId": "context-pack-nebulagraph-production-projection",
+      "relatedAssetIds": [
+        "data-specforge-asset-graph",
+        "api-specforge-mcp-tools",
+        "quality-specforge-impact-ready"
+      ],
+      "status": "MCP synchronization blocked",
+      "owner": "SpecForge Runtime and SpecForge Architecture",
+      "reason": "The live graph profile is healthy, but its authoritative RelationshipOutbox and ProjectionCheckpoint tables are empty and the elected localhost:5433 PostgreSQL authority is unreachable from the MCP stdio client. localhost:5432 was intentionally not substituted.",
+      "retryTrigger": "Restore the elected localhost:5433 authority or run the scoped MCP client on the private Compose network; author one exact-Designer-scope relationship, then run design-facts:sync, design-facts:check, the federation check, and scoped read-back.",
+      "localizedContent": {
+        "en": {
+          "decision": "PostgreSQL remains authoritative; NebulaGraph is a derived exact-scope projection reached only through the typed Gateway and leased outbox Projector.",
+          "constraints": [
+            "Do not claim outbox projection, checkpoint advancement, restart idempotency, or MCP synchronization until the elected authority is reachable and the resulting records are read back in the exact Designer Scope."
+          ]
+        },
+        "zh": {
+          "decision": "PostgreSQL 保持权威；NebulaGraph 是只能通过有类型 Gateway 和带租约 Outbox Projector 访问的精确 Scope 派生投影。",
+          "constraints": [
+            "在已选权威库可达且精确 Designer Scope 内的结果完成回读前，不得声明 Outbox 投影、检查点推进、重启幂等或 MCP 同步完成。"
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "command": "docker compose --env-file deploy/.env --env-file deploy/graph/.env -f deploy/compose.yaml -f deploy/compose.graph-local.yaml ps",
+          "result": "PostgreSQL, Nebula Meta, Storage, Graphd, Gateway, and Projector reported healthy in the local graph profile."
+        },
+        {
+          "command": "docker exec specforge-graph-verify-postgres-1 psql -U specforge -d specforge -v ON_ERROR_STOP=1 < read-only outbox/checkpoint query",
+          "result": "RelationshipOutbox and ProjectionCheckpoint returned zero rows, so no authoritative outbox projection or checkpoint evidence exists."
+        },
+        {
+          "command": "DATABASE_URL=postgresql://admin:admin@localhost:5433/specforge?schema=public pnpm design-facts:sync",
+          "result": "The MCP stdio client reached create_adr, then failed with Prisma P1001 because the elected localhost:5433 authority is unreachable; localhost:5432 was not substituted."
+        }
+      ]
     }
   ]
 }

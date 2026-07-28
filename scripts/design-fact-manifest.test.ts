@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(9);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(9);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(9);
+  expect(manifest.decisions).toHaveLength(10);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(10);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(10);
 
   for (const decision of manifest.decisions) {
     expect(decision.id).toMatch(/^adr-/);
@@ -34,6 +34,18 @@ it("includes the single-host Docker deployment decision in the baseline", () => 
   const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-single-host-docker-compose-deployment");
   expect(decision?.proposalId).toBe("proposal-single-host-docker-deployment");
   expect(decision?.contextPackId).toBe("context-pack-single-host-docker-deployment");
+  expect(decision?.evidence).toHaveLength(3);
+});
+
+it("records the NebulaGraph projection decision as blocked until authoritative outbox and MCP evidence exists", () => {
+  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-nebulagraph-production-projection");
+  expect(decision?.proposalId).toBe("proposal-nebulagraph-production-projection");
+  expect(decision?.contextPackId).toBe("context-pack-nebulagraph-production-projection");
+  expect(decision?.status).toBe("MCP synchronization blocked");
+  expect(decision?.reason).toContain("RelationshipOutbox");
+  expect(decision?.retryTrigger).toContain("localhost:5433");
+  expect(decision?.localizedContent?.en.decision).toContain("PostgreSQL remains authoritative");
+  expect(decision?.localizedContent?.zh.decision).toContain("PostgreSQL 保持权威");
   expect(decision?.evidence).toHaveLength(3);
 });
 

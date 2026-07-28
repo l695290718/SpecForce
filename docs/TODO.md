@@ -61,7 +61,7 @@ The Web console and authoritative PostgreSQL database are packaged as separate D
 
 ### NebulaGraph production projection
 
-**Status:** Repository implementation and non-live checks complete; production completion blocked.
+**Status:** Runtime components live and healthy; authoritative outbox projection and MCP closure blocked.
 
 **Owner:** SpecForge Runtime for live projection and Projector health; SpecForge Architecture for MCP synchronization.
 
@@ -75,16 +75,17 @@ The repository now contains the typed Go Gateway and official NebulaGraph adapte
 - Gateway `go test ./...` passed with the live compatibility case skipped because `SPECFORGE_NEBULA_COMPATIBILITY=1` was not set; and
 - `powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -ConfigurationOnly` passed the local/external Compose topology assertions.
 
+**Verified live state (2026-07-28):** the private Compose profile reports PostgreSQL, Nebula Meta, Storage, Graphd, Gateway, and Projector healthy. The Gateway uses the official v3 Nebula client, initializes the schema before health checks, projects stable bounded vertex IDs, and returns complete typed edges. The Projector exposes exact-scope health with backlog, checkpoint, retry, and dead-letter fields.
+
 **Remaining completion gates:**
 
-- run the official-client compatibility test against a live NebulaGraph 3.8.0 service;
-- prove PostgreSQL outbox drain, idempotent Nebula writes, exact-scope checkpoint advancement, multi-hop traversal, Projector restart, and no duplicate logical edge;
-- expose and verify the Projector health endpoint for backlog, oldest pending age, checkpoint, retries, and dead letters; and
+- make the elected PostgreSQL authority available to the scoped MCP client, author one exact-Designer-scope relationship, and prove its `RelationshipOutbox` row drains to NebulaGraph;
+- retain exact-scope checkpoint advancement, multi-hop traversal, Projector restart, and duplicate-edge evidence; and
 - persist and read back the matching ADR, Proposal, Context Pack, design assets, typed links, and Evidence through MCP in the exact Designer scope.
 
-**Live Docker verification blocked:** no live compatibility or end-to-end projection evidence exists. Retry trigger: start the local graph profile with buildable Gateway/Projector images and reachable PostgreSQL, then execute the live procedure in `docs/operations/nebulagraph-projection.md`.
+**Authoritative outbox blocked:** a read-only query against the live graph-profile PostgreSQL returned zero `RelationshipOutbox` and zero `ProjectionCheckpoint` rows. Retry trigger: create the exact-scope relationship through MCP after the elected authority is reachable, then repeat the live procedure in `docs/operations/nebulagraph-projection.md`.
 
-**MCP synchronization blocked:** this repository-only Task 7 execution explicitly prohibited MCP calls, so no write or read-back was attempted. Retry trigger: authorize exact-scope MCP writes, persist the records, run `pnpm design-facts:sync`, `pnpm design-facts:check`, and the exact-scope federation check, then read back IDs, localized fields, directional links, and Evidence.
+**MCP synchronization blocked:** the elected Docker PostgreSQL authority at `localhost:5433/specforge` is unreachable from the MCP stdio client. The graph-profile database remains private by design and `localhost:5432` was deliberately not substituted. Retry trigger: restore `5433` or run an approved scoped MCP client on the private Compose network, then run `pnpm design-facts:sync`, `pnpm design-facts:check`, and the exact-scope federation check with scoped read-back.
 
 **中文本地化：**
 
@@ -95,6 +96,10 @@ The repository now contains the typed Go Gateway and official NebulaGraph adapte
 2026-07-27 的仓库证据包括：检查六个实现提交；聚焦 Vitest 通过 5 个文件和 33 个测试；三个相关 TypeScript 类型检查通过；Gateway `go test ./...` 通过但真实 Nebula 兼容测试因未启用而跳过；Compose 配置断言通过。
 
 剩余门禁包括：在真实 NebulaGraph 3.8.0 上运行官方客户端兼容测试；验证 Outbox 到 Nebula 的端到端投影、幂等写入、精确 Scope 检查点、多跳遍历和重启去重；交付 Projector 运维健康端点；并在精确 Designer Scope 通过 MCP 写入和回读 ADR、Proposal、Context Pack、设计资产、类型关系与 Evidence。本次仅仓库任务禁止调用 MCP，因此必须保持 **MCP synchronization blocked**，不得声明整体完成。
+
+**2026-07-28 更新：** 本地私有 Compose 图运行时中的 PostgreSQL、Nebula Meta、Storage、Graphd、Gateway 和 Projector 均已健康。Gateway 已使用官方 v3 客户端，并完成 schema 初始化、稳定短顶点 ID 和完整边映射；Projector 已提供精确 Scope 的 backlog、checkpoint、retry 与 dead-letter 健康字段。
+
+当前不能关闭本待办：对图运行时私有 PostgreSQL 的只读查询返回零条 `RelationshipOutbox` 和零条 `ProjectionCheckpoint`，因此尚无 MCP 编写关系经 Outbox 到 NebulaGraph 的证据。已选定的权威库 `localhost:5433/specforge` 对主机 MCP stdio 客户端不可达；虽然 `localhost:5432` 可响应，但它不是已选权威库，未被替代使用。重试条件：恢复 `5433`，或在私有 Compose 网络中运行获准的 Scope MCP 客户端；随后创建一条精确 Designer Scope 关系，并完成 Outbox、checkpoint、遍历、Projector 重启和 MCP 回读验证。
 
 ### PostgreSQL graph traversal final regression
 
