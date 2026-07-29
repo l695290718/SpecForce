@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted; implementation locally verified; MCP synchronization blocked.**
+**Accepted; implementation locally verified; MCP synchronized and read back.**
 
 - Stable ADR/MCP ID: `adr-architecture-overview-home`
 - Matching Proposal ID: `proposal-architecture-overview-home`
@@ -45,9 +45,11 @@ Use `/` as a static bilingual architecture orientation. It presents the design-f
 - **Verified:** `pnpm exec vitest run apps/web/lib/__tests__/overview.test.ts apps/web/app/__tests__/overview-page.test.tsx apps/web/components/__tests__/app-shell.test.tsx` passed 3 files and 11 tests during the implemented stage.
 - **Verified:** `pnpm --filter @specforge/web lint` passed during the implemented stage.
 - **Blocked outside this feature change range:** Web typecheck stops at `apps/web/lib/db.ts(1,10)` because generated `@prisma/client` does not export `PrismaClient`.
-- **MCP synchronization blocked:** Owner: SpecForge Architecture. `pnpm design-facts:sync` and `pnpm design-facts:check` cannot start the MCP server because `apps/mcp-server/src/persistence.ts:1` imports `PrismaClient`, but the generated `@prisma/client` module does not export it. The MCP client receives `MCP error -32000: Connection closed`; no ADR, Proposal, Context Pack, evidence, or typed link for this decision was persisted or read back. Retry trigger: regenerate or repair the Prisma Client in the configured runtime, then run `pnpm design-facts:sync` and `pnpm design-facts:check` against the exact Designer Scope and confirm the persisted IDs, localized fields, `IMPLEMENTS_DECISION`, `IMPLEMENTS_CONTEXT_FOR`, `DECIDES`, and `VALIDATES` links.
+- **MCP synchronized and read back:** `pnpm design-facts:sync` persisted the ADR, Proposal, Context Pack, Evidence, and typed links through the exact Designer Scope. `pnpm design-facts:check` verified all ten decisions with no missing, mismatched, out-of-scope, or blocked facts. The focused persistence, tools, and manifest suites passed 54 tests.
 
 ## 中文本地化 / Chinese Localization
+
+**同步完成说明：** 2026-07-29 已重新生成 Prisma Client，并通过仅本机可访问的权威 PostgreSQL 隧道执行 `pnpm design-facts:sync` 和 `pnpm design-facts:check`。首页 ADR、Proposal、Context Pack、Evidence 与有类型关系均已在精确 Designer Scope 中写入并回读；10 项决策均无缺失、不匹配、越界或受阻事实。以下历史“同步受阻”描述由本说明取代。
 
 ### 状态
 

@@ -406,6 +406,19 @@ describe("legacy AssetLink ledger synchronization", () => {
     expect(harness.state.calls.indexOf("lock")).toBeLessThan(harness.state.calls.indexOf("assetLink.upsert"));
   });
 
+  it("persists a design-governance link without projecting an unsupported relation into the graph ledger", async () => {
+    mockSchemaSetup();
+    const harness = installLegacyLedgerHarness();
+
+    await expect(upsertAssetLink({ ...legacyLinkInput(), relationType: "DECIDES" })).resolves.toMatchObject({ relationType: "DECIDES" });
+
+    expect(harness.state.assetLinks).toHaveLength(1);
+    expect(harness.state.assetLinks[0]).toMatchObject({ relationType: "DECIDES" });
+    expect(harness.state.current).toHaveLength(0);
+    expect(harness.state.events).toHaveLength(0);
+    expect(harness.state.outbox).toHaveLength(0);
+  });
+
   it("updates a backfilled legacy relationship in its recorded enterprise instead of duplicating it", async () => {
     process.env.SPECFORGE_ENTERPRISE_ID = "configured-enterprise";
     mockSchemaSetup();

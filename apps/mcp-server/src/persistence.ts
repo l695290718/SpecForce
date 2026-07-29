@@ -493,11 +493,14 @@ export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedA
   assertString(input.sourceId, "sourceId");
   assertString(input.targetId, "targetId");
   assertString(input.relationType, "relationType");
-  const relationshipCode = normalizeLegacyRelationshipCode(input.relationType);
+  const designFactRelation = isDesignFactRelation(input.relationType);
+  const relationshipCode = designFactRelation ? undefined : normalizeLegacyRelationshipCode(input.relationType);
   const id = assetLinkId({ ...input, sourceType, targetType });
   await ensureMcpPersistenceSchema();
   await prisma.$transaction(async (transaction) => {
-    const relationshipScope = await resolveLegacyRelationshipScope(transaction, scope, `legacy-asset-link:${id}`);
+    const relationshipScope = relationshipCode
+      ? await resolveLegacyRelationshipScope(transaction, scope, `legacy-asset-link:${id}`)
+      : undefined;
     const link = await transaction.assetLink.upsert({
       where: {
         applicationServiceId_scopePath_id: {
@@ -526,7 +529,7 @@ export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedA
         description: input.description
       }
     });
-    await synchronizeLegacyAssetLinkUpsert(transaction, link, relationshipCode, relationshipScope);
+    if (relationshipCode && relationshipScope) await synchronizeLegacyAssetLinkUpsert(transaction, link, relationshipCode, relationshipScope);
   });
 
   return {
@@ -540,6 +543,11 @@ export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedA
     architectureScope: scope,
     createdAt: new Date().toISOString()
   };
+}
+
+function isDesignFactRelation(relationType: string): boolean {
+  return new Set(["DECIDES", "IMPLEMENTS_DECISION", "IMPLEMENTS_CONTEXT_FOR", "VALIDATES"])
+    .has(relationType.trim().toUpperCase());
 }
 
 export async function listPersistedAssetLinks(applicationServiceId: string): Promise<PersistedAssetLink[]> {

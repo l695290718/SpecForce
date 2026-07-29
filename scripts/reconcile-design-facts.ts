@@ -8,7 +8,7 @@ type Decision = Pick<DesignFactManifestDecision, "id" | "mcpAdrId" | "proposalId
 type Manifest = { decisions: Decision[] };
 type PersistedAdr = { id?: string; command?: string; result?: string; status?: string; architectureScope?: { applicationServiceId?: string; scopePath?: string }; localizedContent?: { zh?: unknown } };
 type RecordType = "adr" | "proposal" | "contextPack" | "evidence";
-type Link = { sourceLogicalId?: string; targetLogicalId?: string; label?: string };
+type Link = { sourceLogicalId?: string; targetLogicalId?: string; label?: string; sourceId?: string; targetId?: string; relationType?: string };
 
 export interface DesignFactReconciliationReport {
   missing: string[];
@@ -74,7 +74,9 @@ function hasDecisionIssue(report: DesignFactReconciliationReport, decisionId: st
 }
 
 function hasLink(links: Link[], sourceId: string, targetId: string, relationType: string): boolean {
-  return links.some((link) => link.sourceLogicalId === sourceId && link.targetLogicalId === targetId && link.label === relationType);
+  return links.some((link) => (link.sourceLogicalId === sourceId || link.sourceId === sourceId)
+    && (link.targetLogicalId === targetId || link.targetId === targetId)
+    && (link.label === relationType || link.relationType === relationType));
 }
 
 export function reconciliationExitCode(report: DesignFactReconciliationReport): 0 | 1 {
@@ -101,10 +103,10 @@ async function main(): Promise<void> {
         return parsed.asset;
       },
       findLinks: async (decision) => {
-        const result = await client.callTool({ name: "get_asset_graph", arguments: { applicationServiceId: decision.scope.applicationServiceId, locale: "en" } });
+        const result = await client.callTool({ name: "list_asset_links", arguments: { applicationServiceId: decision.scope.applicationServiceId } });
         if (result.isError) return [];
         const text = Array.isArray(result.content) ? result.content.map((item) => "text" in item ? item.text : "").join("") : "";
-        return (JSON.parse(text) as { graph?: { edges?: Link[] } }).graph?.edges ?? [];
+        return JSON.parse(text) as Link[];
       }
     });
     console.log(JSON.stringify(report, null, 2));
