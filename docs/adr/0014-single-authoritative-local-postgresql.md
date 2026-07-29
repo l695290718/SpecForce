@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for implementation on 2026-07-29.
+Accepted; local canonical database cutover verified and MCP synchronized on 2026-07-29.
 
 ## Context
 
@@ -10,7 +10,13 @@ Two independent Docker Compose projects were started from isolated worktrees. Th
 
 ## Decision
 
-Use one PostgreSQL instance as the sole local authority for authored SpecForge records. The complete asset catalog from `specforge-graph-verify-postgres` is the source for a one-time, rollback-safe import into the canonical `deploy-postgres` instance. After verified import, local Web, MCP, reconciliation, and graph projection use only the canonical deployment database connection. The graph verification Compose project remains a disposable derived-projection environment and must not be used as an authored-data authority.
+Use one PostgreSQL instance as the sole local authority for authored SpecForge records. The complete asset catalog from `specforge-graph-verify-postgres` is restored into a fresh `specforge_canonical` database inside the canonical `deploy-postgres` instance. This avoids overwriting the existing deployment-validation database during cutover. After verified import, local Web, MCP, reconciliation, and graph projection use only the canonical deployment database connection. The graph verification Compose project remains a disposable derived-projection environment and must not be used as an authored-data authority.
+
+## Alternatives
+
+1. Continue selecting the database by local port. Rejected because the same scope can silently show different assets.
+2. Restore the source directly over the existing deployment database. Rejected because it can overwrite newer deployment-validation facts.
+3. Merge every table into the existing deployment database. Rejected for this cutover because stable-ID and graph-record conflicts would make the first consolidation needlessly destructive.
 
 ## Consequences
 
@@ -20,7 +26,7 @@ Use one PostgreSQL instance as the sole local authority for authored SpecForge r
 - Tradeoff: the one-time import requires backup, integrity checks, and a controlled service restart.
 - Tradeoff: verification containers must be recreated from the canonical database rather than treated as persistent authoring stores.
 
-## Safety Constraints
+## Constraints
 
 - Export both source and target before importing; never reset or delete either database during migration.
 - Compare row counts by table, asset type, and `applicationServiceId`, then validate stable IDs and relationship counts before the cutover.
@@ -28,7 +34,44 @@ Use one PostgreSQL instance as the sole local authority for authored SpecForge r
 - PostgreSQL remains authoritative. NebulaGraph remains a derived projection only.
 - A failed import or reconciliation leaves the existing source data intact and restores the former Web connection.
 
+## Evidence
+
+- `pg_dump` created non-empty logical backups for both source and former deployment databases before cutover.
+- `pg_restore` restored the full source backup into `deploy-postgres-1/specforge_canonical` without modifying `deploy-postgres-1/specforge`.
+- The post-import canonical fingerprint matched the source: 70 design assets, 115 AssetLinks, 173 current relationships, 411 relationship events, and 411 outbox records.
+- Canonical Web route checks rendered the scoped API, data-model, graph, and workspace pages without Prisma errors.
+- `pnpm design-facts:sync` and `pnpm design-facts:check` persisted and read back all 11 decisions in the exact Designer Scope with no missing, mismatched, out-of-scope, or blocked records.
+
 ## Chinese Localization / 中文本地化
+
+### 备选方案
+
+1. 继续通过本地端口选择数据库。拒绝，因为同一 Scope 可能静默展示不同资产。
+2. 直接用源库覆盖原部署数据库。拒绝，因为可能覆盖较新的部署验证事实。
+3. 将每张表合并到原部署数据库。拒绝，因为稳定 ID 和图记录冲突会使首次收敛具有破坏性。
+
+### 后果
+
+- 正向影响：每个本地入口读取同一组范围化资产、链接、计数和设计事实。
+- 正向影响：部署环境使用与开发人员相同的 PostgreSQL 权威源。
+- 正向影响：图验证环境不能再静默成为第二个事实来源。
+- 权衡：一次性导入需要备份、完整性检查和受控的服务重启。
+- 权衡：验证容器必须从规范数据库重建，而不能被视为长期编写存储。
+
+### 约束
+
+- 导入前导出源库和目标库；迁移期间不得重置或删除任何数据库。
+- 按表、资产类型和 `applicationServiceId` 对比行数，并核验稳定 ID 与关系数量。
+- 只允许一个显式配置的 `DATABASE_URL`；禁止跨端口或跨数据库运行时回退。
+- PostgreSQL 保持权威，NebulaGraph 只保留为派生投影。
+- 导入或对账失败时保留源数据并恢复先前的 Web 连接。
+
+### 证据
+
+- 已在切换前为源库和原部署库创建非空逻辑备份。
+- 已将完整源库恢复到 `deploy-postgres-1/specforge_canonical`，未修改原 `specforge` 数据库。
+- 导入后指纹与源库一致：70 条设计资产、115 条 AssetLink、173 条当前关系、411 条关系事件和 411 条 Outbox 记录。
+- 规范 Web 服务已渲染范围化 API、数据模型、图谱和工作台页面，未出现 Prisma 错误。
 
 ### 背景
 

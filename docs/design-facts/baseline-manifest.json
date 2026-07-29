@@ -260,9 +260,9 @@
         "adr-design-fact-dual-record-governance"
       ],
       "owner": "SpecForge Architecture",
-      "status": "MCP synchronization blocked",
-      "reason": "The MCP server cannot start because apps/mcp-server/src/persistence.ts imports PrismaClient but the generated @prisma/client module does not export it; the MCP client receives MCP error -32000: Connection closed.",
-      "retryTrigger": "Regenerate or repair the Prisma Client in the configured runtime, then run pnpm design-facts:sync and pnpm design-facts:check against the exact Designer Scope and read back the IDs, localized fields, and typed links.",
+      "status": "MCP synchronized and read back from the canonical database",
+      "reason": "The architecture overview facts were persisted and read back from specforge_canonical in the exact Designer Scope.",
+      "retryTrigger": "After a future design-fact change, re-run pnpm design-facts:sync and pnpm design-facts:check against specforge_canonical.",
       "localizedContent": {
         "en": {
           "decision": "Use `/` as a static bilingual architecture orientation. It presents the design-fact flow from Proposal through ADR, assets, rules and contracts, Context Pack, and evidence, plus navigation into a selected application-service workspace. Use `/workspace` as the scoped operational dashboard. The root route must not load, join, count, or aggregate authored design facts across application services.",
@@ -293,6 +293,40 @@
         {
           "command": "pnpm --filter @specforge/web lint",
           "result": "Web lint passed for the architecture overview implementation."
+        }
+      ]
+    },
+    {
+      "id": "adr-single-authoritative-local-postgresql",
+      "repositoryAdr": "docs/adr/0014-single-authoritative-local-postgresql.md",
+      "mcpAdrId": "adr-single-authoritative-local-postgresql",
+      "scope": {
+        "applicationServiceId": "com.huawei.celon.desiner",
+        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+      },
+      "proposalId": "proposal-single-authoritative-local-postgresql",
+      "contextPackId": "context-pack-single-authoritative-local-postgresql",
+      "relatedAssetIds": [
+        "data-specforge-assets",
+        "data-specforge-asset-graph",
+        "api-specforge-mcp-tools"
+      ],
+      "owner": "SpecForge Architecture",
+      "status": "MCP synchronized and read back from the canonical database",
+      "reason": "The canonical database cutover decision, Proposal, Context Pack, Evidence, and typed links were persisted and read back in the exact Designer Scope.",
+      "retryTrigger": "After a future topology or canonical database change, re-run pnpm design-facts:sync and pnpm design-facts:check using specforge_canonical.",
+      "evidence": [
+        {
+          "command": "docker exec deploy-postgres-1 pg_restore -U specforge -d specforge_canonical --no-owner --no-privileges /tmp/source-graph-verify.dump",
+          "result": "The full source catalog was restored into a fresh canonical database without modifying the former deployment database."
+        },
+        {
+          "command": "Compare-Object source-pre-import-fingerprint.txt canonical-post-import-fingerprint.txt",
+          "result": "The canonical fingerprint matched the complete source catalog: 70 design assets, 115 links, 173 current relationships, 411 relationship events, and 411 outbox records."
+        },
+        {
+          "command": "Invoke-WebRequest http://localhost:3000/assets/apis?scope=com.huawei.celon.desiner",
+          "result": "The canonical Web service rendered the scoped API, data-model, graph, and workspace routes without Prisma errors."
         }
       ]
     }

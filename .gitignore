@@ -10,5 +10,6 @@ coverage
 *.db-journal
 *.tsbuildinfo
 *.log
+artifacts/db-consolidation/
 .worktrees
 worktrees

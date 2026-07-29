@@ -69,6 +69,18 @@ The Web console and authoritative PostgreSQL database are packaged as separate D
 
 ## Enterprise Impact Analysis
 
+### Reconfigure graph verification for the canonical PostgreSQL authority
+
+**Status:** Deferred after local database consolidation.
+
+**Owner:** SpecForge Architecture.
+
+**Rationale:** The complete authored catalog was restored into `deploy-postgres/specforge_canonical` and local Web/MCP now use that single authority. The legacy `specforge-graph-verify-postgres` container remains preserved as a rollback source because the graph verification Compose stack still depends on its isolated PostgreSQL service.
+
+**Trigger:** Update the graph verification Compose profile so its projector and gateway read the canonical PostgreSQL connection, validate a rebuilt derived projection, then stop the isolated graph-verification PostgreSQL container without deleting its backup.
+
+**Completion evidence:** The graph verifier uses the canonical PostgreSQL connection, projection checkpoints and an impact query pass, no active application process reads `specforge-graph-verify-postgres`, and the scoped MCP reconciliation remains clean.
+
 ### NebulaGraph production projection
 
 **Status:** Pending production-profile verification.
