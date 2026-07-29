@@ -95,5 +95,5 @@ SpecForge 需要一个系统定位入口，用于说明 MCP-first 设计事实�
 
 - **已验证：** 实现阶段运行 `pnpm exec vitest run apps/web/lib/__tests__/overview.test.ts apps/web/app/__tests__/overview-page.test.tsx apps/web/components/__tests__/app-shell.test.tsx`，3 个文件、11 个测试通过。
 - **已验证：** 实现阶段 `pnpm --filter @specforge/web lint` 通过。
-- **功能变更范围外的阻塞：** Web typecheck 在 `apps/web/lib/db.ts(1,10)` 停止，原因是生成的 `@prisma/client` 未导出 `PrismaClient`。
-- **MCP synchronization blocked：** 负责人：SpecForge Architecture。`pnpm design-facts:sync` 和 `pnpm design-facts:check` 无法启动 MCP 服务，因为 `apps/mcp-server/src/persistence.ts:1` 导入 `PrismaClient`，但生成的 `@prisma/client` 模块未导出该符号。MCP 客户端收到 `MCP error -32000: Connection closed`；此决策的 ADR、Proposal、Context Pack、证据和类型化链接均未持久化或回读。重试触发条件：在已配置运行环境中重新生成或修复 Prisma Client，然后在精确 Designer Scope 下运行 `pnpm design-facts:sync` 与 `pnpm design-facts:check`，并确认已持久化的 ID、本地化字段以及 `IMPLEMENTS_DECISION`、`IMPLEMENTS_CONTEXT_FOR`、`DECIDES` 和 `VALIDATES` 链接。
+- **已验证：** 重新生成 Prisma Client 后，Web typecheck 已通过。
+- **MCP 已同步并回读：** 在仅本机可访问的权威 PostgreSQL 隧道上运行 `pnpm design-facts:sync` 与 `pnpm design-facts:check` 后，首页 ADR、Proposal、Context Pack、Evidence 和有类型关系均已写入精确 Designer Scope；全部 10 项决策无缺失、不匹配、越界或受阻事实。MCP 持久化、工具和清单定向测试共 54 项通过。
