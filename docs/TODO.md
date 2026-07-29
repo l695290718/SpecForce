@@ -83,6 +83,30 @@ The complete PostgreSQL-backed GraphStore suite was run after the final determin
 
 ## Deferred product capability
 
+### Architecture overview home page
+
+**Status:** Deferred.
+
+Create a bilingual home page that explains SpecForge's system positioning, MCP-first authoring boundary, authoritative PostgreSQL and derived graph-projection architecture, and the typed relationships among design assets. The page must help a new user understand how Proposals, ADRs, Context Packs, APIs, data models, rules, events, state machines, and evidence connect without becoming a global cross-service data view.
+
+**Owner:** SpecForge Product and Architecture.
+
+**Rationale:** The current console opens directly into scoped workspaces and design assets. It does not yet provide a concise architectural orientation or a relationship-led entry point for new users.
+
+**Trigger:** Start after the NebulaGraph production-projection runtime is operationally verified and the product team approves the information architecture for a scoped, bilingual landing experience.
+
+**Completion evidence:** A bilingual, scope-safe home page is implemented with a verified relationship visualization sourced from scoped design assets; its Proposal, Context Pack, design assets, typed links, and Evidence are persisted and read back through MCP.
+
+**中文本地化：**
+
+**状态：** 延期。
+
+新增双语首页，说明 SpecForge 的系统定位、MCP-first 编写边界、PostgreSQL 权威存储与派生图投影架构，以及设计资产之间的有类型关系。首页应帮助新用户理解 Proposal、ADR、Context Pack、API、数据模型、规则、事件、状态机和 Evidence 如何关联，同时不得形成跨应用服务的全局数据视图。
+
+**负责人：** SpecForge 产品与架构团队。
+
+**触发条件：** NebulaGraph 生产投影运行时完成运维验证，并且产品团队确认面向精确 Scope 的双语首页信息架构后启动。
+
 ### Authorized multi-service comparison
 
 **Status:** Deferred.
