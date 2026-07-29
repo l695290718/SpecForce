@@ -95,7 +95,11 @@ The complete PostgreSQL-backed GraphStore suite was run after the final determin
 
 ### Architecture overview home page
 
-**Status:** Deferred.
+**Status:** Complete (superseded backlog record).
+
+**Superseded:** This historical entry is retained only for traceability. The authoritative completion record is `Synchronize architecture overview design facts`, which was MCP synchronized and read back on 2026-07-29. The implementation is now on `main`.
+
+**中文说明：** 此历史条目仅保留用于追溯，已被“Synchronize architecture overview design facts”完成记录取代；该记录已于 2026-07-29 通过 MCP 同步并回读，首页实现已合并至 `main`。
 
 Create a bilingual home page that explains SpecForge's system positioning, MCP-first authoring boundary, authoritative PostgreSQL and derived graph-projection architecture, and the typed relationships among design assets. The page must help a new user understand how Proposals, ADRs, Context Packs, APIs, data models, rules, events, state machines, and evidence connect without becoming a global cross-service data view.
 
