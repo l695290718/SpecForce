@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Boxes, ClipboardList, FileCode2, Home, ListChecks, Network, Search, Settings } from "lucide-react";
+import { Activity, Boxes, ClipboardList, FileCode2, Home, LayoutDashboard, ListChecks, Network, Search, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
@@ -45,7 +45,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
         <nav className="space-y-1 border-l border-border pl-2 text-sm">
-          <NavItem href={withScope("/")} icon={<Home size={16} />} isActive={pathname === "/"} labelKey="nav.dashboard" />
+          <NavItem href="/" icon={<Home size={16} />} isActive={pathname === "/"} labelKey="nav.overview" />
+          <NavItem href={withScope("/workspace")} icon={<LayoutDashboard size={16} />} isActive={pathname === "/workspace"} labelKey="nav.workspace" />
           <div className="px-3 pt-4 text-xs font-semibold uppercase text-muted"><T k="nav.designAssets" /></div>
           {assetLinks.map(([labelKey, href]) => <NavItem href={withScope(href)} icon={<Boxes size={16} />} isActive={pathname.startsWith(href)} key={href} labelKey={labelKey} />)}
           <NavItem href={withScope("/assets/adrs")} icon={<FileCode2 size={16} />} isActive={pathname.startsWith("/assets/adrs")} labelKey="nav.adrs" />

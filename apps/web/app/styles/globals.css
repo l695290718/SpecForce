@@ -136,13 +136,47 @@ code {
   animation: specforge-border 4s ease-in-out infinite;
 }
 
+@keyframes specforge-overview-connector {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translate(-15%, -50%);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(15%, -50%);
+  }
+}
+
+.sf-overview-flow {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.sf-overview-flow-step {
+  min-height: 7.5rem;
+}
+
+.sf-overview-flow-connector[data-motion] {
+  animation: specforge-overview-connector 3.6s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sf-scan::after,
   .sf-flow::after,
   .sf-border-live,
   .sf-pulse,
-  .sf-rise {
+  .sf-rise,
+  .sf-overview-flow [data-motion] {
     animation: none;
+    transition: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .sf-overview-flow {
+    grid-template-columns: 1fr;
   }
 }
 

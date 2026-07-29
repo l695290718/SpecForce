@@ -244,6 +244,57 @@
           "result": "Isolated deployment stack passed health and Web restart persistence verification on port 3010."
         }
       ]
+    },
+    {
+      "id": "adr-architecture-overview-home",
+      "repositoryAdr": "docs/adr/0013-architecture-overview-home.md",
+      "mcpAdrId": "adr-architecture-overview-home",
+      "scope": {
+        "applicationServiceId": "com.huawei.celon.desiner",
+        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+      },
+      "proposalId": "proposal-architecture-overview-home",
+      "contextPackId": "ctx-architecture-overview-home",
+      "relatedAssetIds": [
+        "data-specforge-assets",
+        "adr-design-fact-dual-record-governance"
+      ],
+      "owner": "SpecForge Architecture",
+      "status": "MCP synchronization blocked",
+      "reason": "The MCP server cannot start because apps/mcp-server/src/persistence.ts imports PrismaClient but the generated @prisma/client module does not export it; the MCP client receives MCP error -32000: Connection closed.",
+      "retryTrigger": "Regenerate or repair the Prisma Client in the configured runtime, then run pnpm design-facts:sync and pnpm design-facts:check against the exact Designer Scope and read back the IDs, localized fields, and typed links.",
+      "localizedContent": {
+        "en": {
+          "decision": "Use `/` as a static bilingual architecture orientation. It presents the design-fact flow from Proposal through ADR, assets, rules and contracts, Context Pack, and evidence, plus navigation into a selected application-service workspace. Use `/workspace` as the scoped operational dashboard. The root route must not load, join, count, or aggregate authored design facts across application services.",
+          "constraints": [
+            "English is canonical and every human-facing orientation concept has a Chinese overlay.",
+            "`/` must not import scoped asset loaders, dashboard loaders, or aggregate authored facts.",
+            "Scoped destinations must use the selected application-service ID and retain its exact scope boundary.",
+            "Proposal, Context Pack, ADR, typed links, and evidence are written only through MCP in the exact owning Designer Scope.",
+            "Completion requires MCP persistence and read-back of the exact IDs, scope, localization, typed links, and evidence."
+          ]
+        },
+        "zh": {
+          "decision": "将 `/` 作为静态双语架构定位页。它展示从 Proposal、ADR、资产、规则与契约、Context Pack 到证据的设计事实流，并提供进入已选应用服务工作台的导航。将 `/workspace` 作为范围化的操作仪表盘。根路由不得加载、关联、计数或聚合跨应用服务的已编写设计事实。",
+          "constraints": [
+            "英文为规范内容，所有面向人的定位概念均提供中文覆盖。",
+            "`/` 不得导入范围化资产加载器、仪表盘加载器，也不得聚合已编写事实。",
+            "范围化目的地必须使用已选应用服务 ID，并保留其精确 Scope 边界。",
+            "Proposal、Context Pack、ADR、类型化链接和证据只能通过 MCP 写入精确所属的 Designer Scope。",
+            "只有 MCP 持久化并回读精确 ID、Scope、本地化、类型化链接和证据后才能完成。"
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "command": "pnpm exec vitest run apps/web/lib/__tests__/overview.test.ts apps/web/app/__tests__/overview-page.test.tsx apps/web/components/__tests__/app-shell.test.tsx",
+          "result": "Architecture overview focused suites passed: 3 files and 11 tests."
+        },
+        {
+          "command": "pnpm --filter @specforge/web lint",
+          "result": "Web lint passed for the architecture overview implementation."
+        }
+      ]
     }
   ]
 }

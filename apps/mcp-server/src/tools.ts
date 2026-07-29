@@ -4,7 +4,7 @@ import type { Permission } from "@specforge/core";
 import { z } from "zod";
 import { auditToolCall } from "./audit";
 import { allowAllPolicy, getDefaultActor } from "./auth";
-import { deletePersistedDesignData, isSeedMode, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
+import { deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
 import {
   analyzeScopedProposalImpact,
   buildScopedAssetGraph,
@@ -383,6 +383,19 @@ export function registerTools(server: McpServer): void {
       readOnly: false
     },
     upsertAssetLink
+  );
+
+  registerJsonTool(
+    server,
+    "list_asset_links",
+    {
+      title: "List asset links",
+      description: "Lists persisted typed relationships inside one authorized application-service scope.",
+      inputSchema: { applicationServiceId: z.string().min(1) },
+      permissions: ["asset:read"],
+      readOnly: true
+    },
+    async (input) => listPersistedAssetLinks(input.applicationServiceId)
   );
 
   registerJsonTool(

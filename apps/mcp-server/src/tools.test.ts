@@ -6,6 +6,7 @@ const persistence = vi.hoisted(() => ({
   isSeedMode: vi.fn(() => process.env.SPECFORGE_MCP_SEED === "1"),
   deletePersistedDesignData: vi.fn().mockResolvedValue({ status: "deleted" }),
   getPersistedAsset: vi.fn(),
+  listPersistedAssetLinks: vi.fn().mockResolvedValue([]),
   listPersistedContextPacks: vi.fn().mockResolvedValue([]),
   renderPersistedAssetAsMarkdown: vi.fn(),
   searchPersistedDesignAssets: vi.fn(),
