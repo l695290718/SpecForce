@@ -105,7 +105,7 @@ This update supersedes earlier baseline-governance synchronization deferrals. Th
 - Matching MCP ADR ID: `adr-postgresql-authoritative-design-store`
 - Exact `architectureScope`: `applicationServiceId=com.huawei.celon.desiner`; `scopePath=pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - Related Proposal: `proposal-specforge-self-design`
-- Related Context Pack: `context-pack-specforge-self-design`
+- Related Context Pack: `ctx-specforge-self-design`
 - Related assets: `data-specforge-assets`, `data-specforge-asset-graph`, `api-specforge-mcp-tools`, `quality-specforge-impact-ready`
 - Typed links: `implements`, `governs`, and `provides-authoritative-store-for`, with all endpoints in the exact scope.
 - Evidence references: the commands and repository paths listed in `Evidence`.
@@ -116,7 +116,7 @@ This update supersedes earlier baseline-governance synchronization deferrals. Th
 - 匹配的 MCP ADR ID：`adr-postgresql-authoritative-design-store`
 - 精确 `architectureScope`：`applicationServiceId=com.huawei.celon.desiner`；`scopePath=pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - 相关 Proposal：`proposal-specforge-self-design`
-- 相关 Context Pack：`context-pack-specforge-self-design`
+- 相关 Context Pack：`ctx-specforge-self-design`
 - 相关资产：`data-specforge-assets`、`data-specforge-asset-graph`、`api-specforge-mcp-tools`、`quality-specforge-impact-ready`
 - 有类型关系：`implements`、`governs` 和 `provides-authoritative-store-for`，所有端点都必须位于精确范围内。
 - 证据引用：使用 `Evidence` 章节列出的命令和仓库路径。

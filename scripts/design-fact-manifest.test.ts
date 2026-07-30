@@ -11,6 +11,7 @@ it("maps every baseline decision to a complete repository and MCP record", () =>
   expect(manifest.decisions).toHaveLength(12);
   expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(12);
   expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(12);
+  const proposalByContextPack = new Map<string, string>();
 
   for (const decision of manifest.decisions) {
     expect(decision.id).toMatch(/^adr-/);
@@ -23,6 +24,9 @@ it("maps every baseline decision to a complete repository and MCP record", () =>
     expect(decision.relatedAssetIds.length).toBeGreaterThan(0);
     expect(decision.evidence.length).toBeGreaterThan(0);
     expect(decision.evidence.every((entry) => entry.command.length > 0 && entry.result.length > 0)).toBe(true);
+    const existingProposal = proposalByContextPack.get(decision.contextPackId);
+    expect(existingProposal === undefined || existingProposal === decision.proposalId).toBe(true);
+    proposalByContextPack.set(decision.contextPackId, decision.proposalId);
   }
 });
 

@@ -110,8 +110,8 @@ This update supersedes the prior statement that MCP synchronization for this ADR
 
 - Matching MCP ADR ID: `adr-nebulagraph-derived-impact-runtime`
 - Exact `architectureScope`: `applicationServiceId=com.huawei.celon.desiner`; `scopePath=pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
-- Related Proposal: `proposal-specforge-self-design`
-- Related Context Pack: `context-pack-specforge-self-design`
+- Related Proposal: `proposal-enterprise-impact-analysis`
+- Related Context Pack: `ctx-enterprise-impact-analysis`
 - Related assets: `data-specforge-asset-graph`, `api-specforge-mcp-tools`, `quality-specforge-impact-ready`, `event-specforge-context-pack-generated`
 - Typed links: `derives-from`, `implements`, `queries`, and `blocked-by-deferred-work`, with all endpoints in the exact scope.
 - Evidence references: the commands and repository paths listed in `Evidence`.
@@ -121,8 +121,8 @@ This update supersedes the prior statement that MCP synchronization for this ADR
 
 - 匹配的 MCP ADR ID：`adr-nebulagraph-derived-impact-runtime`
 - 精确 `architectureScope`：`applicationServiceId=com.huawei.celon.desiner`；`scopePath=pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
-- 相关 Proposal：`proposal-specforge-self-design`
-- 相关 Context Pack：`context-pack-specforge-self-design`
+- 相关 Proposal：`proposal-enterprise-impact-analysis`
+- 相关 Context Pack：`ctx-enterprise-impact-analysis`
 - 相关资产：`data-specforge-asset-graph`、`api-specforge-mcp-tools`、`quality-specforge-impact-ready`、`event-specforge-context-pack-generated`
 - 有类型关系：`derives-from`、`implements`、`queries` 和 `blocked-by-deferred-work`，所有端点都必须位于精确范围内。
 - 证据引用：使用 `Evidence` 章节列出的命令和仓库路径。

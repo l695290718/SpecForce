@@ -31,7 +31,7 @@
                                         "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
                                     },
                           "proposalId":  "proposal-specforge-self-design",
-                          "contextPackId":  "context-pack-specforge-architecture",
+                          "contextPackId":  "ctx-specforge-self-design",
                           "relatedAssetIds":  [
                                                   "api-specforge-mcp-tools",
                                                   "rule-specforge-core-service-reuse"
@@ -52,7 +52,7 @@
                                         "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
                                     },
                           "proposalId":  "proposal-bilingual-design-assets",
-                          "contextPackId":  "context-pack-specforge-architecture",
+                          "contextPackId":  "ctx-bilingual-design-assets",
                           "relatedAssetIds":  [
                                                   "data-specforge-i18n",
                                                   "rule-bilingual-asset-completeness"
@@ -73,7 +73,7 @@
                                         "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
                                     },
                           "proposalId":  "proposal-specforge-self-design",
-                          "contextPackId":  "context-pack-specforge-architecture",
+                          "contextPackId":  "ctx-specforge-self-design",
                           "relatedAssetIds":  [
                                                   "data-specforge-assets",
                                                   "data-specforge-asset-graph"
@@ -98,7 +98,7 @@
                                         "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
                                     },
                           "proposalId":  "proposal-enterprise-impact-analysis",
-                          "contextPackId":  "context-pack-specforge-architecture",
+                          "contextPackId":  "ctx-enterprise-impact-analysis",
                           "relatedAssetIds":  [
                                                   "data-specforge-asset-graph",
                                                   "quality-specforge-impact-ready"
@@ -119,7 +119,7 @@
                                         "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
                                     },
                           "proposalId":  "proposal-enterprise-impact-analysis",
-                          "contextPackId":  "context-pack-specforge-architecture",
+                          "contextPackId":  "ctx-enterprise-impact-analysis",
                           "relatedAssetIds":  [
                                                   "data-specforge-asset-graph",
                                                   "api-specforge-mcp-tools"
@@ -140,7 +140,7 @@
                                         "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
                                     },
                           "proposalId":  "proposal-specforge-self-design",
-                          "contextPackId":  "context-pack-specforge-architecture",
+                          "contextPackId":  "ctx-specforge-self-design",
                           "relatedAssetIds":  [
                                                   "api-specforge-mcp-tools",
                                                   "data-specforge-assets"

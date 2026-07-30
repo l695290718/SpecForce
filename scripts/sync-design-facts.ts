@@ -77,6 +77,11 @@ const supportedManifestLocalizedFields = new Set([
 
 const canonicalStringFields = new Set(["name", "title", "description", "context", "decision"]);
 const canonicalArrayFields = new Set(["alternatives", "consequences", "constraints"]);
+const proposalLocalizedStringFields = ["name", "title", "description", "background", "goal", "nonGoal", "scope", "rolloutPlan"] as const;
+const proposalLocalizedOptionalStringFields = ["rollbackPlan"] as const;
+const proposalLocalizedArrayFields = ["specChanges", "risks"] as const;
+const contextPackLocalizedStringFields = ["name", "summary", "generatedMarkdown"] as const;
+const contextPackLocalizedArrayFields = ["constraints", "instructions"] as const;
 
 export async function synchronizeDesignFacts(input: {
   callTool: CallTool;
@@ -90,11 +95,12 @@ export async function synchronizeDesignFacts(input: {
     assertDecision(decision);
     const source = await input.readAdr(decision.repositoryAdr);
     if (!source.english.trim() || !source.chinese.trim()) throw new Error(`DESIGN_FACT_LOCALIZATION_MISSING: ${decision.id}`);
+    const parsed = parseAdrSource(source);
 
     const result = await input.callTool("create_adr", {
       applicationServiceId: decision.scope.applicationServiceId,
       architectureScope: decision.scope,
-      adr: buildAdr(decision, parseAdrSource(source))
+      adr: buildAdr(decision, parsed)
     });
     if (result.isError || result.ok === false) {
       throw new Error(`DESIGN_FACT_MCP_WRITE_FAILED: ${decision.id}${result.message ? `: ${result.message}` : ""}`);
@@ -103,9 +109,8 @@ export async function synchronizeDesignFacts(input: {
     if (input.readExisting) {
       const proposal = await input.readExisting("proposal", decision.proposalId, decision.scope);
       const contextPack = await input.readExisting("contextPack", decision.contextPackId, decision.scope);
-      const parsed = parseAdrSource(source);
-      const syncedProposal = proposal ?? buildProposal(decision, parsed);
-      const syncedContextPack = contextPack ?? buildContextPack(decision, parsed);
+      const syncedProposal = backfillProposal(decision, proposal, buildProposal(decision, parsed));
+      const syncedContextPack = backfillContextPack(decision, contextPack, buildContextPack(decision, parsed));
       await callOrThrow(input.callTool, "upsert_proposal", { proposal: syncedProposal, architectureScope: decision.scope }, decision.id);
       await callOrThrow(input.callTool, "upsert_context_pack", { contextPack: syncedContextPack, architectureScope: decision.scope }, decision.id);
       await callOrThrow(input.callTool, "link_assets", link("proposal", decision.proposalId, "adr", decision.mcpAdrId, "IMPLEMENTS_DECISION", decision.scope), decision.id);
@@ -119,7 +124,7 @@ export async function synchronizeDesignFacts(input: {
       const evidenceId = designEvidenceId(decision.id, index);
       await callOrThrow(input.callTool, "upsert_design_asset", {
         assetType: "evidence",
-        asset: buildEvidence(decision, parseAdrSource(source), evidenceId, evidence),
+        asset: buildEvidence(decision, parsed, evidenceId, evidence),
         architectureScope: decision.scope
       }, decision.id);
       await callOrThrow(input.callTool, "link_assets", link("evidence", evidenceId, "adr", decision.mcpAdrId, "VALIDATES", decision.scope), decision.id);
@@ -178,6 +183,38 @@ function buildProposal(decision: DesignFactManifestDecision, parsed: ParsedAdr) 
   };
 }
 
+function backfillProposal(
+  decision: DesignFactManifestDecision,
+  existing: Record<string, unknown> | undefined,
+  canonical: ReturnType<typeof buildProposal>
+) {
+  if (!existing) return canonical;
+  const proposal = {
+    ...canonical,
+    ...existing,
+    id: canonical.id,
+    architectureScope: decision.scope,
+    localizedContent: {
+      en: completeLocalizedFields({
+        current: localeRecord(existing, "en"),
+        topLevel: existing,
+        fallback: canonical.localizedContent.en,
+        requiredStringFields: proposalLocalizedStringFields,
+        optionalStringFields: proposalLocalizedOptionalStringFields,
+        requiredArrayFields: proposalLocalizedArrayFields
+      }),
+      zh: completeLocalizedFields({
+        current: localeRecord(existing, "zh"),
+        fallback: canonical.localizedContent.zh,
+        requiredStringFields: proposalLocalizedStringFields,
+        optionalStringFields: proposalLocalizedOptionalStringFields,
+        requiredArrayFields: proposalLocalizedArrayFields
+      })
+    }
+  };
+  return proposal;
+}
+
 function buildContextPack(decision: DesignFactManifestDecision, parsed: ParsedAdr) {
   const now = new Date().toISOString();
   const generatedMarkdown = renderContextMarkdown(parsed.en);
@@ -199,6 +236,37 @@ function buildContextPack(decision: DesignFactManifestDecision, parsed: ParsedAd
       zh: { name: `${parsed.zh.title} 上下文包`, summary: parsed.zh.description, constraints: parsed.zh.constraints, instructions: [parsed.zh.decision], generatedMarkdown: generatedChineseMarkdown }
     }
   };
+}
+
+function backfillContextPack(
+  decision: DesignFactManifestDecision,
+  existing: Record<string, unknown> | undefined,
+  canonical: ReturnType<typeof buildContextPack>
+) {
+  if (!existing) return canonical;
+  const contextPack = {
+    ...canonical,
+    ...existing,
+    id: canonical.id,
+    proposalId: canonical.proposalId,
+    architectureScope: decision.scope,
+    localizedContent: {
+      en: completeLocalizedFields({
+        current: localeRecord(existing, "en"),
+        topLevel: existing,
+        fallback: canonical.localizedContent.en,
+        requiredStringFields: contextPackLocalizedStringFields,
+        requiredArrayFields: contextPackLocalizedArrayFields
+      }),
+      zh: completeLocalizedFields({
+        current: localeRecord(existing, "zh"),
+        fallback: canonical.localizedContent.zh,
+        requiredStringFields: contextPackLocalizedStringFields,
+        requiredArrayFields: contextPackLocalizedArrayFields
+      })
+    }
+  };
+  return contextPack;
 }
 
 function buildEvidence(
@@ -413,6 +481,60 @@ function listValue(value: string): string[] {
 
 function firstParagraph(value: string): string {
   return value.split(/\r?\n\s*\r?\n/)[0].replace(/^[-*+]\s+/, "").trim();
+}
+
+function completeLocalizedFields(input: {
+  current: Record<string, unknown> | undefined;
+  fallback: Record<string, string | string[]>;
+  topLevel?: Record<string, unknown>;
+  requiredStringFields: readonly string[];
+  optionalStringFields?: readonly string[];
+  requiredArrayFields?: readonly string[];
+}): Record<string, string | string[]> {
+  const localized: Record<string, string | string[]> = {};
+  for (const field of input.requiredStringFields) {
+    localized[field] = firstNonEmptyString(input.current?.[field], input.topLevel?.[field], input.fallback[field]);
+  }
+  for (const field of input.optionalStringFields ?? []) {
+    const value = firstNonEmptyStringOrUndefined(input.current?.[field], input.topLevel?.[field], input.fallback[field]);
+    if (value !== undefined) localized[field] = value;
+  }
+  for (const field of input.requiredArrayFields ?? []) {
+    localized[field] = firstNonEmptyStringArray(input.current?.[field], input.topLevel?.[field], input.fallback[field]);
+  }
+  return localized;
+}
+
+function localeRecord(existing: Record<string, unknown>, locale: "en" | "zh"): Record<string, unknown> | undefined {
+  const localizedContent = existing.localizedContent;
+  if (!localizedContent || typeof localizedContent !== "object" || Array.isArray(localizedContent)) return undefined;
+  const record = (localizedContent as Record<string, unknown>)[locale];
+  return record && typeof record === "object" && !Array.isArray(record)
+    ? record as Record<string, unknown>
+    : undefined;
+}
+
+function firstNonEmptyString(...values: Array<unknown>): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return "";
+}
+
+function firstNonEmptyStringOrUndefined(...values: Array<unknown>): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return undefined;
+}
+
+function firstNonEmptyStringArray(...values: Array<unknown>): string[] {
+  for (const value of values) {
+    if (Array.isArray(value) && value.length > 0 && value.every((entry) => typeof entry === "string" && entry.trim())) {
+      return [...value];
+    }
+  }
+  return [];
 }
 
 function localizedFallback(markdown: string): string {

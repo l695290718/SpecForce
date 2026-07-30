@@ -332,7 +332,7 @@ English canonical decision.
     })).resolves.toEqual([{ id: "adr-bold-zh-sections", mcpAdrId: "adr-bold-zh-sections", status: "complete" }]);
   });
 
-  it("preserves existing proposal and Context Pack payloads before linking ADR evidence", async () => {
+  it("backfills stale proposal and Context Pack companions before linking ADR evidence", async () => {
     const callTool = vi.fn().mockResolvedValue({ ok: true });
     await synchronizeDesignFacts({
       callTool,
@@ -350,12 +350,91 @@ English canonical decision.
       },
       readAdr: async () => ({ title: "Scope isolation", english: simpleEnglishAdr, chinese: simpleChineseAdr }),
       readExisting: async (type) => type === "proposal"
-        ? { id: "proposal-scope", title: "Existing proposal" }
-        : { id: "ctx-scope", proposalId: "proposal-scope", name: "Existing context" }
+        ? {
+          id: "proposal-scope",
+          title: "Existing proposal",
+          name: "Existing proposal",
+          description: "Existing description",
+          background: "Existing background",
+          goal: "Existing goal",
+          nonGoal: "Existing non-goal",
+          scope: "Existing scope",
+          specChanges: ["Existing change"],
+          risks: ["Existing risk"],
+          rolloutPlan: "Existing rollout",
+          localizedContent: {
+            zh: {
+              name: "鐜版湁鎻愭",
+              title: "鐜版湁鎻愭",
+              description: "鐜版湁鎻忚堪",
+              background: "鐜版湁鑳屾櫙",
+              goal: "鐜版湁鐩爣",
+              nonGoal: "鐜版湁闈炵洰鏍?",
+              scope: "鐜版湁鑼冨洿",
+              specChanges: ["鐜版湁鍙樻洿"],
+              risks: ["鐜版湁椋庨櫓"],
+              rolloutPlan: "鐜版湁鍙戝竷"
+            }
+          }
+        }
+        : {
+          id: "ctx-scope",
+          proposalId: "proposal-shadow",
+          name: "Existing context",
+          summary: "Existing summary",
+          constraints: ["Existing constraint"],
+          instructions: ["Existing instruction"],
+          generatedMarkdown: "# Existing context",
+          localizedContent: {
+            zh: {
+              name: "鐜版湁涓婁笅鏂囧寘",
+              summary: "鐜版湁鎽樿",
+              constraints: ["鐜版湁绾︽潫"],
+              instructions: ["鐜版湁鎸囦护"],
+              generatedMarkdown: "# 鐜版湁涓婁笅鏂囧寘"
+            }
+          }
+        }
     });
 
-    expect(callTool).toHaveBeenCalledWith("upsert_proposal", expect.objectContaining({ proposal: { id: "proposal-scope", title: "Existing proposal" } }));
-    expect(callTool).toHaveBeenCalledWith("upsert_context_pack", expect.objectContaining({ contextPack: { id: "ctx-scope", proposalId: "proposal-scope", name: "Existing context" } }));
+    expect(callTool).toHaveBeenCalledWith("upsert_proposal", expect.objectContaining({
+      proposal: expect.objectContaining({
+        id: "proposal-scope",
+        title: "Existing proposal",
+        localizedContent: expect.objectContaining({
+          en: expect.objectContaining({
+            title: "Existing proposal",
+            description: "Existing description",
+            goal: "Existing goal",
+            specChanges: ["Existing change"],
+            risks: ["Existing risk"]
+          }),
+          zh: expect.objectContaining({
+            title: "鐜版湁鎻愭",
+            description: "鐜版湁鎻忚堪"
+          })
+        })
+      })
+    }));
+    expect(callTool).toHaveBeenCalledWith("upsert_context_pack", expect.objectContaining({
+      contextPack: expect.objectContaining({
+        id: "ctx-scope",
+        proposalId: "proposal-scope",
+        name: "Existing context",
+        localizedContent: expect.objectContaining({
+          en: expect.objectContaining({
+            name: "Existing context",
+            summary: "Existing summary",
+            constraints: ["Existing constraint"],
+            instructions: ["Existing instruction"]
+          }),
+          zh: expect.objectContaining({
+            name: "鐜版湁涓婁笅鏂囧寘",
+            summary: "鐜版湁鎽樿"
+          })
+        })
+      })
+    }));
     expect(callTool).toHaveBeenCalledWith("link_assets", expect.objectContaining({ sourceType: "proposal", targetType: "adr", relationType: "IMPLEMENTS_DECISION" }));
     expect(callTool).toHaveBeenCalledWith("upsert_design_asset", expect.objectContaining({
       assetType: "evidence",
