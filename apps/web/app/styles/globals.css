@@ -162,6 +162,102 @@ code {
   animation: specforge-overview-connector 3.6s ease-in-out infinite;
 }
 
+.sf-relationship-constellation {
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+}
+
+.sf-relationship-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sf-relationship-node {
+  width: 100%;
+  min-height: 6.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 8px;
+  background: rgba(244, 246, 249, 0.82);
+  padding: 0.85rem 0.9rem;
+  text-align: left;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.sf-relationship-edge-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sf-relationship-edge-button {
+  width: 100%;
+  min-height: 7.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.92);
+  padding: 0.9rem 1rem;
+  text-align: left;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.sf-relationship-edge-route {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.sf-relationship-edge-type {
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+  padding: 0.18rem 0.5rem;
+  color: #2563eb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.sf-relationship-node:hover,
+.sf-relationship-node:focus-visible,
+.sf-relationship-edge-button:hover,
+.sf-relationship-edge-button:focus-visible,
+.sf-relationship-node[data-highlighted="true"],
+.sf-relationship-edge-button[data-highlighted="true"] {
+  border-color: rgba(37, 99, 235, 0.48);
+  background: #ffffff;
+  box-shadow: 0 14px 30px rgba(37, 99, 235, 0.12);
+  transform: translateY(-1px);
+}
+
+.sf-relationship-constellation[data-has-active="true"] .sf-relationship-node[data-highlighted="false"],
+.sf-relationship-constellation[data-has-active="true"] .sf-relationship-edge-button[data-highlighted="false"] {
+  opacity: 0.62;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sf-scan::after,
   .sf-flow::after,
@@ -177,6 +273,16 @@ code {
 @media (max-width: 768px) {
   .sf-overview-flow {
     grid-template-columns: 1fr;
+  }
+
+  .sf-relationship-edge-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 640px) {
+  .sf-relationship-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 

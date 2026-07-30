@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { ArrowRight, Database, FileCheck2, FileText, GitBranch, Network, Scale, ShieldCheck, Waypoints } from "lucide-react";
-import { T } from "../components/language-provider";
+import { T, useLanguage } from "../components/language-provider";
 import { overviewDestinations } from "../lib/overview";
 
 const factFlow = [
@@ -15,20 +16,150 @@ const factFlow = [
   ["overview.flowEvidence", FileCheck2]
 ] as const;
 
-const assetTypes = [
-  "nav.apis",
-  "nav.dataModels",
-  "nav.events",
-  "nav.rules",
-  "nav.stateMachines",
-  "nav.integrations",
-  "nav.quality",
-  "nav.observability"
+const explanationSections = [
+  {
+    titleKey: "overview.authoringTitle",
+    descriptionKey: "overview.authoringDescription",
+    Icon: GitBranch,
+    accentClassName: "text-rule",
+    borderClassName: "border-rule"
+  },
+  {
+    titleKey: "overview.ownershipTitle",
+    descriptionKey: "overview.ownershipDescription",
+    Icon: ShieldCheck,
+    accentClassName: "text-amber-500",
+    borderClassName: "border-amber-400"
+  },
+  {
+    titleKey: "overview.projectionTitle",
+    descriptionKey: "overview.projectionDescription",
+    Icon: Database,
+    accentClassName: "text-accent",
+    borderClassName: "border-accent"
+  }
 ] as const;
+
+const relationshipNodes = [
+  { id: "apis", labelKey: "nav.apis" },
+  { id: "dataModels", labelKey: "nav.dataModels" },
+  { id: "events", labelKey: "nav.events" },
+  { id: "rules", labelKey: "nav.rules" },
+  { id: "stateMachines", labelKey: "nav.stateMachines" },
+  { id: "integrations", labelKey: "nav.integrations" },
+  { id: "quality", labelKey: "nav.quality" },
+  { id: "observability", labelKey: "nav.observability" }
+] as const;
+
+const relationshipEdges = [
+  {
+    id: "data-model-shapes-api",
+    from: "dataModels",
+    to: "apis",
+    fromKey: "nav.dataModels",
+    toKey: "nav.apis",
+    typeKey: "overview.edgeShapes",
+    descriptionKey: "overview.edgeShapesDescription"
+  },
+  {
+    id: "rules-constrain-api",
+    from: "rules",
+    to: "apis",
+    fromKey: "nav.rules",
+    toKey: "nav.apis",
+    typeKey: "overview.edgeConstrains",
+    descriptionKey: "overview.edgeConstrainsDescription"
+  },
+  {
+    id: "api-emits-event",
+    from: "apis",
+    to: "events",
+    fromKey: "nav.apis",
+    toKey: "nav.events",
+    typeKey: "overview.edgeEmits",
+    descriptionKey: "overview.edgeEmitsDescription"
+  },
+  {
+    id: "state-machine-drives-event",
+    from: "stateMachines",
+    to: "events",
+    fromKey: "nav.stateMachines",
+    toKey: "nav.events",
+    typeKey: "overview.edgeDrives",
+    descriptionKey: "overview.edgeDrivesDescription"
+  },
+  {
+    id: "rules-guard-state",
+    from: "rules",
+    to: "stateMachines",
+    fromKey: "nav.rules",
+    toKey: "nav.stateMachines",
+    typeKey: "overview.edgeGuards",
+    descriptionKey: "overview.edgeGuardsDescription"
+  },
+  {
+    id: "integration-depends-api",
+    from: "integrations",
+    to: "apis",
+    fromKey: "nav.integrations",
+    toKey: "nav.apis",
+    typeKey: "overview.edgeDependsOn",
+    descriptionKey: "overview.edgeDependsOnDescription"
+  },
+  {
+    id: "quality-verifies-api",
+    from: "quality",
+    to: "apis",
+    fromKey: "nav.quality",
+    toKey: "nav.apis",
+    typeKey: "overview.edgeVerifies",
+    descriptionKey: "overview.edgeVerifiesDescription"
+  },
+  {
+    id: "observability-observes-event",
+    from: "observability",
+    to: "events",
+    fromKey: "nav.observability",
+    toKey: "nav.events",
+    typeKey: "overview.edgeObserves",
+    descriptionKey: "overview.edgeObservesDescription"
+  }
+] as const;
+
+type RelationshipNodeId = (typeof relationshipNodes)[number]["id"];
+type HighlightState = { nodeId?: RelationshipNodeId; relationId?: (typeof relationshipEdges)[number]["id"] } | null;
 
 export default function ArchitectureOverviewPage() {
   const scope = useSearchParams().get("scope") ?? undefined;
   const destinations = overviewDestinations(scope);
+  const { t } = useLanguage();
+  const [activeHighlight, setActiveHighlight] = useState<HighlightState>(null);
+
+  const activeEdge = relationshipEdges.find((edge) => edge.id === activeHighlight?.relationId);
+  const highlightedRelationIds = new Set(
+    activeHighlight?.relationId
+      ? [activeHighlight.relationId]
+      : activeHighlight?.nodeId
+        ? relationshipEdges
+          .filter((edge) => edge.from === activeHighlight.nodeId || edge.to === activeHighlight.nodeId)
+          .map((edge) => edge.id)
+        : []
+  );
+  const highlightedNodeIds = new Set<RelationshipNodeId>(
+    activeHighlight?.relationId && activeEdge
+      ? [activeEdge.from, activeEdge.to]
+      : activeHighlight?.nodeId
+        ? relationshipEdges
+          .filter((edge) => edge.from === activeHighlight.nodeId || edge.to === activeHighlight.nodeId)
+          .flatMap((edge) => [edge.from, edge.to])
+        : []
+  );
+
+  if (activeHighlight?.nodeId) {
+    highlightedNodeIds.add(activeHighlight.nodeId);
+  }
+
+  const hasActiveHighlight = highlightedNodeIds.size > 0 || highlightedRelationIds.size > 0;
 
   return (
     <div className="space-y-8 pb-4">
@@ -45,20 +176,24 @@ export default function ArchitectureOverviewPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <article className="border-l-2 border-rule bg-panel px-5 py-5 shadow-panel">
-          <div className="flex items-center gap-2 text-rule"><GitBranch size={18} /><h2 className="text-base font-semibold text-ink"><T k="overview.authoringTitle" /></h2></div>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-muted"><T k="overview.authoringDescription" /></p>
-        </article>
-        <article className="border-l-2 border-accent bg-panel px-5 py-5 shadow-panel">
-          <div className="flex items-center gap-2 text-accent"><Database size={18} /><h2 className="text-base font-semibold text-ink"><T k="overview.storageTitle" /></h2></div>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-muted"><T k="overview.storageDescription" /></p>
-        </article>
+      <section className="grid gap-4 xl:grid-cols-3">
+        {explanationSections.map(({ titleKey, descriptionKey, Icon, accentClassName, borderClassName }) => (
+          <article className={`border-l-2 bg-panel px-5 py-5 shadow-panel ${borderClassName}`} key={titleKey}>
+            <div className={`flex items-center gap-2 ${accentClassName}`}>
+              <Icon size={18} />
+              <h2 className="text-base font-semibold text-ink"><T k={titleKey} /></h2>
+            </div>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-muted"><T k={descriptionKey} /></p>
+          </article>
+        ))}
       </section>
 
       <section aria-label="Architecture concept map" className="border-y border-border py-7">
         <div className="mb-5 flex items-end justify-between gap-4">
-          <div><p className="font-mono text-[11px] font-semibold uppercase text-rule">SYSTEM OF DESIGN</p><h2 className="mt-2 text-xl font-semibold text-ink"><T k="overview.flowTitle" /></h2></div>
+          <div>
+            <p className="font-mono text-[11px] font-semibold uppercase text-rule">SYSTEM OF DESIGN</p>
+            <h2 className="mt-2 text-xl font-semibold text-ink"><T k="overview.flowTitle" /></h2>
+          </div>
           <span className="hidden font-mono text-xs text-muted sm:block">MCP -&gt; PG -&gt; GRAPH</span>
         </div>
         <ol className="sf-overview-flow" data-testid="architecture-fact-flow">
@@ -73,21 +208,76 @@ export default function ArchitectureOverviewPage() {
         </ol>
       </section>
 
-      <section aria-label="Architecture relationship map" className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+      <section aria-label="Architecture relationship map" className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
         <div>
           <p className="font-mono text-[11px] font-semibold uppercase text-rule">TYPED LINKS</p>
           <h2 className="mt-2 text-xl font-semibold text-ink"><T k="overview.relationshipTitle" /></h2>
           <p className="mt-3 max-w-xl text-sm leading-6 text-muted"><T k="overview.relationshipDescription" /></p>
           <p className="mt-5 border-l-2 border-amber-400 pl-3 text-sm leading-6 text-muted"><T k="overview.scopeNotice" /></p>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {assetTypes.map((labelKey, index) => (
-            <div className="relative min-h-24 border border-border bg-panel px-3 py-3 shadow-sm" key={labelKey}>
-              <span className="font-mono text-[11px] text-muted">{String(index + 1).padStart(2, "0")}</span>
-              <div className="mt-4 text-sm font-semibold text-ink"><T k={labelKey} /></div>
-            </div>
-          ))}
-        </div>
+        <figure aria-label="Architecture relationship constellation" className="sf-relationship-constellation" data-has-active={hasActiveHighlight}>
+          <figcaption className="border-b border-border/80 px-4 py-4 sm:px-5">
+            <h3 className="text-sm font-semibold text-ink"><T k="overview.relationshipLegendTitle" /></h3>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted"><T k="overview.relationshipLegendDescription" /></p>
+          </figcaption>
+          <div className="px-4 py-4 sm:px-5">
+            <ul className="sf-relationship-grid" role="list">
+              {relationshipNodes.map((node, index) => {
+                const isHighlighted = highlightedNodeIds.has(node.id);
+
+                return (
+                  <li key={node.id}>
+                    <button
+                      aria-label={t(node.labelKey)}
+                      className="sf-relationship-node"
+                      data-highlighted={isHighlighted}
+                      onBlur={() => setActiveHighlight(null)}
+                      onClick={() => setActiveHighlight({ nodeId: node.id })}
+                      onFocus={() => setActiveHighlight({ nodeId: node.id })}
+                      onMouseEnter={() => setActiveHighlight({ nodeId: node.id })}
+                      onMouseLeave={() => setActiveHighlight(null)}
+                      type="button"
+                    >
+                      <span className="font-mono text-[11px] text-muted">{String(index + 1).padStart(2, "0")}</span>
+                      <span className="mt-3 block text-sm font-semibold text-ink"><T k={node.labelKey} /></span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <ol className="sf-relationship-edge-list" data-testid="typed-relationship-list">
+              {relationshipEdges.map((edge) => {
+                const isHighlighted = highlightedRelationIds.has(edge.id);
+
+                return (
+                  <li key={edge.id}>
+                    <button
+                      aria-label={[t(edge.fromKey), t(edge.typeKey), t(edge.toKey)].join(" ")}
+                      className="sf-relationship-edge-button"
+                      data-highlighted={isHighlighted}
+                      onBlur={() => setActiveHighlight(null)}
+                      onClick={() => setActiveHighlight({ relationId: edge.id })}
+                      onFocus={() => setActiveHighlight({ relationId: edge.id })}
+                      onMouseEnter={() => setActiveHighlight({ relationId: edge.id })}
+                      onMouseLeave={() => setActiveHighlight(null)}
+                      type="button"
+                    >
+                      <span className="sf-relationship-edge-route">
+                        <span className="text-ink"><T k={edge.fromKey} /></span>
+                        <span aria-hidden className="text-muted">→</span>
+                        <span className="sf-relationship-edge-type"><T k={edge.typeKey} /></span>
+                        <span aria-hidden className="text-muted">→</span>
+                        <span className="text-ink"><T k={edge.toKey} /></span>
+                      </span>
+                      <span className="mt-2 block text-left text-sm leading-6 text-muted"><T k={edge.descriptionKey} /></span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        </figure>
       </section>
     </div>
   );

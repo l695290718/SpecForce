@@ -29,6 +29,20 @@ describe("overview localization", () => {
     expect(overviewKeys.length).toBeGreaterThan(12);
     expect(overviewKeys.every((key) => key in messages.zh)).toBe(true);
   });
+
+  it("localizes the three explanatory platform concepts in both locales", () => {
+    const conceptKeys = [
+      "overview.authoringTitle",
+      "overview.authoringDescription",
+      "overview.ownershipTitle",
+      "overview.ownershipDescription",
+      "overview.projectionTitle",
+      "overview.projectionDescription",
+    ] as const;
+
+    expect(conceptKeys.every((key) => key in messages.en)).toBe(true);
+    expect(conceptKeys.every((key) => key in messages.zh)).toBe(true);
+  });
 });
 
 describe("overview route isolation", () => {
@@ -45,5 +59,26 @@ describe("overview route isolation", () => {
 
     expect(source).toContain('className="sf-overview-flow"');
     expect(source).toContain("data-motion");
+  });
+
+  it("renders three localized explanation sections for the core platform model", async () => {
+    const source = await readFile(new URL("../../app/page.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain("overview.authoringTitle");
+    expect(source).toContain("overview.ownershipTitle");
+    expect(source).toContain("overview.projectionTitle");
+  });
+
+  it("models typed relationships with directional labels and local highlighting hooks", async () => {
+    const source = await readFile(new URL("../../app/page.tsx", import.meta.url), "utf8");
+    const css = await readFile(new URL("../../app/styles/globals.css", import.meta.url), "utf8");
+
+    expect(source).toContain("const relationshipEdges = [");
+    expect(source).toContain('aria-label="Architecture relationship constellation"');
+    expect(source).toContain('data-testid="typed-relationship-list"');
+    expect(source).toContain("typeKey:");
+    expect(source).toContain("setActiveHighlight");
+    expect(css).toContain('.sf-relationship-node[data-highlighted="true"]');
+    expect(css).toContain('.sf-relationship-edge-button[data-highlighted="true"]');
   });
 });
