@@ -248,6 +248,11 @@ code {
     transform: none;
     opacity: 1;
   }
+
+  .sf-overview-asset-node:hover,
+  .sf-overview-asset-node:focus-visible {
+    transform: none;
+  }
 }
 
 @media (max-width: 768px) {
