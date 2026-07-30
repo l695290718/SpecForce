@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowRight, Database, FileCheck2, FileText, GitBranch, Network, Scale, ShieldCheck, Waypoints } from "lucide-react";
-import { T } from "../components/language-provider";
+import { T, useLanguage } from "../components/language-provider";
 import { overviewDestinations } from "../lib/overview";
 
 const factFlow = [
@@ -29,6 +29,7 @@ const assetTypes = [
 ] as const;
 
 export default function ArchitectureOverviewPage() {
+  const { t } = useLanguage();
   const scope = useSearchParams().get("scope") ?? undefined;
   const destinations = overviewDestinations(scope);
 
@@ -61,10 +62,10 @@ export default function ArchitectureOverviewPage() {
         </article>
       </section>
 
-      <section aria-label="Architecture concept map" className="border-y border-border py-7">
+      <section aria-label={t("overview.flowAriaLabel")} className="border-y border-border py-7">
         <div className="mb-5 flex items-end justify-between gap-4">
           <div><h2 className="text-xl font-semibold text-ink"><T k="overview.flowTitle" /></h2><p className="mt-2 text-sm text-muted"><T k="overview.flowCaption" /></p></div>
-          <span className="hidden font-mono text-xs text-muted sm:block">MCP -&gt; PG -&gt; GRAPH</span>
+          <span className="hidden font-mono text-xs text-muted sm:block">{t("overview.flowLegend")}</span>
         </div>
         <ol className="sf-overview-flow" data-testid="architecture-fact-flow">
           {factFlow.map(([labelKey, Icon], index) => (
@@ -78,9 +79,9 @@ export default function ArchitectureOverviewPage() {
         </ol>
       </section>
 
-      <section aria-label="Architecture relationship map" className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+      <section aria-label={t("overview.relationshipAriaLabel")} className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div>
-          <p className="font-mono text-[11px] font-semibold uppercase text-rule">TYPED LINKS</p>
+          <p className="font-mono text-[11px] font-semibold uppercase text-rule">{t("overview.relationshipEyebrow")}</p>
           <h2 className="mt-2 text-xl font-semibold text-ink"><T k="overview.relationshipTitle" /></h2>
           <p className="mt-3 max-w-xl text-sm leading-6 text-muted"><T k="overview.relationshipDescription" /></p>
           <p className="mt-5 border-l-2 border-amber-400 pl-3 text-sm leading-6 text-muted"><T k="overview.scopeNotice" /></p>

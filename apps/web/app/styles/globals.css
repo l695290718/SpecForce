@@ -191,8 +191,8 @@ code {
 
 .sf-overview-flow {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.75rem;
+  grid-template-columns: 1fr;
 }
 
 .sf-overview-flow-step {
@@ -255,11 +255,19 @@ code {
   }
 }
 
-@media (max-width: 768px) {
+@media (min-width: 768px) {
   .sf-overview-flow {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+}
 
+@media (min-width: 1280px) {
+  .sf-overview-flow {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
   .sf-overview-canvas {
     min-height: 0;
   }

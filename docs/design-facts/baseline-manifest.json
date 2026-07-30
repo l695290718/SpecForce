@@ -289,16 +289,20 @@
                                                },
                           "evidence":  [
                                            {
-                                               "command":  ".\\node_modules\\.bin\\vitest.cmd run apps/web/lib/__tests__/overview.test.ts",
-                                               "result":  "Exited 0: 1 test file and 8 tests passed."
+                                               "command":  ".\\node_modules\\.bin\\vitest.cmd run apps/web/lib/__tests__/overview.test.ts scripts/design-fact-manifest.test.ts",
+                                               "result":  "Exited 0: 2 test files and 14 tests passed."
                                            },
                                            {
                                                "command":  "pnpm --filter @specforge/web lint",
                                                "result":  "Exited 0 with no ESLint warnings or errors; Next.js emitted deprecation and workspace-root/extra-lockfile warnings."
                                            },
                                            {
-                                               "command":  "Browser inspection: http://localhost:3002/?scope=com.huawei.celon.desiner at 1440x960 and 390x844 in English and Chinese; targeted reduced-motion CSS inspection.",
-                                               "result":  "Canvas and action controls were readable, actions did not overlap, mobile had no horizontal overflow, exact scoped links were retained, root stayed scope-data-free, and reduced motion resolves to a static final state."
+                                               "command":  "Bundled Playwright browser inspection (system Chrome channel): http://localhost:3002/?scope=com.huawei.celon.desiner at 1440x960 and 390x844 in English and Chinese.",
+                                               "result":  "Desktop English and Chinese kept all eight stages on one logical row with only 2px and 3px vertical variance respectively, so stage 6 remained directly before stages 7 and 8 instead of pointing into empty space. Desktop connectors stayed visible, mobile connectors stayed hidden, action links did not overlap, mobile had no horizontal overflow, `/` showed no dashboard signals, and all three action links preserved the exact scoped destinations."
+                                           },
+                                           {
+                                               "command":  "Bundled Playwright reduced-motion inspection (system Chrome channel): http://localhost:3002/?scope=com.huawei.celon.desiner at 1440x960 in English with reducedMotion='reduce'.",
+                                               "result":  "window.matchMedia('(prefers-reduced-motion: reduce)').matches was true; overview motion targets resolved to animationName none, animationDuration 0s, transitionDuration 0s, transform none, and opacity 1; the connector animation resolved to none; and sampled stage positions stayed unchanged over 250ms."
                                            },
                                            {
                                                "command":  "$env:DATABASE_URL='postgresql://specforge:local-deployment-verification-only@localhost:15433/specforge_canonical?schema=public'; pnpm design-facts:sync",

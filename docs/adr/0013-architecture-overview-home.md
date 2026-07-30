@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted; introduction verification complete; MCP synchronized and read back.**
+**Accepted; introduction verification evidence repaired; MCP synchronization was not rerun in this restoration turn.**
 
 - Stable ADR/MCP ID: `adr-architecture-overview-home`
 - Matching Proposal ID: `proposal-architecture-overview-home`
@@ -44,13 +44,11 @@ Use `/` as a static bilingual architecture orientation. The refined introduction
 
 ## Evidence
 
-- **Verified:** `.\\node_modules\\.bin\\vitest.cmd run apps/web/lib/__tests__/overview.test.ts` exited 0: 1 test file and 8 tests passed.
+- **Verified:** `.\\node_modules\\.bin\\vitest.cmd run apps/web/lib/__tests__/overview.test.ts scripts/design-fact-manifest.test.ts` exited 0: 2 test files and 14 tests passed.
 - **Verified:** `pnpm --filter @specforge/web lint` exited 0 with no ESLint warnings or errors. Next.js emitted its deprecation and workspace-root/extra-lockfile warnings.
-- **Verified:** Browser inspection of `http://localhost:3002/?scope=com.huawei.celon.desiner` at 1440x960 in English and Chinese plus 390x844 in English and Chinese found a readable canvas and action controls, no action overlap, no horizontal overflow at mobile, no loader state on `/`, no scoped counts or authored asset data on `/`, and exact scoped action destinations for workspace, graph, and governance.
-- **Verified:** Targeted reduced-motion inspection of `apps/web/app/styles/globals.css` found `@media (prefers-reduced-motion: reduce)` plus `.sf-overview-canvas [data-motion]` applying `animation: none`, `transition: none`, `transform: none`, and `opacity: 1` to the overview motion elements and final state.
-- **Verified:** `pnpm db:generate` regenerated `@prisma/client` in this worktree so the MCP server could start with the canonical database URL.
-- **Verified:** `$env:DATABASE_URL='postgresql://specforge:local-deployment-verification-only@localhost:15433/specforge_canonical?schema=public'; pnpm design-facts:sync` exited 0 and read back all 12 baseline decisions as complete, including `adr-architecture-overview-home`.
-- **Verified:** `$env:DATABASE_URL='postgresql://specforge:local-deployment-verification-only@localhost:15433/specforge_canonical?schema=public'; pnpm design-facts:check` exited 0 with no missing, mismatched, out-of-scope, or blocked records after the serial rerun against `specforge_canonical`.
+- **Verified:** Bundled Playwright browser inspection on the system Chrome channel checked `http://localhost:3002/?scope=com.huawei.celon.desiner` at 1440x960 and 390x844 in English and Chinese. Desktop English and Chinese kept all eight stages on one logical row with only 2px and 3px vertical variance respectively, so stage 6 remained directly before stages 7 and 8 instead of pointing into empty space. Desktop connectors stayed visible, mobile connectors stayed hidden, action links did not overlap, mobile had no horizontal overflow, `/` showed no dashboard signals, and all three action links preserved the exact scoped destinations.
+- **Verified:** Bundled Playwright reduced-motion inspection on the system Chrome channel checked `http://localhost:3002/?scope=com.huawei.celon.desiner` at 1440x960 in English with `reducedMotion: 'reduce'`. `window.matchMedia('(prefers-reduced-motion: reduce)').matches` was true, overview motion targets resolved to `animationName: none`, `animationDuration: 0s`, `transitionDuration: 0s`, `transform: none`, and `opacity: 1`, the connector animation resolved to `none`, and sampled stage positions stayed unchanged over 250ms.
+- **Not rerun in this restoration turn:** `pnpm design-facts:sync` and serial `pnpm design-facts:check`. Per the user’s instruction, no additional MCP operations were executed beyond previously completed evidence.
 
 ## 中文本地化 / Chinese Localization
 
@@ -60,7 +58,7 @@ Use `/` as a static bilingual architecture orientation. The refined introduction
 
 ### 状态
 
-**已接受；引导页验证完成；MCP 已同步并回读。**
+**已接受；引导页验证证据已修复；本次恢复回合未重新运行 MCP 同步。**
 
 - 稳定 ADR/MCP ID：`adr-architecture-overview-home`
 - 对应 Proposal ID：`proposal-architecture-overview-home`
@@ -102,10 +100,8 @@ SpecForge 需要一个系统定位入口，用于说明 MCP-first 设计事实�
 
 ### 证据
 
-- **已验证：** `.\\node_modules\\.bin\\vitest.cmd run apps/web/lib/__tests__/overview.test.ts` 以退出码 0 完成：1 个测试文件、8 个测试通过。
+- **已验证：** `.\\node_modules\\.bin\\vitest.cmd run apps/web/lib/__tests__/overview.test.ts scripts/design-fact-manifest.test.ts` 以退出码 0 完成：2 个测试文件、14 个测试通过。
 - **已验证：** `pnpm --filter @specforge/web lint` 以退出码 0 完成，未发现 ESLint 警告或错误。Next.js 输出了弃用和工作区根目录/额外锁文件警告。
-- **已验证：** 在 1440x960 下以英文和中文、在 390x844 下以英文和中文检查 `http://localhost:3002/?scope=com.huawei.celon.desiner`。画布和操作控件可读，操作控件无重叠，移动端无水平溢出，`/` 无加载态、无范围化计数、无已编写资产数据，工作台、关系图谱和治理操作均保留精确 Scope 目的地。
-- **已验证：** 针对 `apps/web/app/styles/globals.css` 的减少动效检查确认存在 `@media (prefers-reduced-motion: reduce)`，且 `.sf-overview-canvas [data-motion]` 对概览动效元素和最终状态应用 `animation: none`、`transition: none`、`transform: none` 与 `opacity: 1`。
-- **已验证：** `pnpm db:generate` 在该工作树中重新生成了 `@prisma/client`，使 MCP 服务能够携带规范数据库 URL 启动。
-- **已验证：** `$env:DATABASE_URL='postgresql://specforge:local-deployment-verification-only@localhost:15433/specforge_canonical?schema=public'; pnpm design-facts:sync` 以退出码 0 完成，并将全部 12 项基线决策（含 `adr-architecture-overview-home`）回读为 complete。
-- **已验证：** `$env:DATABASE_URL='postgresql://specforge:local-deployment-verification-only@localhost:15433/specforge_canonical?schema=public'; pnpm design-facts:check` 在针对 `specforge_canonical` 的串行重跑后以退出码 0 完成，无缺失、不匹配、越界或受阻记录。
+- **已验证：** 通过系统 Chrome 通道上的 bundled Playwright，在 1440x960 与 390x844 下分别以英文和中文检查 `http://localhost:3002/?scope=com.huawei.celon.desiner`。英文与中文桌面视图都让 8 个阶段保持在同一逻辑行内，顶部偏差分别仅为 2px 和 3px，因此第 6 阶段直接位于第 7、8 阶段之前，不会指向空白区域。桌面连接箭头保持可见，移动端连接箭头保持隐藏，操作链接无重叠，移动端无水平溢出，`/` 未显示仪表盘信号，且 3 个操作链接都保留了精确的 Scope 目的地。
+- **已验证：** 通过系统 Chrome 通道上的 bundled Playwright，在英文 1440x960 视口下以 `reducedMotion: 'reduce'` 检查 `http://localhost:3002/?scope=com.huawei.celon.desiner`。`window.matchMedia('(prefers-reduced-motion: reduce)').matches` 为 true，概览动效目标解析为 `animationName: none`、`animationDuration: 0s`、`transitionDuration: 0s`、`transform: none` 与 `opacity: 1`，连接箭头动画也解析为 `none`，并且连续 250ms 采样的阶段位置保持不变。
+- **本次恢复回合未重跑：** `pnpm design-facts:sync` 与串行 `pnpm design-facts:check`。按照用户指示，除既有已完成证据外，本回合未再执行额外 MCP 操作。
