@@ -68,11 +68,11 @@ Use `/` as a static bilingual architecture orientation. The refined introduction
 
 ### 背景
 
-SpecForge 需要一个系统定位入口，用于说明 MCP-first 设计事实生命周期，而不能把应用根路由变成操作仪表盘。应用服务 Scope 是隔离边界：已编写的设计事实、派生计数和仪表盘指标都属于一个已选应用服务，访问根路由本身不得读取或聚合这些数据。
+SpecForge 需要一个系统导向入口，用于解释其以 MCP 为先的设计事实生命周期，同时不能把应用根路由变成运维仪表盘。应用服务 Scope 是隔离边界：已编写的设计事实、派生计数和仪表盘指标都属于某一个被选定的应用服务，不能仅因为访问者打开根路由就被读取或聚合。
 
 ### 决策
 
-将 `/` 作为静态双语架构定位页。改进后的引导页使用深墨色蓝图画布、分阶段生命周期流和有类型资产星图，说明从变更到 Proposal、ADR、资产、规则与契约、治理、Context Pack 和证据的过程。页面提供进入已选应用服务工作台、关系分析和治理检查的 Scope 保留导航。将 `/workspace` 作为范围化的操作仪表盘。根路由不得加载、关联、计数或聚合跨应用服务的已编写设计事实。
+将 `/` 作为静态双语架构定位页。改进后的引导页使用深墨色蓝图画布、分阶段生命周期流和有类型资产星图，说明从变更到 Proposal、ADR、设计资产、规则与契约、治理、Context Pack 和证据的过程。页面提供进入所选应用服务工作区、关系分析和治理检查的保留 Scope 导航。将 `/workspace` 作为带范围的操作仪表盘。根路由不得加载、关联、计数或聚合跨应用服务的已编写设计事实。
 
 ### 备选方案
 
@@ -83,25 +83,25 @@ SpecForge 需要一个系统定位入口，用于说明 MCP-first 设计事实�
 ### 后果
 
 - 积极影响：新用户可以在进入工作台前理解系统模型。
-- 积极影响：根路由不依赖已编写设计事实数据，因此按构造满足 Scope 安全。
+- 积极影响：根路由独立于已编写的设计事实数据，并且按构造保证 Scope 安全。
 - 积极影响：画布在完整动效和减少动效环境中都提供说明性的最终状态，且不引入加载器或数据查询。
-- 积极影响：现有仪表盘在 `/workspace?scope=<applicationServiceId>` 下保持操作工作台定位。
-- 权衡：导航仅在进入范围化目的地时保留已选应用服务 Scope。
-- 权衡：跨应用服务比较仍是需要单独授权的延期能力。
+- 积极影响：现有仪表盘在 `/workspace?scope=<applicationServiceId>` 下保持其操作工作区定位。
+- 权衡：导航仅在进入带范围的目标页面时保留所选应用服务 Scope。
+- 权衡：跨服务比较仍然是需要单独授权的延期能力。
 
 ### 约束
 
-- 英文为规范内容，所有面向人的定位概念均提供中文覆盖。
-- `/` 不得导入范围化资产加载器、仪表盘加载器，也不得聚合已编写事实。
-- 范围化目的地必须使用已选应用服务 ID，并保留其精确 Scope 边界。
+- 英文是规范内容，所有面向人的导向概念都必须提供中文覆盖。
+- `/` 不得导入带范围的资产加载器、仪表盘加载器，也不得聚合已编写事实。
+- 带范围的目标页面必须使用所选应用服务 ID，并保留其精确 Scope 边界。
 - 减少动效时必须以静态最终状态呈现概览画布，并禁用动画和过渡。
-- Proposal、Context Pack、ADR、类型化链接和证据只能通过 MCP 写入精确所属的 Designer Scope。
-- 只有 MCP 持久化并回读精确 ID、Scope、本地化、类型化链接和证据后才能完成。
+- Proposal、Context Pack、ADR、有类型链接和证据只能通过 MCP 写入精确所属的 Designer Scope。
+- 只有在 MCP 持久化并回读精确 ID、Scope、本地化、有类型链接和证据后，才可视为完成。
 
 ### 证据
 
 - **已验证：** `.\\node_modules\\.bin\\vitest.cmd run apps/web/lib/__tests__/overview.test.ts scripts/design-fact-manifest.test.ts` 以退出码 0 完成：2 个测试文件、14 个测试通过。
 - **已验证：** `pnpm --filter @specforge/web lint` 以退出码 0 完成，未发现 ESLint 警告或错误。Next.js 输出了弃用和工作区根目录/额外锁文件警告。
-- **已验证：** 通过系统 Chrome 通道上的 bundled Playwright，在 1440x960 与 390x844 下分别以英文和中文检查 `http://localhost:3002/?scope=com.huawei.celon.desiner`。英文与中文桌面视图都让 8 个阶段保持在同一逻辑行内，顶部偏差分别仅为 2px 和 3px，因此第 6 阶段直接位于第 7、8 阶段之前，不会指向空白区域。桌面连接箭头保持可见，移动端连接箭头保持隐藏，操作链接无重叠，移动端无水平溢出，`/` 未显示仪表盘信号，且 3 个操作链接都保留了精确的 Scope 目的地。
+- **已验证：** 通过系统 Chrome 通道上的 bundled Playwright，在 1440x960 与 390x844 下分别以英文和中文检查 `http://localhost:3002/?scope=com.huawei.celon.desiner`。英文与中文桌面视图都让 8 个阶段保持在同一逻辑行内，顶部偏差分别仅为 2px 和 3px，因此第 6 阶段直接位于第 7、8 阶段之前，而不是指向空白区域。桌面连接箭头保持可见，移动端连接箭头保持隐藏，操作链接无重叠，移动端无水平溢出，`/` 未显示仪表盘信号，且 3 个操作链接都保留了精确的 Scope 目标地址。
 - **已验证：** 通过系统 Chrome 通道上的 bundled Playwright，在英文 1440x960 视口下以 `reducedMotion: 'reduce'` 检查 `http://localhost:3002/?scope=com.huawei.celon.desiner`。`window.matchMedia('(prefers-reduced-motion: reduce)').matches` 为 true，概览动效目标解析为 `animationName: none`、`animationDuration: 0s`、`transitionDuration: 0s`、`transform: none` 与 `opacity: 1`，连接箭头动画也解析为 `none`，并且连续 250ms 采样的阶段位置保持不变。
 - **本次恢复回合未重跑：** `pnpm design-facts:sync` 与串行 `pnpm design-facts:check`。按照用户指示，除既有已完成证据外，本回合未再执行额外 MCP 操作。
