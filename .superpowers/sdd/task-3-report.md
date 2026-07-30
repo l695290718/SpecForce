@@ -1,86 +1,132 @@
-# Task 3 Report: Architecture Overview Flow Styling
+# Task 3 Report: Architecture Overview Introduction Verification
 
 ## Scope
 
-Implemented the Task 3 visual contract only:
+Updated only the permitted Task 3 records:
 
-- `apps/web/app/page.tsx`
-- `apps/web/app/styles/globals.css`
-- `apps/web/lib/__tests__/overview.test.ts`
+- `docs/adr/0013-architecture-overview-home.md`
+- `docs/design-facts/baseline-manifest.json`
+- `.superpowers/sdd/task-3-report.md`
 
-The root route remains a concept-only client page. No scoped loader, dashboard
-data, ADR, MCP manifest, or TODO record was changed.
+No product code or CSS was changed.
 
-## TDD Evidence
+## Verification
 
-### RED
-
-Added a source-level route contract asserting that the root page includes:
-
-- `className="sf-overview-flow"`
-- a `data-motion` connector
+### Focused test
 
 Command:
 
 ```text
-pnpm exec vitest run apps/web/lib/__tests__/overview.test.ts
+.\node_modules\.bin\vitest.cmd run apps/web/lib/__tests__/overview.test.ts
 ```
 
-Result: failed as expected. The new assertion could not find
-`className="sf-overview-flow"`; 4 existing tests passed and 1 new test failed.
-
-### GREEN
-
-Added a stable six-column fact-flow grid, 7.5rem minimum step height, mobile
-single-column fallback, and restrained connector motion. The connector is
-disabled with all transition behavior under `prefers-reduced-motion`.
-
-Command:
+Result:
 
 ```text
-pnpm exec vitest run apps/web/lib/__tests__/overview.test.ts
+1 test file passed; 8 tests passed; exit code 0.
 ```
-
-Result: passed, 5/5 tests.
-
-## Consolidated Verification
-
-### Focused tests
-
-```text
-pnpm exec vitest run apps/web/lib/__tests__/overview.test.ts apps/web/lib/__tests__/scope.test.ts apps/web/lib/__tests__/dashboard.test.ts
-```
-
-Result: passed, 3 test files and 11 tests.
 
 ### Lint
+
+Command:
 
 ```text
 pnpm --filter @specforge/web lint
 ```
 
-Result: passed, no ESLint warnings or errors. Next.js emitted only its existing
-`next lint` deprecation and multiple-lockfile workspace-root warnings.
-
-### Typecheck
+Result:
 
 ```text
-pnpm --filter @specforge/web typecheck
+No ESLint warnings or errors; exit code 0.
+Next.js emitted its existing next lint deprecation warning and workspace-root / extra-lockfile warnings.
 ```
 
-Result: blocked by the pre-existing generated Prisma client state. The exact
-first error is:
+### Browser inspection
+
+Target:
 
 ```text
-lib/db.ts(1,10): error TS2305: Module '"@prisma/client"' has no exported member 'PrismaClient'.
+http://localhost:3002/?scope=com.huawei.celon.desiner
 ```
 
-This also produces existing downstream implicit-`any` errors in `lib/assets.ts`
-and the migrated `app/workspace/page.tsx`. Task 3 did not modify those files or
-the Prisma generation setup, so no unrelated repair was made.
+Observed:
+
+- Desktop English at `1440x960`: readable canvas, readable action controls, no CTA overlap, exact scoped links for workspace, graph, and governance.
+- Desktop Chinese at `1440x960`: readable canvas, readable action controls, no CTA overlap, exact scoped links for workspace, graph, and governance.
+- Mobile English at `390x844`: readable stacked action controls, no CTA overlap, no horizontal overflow, exact scoped links preserved.
+- Mobile Chinese at `390x844`: readable stacked action controls, no CTA overlap, no horizontal overflow, exact scoped links preserved.
+- `/` showed no scoped counts, no authored asset data, and no loader state during the consolidated inspection.
+
+### Reduced motion
+
+Command:
+
+```text
+rg -n "prefers-reduced-motion|sf-overview-canvas \[data-motion\]|animation: none|transition: none|transform: none|opacity: 1" apps\web\app\styles\globals.css
+```
+
+Result:
+
+```text
+The overview stylesheet contains @media (prefers-reduced-motion: reduce) and applies animation: none, transition: none, transform: none, and opacity: 1 to the overview motion elements.
+```
+
+## MCP Synchronization
+
+### Environment repair
+
+Command:
+
+```text
+pnpm db:generate
+```
+
+Result:
+
+```text
+Regenerated @prisma/client in this worktree so the MCP server could start.
+```
+
+### Sync
+
+Command:
+
+```text
+$env:DATABASE_URL='postgresql://specforge:local-deployment-verification-only@localhost:15433/specforge_canonical?schema=public'; pnpm design-facts:sync
+```
+
+Result:
+
+```text
+Exit code 0. All 12 baseline decisions, including adr-architecture-overview-home, were returned as complete.
+```
+
+### Check
+
+Command:
+
+```text
+$env:DATABASE_URL='postgresql://specforge:local-deployment-verification-only@localhost:15433/specforge_canonical?schema=public'; pnpm design-facts:check
+```
+
+Result:
+
+```text
+The first parallel run raced the sync and reported adr-architecture-overview-home evidence drift.
+The serial rerun completed with exit code 0 and reported no missing, mismatched, out-of-scope, or blocked records.
+```
+
+## Changed Paths
+
+- `docs/adr/0013-architecture-overview-home.md`
+- `docs/design-facts/baseline-manifest.json`
+- `.superpowers/sdd/task-3-report.md`
+
+## Fixed Commit Hash
+
+Recorded in the final task handoff after commit creation.
 
 ## Concerns
 
-Browser verification remains controller-owned and was not run by this subtask.
-The typecheck remains incomplete until the Prisma client is generated correctly
-for this worktree.
+- `scripts/design-fact-manifest.test.ts` still expects two overview evidence entries. This task did not update non-record verification code.
+- The first `design-facts:check` invocation ran in parallel with `design-facts:sync`, so only the serial rerun is authoritative.

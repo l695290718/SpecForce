@@ -261,25 +261,27 @@
                                               ],
                           "owner":  "SpecForge Architecture",
                           "status":  "MCP synchronized and read back from the canonical database",
-                          "reason":  "The architecture overview facts were persisted and read back from specforge_canonical in the exact Designer Scope.",
-                          "retryTrigger":  "After a future design-fact change, re-run pnpm design-facts:sync and pnpm design-facts:check against specforge_canonical.",
+                          "reason":  "The architecture overview introduction refinement, Proposal, Context Pack, evidence, and typed links were persisted and read back in the exact Designer Scope using specforge_canonical.",
+                          "retryTrigger":  "After a future introduction or verification change, re-run pnpm design-facts:sync and pnpm design-facts:check against specforge_canonical.",
                           "localizedContent":  {
                                                    "en":  {
-                                                              "decision":  "Use `/` as a static bilingual architecture orientation. It presents the design-fact flow from Proposal through ADR, assets, rules and contracts, Context Pack, and evidence, plus navigation into a selected application-service workspace. Use `/workspace` as the scoped operational dashboard. The root route must not load, join, count, or aggregate authored design facts across application services.",
+                                                              "decision":  "Use `/` as a static bilingual architecture orientation. The refined introduction uses a deep-ink blueprint canvas, staged lifecycle flow, and typed-asset constellation to explain change through Proposal, ADR, assets, rules and contracts, governance, Context Pack, and evidence. It provides scope-preserving navigation into the selected application-service workspace, relationship analysis, and governance checks. Use `/workspace` as the scoped operational dashboard. The root route must not load, join, count, or aggregate authored design facts across application services.",
                                                               "constraints":  [
                                                                                   "English is canonical and every human-facing orientation concept has a Chinese overlay.",
                                                                                   "`/` must not import scoped asset loaders, dashboard loaders, or aggregate authored facts.",
                                                                                   "Scoped destinations must use the selected application-service ID and retain its exact scope boundary.",
+                                                                                  "Reduced motion renders the overview canvas in a static final state with animation and transitions disabled.",
                                                                                   "Proposal, Context Pack, ADR, typed links, and evidence are written only through MCP in the exact owning Designer Scope.",
                                                                                   "Completion requires MCP persistence and read-back of the exact IDs, scope, localization, typed links, and evidence."
                                                                               ]
                                                           },
                                                    "zh":  {
-                                                              "decision":  "将 `/` 作为静态双语架构定位页。它展示从 Proposal、ADR、资产、规则与契约、Context Pack 到证据的设计事实流，并提供进入已选应用服务工作台的导航。将 `/workspace` 作为范围化的操作仪表盘。根路由不得加载、关联、计数或聚合跨应用服务的已编写设计事实。",
+                                                              "decision":  "将 `/` 作为静态双语架构定位页。改进后的引导页使用深墨色蓝图画布、分阶段生命周期流和有类型资产星图，说明从变更到 Proposal、ADR、资产、规则与契约、治理、Context Pack 和证据的过程。页面提供进入已选应用服务工作台、关系分析和治理检查的 Scope 保留导航。将 `/workspace` 作为范围化的操作仪表盘。根路由不得加载、关联、计数或聚合跨应用服务的已编写设计事实。",
                                                               "constraints":  [
                                                                                   "英文为规范内容，所有面向人的定位概念均提供中文覆盖。",
                                                                                   "`/` 不得导入范围化资产加载器、仪表盘加载器，也不得聚合已编写事实。",
                                                                                   "范围化目的地必须使用已选应用服务 ID，并保留其精确 Scope 边界。",
+                                                                                  "减少动效时必须以静态最终状态呈现概览画布，并禁用动画和过渡。",
                                                                                   "Proposal、Context Pack、ADR、类型化链接和证据只能通过 MCP 写入精确所属的 Designer Scope。",
                                                                                   "只有 MCP 持久化并回读精确 ID、Scope、本地化、类型化链接和证据后才能完成。"
                                                                               ]
@@ -287,12 +289,16 @@
                                                },
                           "evidence":  [
                                            {
-                                               "command":  "pnpm exec vitest run apps/web/lib/__tests__/overview.test.ts apps/web/app/__tests__/overview-page.test.tsx apps/web/components/__tests__/app-shell.test.tsx",
-                                               "result":  "Architecture overview focused suites passed: 3 files and 11 tests."
+                                               "command":  ".\\node_modules\\.bin\\vitest.cmd run apps/web/lib/__tests__/overview.test.ts",
+                                               "result":  "Exited 0: 1 test file and 8 tests passed."
                                            },
                                            {
                                                "command":  "pnpm --filter @specforge/web lint",
-                                               "result":  "Web lint passed for the architecture overview implementation."
+                                               "result":  "Exited 0 with no ESLint warnings or errors; Next.js emitted deprecation and workspace-root/extra-lockfile warnings."
+                                           },
+                                           {
+                                               "command":  "Browser inspection: http://localhost:3002/?scope=com.huawei.celon.desiner at 1440x960 and 390x844 in English and Chinese; targeted reduced-motion CSS inspection.",
+                                               "result":  "Canvas and action controls were readable, actions did not overlap, mobile had no horizontal overflow, exact scoped links were retained, root stayed scope-data-free, and reduced motion resolves to a static final state."
                                            }
                                        ]
                       },
