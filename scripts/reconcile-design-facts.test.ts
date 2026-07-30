@@ -106,6 +106,13 @@ function persistedContextPack(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function persistedLink(overrides: Record<string, unknown> = {}) {
+  return {
+    architectureScope: scope,
+    ...overrides
+  };
+}
+
 it("reports a missing ADR as incomplete", async () => {
   const report = await reconcileDesignFacts({
     manifest: {
@@ -139,17 +146,70 @@ it("reports a missing typed relationship as incomplete", async () => {
   expect(report.missing).toEqual(["scope:proposal-adr-link"]);
 });
 
+it("rejects an otherwise matching proposal link outside the decision scope", async () => {
+  const report = await reconcileDesignFacts({
+    manifest: { decisions: [manifestDecision()] } as never,
+    find: async (type) => type === "evidence" ? undefined : type === "adr" ? persistedAdr() : type === "proposal" ? persistedProposal() : persistedContextPack(),
+    findLinks: async () => [
+      persistedLink({
+        sourceLogicalId: "proposal-scope",
+        targetLogicalId: "adr-scope",
+        label: "IMPLEMENTS_DECISION",
+        architectureScope: { applicationServiceId: scope.applicationServiceId, scopePath: "scope/shadow" }
+      }),
+      persistedLink({ sourceLogicalId: "ctx-scope", targetLogicalId: "proposal-scope", label: "IMPLEMENTS_CONTEXT_FOR" })
+    ]
+  });
+
+  expect(report.missing).toEqual(["scope:proposal-adr-link"]);
+});
+
 it("reports missing evidence as incomplete", async () => {
   const report = await reconcileDesignFacts({
     manifest: { decisions: [manifestDecision({ evidence: [{ command: "pnpm test", result: "passes" }] })] } as never,
     find: async (type) => type === "evidence" ? undefined : type === "adr" ? persistedAdr() : type === "proposal" ? persistedProposal() : persistedContextPack(),
     findLinks: async () => [
-      { sourceLogicalId: "proposal-scope", targetLogicalId: "adr-scope", label: "IMPLEMENTS_DECISION" },
-      { sourceLogicalId: "ctx-scope", targetLogicalId: "proposal-scope", label: "IMPLEMENTS_CONTEXT_FOR" }
+      persistedLink({ sourceLogicalId: "proposal-scope", targetLogicalId: "adr-scope", label: "IMPLEMENTS_DECISION" }),
+      persistedLink({ sourceLogicalId: "ctx-scope", targetLogicalId: "proposal-scope", label: "IMPLEMENTS_CONTEXT_FOR" })
     ]
   });
 
   expect(report.missing).toEqual(["scope:evidence"]);
+});
+
+it("rejects an otherwise matching evidence link outside the decision scope", async () => {
+  const report = await reconcileDesignFacts({
+    manifest: { decisions: [manifestDecision({ evidence: [{ command: "pnpm test", result: "passes" }] })] } as never,
+    find: async (type) => type === "adr"
+      ? persistedAdr()
+      : type === "proposal"
+        ? persistedProposal()
+        : type === "contextPack"
+          ? persistedContextPack()
+          : {
+            id: "scope:evidence:0",
+            status: "passed",
+            command: "pnpm test",
+            result: "passes",
+            architectureScope: scope,
+            localizedContent: {
+              en: { name: "Evidence", description: "Evidence", command: "pnpm test", result: "passes" },
+              zh: { name: "璇佹嵁", description: "璇佹嵁", command: "pnpm test", result: "passes" }
+            }
+          },
+    findLinks: async () => [
+      persistedLink({ sourceLogicalId: "proposal-scope", targetLogicalId: "adr-scope", label: "IMPLEMENTS_DECISION" }),
+      persistedLink({ sourceLogicalId: "ctx-scope", targetLogicalId: "proposal-scope", label: "IMPLEMENTS_CONTEXT_FOR" }),
+      persistedLink({
+        sourceLogicalId: "scope:evidence:0",
+        targetLogicalId: "adr-scope",
+        label: "VALIDATES",
+        architectureScope: { applicationServiceId: scope.applicationServiceId, scopePath: "scope/shadow" }
+      })
+    ]
+  });
+
+  expect(report.missing).toEqual(["scope:evidence-link"]);
 });
 
 it("reports a mismatched proposal ID", async () => {

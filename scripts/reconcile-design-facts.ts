@@ -16,7 +16,15 @@ type PersistedAdr = {
   localizedContent?: { en?: unknown; zh?: unknown };
 };
 type RecordType = "adr" | "proposal" | "contextPack" | "evidence";
-type Link = { sourceLogicalId?: string; targetLogicalId?: string; label?: string; sourceId?: string; targetId?: string; relationType?: string };
+type Link = {
+  sourceLogicalId?: string;
+  targetLogicalId?: string;
+  label?: string;
+  sourceId?: string;
+  targetId?: string;
+  relationType?: string;
+  architectureScope?: { applicationServiceId?: string; scopePath?: string };
+};
 type LocalizationShape = { stringFields: string[]; arrayFields?: string[] };
 
 const adrLocalizationShape: LocalizationShape = {
@@ -69,9 +77,9 @@ export async function reconcileDesignFacts(input: {
         else if (!hasLocalizedContent(contextPack, contextPackLocalizationShape)) report.mismatched.push(`${decision.id}:contextPack`);
         else if (input.findLinks) {
           const links = await input.findLinks(decision);
-          if (!hasLink(links, decision.proposalId, decision.mcpAdrId, "IMPLEMENTS_DECISION")) report.missing.push(`${decision.id}:proposal-adr-link`);
-          else if (!hasLink(links, decision.contextPackId, decision.proposalId, "IMPLEMENTS_CONTEXT_FOR")) report.missing.push(`${decision.id}:context-proposal-link`);
-          else if (decision.relatedAssetIds.some((assetId) => !hasLink(links, decision.mcpAdrId, assetId, "DECIDES"))) report.missing.push(`${decision.id}:adr-asset-link`);
+          if (!hasLink(links, decision.scope, decision.proposalId, decision.mcpAdrId, "IMPLEMENTS_DECISION")) report.missing.push(`${decision.id}:proposal-adr-link`);
+          else if (!hasLink(links, decision.scope, decision.contextPackId, decision.proposalId, "IMPLEMENTS_CONTEXT_FOR")) report.missing.push(`${decision.id}:context-proposal-link`);
+          else if (decision.relatedAssetIds.some((assetId) => !hasLink(links, decision.scope, decision.mcpAdrId, assetId, "DECIDES"))) report.missing.push(`${decision.id}:adr-asset-link`);
           else {
             for (const [index, expected] of decision.evidence.entries()) {
               const evidenceId = designEvidenceId(decision.id, index);
@@ -80,7 +88,7 @@ export async function reconcileDesignFacts(input: {
               else if (!matchesScope(evidence, decision.scope)) report.outOfScope.push(`${decision.id}:evidence`);
               else if (evidence.command !== expected.command || evidence.result !== expected.result || !hasLocalizedContent(evidence, evidenceLocalizationShape)) report.mismatched.push(`${decision.id}:evidence`);
               else if (evidence.status !== "passed") report.blocked.push(`${decision.id}:evidence`);
-              else if (!hasLink(links, evidenceId, decision.mcpAdrId, "VALIDATES")) report.missing.push(`${decision.id}:evidence-link`);
+              else if (!hasLink(links, decision.scope, evidenceId, decision.mcpAdrId, "VALIDATES")) report.missing.push(`${decision.id}:evidence-link`);
             }
             if (!hasDecisionIssue(report, decision.id)) report.verified.push(decision.id);
           }
@@ -94,8 +102,15 @@ export async function reconcileDesignFacts(input: {
 }
 
 function matchesScope(record: PersistedAdr, expectedScope: Decision["scope"]): boolean {
-  return record.architectureScope?.applicationServiceId === expectedScope.applicationServiceId
-    && record.architectureScope?.scopePath === expectedScope.scopePath;
+  return matchesArchitectureScope(record.architectureScope, expectedScope);
+}
+
+function matchesArchitectureScope(
+  actualScope: { applicationServiceId?: string; scopePath?: string } | undefined,
+  expectedScope: Decision["scope"]
+): boolean {
+  return actualScope?.applicationServiceId === expectedScope.applicationServiceId
+    && actualScope?.scopePath === expectedScope.scopePath;
 }
 
 function hasLocalizedContent(record: PersistedAdr, shape: LocalizationShape): boolean {
@@ -118,10 +133,11 @@ function hasDecisionIssue(report: DesignFactReconciliationReport, decisionId: st
   return [report.missing, report.mismatched, report.outOfScope, report.blocked].some((items) => items.some((item) => item === decisionId || item.startsWith(`${decisionId}:`)));
 }
 
-function hasLink(links: Link[], sourceId: string, targetId: string, relationType: string): boolean {
+function hasLink(links: Link[], expectedScope: Decision["scope"], sourceId: string, targetId: string, relationType: string): boolean {
   return links.some((link) => (link.sourceLogicalId === sourceId || link.sourceId === sourceId)
     && (link.targetLogicalId === targetId || link.targetId === targetId)
-    && (link.label === relationType || link.relationType === relationType));
+    && (link.label === relationType || link.relationType === relationType)
+    && matchesArchitectureScope(link.architectureScope, expectedScope));
 }
 
 export function reconciliationExitCode(report: DesignFactReconciliationReport): 0 | 1 {
