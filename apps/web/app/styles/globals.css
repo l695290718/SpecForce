@@ -148,6 +148,47 @@ code {
   }
 }
 
+@keyframes specforge-overview-stage-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sf-overview-canvas {
+  position: relative;
+  isolation: isolate;
+  min-height: 16rem;
+  background-color: #111b2f;
+  background-image:
+    linear-gradient(rgba(147, 197, 253, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(147, 197, 253, 0.1) 1px, transparent 1px);
+  background-size: 2rem 2rem;
+}
+
+.sf-overview-canvas::before {
+  position: absolute;
+  z-index: -1;
+  inset: 1rem;
+  content: "";
+  border: 1px solid rgba(191, 219, 254, 0.16);
+  pointer-events: none;
+}
+
+.sf-overview-canvas > * {
+  position: relative;
+}
+
+.sf-overview-canvas a {
+  min-width: 10rem;
+  justify-content: center;
+  text-align: center;
+}
+
 .sf-overview-flow {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -158,8 +199,38 @@ code {
   min-height: 7.5rem;
 }
 
+.sf-overview-stage {
+  animation: specforge-overview-stage-in 520ms ease-out both;
+  animation-delay: var(--stage-delay, 0ms);
+}
+
 .sf-overview-flow-connector[data-motion] {
   animation: specforge-overview-connector 3.6s ease-in-out infinite;
+}
+
+.sf-overview-asset-node {
+  min-height: 7.5rem;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.sf-overview-asset-node:hover,
+.sf-overview-asset-node:focus-visible {
+  z-index: 1;
+  border-color: #2563eb;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.14);
+  transform: translateY(-2px);
+}
+
+.sf-overview-asset-node:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+
+.sf-overview-asset-node:hover + .sf-overview-asset-node,
+.sf-overview-asset-node:focus-visible + .sf-overview-asset-node,
+.sf-overview-asset-node:has(+ .sf-overview-asset-node:hover),
+.sf-overview-asset-node:has(+ .sf-overview-asset-node:focus-visible) {
+  border-color: rgba(37, 99, 235, 0.45);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -168,14 +239,33 @@ code {
   .sf-border-live,
   .sf-pulse,
   .sf-rise,
-  .sf-overview-flow [data-motion] {
+  .sf-overview-canvas [data-motion],
+  .sf-overview-flow [data-motion],
+  .sf-overview-stage,
+  .sf-overview-asset-node {
     animation: none;
     transition: none;
+    transform: none;
+    opacity: 1;
   }
 }
 
 @media (max-width: 768px) {
   .sf-overview-flow {
+    grid-template-columns: 1fr;
+  }
+
+  .sf-overview-canvas {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .sf-overview-canvas a {
+    width: 100%;
+  }
+
+  .sf-overview-asset-constellation {
     grid-template-columns: 1fr;
   }
 }

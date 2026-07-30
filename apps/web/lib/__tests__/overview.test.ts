@@ -69,4 +69,14 @@ describe("overview route isolation", () => {
     expect(source).toContain('className="sf-overview-flow"');
     expect(source).toContain("data-motion");
   });
+
+  it("uses staged canvas motion with an explicit reduced-motion fallback", async () => {
+    const css = await readFile(new URL("../../app/styles/globals.css", import.meta.url), "utf8");
+
+    expect(css).toContain(".sf-overview-canvas");
+    expect(css).toContain(".sf-overview-stage");
+    expect(css).toContain(".sf-overview-asset-node");
+    expect(css).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(css).toContain(".sf-overview-canvas [data-motion]");
+  });
 });

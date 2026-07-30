@@ -34,7 +34,7 @@ export default function ArchitectureOverviewPage() {
 
   return (
     <div className="space-y-8 pb-4">
-      <section className="sf-scan overflow-hidden rounded-lg border border-slate-700 bg-ink px-6 py-8 text-white shadow-elevated sm:px-8" data-testid="architecture-introduction-canvas">
+      <section className="sf-overview-canvas overflow-hidden rounded-lg border border-slate-700 px-6 py-8 text-white shadow-elevated sm:px-8" data-testid="architecture-introduction-canvas">
         <div className="max-w-4xl">
           <p className="font-mono text-[11px] font-semibold uppercase text-blue-200"><T k="overview.eyebrow" /></p>
           <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-normal sm:text-4xl"><T k="overview.title" /></h1>
@@ -68,7 +68,7 @@ export default function ArchitectureOverviewPage() {
         </div>
         <ol className="sf-overview-flow" data-testid="architecture-fact-flow">
           {factFlow.map(([labelKey, Icon], index) => (
-            <li className="sf-overview-flow-step relative border border-border bg-white px-4 py-4 shadow-sm" key={labelKey}>
+            <li className="sf-overview-flow-step sf-overview-stage relative border border-border bg-white px-4 py-4 shadow-sm" data-motion key={labelKey} style={{ "--stage-delay": `${index * 80}ms` } as React.CSSProperties}>
               <span className="font-mono text-[11px] font-semibold text-rule">0{index + 1}</span>
               <Icon className="mt-5 text-accent" size={20} />
               <div className="mt-3 text-sm font-semibold text-ink"><T k={labelKey} /></div>
@@ -85,9 +85,9 @@ export default function ArchitectureOverviewPage() {
           <p className="mt-3 max-w-xl text-sm leading-6 text-muted"><T k="overview.relationshipDescription" /></p>
           <p className="mt-5 border-l-2 border-amber-400 pl-3 text-sm leading-6 text-muted"><T k="overview.scopeNotice" /></p>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="architecture-asset-constellation">
+        <div className="sf-overview-asset-constellation grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="architecture-asset-constellation">
           {assetTypes.map((labelKey, index) => (
-            <div className="relative min-h-24 border border-border bg-panel px-3 py-3 shadow-sm" key={labelKey}>
+            <div className="sf-overview-asset-node relative min-h-24 border border-border bg-panel px-3 py-3 shadow-sm" key={labelKey} tabIndex={0}>
               <span className="font-mono text-[11px] text-muted">{String(index + 1).padStart(2, "0")}</span>
               <div className="mt-4 text-sm font-semibold text-ink"><T k={labelKey} /></div>
             </div>
