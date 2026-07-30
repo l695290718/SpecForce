@@ -44,7 +44,16 @@ it("includes the scope-safe architecture overview decision with bilingual govern
   expect(decision?.relatedAssetIds).toEqual(["data-specforge-assets", "adr-design-fact-dual-record-governance"]);
   expect(decision?.localizedContent?.en.decision).toContain("static bilingual architecture orientation");
   expect(decision?.localizedContent?.zh.decision).toContain("静态双语架构定位页");
-  expect(decision?.evidence).toHaveLength(2);
+  expect(decision?.evidence).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      command: "$env:DATABASE_URL='postgresql://specforge:local-deployment-verification-only@localhost:15433/specforge_canonical?schema=public'; pnpm design-facts:sync",
+      result: "Exit code 0. All 12 baseline decisions, including adr-architecture-overview-home, were returned as complete."
+    }),
+    expect.objectContaining({
+      command: "$env:DATABASE_URL='postgresql://specforge:local-deployment-verification-only@localhost:15433/specforge_canonical?schema=public'; pnpm design-facts:check",
+      result: "The serial rerun completed with exit code 0 and reported no missing, mismatched, out-of-scope, or blocked records."
+    })
+  ]));
 });
 
 it("records the verified federated sync fact with canonical metadata and valid bilingual ADR overlays", () => {
