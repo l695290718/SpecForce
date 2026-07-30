@@ -111,7 +111,10 @@ async function main(): Promise<void> {
     });
     console.log(JSON.stringify(report, null, 2));
     process.exitCode = reconciliationExitCode(report);
-  } finally { await client.close(); }
+  } finally {
+    await client.close();
+    await transport.close();
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch((error) => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; });

@@ -1,334 +1,391 @@
 {
-  "version": 1,
-  "decisions": [
-    {
-      "id": "adr-application-service-scope-isolation",
-      "repositoryAdr": "docs/adr/0001-application-service-scope-isolation.md",
-      "mcpAdrId": "adr-application-service-scope-isolation",
-      "scope": {
-        "applicationServiceId": "com.huawei.celon.desiner",
-        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
-      },
-      "proposalId": "proposal-strict-application-service-isolation",
-      "contextPackId": "context-pack-specforge-architecture",
-      "relatedAssetIds": [
-        "api-specforge-mcp-tools",
-        "data-specforge-assets"
-      ],
-      "evidence": [
-        {
-          "command": "pnpm --filter @specforge/mcp-server test",
-          "result": "Scoped MCP tool tests pass."
-        }
-      ]
-    },
-    {
-      "id": "adr-mcp-first-architecture",
-      "repositoryAdr": "docs/adr/0002-mcp-first-design-authoring.md",
-      "mcpAdrId": "adr-mcp-first-architecture",
-      "scope": {
-        "applicationServiceId": "com.huawei.celon.desiner",
-        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
-      },
-      "proposalId": "proposal-specforge-self-design",
-      "contextPackId": "context-pack-specforge-architecture",
-      "relatedAssetIds": [
-        "api-specforge-mcp-tools",
-        "rule-specforge-core-service-reuse"
-      ],
-      "evidence": [
-        {
-          "command": "pnpm --filter @specforge/mcp-server test",
-          "result": "MCP tool contracts pass."
-        }
-      ]
-    },
-    {
-      "id": "adr-canonical-english-localized-overlay",
-      "repositoryAdr": "docs/adr/0003-english-canonical-bilingual-overlays.md",
-      "mcpAdrId": "adr-canonical-english-localized-overlay",
-      "scope": {
-        "applicationServiceId": "com.huawei.celon.desiner",
-        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
-      },
-      "proposalId": "proposal-bilingual-design-assets",
-      "contextPackId": "context-pack-specforge-architecture",
-      "relatedAssetIds": [
-        "data-specforge-i18n",
-        "rule-bilingual-asset-completeness"
-      ],
-      "evidence": [
-        {
-          "command": "pnpm --filter @specforge/core test",
-          "result": "Localization validation tests pass."
-        }
-      ]
-    },
-    {
-      "id": "adr-postgresql-authoritative-design-store",
-      "repositoryAdr": "docs/adr/0004-postgresql-authoritative-design-store.md",
-      "mcpAdrId": "adr-postgresql-authoritative-design-store",
-      "scope": {
-        "applicationServiceId": "com.huawei.celon.desiner",
-        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
-      },
-      "proposalId": "proposal-specforge-self-design",
-      "contextPackId": "context-pack-specforge-architecture",
-      "relatedAssetIds": [
-        "data-specforge-assets",
-        "data-specforge-asset-graph"
-      ],
-      "evidence": [
-        {
-          "command": "pnpm db:push",
-          "result": "Prisma schema applied to PostgreSQL."
-        },
-        {
-          "command": "SPECFORGE_PG_INTEGRATION=1 pnpm --filter @specforge/graph-store test -- postgres.integration.test.ts",
-          "result": "PostgreSQL GraphStore regression passed: 3 files and 51 tests."
-        }
-      ]
-    },
-    {
-      "id": "adr-nebulagraph-derived-impact-runtime",
-      "repositoryAdr": "docs/adr/0005-nebulagraph-derived-impact-runtime.md",
-      "mcpAdrId": "adr-nebulagraph-derived-impact-runtime",
-      "scope": {
-        "applicationServiceId": "com.huawei.celon.desiner",
-        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
-      },
-      "proposalId": "proposal-enterprise-impact-analysis",
-      "contextPackId": "context-pack-specforge-architecture",
-      "relatedAssetIds": [
-        "data-specforge-asset-graph",
-        "quality-specforge-impact-ready"
-      ],
-      "evidence": [
-        {
-          "command": "pnpm --filter @specforge/graph-store test -- nebula.integration",
-          "result": "Projection, checkpoint, and traversal pass locally."
-        }
-      ]
-    },
-    {
-      "id": "adr-transactional-outbox-graph-projection",
-      "repositoryAdr": "docs/adr/0006-transactional-outbox-graph-projection.md",
-      "mcpAdrId": "adr-transactional-outbox-graph-projection",
-      "scope": {
-        "applicationServiceId": "com.huawei.celon.desiner",
-        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
-      },
-      "proposalId": "proposal-enterprise-impact-analysis",
-      "contextPackId": "context-pack-specforge-architecture",
-      "relatedAssetIds": [
-        "data-specforge-asset-graph",
-        "api-specforge-mcp-tools"
-      ],
-      "evidence": [
-        {
-          "command": "pnpm --filter @specforge/graph-projector test",
-          "result": "Outbox claim, retry, and checkpoint tests pass."
-        }
-      ]
-    },
-    {
-      "id": "adr-design-fact-dual-record-governance",
-      "repositoryAdr": "docs/adr/0007-design-fact-dual-record-governance.md",
-      "mcpAdrId": "adr-design-fact-dual-record-governance",
-      "scope": {
-        "applicationServiceId": "com.huawei.celon.desiner",
-        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
-      },
-      "proposalId": "proposal-specforge-self-design",
-      "contextPackId": "context-pack-specforge-architecture",
-      "relatedAssetIds": [
-        "api-specforge-mcp-tools",
-        "data-specforge-assets"
-      ],
-      "evidence": [
-        {
-          "command": "pnpm exec vitest run scripts/design-fact-governance.test.ts",
-          "result": "Dual-record governance policy test passes."
-        }
-      ]
-    },
-    {
-      "id": "adr-federated-design-fact-synchronization",
-      "repositoryAdr": "docs/adr/0010-federated-design-fact-synchronization.md",
-      "mcpAdrId": "adr-federated-design-fact-synchronization",
-      "scope": {
-        "applicationServiceId": "com.huawei.celon.desiner",
-        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
-      },
-      "proposalId": "proposal-federated-design-fact-governance-core",
-      "contextPackId": "context-pack-federated-design-fact-governance",
-      "relatedAssetIds": [
-        "api-specforge-mcp-tools",
-        "data-specforge-assets",
-        "data-specforge-asset-graph",
-        "adr-design-fact-dual-record-governance"
-      ],
-      "status": "MCP synchronized and read back",
-      "owner": "SpecForge Architecture",
-      "reason": "The configured Docker PostgreSQL authority at localhost:5433 is reachable and the exact Designer Scope has been reconciled.",
-      "retryTrigger": "After a future design-fact change, re-run design-facts:sync, design-facts:check, and the configured-scope federation check before completion.",
-      "auditFailureCode": "FEDERATION_TOOL_ERROR",
-      "auditDiagnosticReference": "diagnosticRef=<64-hex SHA-256 digest>",
-      "auditSecurityContract": "AuditLog.errorMessage stores only the stable failure code and diagnosticRef; raw exceptions and credential text are never persisted.",
-      "localizedContent": {
-        "en": {
-          "decision": "Audit failure contract: FEDERATION_TOOL_ERROR with diagnosticRef=<64-hex SHA-256 digest>; raw exceptions and credential text are never persisted.",
-          "constraints": [
-            "MCP synchronization and read-back are verified against the configured Docker PostgreSQL authority at localhost:5433 in the exact Designer Scope. After a future design-fact change, re-run design-facts:sync, design-facts:check, and the configured-scope federation check before completion."
-          ]
-        },
-        "zh": {
-          "decision": "审计失败合同：FEDERATION_TOOL_ERROR 及 diagnosticRef=SHA-256 摘要；不得持久化原始异常或凭据文本。",
-          "constraints": [
-            "MCP 同步与回读已在精确 Designer Scope 下针对 localhost:5433 的 Docker PostgreSQL 权威库完成核验。未来设计事实变更后，完成前必须重新运行 design-facts:sync、design-facts:check 和配置 Scope 的联邦检查。"
-          ]
-        }
-      },
-      "evidence": [
-        {
-          "command": "node .\\node_modules\\vitest\\vitest.mjs run scripts/design-fact-manifest.test.ts",
-          "result": "Federated governance manifest regression passes: 3 tests."
-        },
-        {
-          "command": "node .\\node_modules\\vitest\\vitest.mjs run packages\\core\\src\\__tests__",
-          "result": "Core suite passes: 12 files and 126 tests."
-        },
-        {
-          "command": "node .\\node_modules\\vitest\\vitest.mjs run apps\\mcp-server\\src",
-          "result": "MCP suite passes: 12 files and 144 tests; 9 PostgreSQL integration tests skipped without DATABASE_URL."
-        },
-        {
-          "command": "pnpm --filter @specforge/mcp-server typecheck && pnpm --filter @specforge/core typecheck",
-          "result": "Slice 2D maintenance retry typechecks passed."
-        },
-        {
-          "command": "pnpm design-facts:sync && pnpm design-facts:check",
-          "result": "Passed against localhost:5433: all eight baseline decisions were read back with no missing, mismatched, out-of-scope, or blocked records."
-        },
-        {
-          "command": "node .\\node_modules\\.pnpm\\vitest@2.1.9_@types+node@22.20.1\\node_modules\\vitest\\vitest.mjs run apps\\mcp-server\\src\\federation\\tools.test.ts apps\\mcp-server\\src\\federation\\persistence.test.ts",
-          "result": "Slice 3B audit failure diagnostic redaction regression passes: 2 files and 96 tests; raw exception and credential text are absent from AuditLog.errorMessage."
-        }
-      ]
-    },
-    {
-      "id": "adr-single-host-docker-compose-deployment",
-      "repositoryAdr": "docs/adr/0011-single-host-docker-compose-deployment.md",
-      "mcpAdrId": "adr-single-host-docker-compose-deployment",
-      "scope": {
-        "applicationServiceId": "com.huawei.celon.desiner",
-        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
-      },
-      "proposalId": "proposal-single-host-docker-deployment",
-      "contextPackId": "context-pack-single-host-docker-deployment",
-      "relatedAssetIds": [
-        "data-specforge-assets",
-        "api-specforge-mcp-tools"
-      ],
-      "evidence": [
-        {
-          "command": "powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -ConfigurationOnly",
-          "result": "Bundled and external PostgreSQL Compose topology checks passed."
-        },
-        {
-          "command": "docker compose --env-file deploy/.env.example -f deploy/compose.yaml build web",
-          "result": "Standalone production Web image built successfully."
-        },
-        {
-          "command": "powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -Live",
-          "result": "Isolated deployment stack passed health and Web restart persistence verification on port 3010."
-        }
-      ]
-    },
-    {
-      "id": "adr-architecture-overview-home",
-      "repositoryAdr": "docs/adr/0013-architecture-overview-home.md",
-      "mcpAdrId": "adr-architecture-overview-home",
-      "scope": {
-        "applicationServiceId": "com.huawei.celon.desiner",
-        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
-      },
-      "proposalId": "proposal-architecture-overview-home",
-      "contextPackId": "ctx-architecture-overview-home",
-      "relatedAssetIds": [
-        "data-specforge-assets",
-        "adr-design-fact-dual-record-governance"
-      ],
-      "owner": "SpecForge Architecture",
-      "status": "MCP synchronized and read back from the canonical database",
-      "reason": "The architecture overview facts were persisted and read back from specforge_canonical in the exact Designer Scope.",
-      "retryTrigger": "After a future design-fact change, re-run pnpm design-facts:sync and pnpm design-facts:check against specforge_canonical.",
-      "localizedContent": {
-        "en": {
-          "decision": "Use `/` as a static bilingual architecture orientation. It presents the design-fact flow from Proposal through ADR, assets, rules and contracts, Context Pack, and evidence, plus navigation into a selected application-service workspace. Use `/workspace` as the scoped operational dashboard. The root route must not load, join, count, or aggregate authored design facts across application services.",
-          "constraints": [
-            "English is canonical and every human-facing orientation concept has a Chinese overlay.",
-            "`/` must not import scoped asset loaders, dashboard loaders, or aggregate authored facts.",
-            "Scoped destinations must use the selected application-service ID and retain its exact scope boundary.",
-            "Proposal, Context Pack, ADR, typed links, and evidence are written only through MCP in the exact owning Designer Scope.",
-            "Completion requires MCP persistence and read-back of the exact IDs, scope, localization, typed links, and evidence."
-          ]
-        },
-        "zh": {
-          "decision": "将 `/` 作为静态双语架构定位页。它展示从 Proposal、ADR、资产、规则与契约、Context Pack 到证据的设计事实流，并提供进入已选应用服务工作台的导航。将 `/workspace` 作为范围化的操作仪表盘。根路由不得加载、关联、计数或聚合跨应用服务的已编写设计事实。",
-          "constraints": [
-            "英文为规范内容，所有面向人的定位概念均提供中文覆盖。",
-            "`/` 不得导入范围化资产加载器、仪表盘加载器，也不得聚合已编写事实。",
-            "范围化目的地必须使用已选应用服务 ID，并保留其精确 Scope 边界。",
-            "Proposal、Context Pack、ADR、类型化链接和证据只能通过 MCP 写入精确所属的 Designer Scope。",
-            "只有 MCP 持久化并回读精确 ID、Scope、本地化、类型化链接和证据后才能完成。"
-          ]
-        }
-      },
-      "evidence": [
-        {
-          "command": "pnpm exec vitest run apps/web/lib/__tests__/overview.test.ts apps/web/app/__tests__/overview-page.test.tsx apps/web/components/__tests__/app-shell.test.tsx",
-          "result": "Architecture overview focused suites passed: 3 files and 11 tests."
-        },
-        {
-          "command": "pnpm --filter @specforge/web lint",
-          "result": "Web lint passed for the architecture overview implementation."
-        }
-      ]
-    },
-    {
-      "id": "adr-single-authoritative-local-postgresql",
-      "repositoryAdr": "docs/adr/0014-single-authoritative-local-postgresql.md",
-      "mcpAdrId": "adr-single-authoritative-local-postgresql",
-      "scope": {
-        "applicationServiceId": "com.huawei.celon.desiner",
-        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
-      },
-      "proposalId": "proposal-single-authoritative-local-postgresql",
-      "contextPackId": "context-pack-single-authoritative-local-postgresql",
-      "relatedAssetIds": [
-        "data-specforge-assets",
-        "data-specforge-asset-graph",
-        "api-specforge-mcp-tools"
-      ],
-      "owner": "SpecForge Architecture",
-      "status": "MCP synchronized and read back from the canonical database",
-      "reason": "The canonical database cutover decision, Proposal, Context Pack, Evidence, and typed links were persisted and read back in the exact Designer Scope.",
-      "retryTrigger": "After a future topology or canonical database change, re-run pnpm design-facts:sync and pnpm design-facts:check using specforge_canonical.",
-      "evidence": [
-        {
-          "command": "docker exec deploy-postgres-1 pg_restore -U specforge -d specforge_canonical --no-owner --no-privileges /tmp/source-graph-verify.dump",
-          "result": "The full source catalog was restored into a fresh canonical database without modifying the former deployment database."
-        },
-        {
-          "command": "Compare-Object source-pre-import-fingerprint.txt canonical-post-import-fingerprint.txt",
-          "result": "The canonical fingerprint matched the complete source catalog: 70 design assets, 115 links, 173 current relationships, 411 relationship events, and 411 outbox records."
-        },
-        {
-          "command": "Invoke-WebRequest http://localhost:3000/assets/apis?scope=com.huawei.celon.desiner",
-          "result": "The canonical Web service rendered the scoped API, data-model, graph, and workspace routes without Prisma errors."
-        }
-      ]
-    }
-  ]
+    "version":  1,
+    "decisions":  [
+                      {
+                          "id":  "adr-application-service-scope-isolation",
+                          "repositoryAdr":  "docs/adr/0001-application-service-scope-isolation.md",
+                          "mcpAdrId":  "adr-application-service-scope-isolation",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-strict-application-service-isolation",
+                          "contextPackId":  "context-pack-specforge-architecture",
+                          "relatedAssetIds":  [
+                                                  "api-specforge-mcp-tools",
+                                                  "data-specforge-assets"
+                                              ],
+                          "evidence":  [
+                                           {
+                                               "command":  "pnpm --filter @specforge/mcp-server test",
+                                               "result":  "Scoped MCP tool tests pass."
+                                           }
+                                       ]
+                      },
+                      {
+                          "id":  "adr-mcp-first-architecture",
+                          "repositoryAdr":  "docs/adr/0002-mcp-first-design-authoring.md",
+                          "mcpAdrId":  "adr-mcp-first-architecture",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-specforge-self-design",
+                          "contextPackId":  "context-pack-specforge-architecture",
+                          "relatedAssetIds":  [
+                                                  "api-specforge-mcp-tools",
+                                                  "rule-specforge-core-service-reuse"
+                                              ],
+                          "evidence":  [
+                                           {
+                                               "command":  "pnpm --filter @specforge/mcp-server test",
+                                               "result":  "MCP tool contracts pass."
+                                           }
+                                       ]
+                      },
+                      {
+                          "id":  "adr-canonical-english-localized-overlay",
+                          "repositoryAdr":  "docs/adr/0003-english-canonical-bilingual-overlays.md",
+                          "mcpAdrId":  "adr-canonical-english-localized-overlay",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-bilingual-design-assets",
+                          "contextPackId":  "context-pack-specforge-architecture",
+                          "relatedAssetIds":  [
+                                                  "data-specforge-i18n",
+                                                  "rule-bilingual-asset-completeness"
+                                              ],
+                          "evidence":  [
+                                           {
+                                               "command":  "pnpm --filter @specforge/core test",
+                                               "result":  "Localization validation tests pass."
+                                           }
+                                       ]
+                      },
+                      {
+                          "id":  "adr-postgresql-authoritative-design-store",
+                          "repositoryAdr":  "docs/adr/0004-postgresql-authoritative-design-store.md",
+                          "mcpAdrId":  "adr-postgresql-authoritative-design-store",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-specforge-self-design",
+                          "contextPackId":  "context-pack-specforge-architecture",
+                          "relatedAssetIds":  [
+                                                  "data-specforge-assets",
+                                                  "data-specforge-asset-graph"
+                                              ],
+                          "evidence":  [
+                                           {
+                                               "command":  "pnpm db:push",
+                                               "result":  "Prisma schema applied to PostgreSQL."
+                                           },
+                                           {
+                                               "command":  "SPECFORGE_PG_INTEGRATION=1 pnpm --filter @specforge/graph-store test -- postgres.integration.test.ts",
+                                               "result":  "PostgreSQL GraphStore regression passed: 3 files and 51 tests."
+                                           }
+                                       ]
+                      },
+                      {
+                          "id":  "adr-nebulagraph-derived-impact-runtime",
+                          "repositoryAdr":  "docs/adr/0005-nebulagraph-derived-impact-runtime.md",
+                          "mcpAdrId":  "adr-nebulagraph-derived-impact-runtime",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-enterprise-impact-analysis",
+                          "contextPackId":  "context-pack-specforge-architecture",
+                          "relatedAssetIds":  [
+                                                  "data-specforge-asset-graph",
+                                                  "quality-specforge-impact-ready"
+                                              ],
+                          "evidence":  [
+                                           {
+                                               "command":  "pnpm --filter @specforge/graph-store test -- nebula.integration",
+                                               "result":  "Projection, checkpoint, and traversal pass locally."
+                                           }
+                                       ]
+                      },
+                      {
+                          "id":  "adr-transactional-outbox-graph-projection",
+                          "repositoryAdr":  "docs/adr/0006-transactional-outbox-graph-projection.md",
+                          "mcpAdrId":  "adr-transactional-outbox-graph-projection",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-enterprise-impact-analysis",
+                          "contextPackId":  "context-pack-specforge-architecture",
+                          "relatedAssetIds":  [
+                                                  "data-specforge-asset-graph",
+                                                  "api-specforge-mcp-tools"
+                                              ],
+                          "evidence":  [
+                                           {
+                                               "command":  "pnpm --filter @specforge/graph-projector test",
+                                               "result":  "Outbox claim, retry, and checkpoint tests pass."
+                                           }
+                                       ]
+                      },
+                      {
+                          "id":  "adr-design-fact-dual-record-governance",
+                          "repositoryAdr":  "docs/adr/0007-design-fact-dual-record-governance.md",
+                          "mcpAdrId":  "adr-design-fact-dual-record-governance",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-specforge-self-design",
+                          "contextPackId":  "context-pack-specforge-architecture",
+                          "relatedAssetIds":  [
+                                                  "api-specforge-mcp-tools",
+                                                  "data-specforge-assets"
+                                              ],
+                          "evidence":  [
+                                           {
+                                               "command":  "pnpm exec vitest run scripts/design-fact-governance.test.ts",
+                                               "result":  "Dual-record governance policy test passes."
+                                           }
+                                       ]
+                      },
+                      {
+                          "id":  "adr-federated-design-fact-synchronization",
+                          "repositoryAdr":  "docs/adr/0010-federated-design-fact-synchronization.md",
+                          "mcpAdrId":  "adr-federated-design-fact-synchronization",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-federated-design-fact-governance-core",
+                          "contextPackId":  "context-pack-federated-design-fact-governance",
+                          "relatedAssetIds":  [
+                                                  "api-specforge-mcp-tools",
+                                                  "data-specforge-assets",
+                                                  "data-specforge-asset-graph",
+                                                  "adr-design-fact-dual-record-governance"
+                                              ],
+                          "status":  "MCP synchronized and read back",
+                          "owner":  "SpecForge Architecture",
+                          "reason":  "The configured Docker PostgreSQL authority at localhost:5433 is reachable and the exact Designer Scope has been reconciled.",
+                          "retryTrigger":  "After a future design-fact change, re-run design-facts:sync, design-facts:check, and the configured-scope federation check before completion.",
+                          "auditFailureCode":  "FEDERATION_TOOL_ERROR",
+                          "auditDiagnosticReference":  "diagnosticRef=\u003c64-hex SHA-256 digest\u003e",
+                          "auditSecurityContract":  "AuditLog.errorMessage stores only the stable failure code and diagnosticRef; raw exceptions and credential text are never persisted.",
+                          "localizedContent":  {
+                                                   "en":  {
+                                                              "decision":  "Audit failure contract: FEDERATION_TOOL_ERROR with diagnosticRef=\u003c64-hex SHA-256 digest\u003e; raw exceptions and credential text are never persisted.",
+                                                              "constraints":  [
+                                                                                  "MCP synchronization and read-back are verified against the configured Docker PostgreSQL authority at localhost:5433 in the exact Designer Scope. After a future design-fact change, re-run design-facts:sync, design-facts:check, and the configured-scope federation check before completion."
+                                                                              ]
+                                                          },
+                                                   "zh":  {
+                                                              "decision":  "审计失败合同：FEDERATION_TOOL_ERROR 及 diagnosticRef=SHA-256 摘要；不得持久化原始异常或凭据文本。",
+                                                              "constraints":  [
+                                                                                  "MCP 同步与回读已在精确 Designer Scope 下针对 localhost:5433 的 Docker PostgreSQL 权威库完成核验。未来设计事实变更后，完成前必须重新运行 design-facts:sync、design-facts:check 和配置 Scope 的联邦检查。"
+                                                                              ]
+                                                          }
+                                               },
+                          "evidence":  [
+                                           {
+                                               "command":  "node .\\node_modules\\vitest\\vitest.mjs run scripts/design-fact-manifest.test.ts",
+                                               "result":  "Federated governance manifest regression passes: 3 tests."
+                                           },
+                                           {
+                                               "command":  "node .\\node_modules\\vitest\\vitest.mjs run packages\\core\\src\\__tests__",
+                                               "result":  "Core suite passes: 12 files and 126 tests."
+                                           },
+                                           {
+                                               "command":  "node .\\node_modules\\vitest\\vitest.mjs run apps\\mcp-server\\src",
+                                               "result":  "MCP suite passes: 12 files and 144 tests; 9 PostgreSQL integration tests skipped without DATABASE_URL."
+                                           },
+                                           {
+                                               "command":  "pnpm --filter @specforge/mcp-server typecheck \u0026\u0026 pnpm --filter @specforge/core typecheck",
+                                               "result":  "Slice 2D maintenance retry typechecks passed."
+                                           },
+                                           {
+                                               "command":  "pnpm design-facts:sync \u0026\u0026 pnpm design-facts:check",
+                                               "result":  "Passed against localhost:5433: all eight baseline decisions were read back with no missing, mismatched, out-of-scope, or blocked records."
+                                           },
+                                           {
+                                               "command":  "node .\\node_modules\\.pnpm\\vitest@2.1.9_@types+node@22.20.1\\node_modules\\vitest\\vitest.mjs run apps\\mcp-server\\src\\federation\\tools.test.ts apps\\mcp-server\\src\\federation\\persistence.test.ts",
+                                               "result":  "Slice 3B audit failure diagnostic redaction regression passes: 2 files and 96 tests; raw exception and credential text are absent from AuditLog.errorMessage."
+                                           }
+                                       ]
+                      },
+                      {
+                          "id":  "adr-single-host-docker-compose-deployment",
+                          "repositoryAdr":  "docs/adr/0011-single-host-docker-compose-deployment.md",
+                          "mcpAdrId":  "adr-single-host-docker-compose-deployment",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-single-host-docker-deployment",
+                          "contextPackId":  "context-pack-single-host-docker-deployment",
+                          "relatedAssetIds":  [
+                                                  "data-specforge-assets",
+                                                  "api-specforge-mcp-tools"
+                                              ],
+                          "evidence":  [
+                                           {
+                                               "command":  "powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -ConfigurationOnly",
+                                               "result":  "Bundled and external PostgreSQL Compose topology checks passed."
+                                           },
+                                           {
+                                               "command":  "docker compose --env-file deploy/.env.example -f deploy/compose.yaml build web",
+                                               "result":  "Standalone production Web image built successfully."
+                                           },
+                                           {
+                                               "command":  "powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -Live",
+                                               "result":  "Isolated deployment stack passed health and Web restart persistence verification on port 3010."
+                                           }
+                                       ]
+                      },
+                      {
+                          "id":  "adr-architecture-overview-home",
+                          "repositoryAdr":  "docs/adr/0013-architecture-overview-home.md",
+                          "mcpAdrId":  "adr-architecture-overview-home",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-architecture-overview-home",
+                          "contextPackId":  "ctx-architecture-overview-home",
+                          "relatedAssetIds":  [
+                                                  "data-specforge-assets",
+                                                  "adr-design-fact-dual-record-governance"
+                                              ],
+                          "owner":  "SpecForge Architecture",
+                          "status":  "MCP synchronized and read back from the canonical database",
+                          "reason":  "The architecture overview facts were persisted and read back from specforge_canonical in the exact Designer Scope.",
+                          "retryTrigger":  "After a future design-fact change, re-run pnpm design-facts:sync and pnpm design-facts:check against specforge_canonical.",
+                          "localizedContent":  {
+                                                   "en":  {
+                                                              "decision":  "Use `/` as a static bilingual architecture orientation. It presents the design-fact flow from Proposal through ADR, assets, rules and contracts, Context Pack, and evidence, plus navigation into a selected application-service workspace. Use `/workspace` as the scoped operational dashboard. The root route must not load, join, count, or aggregate authored design facts across application services.",
+                                                              "constraints":  [
+                                                                                  "English is canonical and every human-facing orientation concept has a Chinese overlay.",
+                                                                                  "`/` must not import scoped asset loaders, dashboard loaders, or aggregate authored facts.",
+                                                                                  "Scoped destinations must use the selected application-service ID and retain its exact scope boundary.",
+                                                                                  "Proposal, Context Pack, ADR, typed links, and evidence are written only through MCP in the exact owning Designer Scope.",
+                                                                                  "Completion requires MCP persistence and read-back of the exact IDs, scope, localization, typed links, and evidence."
+                                                                              ]
+                                                          },
+                                                   "zh":  {
+                                                              "decision":  "将 `/` 作为静态双语架构定位页。它展示从 Proposal、ADR、资产、规则与契约、Context Pack 到证据的设计事实流，并提供进入已选应用服务工作台的导航。将 `/workspace` 作为范围化的操作仪表盘。根路由不得加载、关联、计数或聚合跨应用服务的已编写设计事实。",
+                                                              "constraints":  [
+                                                                                  "英文为规范内容，所有面向人的定位概念均提供中文覆盖。",
+                                                                                  "`/` 不得导入范围化资产加载器、仪表盘加载器，也不得聚合已编写事实。",
+                                                                                  "范围化目的地必须使用已选应用服务 ID，并保留其精确 Scope 边界。",
+                                                                                  "Proposal、Context Pack、ADR、类型化链接和证据只能通过 MCP 写入精确所属的 Designer Scope。",
+                                                                                  "只有 MCP 持久化并回读精确 ID、Scope、本地化、类型化链接和证据后才能完成。"
+                                                                              ]
+                                                          }
+                                               },
+                          "evidence":  [
+                                           {
+                                               "command":  "pnpm exec vitest run apps/web/lib/__tests__/overview.test.ts apps/web/app/__tests__/overview-page.test.tsx apps/web/components/__tests__/app-shell.test.tsx",
+                                               "result":  "Architecture overview focused suites passed: 3 files and 11 tests."
+                                           },
+                                           {
+                                               "command":  "pnpm --filter @specforge/web lint",
+                                               "result":  "Web lint passed for the architecture overview implementation."
+                                           }
+                                       ]
+                      },
+                      {
+                          "id":  "adr-single-authoritative-local-postgresql",
+                          "repositoryAdr":  "docs/adr/0014-single-authoritative-local-postgresql.md",
+                          "mcpAdrId":  "adr-single-authoritative-local-postgresql",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-single-authoritative-local-postgresql",
+                          "contextPackId":  "context-pack-single-authoritative-local-postgresql",
+                          "relatedAssetIds":  [
+                                                  "data-specforge-assets",
+                                                  "data-specforge-asset-graph",
+                                                  "api-specforge-mcp-tools"
+                                              ],
+                          "owner":  "SpecForge Architecture",
+                          "status":  "MCP synchronized and read back from the canonical database",
+                          "reason":  "The canonical database cutover decision, Proposal, Context Pack, Evidence, and typed links were persisted and read back in the exact Designer Scope.",
+                          "retryTrigger":  "After a future topology or canonical database change, re-run pnpm design-facts:sync and pnpm design-facts:check using specforge_canonical.",
+                          "evidence":  [
+                                           {
+                                               "command":  "docker exec deploy-postgres-1 pg_restore -U specforge -d specforge_canonical --no-owner --no-privileges /tmp/source-graph-verify.dump",
+                                               "result":  "The full source catalog was restored into a fresh canonical database without modifying the former deployment database."
+                                           },
+                                           {
+                                               "command":  "Compare-Object source-pre-import-fingerprint.txt canonical-post-import-fingerprint.txt",
+                                               "result":  "The canonical fingerprint matched the complete source catalog: 70 design assets, 115 links, 173 current relationships, 411 relationship events, and 411 outbox records."
+                                           },
+                                           {
+                                               "command":  "Invoke-WebRequest http://localhost:3000/assets/apis?scope=com.huawei.celon.desiner",
+                                               "result":  "The canonical Web service rendered the scoped API, data-model, graph, and workspace routes without Prisma errors."
+                                           }
+                                       ]
+                      },
+                      {
+                          "id":  "adr-nebulagraph-production-projection",
+                          "repositoryAdr":  "docs/adr/0012-nebulagraph-production-projection.md",
+                          "mcpAdrId":  "adr-nebulagraph-production-projection",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-nebulagraph-production-projection",
+                          "contextPackId":  "context-pack-nebulagraph-production-projection",
+                          "relatedAssetIds":  [
+                                                  "data-specforge-asset-graph",
+                                                  "api-specforge-mcp-tools",
+                                                  "quality-specforge-impact-ready"
+                                              ],
+                          "status":  "MCP synchronization blocked",
+                          "owner":  "SpecForge Runtime and SpecForge Architecture",
+                          "reason":  "The live graph profile is healthy, but its authoritative RelationshipOutbox and ProjectionCheckpoint tables are empty and the elected localhost:5433 PostgreSQL authority is unreachable from the MCP stdio client. localhost:5432 was intentionally not substituted.",
+                          "retryTrigger":  "Restore the elected localhost:5433 authority or run the scoped MCP client on the private Compose network; author one exact-Designer-scope relationship, then run design-facts:sync, design-facts:check, the federation check, and scoped read-back.",
+                          "localizedContent":  {
+                                                   "en":  {
+                                                              "decision":  "PostgreSQL remains authoritative; NebulaGraph is a derived exact-scope projection reached only through the typed Gateway and leased outbox Projector.",
+                                                              "constraints":  [
+                                                                                  "Do not claim outbox projection, checkpoint advancement, restart idempotency, or MCP synchronization until the elected authority is reachable and the resulting records are read back in the exact Designer Scope."
+                                                                              ]
+                                                          },
+                            "zh":  {
+                                      "decision":  "PostgreSQL 保持权威；NebulaGraph 是只能通过有类型 Gateway 和带租约 Outbox Projector 访问的精确 Scope 派生投影。",
+                                      "consequences":  [
+                                                           "图运行时不可用时，PostgreSQL 写入仍然可用。",
+                                                           "NebulaGraph 可以从保留的 PostgreSQL 关系事件和 Outbox 状态重建。",
+                                                           "至少一次投递要求图写入幂等、带租约领取、重试、死信处理和单调检查点。",
+                                                           "精确 Scope 身份和同级 Scope 测试使应用服务隔离可在投影与查询边界得到执行。",
+                                                           "本地与企业配置共享契约，但仍需在运行中的 NebulaGraph 3.8.0 服务上证明实时兼容性。",
+                                                           "运行人员必须监控投影延迟，并在图运行时事件期间显式选择 PostgreSQL 回退。",
+                                                           "多节点生产规格、亿级边容量认证、Kubernetes 部署和企业密钥托管仍处于延期状态。"
+                                                       ],
+                                      "constraints":  [
+                                                                                  "在已选权威库可达且精确 Designer Scope 内的结果完成回读前，不得声明 Outbox 投影、检查点推进、重启幂等或 MCP 同步完成。"
+                                                                              ]
+                                                          }
+                                               },
+                          "evidence":  [
+                                           {
+                                               "command":  "docker compose --env-file deploy/.env --env-file deploy/graph/.env -f deploy/compose.yaml -f deploy/compose.graph-local.yaml ps",
+                                               "result":  "PostgreSQL, Nebula Meta, Storage, Graphd, Gateway, and Projector reported healthy in the local graph profile."
+                                           },
+                                           {
+                                               "command":  "docker exec specforge-graph-verify-postgres-1 psql -U specforge -d specforge -v ON_ERROR_STOP=1 \u003c read-only outbox/checkpoint query",
+                                               "result":  "RelationshipOutbox and ProjectionCheckpoint returned zero rows, so no authoritative outbox projection or checkpoint evidence exists."
+                                           },
+                                           {
+                                               "command":  "DATABASE_URL=postgresql://admin:admin@localhost:5433/specforge?schema=public pnpm design-facts:sync",
+                                               "result":  "The MCP stdio client reached create_adr, then failed with Prisma P1001 because the elected localhost:5433 authority is unreachable; localhost:5432 was not substituted."
+                                           }
+                                       ]
+                      }
+                  ]
 }

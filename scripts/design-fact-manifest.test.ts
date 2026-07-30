@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+﻿import { existsSync } from "node:fs";
 import manifest from "../docs/design-facts/baseline-manifest.json";
 import { expect, it } from "vitest";
 
@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(11);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(11);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(11);
+  expect(manifest.decisions).toHaveLength(12);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(12);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(12);
 
   for (const decision of manifest.decisions) {
     expect(decision.id).toMatch(/^adr-/);

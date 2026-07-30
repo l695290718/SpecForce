@@ -425,6 +425,11 @@ model RelationshipOutbox {
   sentAt               DateTime?
   attemptCount         Int      @default(0)
   lastError            String?
+  leaseOwner           String?
+  leaseExpiresAt       DateTime?
+  terminalAt           DateTime?
+  diagnostic           String?
+  diagnosticRef        String?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -433,6 +438,8 @@ model RelationshipOutbox {
   @@unique([enterpriseId, applicationServiceId, scopePath, idempotencyKey], map: "RelationshipOutbox_enterprise_scope_idempotency_key")
   @@unique([enterpriseId, applicationServiceId, scopePath, relationshipEventId], map: "RelationshipOutbox_enterprise_scope_event_key")
   @@index([enterpriseId, applicationServiceId, scopePath, status, availableAt])
+  @@index([status, availableAt, leaseExpiresAt, createdAt], map: "RelationshipOutbox_claim_order_idx")
+  @@index([enterpriseId, applicationServiceId, scopePath, status, leaseExpiresAt], map: "RelationshipOutbox_scope_lease_recovery_idx")
 }
 
 model ProjectionCheckpoint {

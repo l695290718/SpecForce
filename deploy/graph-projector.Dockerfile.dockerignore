@@ -1,0 +1,10 @@
+**
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.base.json
+!prisma/
+!prisma/**
+!apps/
+!apps/graph-projector/
+!apps/graph-projector/**

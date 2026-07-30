@@ -7,7 +7,8 @@ import type {
 } from "@specforge/core";
 import type { PrismaClient } from "@prisma/client";
 import { defaultHuaweiActor, scopeById } from "@specforge/core";
-import { describe, expect, it } from "vitest";
+import { NebulaGatewayGraphStore } from "@specforge/graph-store";
+import { describe, expect, it, vi } from "vitest";
 import {
   ImpactAnalysisWorker,
   PrismaImpactWorkerRepository,
@@ -72,6 +73,69 @@ describe("ImpactAnalysisWorker", () => {
     await expect(worker.run(ref(repository.run))).resolves.toMatchObject({ status: "WAITING_FOR_PROJECTION" });
     expect(graphStore.plans).toEqual([]);
     expect(repository.run.actualGraphCheckpoint).toBe(7n);
+  });
+
+  it("waits for its required checkpoint and then completes through the Nebula adapter", async () => {
+    const repository = new MemoryRepository(createRun({ requiredGraphVersion: 5n }));
+    repository.projectionVersion = 4n;
+    const fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const request = JSON.parse(String(init?.body));
+      expect(request.scope).toEqual({
+        enterpriseId: repository.run.enterpriseId,
+        applicationServiceId: repository.run.applicationServiceId,
+        scopePath: repository.run.scopePath
+      });
+      const relationship = {
+        id: "edge-nebula-1",
+        code: "READS",
+        source: { enterpriseId: repository.run.enterpriseId, ...root },
+        target: { enterpriseId: repository.run.enterpriseId, ...dependent },
+        strength: "strong",
+        confidence: 1,
+        version: "5"
+      };
+      return new Response(JSON.stringify({
+        status: "COMPLETE",
+        nodes: [
+          { enterpriseId: repository.run.enterpriseId, ...root },
+          { enterpriseId: repository.run.enterpriseId, ...dependent }
+        ],
+        edges: [relationship],
+        paths: [
+          { nodes: [{ enterpriseId: repository.run.enterpriseId, ...root }], edges: [] },
+          {
+            nodes: [
+              { enterpriseId: repository.run.enterpriseId, ...root },
+              { enterpriseId: repository.run.enterpriseId, ...dependent }
+            ],
+            edges: [relationship]
+          }
+        ],
+        graphVersion: "5",
+        elapsedMs: 2,
+        truncationReasons: []
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof globalThis.fetch;
+    const graphStore = new NebulaGatewayGraphStore({
+      baseUrl: "http://graph-gateway.internal",
+      enterpriseId: repository.run.enterpriseId,
+      fetch
+    });
+    const worker = new ImpactAnalysisWorker(repository, graphStore);
+
+    await expect(worker.run(ref(repository.run))).resolves.toMatchObject({
+      status: "WAITING_FOR_PROJECTION"
+    });
+    expect(fetch).not.toHaveBeenCalled();
+
+    repository.projectionVersion = 5n;
+    await expect(worker.run(ref(repository.run))).resolves.toMatchObject({ status: "COMPLETE" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(repository.persisted?.actualGraphCheckpoint).toBe(5n);
+    expect(repository.persisted?.nodes.map((item) => item.node.logicalId)).toEqual([
+      "customer-api",
+      "customer-model"
+    ]);
   });
 
   it("stops when a stale owner loses its lease before checkpoint mutation", async () => {

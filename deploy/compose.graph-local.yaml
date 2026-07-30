@@ -1,0 +1,152 @@
+# Optional compatibility profile. Apply this file only for local NebulaGraph
+# verification; the base compose file remains the external-cluster topology.
+services:
+  nebula-metad:
+    image: vesoft/nebula-metad:v3.8.0
+    restart: unless-stopped
+    command:
+      - --meta_server_addrs=nebula-metad:9559
+      - --local_ip=nebula-metad
+      - --ws_ip=nebula-metad
+      - --port=9559
+      - --ws_http_port=19559
+      - --data_path=/data/meta
+    volumes:
+      - specforge_nebula_meta:/data/meta
+    healthcheck:
+      test: ["CMD-SHELL", "test -S /tmp/nebula-metad.pid -o -f /proc/1/cmdline"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  nebula-storaged:
+    image: vesoft/nebula-storaged:v3.8.0
+    restart: unless-stopped
+    command:
+      - --meta_server_addrs=nebula-metad:9559
+      - --local_ip=nebula-storaged
+      - --ws_ip=nebula-storaged
+      - --port=9779
+      - --ws_http_port=19779
+      - --data_path=/data/storage
+    volumes:
+      - specforge_nebula_storage:/data/storage
+    depends_on:
+      nebula-metad:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /proc/1/cmdline"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  nebula-graphd:
+    image: vesoft/nebula-graphd:v3.8.0
+    restart: unless-stopped
+    command:
+      - --meta_server_addrs=nebula-metad:9559
+      - --local_ip=nebula-graphd
+      - --ws_ip=nebula-graphd
+      - --port=9669
+      - --ws_http_port=19669
+    depends_on:
+      nebula-metad:
+        condition: service_healthy
+      nebula-storaged:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /proc/1/cmdline"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  nebula-bootstrap:
+    image: vesoft/nebula-console:v3.8.0
+    restart: "no"
+    environment:
+      SPECFORGE_NEBULA_USER: ${SPECFORGE_NEBULA_USER:?Set SPECFORGE_NEBULA_USER in deploy/graph/.env}
+      SPECFORGE_NEBULA_PASSWORD: ${SPECFORGE_NEBULA_PASSWORD:?Set SPECFORGE_NEBULA_PASSWORD in deploy/graph/.env}
+    volumes:
+      - ./graph/bootstrap-local.ngql:/bootstrap/bootstrap-local.ngql:ro
+      - ./graph/bootstrap-local.sh:/bootstrap/bootstrap-local.sh:ro
+    entrypoint: ["/bin/sh", "/bootstrap/bootstrap-local.sh"]
+    depends_on:
+      nebula-graphd:
+        condition: service_healthy
+
+  graph-gateway:
+    image: ${SPECFORGE_GRAPH_GATEWAY_IMAGE:-specforge/graph-gateway:local}
+    pull_policy: build
+    build:
+      context: ..
+      dockerfile: deploy/graph-gateway.Dockerfile
+    restart: unless-stopped
+    environment:
+      SPECFORGE_GRAPH_GATEWAY_PORT: "8088"
+      SPECFORGE_NEBULA_ADDRESS: nebula-graphd:9669
+      SPECFORGE_NEBULA_USER: ${SPECFORGE_NEBULA_USER:?Set SPECFORGE_NEBULA_USER in deploy/graph/.env}
+      SPECFORGE_NEBULA_PASSWORD: ${SPECFORGE_NEBULA_PASSWORD:?Set SPECFORGE_NEBULA_PASSWORD in deploy/graph/.env}
+      SPECFORGE_NEBULA_SPACE: ${SPECFORGE_NEBULA_SPACE:-specforge_graph}
+    depends_on:
+      nebula-graphd:
+        condition: service_healthy
+      nebula-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/graph-gateway-healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  graph-projector:
+    image: ${SPECFORGE_GRAPH_PROJECTOR_IMAGE:-specforge/graph-projector:local}
+    pull_policy: build
+    build:
+      context: ..
+      dockerfile: deploy/graph-projector.Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to deploy-postgres-1/specforge_canonical in deploy/graph/.env}
+      SPECFORGE_GRAPH_GATEWAY_URL: http://graph-gateway:8088
+      SPECFORGE_GRAPH_HEALTH_ENTERPRISE_ID: ${SPECFORGE_GRAPH_HEALTH_ENTERPRISE_ID:?Set SPECFORGE_GRAPH_HEALTH_ENTERPRISE_ID in deploy/graph/.env}
+      SPECFORGE_GRAPH_HEALTH_APPLICATION_SERVICE_ID: ${SPECFORGE_GRAPH_HEALTH_APPLICATION_SERVICE_ID:?Set SPECFORGE_GRAPH_HEALTH_APPLICATION_SERVICE_ID in deploy/graph/.env}
+      SPECFORGE_GRAPH_HEALTH_SCOPE_PATH: ${SPECFORGE_GRAPH_HEALTH_SCOPE_PATH:?Set SPECFORGE_GRAPH_HEALTH_SCOPE_PATH in deploy/graph/.env}
+    depends_on:
+      nebula-graphd:
+        condition: service_healthy
+      graph-gateway:
+        condition: service_healthy
+    networks:
+      - default
+      - deploy_default
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          const http=require('node:http');
+          const query=new URLSearchParams({
+            enterpriseId:process.env.SPECFORGE_GRAPH_HEALTH_ENTERPRISE_ID,
+            applicationServiceId:process.env.SPECFORGE_GRAPH_HEALTH_APPLICATION_SERVICE_ID,
+            scopePath:process.env.SPECFORGE_GRAPH_HEALTH_SCOPE_PATH
+          }).toString();
+          http.get('http://127.0.0.1:8090/health?'+query,
+            response=>process.exit(response.statusCode===200?0:1))
+            .on('error',()=>process.exit(1));
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  specforge_nebula_meta:
+  specforge_nebula_storage:
+
+networks:
+  deploy_default:
+    external: true
