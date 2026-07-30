@@ -130,6 +130,14 @@ The MCP client lifecycle now closes both the Client and its stdio Transport. Aft
 
 MCP 客户端生命周期现在会同时关闭 Client 和 stdio Transport。将中文后果覆盖补齐为与七条英文规范后果相同的结构后，`pnpm design-facts:sync` 已持久化全部十二项清单决策，`pnpm design-facts:check` 回读结果无缺失、不匹配、越界或阻塞事实。精确 Designer Scope 的联邦对账返回 `blocking: false`。该结果取代上文历史 MCP 同步受阻说明；legacy Outbox 迁移仍是独立延期的运行事项。
 
+## Legacy Outbox Archival (2026-07-30)
+
+The canonical database contained 330 nonterminal outbox records under `legacy-enterprise`. They were not replayed across an enterprise boundary and were not deleted. `pnpm graph-outbox:archive --apply` moved only those `PENDING`, `DELIVERING`, and `DEAD_LETTER` records to `ARCHIVED`, retained their payloads and diagnostics, and created a completed `archive_legacy_graph_outbox` AuditLog receipt. Re-projection remains an explicit future same-scope migration decision.
+
+## Legacy Outbox 归档（2026-07-30）
+
+规范数据库中存在 330 条属于 `legacy-enterprise` 的非终态 Outbox 记录。它们没有跨企业边界重放，也没有被删除。`pnpm graph-outbox:archive --apply` 仅将这些 `PENDING`、`DELIVERING` 和 `DEAD_LETTER` 记录转为 `ARCHIVED`，保留负载与诊断，并创建完成状态的 `archive_legacy_graph_outbox` AuditLog 回执。未来重投影仍需单独作出同 Scope 的迁移决策。
+
 ## 规范 PostgreSQL 切换补充（2026-07-30）
 
 本地 NebulaGraph 兼容配置现仅启动 Nebula Meta、Storage、Graphd、一次性存储主机自举、Gateway 和 Projector。它加入外部 `deploy_default` 网络，Projector 使用规范连接 `deploy-postgres-1:5432/specforge_canonical`，不再启动或读取隔离的 PostgreSQL 服务。

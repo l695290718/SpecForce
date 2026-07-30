@@ -85,13 +85,13 @@ The Web console and authoritative PostgreSQL database are packaged as separate D
 
 ### Resolve legacy graph-outbox migration state
 
-**Status:** Deferred, scope-safe migration required.
+**Status:** Complete (scope-safe archival on 2026-07-30).
 
 **Owner:** SpecForge Runtime.
 
-**Rationale:** `legacy-enterprise` has historical `RelationshipOutbox` records (`169 PENDING`, `76 DELIVERING`, `48 DEAD_LETTER`) restored with legacy data. They must not be silently deleted, replayed into `enterprise-1`, or treated as current Designer-scope evidence.
+**Rationale:** `legacy-enterprise` historical outbox records were preserved but cannot be treated as current Designer-scope evidence. The scoped operation archived 330 nonterminal rows without deleting payloads, events, or diagnostics and wrote AuditLog `archive_legacy_graph_outbox` with a completed receipt.
 
-**Trigger:** Approve an explicit legacy-enterprise migration or archival policy, then export a scoped reconciliation report and either replay to an equally scoped derived graph or archive with audit evidence.
+**Completion evidence:** `DATABASE_URL=<canonical> pnpm graph-outbox:archive` reported 330 eligible rows; `pnpm graph-outbox:archive --apply` changed only `legacy-enterprise` PENDING, DELIVERING, and DEAD_LETTER rows to `ARCHIVED`. The post-check reported `legacy-enterprise|ARCHIVED|330`, `legacy-enterprise|COMPLETED|408`, and a completed `AuditLog` entry. A future re-projection requires a separately approved, same-scope replay policy.
 
 ### NebulaGraph production projection
 
