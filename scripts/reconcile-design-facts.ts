@@ -6,9 +6,34 @@ import { designEvidenceId, type DesignFactManifestDecision } from "./sync-design
 
 type Decision = Pick<DesignFactManifestDecision, "id" | "mcpAdrId" | "proposalId" | "contextPackId" | "relatedAssetIds" | "evidence" | "scope">;
 type Manifest = { decisions: Decision[] };
-type PersistedAdr = { id?: string; command?: string; result?: string; status?: string; architectureScope?: { applicationServiceId?: string; scopePath?: string }; localizedContent?: { zh?: unknown } };
+type PersistedAdr = {
+  id?: string;
+  proposalId?: string;
+  command?: string;
+  result?: string;
+  status?: string;
+  architectureScope?: { applicationServiceId?: string; scopePath?: string };
+  localizedContent?: { en?: unknown; zh?: unknown };
+};
 type RecordType = "adr" | "proposal" | "contextPack" | "evidence";
 type Link = { sourceLogicalId?: string; targetLogicalId?: string; label?: string; sourceId?: string; targetId?: string; relationType?: string };
+type LocalizationShape = { stringFields: string[]; arrayFields?: string[] };
+
+const adrLocalizationShape: LocalizationShape = {
+  stringFields: ["name", "title", "description", "context", "decision"],
+  arrayFields: ["alternatives", "consequences", "constraints"]
+};
+const proposalLocalizationShape: LocalizationShape = {
+  stringFields: ["name", "title", "description", "background", "goal", "nonGoal", "scope", "rolloutPlan"],
+  arrayFields: ["specChanges", "risks"]
+};
+const contextPackLocalizationShape: LocalizationShape = {
+  stringFields: ["name", "summary", "generatedMarkdown"],
+  arrayFields: ["constraints", "instructions"]
+};
+const evidenceLocalizationShape: LocalizationShape = {
+  stringFields: ["name", "description", "command", "result"]
+};
 
 export interface DesignFactReconciliationReport {
   missing: string[];
@@ -29,13 +54,19 @@ export async function reconcileDesignFacts(input: {
       const adr = await input.find("adr", decision);
       if (!adr) report.missing.push(decision.id);
       else if (adr.id !== decision.mcpAdrId) report.mismatched.push(decision.id);
-      else if (adr.architectureScope?.applicationServiceId !== decision.scope.applicationServiceId || adr.architectureScope?.scopePath !== decision.scope.scopePath) report.outOfScope.push(decision.id);
-      else if (!adr.localizedContent?.zh) report.mismatched.push(decision.id);
+      else if (!matchesScope(adr, decision.scope)) report.outOfScope.push(decision.id);
+      else if (!hasLocalizedContent(adr, adrLocalizationShape)) report.mismatched.push(decision.id);
       else {
         const proposal = await input.find("proposal", decision);
         const contextPack = await input.find("contextPack", decision);
         if (!proposal) report.missing.push(`${decision.id}:proposal`);
+        else if (proposal.id !== decision.proposalId) report.mismatched.push(`${decision.id}:proposal`);
+        else if (!matchesScope(proposal, decision.scope)) report.outOfScope.push(`${decision.id}:proposal`);
+        else if (!hasLocalizedContent(proposal, proposalLocalizationShape)) report.mismatched.push(`${decision.id}:proposal`);
         else if (!contextPack) report.missing.push(`${decision.id}:contextPack`);
+        else if (contextPack.id !== decision.contextPackId || contextPack.proposalId !== decision.proposalId) report.mismatched.push(`${decision.id}:contextPack`);
+        else if (!matchesScope(contextPack, decision.scope)) report.outOfScope.push(`${decision.id}:contextPack`);
+        else if (!hasLocalizedContent(contextPack, contextPackLocalizationShape)) report.mismatched.push(`${decision.id}:contextPack`);
         else if (input.findLinks) {
           const links = await input.findLinks(decision);
           if (!hasLink(links, decision.proposalId, decision.mcpAdrId, "IMPLEMENTS_DECISION")) report.missing.push(`${decision.id}:proposal-adr-link`);
@@ -46,8 +77,8 @@ export async function reconcileDesignFacts(input: {
               const evidenceId = designEvidenceId(decision.id, index);
               const evidence = await input.find("evidence", decision, evidenceId);
               if (!evidence) report.missing.push(`${decision.id}:evidence`);
-              else if (evidence.architectureScope?.applicationServiceId !== decision.scope.applicationServiceId || evidence.architectureScope?.scopePath !== decision.scope.scopePath) report.outOfScope.push(`${decision.id}:evidence`);
-              else if (evidence.command !== expected.command || evidence.result !== expected.result || !hasEvidenceLocalization(evidence)) report.mismatched.push(`${decision.id}:evidence`);
+              else if (!matchesScope(evidence, decision.scope)) report.outOfScope.push(`${decision.id}:evidence`);
+              else if (evidence.command !== expected.command || evidence.result !== expected.result || !hasLocalizedContent(evidence, evidenceLocalizationShape)) report.mismatched.push(`${decision.id}:evidence`);
               else if (evidence.status !== "passed") report.blocked.push(`${decision.id}:evidence`);
               else if (!hasLink(links, evidenceId, decision.mcpAdrId, "VALIDATES")) report.missing.push(`${decision.id}:evidence-link`);
             }
@@ -62,11 +93,25 @@ export async function reconcileDesignFacts(input: {
   return report;
 }
 
-function hasEvidenceLocalization(evidence: PersistedAdr): boolean {
-  const zh = evidence.localizedContent?.zh;
-  if (!zh || typeof zh !== "object" || Array.isArray(zh)) return false;
-  const localized = zh as Record<string, unknown>;
-  return ["name", "description", "command", "result"].every((field) => typeof localized[field] === "string" && localized[field].trim());
+function matchesScope(record: PersistedAdr, expectedScope: Decision["scope"]): boolean {
+  return record.architectureScope?.applicationServiceId === expectedScope.applicationServiceId
+    && record.architectureScope?.scopePath === expectedScope.scopePath;
+}
+
+function hasLocalizedContent(record: PersistedAdr, shape: LocalizationShape): boolean {
+  return hasLocaleFields(record.localizedContent?.en, shape) && hasLocaleFields(record.localizedContent?.zh, shape);
+}
+
+function hasLocaleFields(value: unknown, shape: LocalizationShape): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const localized = value as Record<string, unknown>;
+  if (!shape.stringFields.every((field) => typeof localized[field] === "string" && localized[field].trim())) return false;
+  return (shape.arrayFields ?? []).every((field) => {
+    const entries = localized[field];
+    return Array.isArray(entries)
+      && entries.length > 0
+      && entries.every((entry) => typeof entry === "string" && entry.trim());
+  });
 }
 
 function hasDecisionIssue(report: DesignFactReconciliationReport, decisionId: string): boolean {
