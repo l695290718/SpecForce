@@ -63,6 +63,20 @@ services:
       retries: 12
       start_period: 20s
 
+  nebula-bootstrap:
+    image: vesoft/nebula-console:v3.8.0
+    restart: "no"
+    environment:
+      SPECFORGE_NEBULA_USER: ${SPECFORGE_NEBULA_USER:?Set SPECFORGE_NEBULA_USER in deploy/graph/.env}
+      SPECFORGE_NEBULA_PASSWORD: ${SPECFORGE_NEBULA_PASSWORD:?Set SPECFORGE_NEBULA_PASSWORD in deploy/graph/.env}
+    volumes:
+      - ./graph/bootstrap-local.ngql:/bootstrap/bootstrap-local.ngql:ro
+      - ./graph/bootstrap-local.sh:/bootstrap/bootstrap-local.sh:ro
+    entrypoint: ["/bin/sh", "/bootstrap/bootstrap-local.sh"]
+    depends_on:
+      nebula-graphd:
+        condition: service_healthy
+
   graph-gateway:
     image: ${SPECFORGE_GRAPH_GATEWAY_IMAGE:-specforge/graph-gateway:local}
     pull_policy: build
@@ -77,10 +91,10 @@ services:
       SPECFORGE_NEBULA_PASSWORD: ${SPECFORGE_NEBULA_PASSWORD:?Set SPECFORGE_NEBULA_PASSWORD in deploy/graph/.env}
       SPECFORGE_NEBULA_SPACE: ${SPECFORGE_NEBULA_SPACE:-specforge_graph}
     depends_on:
-      postgres:
-        condition: service_healthy
       nebula-graphd:
         condition: service_healthy
+      nebula-bootstrap:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "/usr/local/bin/graph-gateway-healthcheck"]
       interval: 10s
@@ -96,18 +110,19 @@ services:
       dockerfile: deploy/graph-projector.Dockerfile
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in deploy/.env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in deploy/.env}?schema=public
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to deploy-postgres-1/specforge_canonical in deploy/graph/.env}
       SPECFORGE_GRAPH_GATEWAY_URL: http://graph-gateway:8088
       SPECFORGE_GRAPH_HEALTH_ENTERPRISE_ID: ${SPECFORGE_GRAPH_HEALTH_ENTERPRISE_ID:?Set SPECFORGE_GRAPH_HEALTH_ENTERPRISE_ID in deploy/graph/.env}
       SPECFORGE_GRAPH_HEALTH_APPLICATION_SERVICE_ID: ${SPECFORGE_GRAPH_HEALTH_APPLICATION_SERVICE_ID:?Set SPECFORGE_GRAPH_HEALTH_APPLICATION_SERVICE_ID in deploy/graph/.env}
       SPECFORGE_GRAPH_HEALTH_SCOPE_PATH: ${SPECFORGE_GRAPH_HEALTH_SCOPE_PATH:?Set SPECFORGE_GRAPH_HEALTH_SCOPE_PATH in deploy/graph/.env}
     depends_on:
-      postgres:
-        condition: service_healthy
       nebula-graphd:
         condition: service_healthy
       graph-gateway:
         condition: service_healthy
+    networks:
+      - default
+      - deploy_default
     healthcheck:
       test:
         - CMD
@@ -131,3 +146,7 @@ services:
 volumes:
   specforge_nebula_meta:
   specforge_nebula_storage:
+
+networks:
+  deploy_default:
+    external: true

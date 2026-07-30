@@ -27,6 +27,8 @@ $gatewayDockerignore = Join-Path $repositoryRoot "deploy\\graph-gateway.Dockerfi
 $projectorDockerignore = Join-Path $repositoryRoot "deploy\\graph-projector.Dockerfile.dockerignore"
 $gatewayHealthcheck = Join-Path $repositoryRoot "deploy\\graph\\gateway-healthcheck.go"
 $buildScript = Join-Path $repositoryRoot "deploy\\graph\\build-images.ps1"
+$bootstrapScript = Join-Path $repositoryRoot "deploy\\graph\\bootstrap-local.sh"
+$bootstrapQuery = Join-Path $repositoryRoot "deploy\\graph\\bootstrap-local.ngql"
 
 Assert-Condition (Test-Path -LiteralPath $baseCompose) "Base Compose file is missing."
 Assert-Condition (Test-Path -LiteralPath $localCompose) "Local NebulaGraph Compose profile is missing."
@@ -36,6 +38,8 @@ Assert-Condition (Test-Path -LiteralPath $gatewayDockerignore) "Gateway Dockerfi
 Assert-Condition (Test-Path -LiteralPath $projectorDockerignore) "Projector Dockerfile-specific ignore file is missing."
 Assert-Condition (Test-Path -LiteralPath $gatewayHealthcheck) "Gateway static healthcheck source is missing."
 Assert-Condition (Test-Path -LiteralPath $buildScript) "Graph image build script is missing."
+Assert-Condition (Test-Path -LiteralPath $bootstrapScript) "Local Nebula bootstrap script is missing."
+Assert-Condition (Test-Path -LiteralPath $bootstrapQuery) "Local Nebula bootstrap query is missing."
 
 $gatewayDockerfileContent = Get-Content -LiteralPath $gatewayDockerfile -Raw
 $projectorDockerfileContent = Get-Content -LiteralPath $projectorDockerfile -Raw
@@ -59,6 +63,7 @@ Assert-Condition ($buildScriptContent -match "\[switch\]\`$Pull") "Build script 
 
 $environmentFile = Join-Path ([System.IO.Path]::GetTempPath()) ("specforge-graph-config-" + [guid]::NewGuid().ToString("N") + ".env")
 @'
+DATABASE_URL=postgresql://specforge:configuration-check-only@deploy-postgres-1:5432/specforge_canonical?schema=public
 POSTGRES_USER=specforge
 POSTGRES_PASSWORD=configuration-check-only
 POSTGRES_DB=specforge
@@ -73,22 +78,25 @@ SPECFORGE_GRAPH_HEALTH_SCOPE_PATH=pf-huawei/product-celon/subproduct-platform/mo
 
 try {
   $external = docker compose --env-file $environmentFile -f $baseCompose config --format json | ConvertFrom-Json
-  $local = docker compose --env-file $environmentFile -f $baseCompose -f $localCompose config --format json | ConvertFrom-Json
+  $local = docker compose --env-file $environmentFile -f $localCompose config --format json | ConvertFrom-Json
 
   Assert-Condition (-not (Has-Service $external "nebula-metad")) "External-cluster mode must not include Nebula meta service."
   Assert-Condition (-not (Has-Service $external "nebula-graphd")) "External-cluster mode must not include Nebula graph service."
+  Assert-Condition (-not (Has-Service $external "nebula-bootstrap")) "External-cluster mode must not include the local Nebula bootstrap job."
   Assert-Condition (-not (Has-Service $external "graph-gateway")) "External-cluster mode must not include the local graph Gateway."
   Assert-Condition (-not (Has-Service $external "graph-projector")) "External-cluster mode must not include the local Projector."
 
-  foreach ($service in @("nebula-metad", "nebula-storaged", "nebula-graphd", "graph-gateway", "graph-projector")) {
+  foreach ($service in @("nebula-metad", "nebula-storaged", "nebula-graphd", "nebula-bootstrap", "graph-gateway", "graph-projector")) {
     Assert-Condition (Has-Service $local $service) "Local graph profile is missing $service."
   }
-  foreach ($service in @("nebula-metad", "nebula-storaged", "nebula-graphd", "graph-gateway", "graph-projector")) {
+  Assert-Condition (-not (Has-Service $local "postgres")) "Local graph profile must not start PostgreSQL."
+  foreach ($service in @("nebula-metad", "nebula-storaged", "nebula-graphd", "nebula-bootstrap", "graph-gateway", "graph-projector")) {
     $ports = (Get-Service $local $service).ports
     Assert-Condition ($null -eq $ports -or $ports.Count -eq 0) "$service must not publish a host port."
   }
   $gateway = Get-Service $local "graph-gateway"
   $projector = Get-Service $local "graph-projector"
+  $bootstrap = Get-Service $local "nebula-bootstrap"
   Assert-Condition ($null -ne $gateway.build) "Gateway must be built from repository source."
   Assert-Condition ($gateway.build.dockerfile -eq "deploy/graph-gateway.Dockerfile") "Gateway must use its production Dockerfile."
   Assert-Condition ($gateway.pull_policy -eq "build") "Gateway must build the current repository source instead of reusing an old image."
@@ -97,11 +105,15 @@ try {
   Assert-Condition ($projector.pull_policy -eq "build") "Projector must build the current repository source instead of reusing an old image."
   Assert-Condition ($null -ne $gateway.healthcheck) "Gateway healthcheck is required."
   Assert-Condition ($null -ne $projector.healthcheck) "Projector healthcheck is required."
-  Assert-Condition ($gateway.depends_on.postgres.condition -eq "service_healthy") "Gateway must wait for healthy PostgreSQL."
+  Assert-Condition ($bootstrap.depends_on."nebula-graphd".condition -eq "service_healthy") "Nebula bootstrap must wait for healthy graphd."
+  Assert-Condition ($gateway.depends_on."nebula-bootstrap".condition -eq "service_completed_successfully") "Gateway must wait for local Nebula bootstrap completion."
+  Assert-Condition ($null -eq $gateway.depends_on.postgres) "Gateway must not depend on a PostgreSQL service."
   Assert-Condition ($gateway.depends_on."nebula-graphd".condition -eq "service_healthy") "Gateway must wait for healthy Nebula graphd."
-  Assert-Condition ($projector.depends_on.postgres.condition -eq "service_healthy") "Projector must wait for healthy PostgreSQL."
+  Assert-Condition ($null -eq $projector.depends_on.postgres) "Projector must not depend on a PostgreSQL service."
   Assert-Condition ($projector.depends_on."nebula-graphd".condition -eq "service_healthy") "Projector must wait for healthy Nebula graphd."
   Assert-Condition ($projector.depends_on."graph-gateway".condition -eq "service_healthy") "Projector must wait for a healthy Gateway."
+  Assert-Condition ($projector.environment.DATABASE_URL -match "deploy-postgres-1:5432/specforge_canonical") "Projector must use the canonical PostgreSQL connection."
+  Assert-Condition ($local.networks.deploy_default.external -eq $true) "Local graph profile must join the external deploy_default network."
 
   Write-Host "NebulaGraph projection configuration assertions passed."
   if (-not $ConfigurationOnly) {

@@ -298,8 +298,19 @@ const CLAIM_SQL = `
   WITH candidates AS (
     SELECT "dbId"
     FROM "RelationshipOutbox"
-    WHERE (status = 'PENDING' AND "availableAt" <= $1)
-       OR (status = 'DELIVERING' AND "leaseExpiresAt" <= $1)
+    WHERE (
+      (status = 'PENDING' AND "availableAt" <= $1)
+      OR (status = 'DELIVERING' AND "leaseExpiresAt" <= $1)
+    )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM "RelationshipOutbox" AS earlier
+        WHERE earlier."enterpriseId" = "RelationshipOutbox"."enterpriseId"
+          AND earlier."applicationServiceId" = "RelationshipOutbox"."applicationServiceId"
+          AND earlier."scopePath" = "RelationshipOutbox"."scopePath"
+          AND earlier."graphVersion" < "RelationshipOutbox"."graphVersion"
+          AND earlier.status <> 'COMPLETED'
+      )
     ORDER BY "availableAt" ASC, "createdAt" ASC, "dbId" ASC
     FOR UPDATE SKIP LOCKED
     LIMIT $4

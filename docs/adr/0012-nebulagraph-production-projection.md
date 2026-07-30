@@ -112,6 +112,26 @@ The fresh 2026-07-28 synchronization attempt used `DATABASE_URL=postgresql://adm
 - Persisted/read-back status: none in this repository-only task.
 - **MCP synchronization blocked** as described in `Completion Blockers`; the active failure is the unreachable elected `localhost:5433` authority, not a missing MCP contract.
 
+## Canonical PostgreSQL Cutover Amendment (2026-07-30)
+
+The local NebulaGraph compatibility profile now starts only Nebula Meta, Storage, Graphd, a one-shot storage-host bootstrap, the Gateway, and the Projector. It joins the external `deploy_default` network and the Projector uses the canonical `deploy-postgres-1:5432/specforge_canonical` connection. It no longer starts or reads an isolated PostgreSQL service.
+
+The bootstrap job registers the single local storage host before the Gateway initializes its graph space. The Projector claim query now permits at most the earliest incomplete graph version in one exact scope, so a batch cannot lease later events in that scope ahead of a failed predecessor.
+
+Focused evidence: the Compose configuration assertions passed; Graph Projector tests (24) and typecheck passed; the rebuilt local Gateway and Projector both reported healthy; a scoped typed Gateway projection returned a successful receipt and Nebula reported populated node tags. A transient startup run before storage-host registration produced legacy-scope `GRAPH_GATEWAY_DELIVERY_FAILED` dead letters. Those historical recovery records are deliberately not reclassified as successful evidence.
+
+MCP synchronization remains required before this amendment can be considered fully closed. Retry trigger: synchronize and read back this ADR, its matching Proposal, Context Pack, typed links, and updated evidence in the exact Designer scope.
+
+## 规范 PostgreSQL 切换补充（2026-07-30）
+
+本地 NebulaGraph 兼容配置现仅启动 Nebula Meta、Storage、Graphd、一次性存储主机自举、Gateway 和 Projector。它加入外部 `deploy_default` 网络，Projector 使用规范连接 `deploy-postgres-1:5432/specforge_canonical`，不再启动或读取隔离的 PostgreSQL 服务。
+
+自举任务会在 Gateway 初始化图空间前注册单节点存储主机。Projector 的领取查询现在在一个精确 Scope 中只允许最早的未完成图版本，避免同一批次预先租赁失败前序事件之后的事件。
+
+聚焦证据：Compose 配置断言、Graph Projector 的 24 项测试和类型检查均已通过；重建后的本地 Gateway 与 Projector 均健康；有 Scope 的 Gateway 投影返回成功回执，Nebula 已存在投影节点标签。存储主机注册前的瞬态启动曾产生 legacy Scope 的 `GRAPH_GATEWAY_DELIVERY_FAILED` 死信；这些历史恢复记录不会被重新描述为成功证据。
+
+在精确 Designer Scope 中通过 MCP 同步并回读本 ADR、匹配 Proposal、Context Pack、有类型链接和更新后的 Evidence 前，本补充仍不能视为完全闭环。
+
 ## Protocol Compatibility Amendment (2026-07-28)
 
 The Gateway dependency `github.com/vesoft-inc/nebula-go v1.1.0` used Thrift types that are incompatible with the deployed NebulaGraph 3.8.0 Graphd and failed during authentication with `unable to skip over unknown type id 116`.
