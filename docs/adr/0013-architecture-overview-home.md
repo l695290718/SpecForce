@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted; implementation locally verified; MCP synchronized and read back.**
+**Accepted; introduction verification complete; MCP synchronization and serial read-back verified.**
 
 - Stable ADR/MCP ID: `adr-architecture-overview-home`
 - Matching Proposal ID: `proposal-architecture-overview-home`
@@ -16,7 +16,7 @@ SpecForge needs a system-orientation entry point that explains its MCP-first des
 
 ## Decision
 
-Use `/` as a static bilingual architecture orientation. It presents the design-fact flow from Proposal through ADR, assets, rules and contracts, Context Pack, and evidence, plus navigation into a selected application-service workspace. Use `/workspace` as the scoped operational dashboard. The root route must not load, join, count, or aggregate authored design facts across application services.
+Use `/` as a static bilingual architecture orientation. The refined introduction uses a deep-ink blueprint canvas, staged lifecycle flow, and typed-asset constellation to explain change through Proposal, ADR, assets, rules and contracts, governance, Context Pack, and evidence. It provides scope-preserving navigation into the selected application-service workspace, relationship analysis, and governance checks. Use `/workspace` as the scoped operational dashboard. The root route must not load, join, count, or aggregate authored design facts across application services.
 
 ## Alternatives
 
@@ -27,7 +27,8 @@ Use `/` as a static bilingual architecture orientation. It presents the design-f
 ## Consequences
 
 - Positive: New users can understand the system model before entering a workspace.
-- Positive: Root-route rendering remains independent of authored design-fact data and scope-safe by construction.
+- Positive: The root route remains independent of authored design-fact data and scope-safe by construction.
+- Positive: The canvas supplies an explanatory final state in both full-motion and reduced-motion contexts without introducing loaders or data queries.
 - Positive: The existing dashboard keeps its operational focus under `/workspace?scope=<applicationServiceId>`.
 - Tradeoff: Navigation must preserve the selected application-service scope only when entering scoped destinations.
 - Tradeoff: Cross-service comparison remains a separately authorized, deferred capability.
@@ -37,23 +38,27 @@ Use `/` as a static bilingual architecture orientation. It presents the design-f
 - English is canonical and every human-facing orientation concept has a Chinese overlay.
 - `/` must not import scoped asset loaders, dashboard loaders, or aggregate authored facts.
 - Scoped destinations must use the selected application-service ID and retain its exact scope boundary.
+- Reduced motion must render the overview canvas in a static final state with animation and transitions disabled.
 - Proposal, Context Pack, ADR, typed links, and evidence are written only through MCP in the exact owning Designer Scope.
 - Completion requires MCP persistence and read-back of the exact IDs, scope, localization, typed links, and evidence.
 
 ## Evidence
 
-- **Verified:** `pnpm exec vitest run apps/web/lib/__tests__/overview.test.ts apps/web/app/__tests__/overview-page.test.tsx apps/web/components/__tests__/app-shell.test.tsx` passed 3 files and 11 tests during the implemented stage.
-- **Verified:** `pnpm --filter @specforge/web lint` passed during the implemented stage.
-- **Blocked outside this feature change range:** Web typecheck stops at `apps/web/lib/db.ts(1,10)` because generated `@prisma/client` does not export `PrismaClient`.
-- **MCP synchronized and read back:** `pnpm design-facts:sync` persisted the ADR, Proposal, Context Pack, Evidence, and typed links through the exact Designer Scope. `pnpm design-facts:check` verified all ten decisions with no missing, mismatched, out-of-scope, or blocked facts. The focused persistence, tools, and manifest suites passed 54 tests.
+- **Verified:** `.\\node_modules\\.bin\\vitest.cmd run apps/web/lib/__tests__/overview.test.ts scripts/design-fact-manifest.test.ts` exited 0: 2 test files and 14 tests passed.
+- **Verified:** `pnpm --filter @specforge/web lint` exited 0 with no ESLint warnings or errors. Next.js emitted its deprecation and workspace-root/extra-lockfile warnings.
+- **Verified:** Bundled Playwright browser inspection on the system Chrome channel checked `http://localhost:3002/?scope=com.huawei.celon.desiner` at 1440x960 and 390x844 in English and Chinese. Desktop English and Chinese kept all eight stages on one logical row with only 2px and 3px vertical variance respectively, so stage 6 remained directly before stages 7 and 8 instead of pointing into empty space. Desktop connectors stayed visible, mobile connectors stayed hidden, action links did not overlap, mobile had no horizontal overflow, `/` showed no dashboard signals, and all three action links preserved the exact scoped destinations.
+- **Verified:** Bundled Playwright reduced-motion inspection on the system Chrome channel checked `http://localhost:3002/?scope=com.huawei.celon.desiner` at 1440x960 in English with `reducedMotion: 'reduce'`. `window.matchMedia('(prefers-reduced-motion: reduce)').matches` was true, overview motion targets resolved to `animationName: none`, `animationDuration: 0s`, `transitionDuration: 0s`, `transform: none`, and `opacity: 1`, the connector animation resolved to `none`, and sampled stage positions stayed unchanged over 250ms.
+- **MCP synchronized and read back:** With `DATABASE_URL=postgresql://specforge:local-deployment-verification-only@localhost:15433/specforge_canonical?schema=public`, `pnpm design-facts:sync` returned all 12 baseline decisions as complete, including `adr-architecture-overview-home`; the following serial `pnpm design-facts:check` returned no missing, mismatched, out-of-scope, or blocked records.
 
 ## 中文本地化 / Chinese Localization
 
-**同步完成说明：** 2026-07-29 已重新生成 Prisma Client，并通过仅本机可访问的权威 PostgreSQL 隧道执行 `pnpm design-facts:sync` 和 `pnpm design-facts:check`。首页 ADR、Proposal、Context Pack、Evidence 与有类型关系均已在精确 Designer Scope 中写入并回读；10 项决策均无缺失、不匹配、越界或受阻事实。以下历史“同步受阻”描述由本说明取代。
+### 标题
+
+架构概览首页
 
 ### 状态
 
-**已接受；实现已完成本地验证；MCP 同步受阻。**
+**已接受；引导页验证完成；MCP 同步与串行回读已验证。**
 
 - 稳定 ADR/MCP ID：`adr-architecture-overview-home`
 - 对应 Proposal ID：`proposal-architecture-overview-home`
@@ -63,11 +68,11 @@ Use `/` as a static bilingual architecture orientation. It presents the design-f
 
 ### 背景
 
-SpecForge 需要一个系统定位入口，用于说明 MCP-first 设计事实生命周期，而不能把应用根路由变成操作仪表盘。应用服务 Scope 是隔离边界：已编写的设计事实、派生计数和仪表盘指标都属于一个已选应用服务，访问根路由本身不得读取或聚合这些数据。
+SpecForge 需要一个系统导向入口，用于解释其以 MCP 为先的设计事实生命周期，同时不能把应用根路由变成运维仪表盘。应用服务 Scope 是隔离边界：已编写的设计事实、派生计数和仪表盘指标都属于某一个被选定的应用服务，不能仅因为访问者打开根路由就被读取或聚合。
 
 ### 决策
 
-将 `/` 作为静态双语架构定位页。它展示从 Proposal、ADR、资产、规则与契约、Context Pack 到证据的设计事实流，并提供进入已选应用服务工作台的导航。将 `/workspace` 作为范围化的操作仪表盘。根路由不得加载、关联、计数或聚合跨应用服务的已编写设计事实。
+将 `/` 作为静态双语架构定位页。改进后的引导页使用深墨色蓝图画布、分阶段生命周期流和有类型资产星图，说明从变更到 Proposal、ADR、设计资产、规则与契约、治理、Context Pack 和证据的过程。页面提供进入所选应用服务工作区、关系分析和治理检查的保留 Scope 导航。将 `/workspace` 作为带范围的操作仪表盘。根路由不得加载、关联、计数或聚合跨应用服务的已编写设计事实。
 
 ### 备选方案
 
@@ -78,22 +83,25 @@ SpecForge 需要一个系统定位入口，用于说明 MCP-first 设计事实�
 ### 后果
 
 - 积极影响：新用户可以在进入工作台前理解系统模型。
-- 积极影响：根路由不依赖已编写设计事实数据，因此按构造满足 Scope 安全。
-- 积极影响：现有仪表盘在 `/workspace?scope=<applicationServiceId>` 下保持操作工作台定位。
-- 权衡：导航仅在进入范围化目的地时保留已选应用服务 Scope。
-- 权衡：跨应用服务比较仍是需要单独授权的延期能力。
+- 积极影响：根路由独立于已编写的设计事实数据，并且按构造保证 Scope 安全。
+- 积极影响：画布在完整动效和减少动效环境中都提供说明性的最终状态，且不引入加载器或数据查询。
+- 积极影响：现有仪表盘在 `/workspace?scope=<applicationServiceId>` 下保持其操作工作区定位。
+- 权衡：导航仅在进入带范围的目标页面时保留所选应用服务 Scope。
+- 权衡：跨服务比较仍然是需要单独授权的延期能力。
 
 ### 约束
 
-- 英文为规范内容，所有面向人的定位概念均提供中文覆盖。
-- `/` 不得导入范围化资产加载器、仪表盘加载器，也不得聚合已编写事实。
-- 范围化目的地必须使用已选应用服务 ID，并保留其精确 Scope 边界。
-- Proposal、Context Pack、ADR、类型化链接和证据只能通过 MCP 写入精确所属的 Designer Scope。
-- 只有 MCP 持久化并回读精确 ID、Scope、本地化、类型化链接和证据后才能完成。
+- 英文是规范内容，所有面向人的导向概念都必须提供中文覆盖。
+- `/` 不得导入带范围的资产加载器、仪表盘加载器，也不得聚合已编写事实。
+- 带范围的目标页面必须使用所选应用服务 ID，并保留其精确 Scope 边界。
+- 减少动效时必须以静态最终状态呈现概览画布，并禁用动画和过渡。
+- Proposal、Context Pack、ADR、有类型链接和证据只能通过 MCP 写入精确所属的 Designer Scope。
+- 只有在 MCP 持久化并回读精确 ID、Scope、本地化、有类型链接和证据后，才可视为完成。
 
 ### 证据
 
-- **已验证：** 实现阶段运行 `pnpm exec vitest run apps/web/lib/__tests__/overview.test.ts apps/web/app/__tests__/overview-page.test.tsx apps/web/components/__tests__/app-shell.test.tsx`，3 个文件、11 个测试通过。
-- **已验证：** 实现阶段 `pnpm --filter @specforge/web lint` 通过。
-- **已验证：** 重新生成 Prisma Client 后，Web typecheck 已通过。
-- **MCP 已同步并回读：** 在仅本机可访问的权威 PostgreSQL 隧道上运行 `pnpm design-facts:sync` 与 `pnpm design-facts:check` 后，首页 ADR、Proposal、Context Pack、Evidence 和有类型关系均已写入精确 Designer Scope；全部 10 项决策无缺失、不匹配、越界或受阻事实。MCP 持久化、工具和清单定向测试共 54 项通过。
+- **已验证：** `.\\node_modules\\.bin\\vitest.cmd run apps/web/lib/__tests__/overview.test.ts scripts/design-fact-manifest.test.ts` 以退出码 0 完成：2 个测试文件、14 个测试通过。
+- **已验证：** `pnpm --filter @specforge/web lint` 以退出码 0 完成，未发现 ESLint 警告或错误。Next.js 输出了弃用和工作区根目录/额外锁文件警告。
+- **已验证：** 通过系统 Chrome 通道上的 bundled Playwright，在 1440x960 与 390x844 下分别以英文和中文检查 `http://localhost:3002/?scope=com.huawei.celon.desiner`。英文与中文桌面视图都让 8 个阶段保持在同一逻辑行内，顶部偏差分别仅为 2px 和 3px，因此第 6 阶段直接位于第 7、8 阶段之前，而不是指向空白区域。桌面连接箭头保持可见，移动端连接箭头保持隐藏，操作链接无重叠，移动端无水平溢出，`/` 未显示仪表盘信号，且 3 个操作链接都保留了精确的 Scope 目标地址。
+- **已验证：** 通过系统 Chrome 通道上的 bundled Playwright，在英文 1440x960 视口下以 `reducedMotion: 'reduce'` 检查 `http://localhost:3002/?scope=com.huawei.celon.desiner`。`window.matchMedia('(prefers-reduced-motion: reduce)').matches` 为 true，概览动效目标解析为 `animationName: none`、`animationDuration: 0s`、`transitionDuration: 0s`、`transform: none` 与 `opacity: 1`，连接箭头动画也解析为 `none`，并且连续 250ms 采样的阶段位置保持不变。
+- **MCP 已同步并回读：** 使用 `DATABASE_URL=postgresql://specforge:local-deployment-verification-only@localhost:15433/specforge_canonical?schema=public` 时，`pnpm design-facts:sync` 将全部 12 项基线决策（包括 `adr-architecture-overview-home`）返回为 complete；随后串行执行的 `pnpm design-facts:check` 未发现缺失、不匹配、越界或受阻记录。

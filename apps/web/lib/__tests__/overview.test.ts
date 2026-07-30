@@ -4,6 +4,13 @@ import { readFile } from "node:fs/promises";
 import { messages } from "../i18n";
 import { overviewDestinations } from "../overview";
 
+const requiredLocalizedOverviewKeys = [
+  "overview.flowAriaLabel",
+  "overview.flowLegend",
+  "overview.relationshipAriaLabel",
+  "overview.relationshipEyebrow"
+] as const;
+
 describe("overviewDestinations", () => {
   it("returns unscoped overview destinations", () => {
     expect(overviewDestinations()).toEqual({
@@ -23,11 +30,30 @@ describe("overviewDestinations", () => {
 });
 
 describe("overview localization", () => {
-  it("keeps every English overview key localized in Chinese", () => {
-    const overviewKeys = Object.keys(messages.en).filter((key) => key.startsWith("overview."));
+  it("keeps every overview key mirrored across English and Chinese", () => {
+    const englishOverviewKeys = Object.keys(messages.en)
+      .filter((key) => key.startsWith("overview."))
+      .sort();
+    const chineseOverviewKeys = Object.keys(messages.zh)
+      .filter((key) => key.startsWith("overview."))
+      .sort();
 
-    expect(overviewKeys.length).toBeGreaterThan(12);
-    expect(overviewKeys.every((key) => key in messages.zh)).toBe(true);
+    expect(englishOverviewKeys).toEqual(chineseOverviewKeys);
+    expect(englishOverviewKeys).toEqual(expect.arrayContaining([...requiredLocalizedOverviewKeys]));
+  });
+
+  it("keeps the product-introduction copy localized in both locales", () => {
+    const requiredKeys = [
+      "overview.change",
+      "overview.governance",
+      "overview.flowCaption",
+      "overview.conceptsTitle",
+      "overview.ownershipTitle",
+      "overview.projectionTitle",
+      ...requiredLocalizedOverviewKeys
+    ] as const;
+
+    expect(requiredKeys.every((key) => messages.en[key] && messages.zh[key])).toBe(true);
   });
 
   it("localizes the three explanatory platform concepts in both locales", () => {
@@ -54,11 +80,49 @@ describe("overview route isolation", () => {
     expect(source).not.toContain("getScopedGovernanceOverview");
   });
 
-  it("uses a responsive, optional-motion conceptual fact flow", async () => {
+  it("keeps the overview visual explanatory and scope-data-free", async () => {
     const source = await readFile(new URL("../../app/page.tsx", import.meta.url), "utf8");
 
+    expect(source).toContain('data-testid="architecture-introduction-canvas"');
+    expect(source).toContain('data-testid="architecture-asset-constellation"');
+    expect(source).not.toContain("getScopedAssetCatalog");
+    expect(source).not.toContain("getAgentServiceWorkspace");
+    expect(source).not.toContain("getScopedGovernanceOverview");
+  });
+
+  it("localizes overview-only visible and aria labels", async () => {
+    const source = await readFile(new URL("../../app/page.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain('aria-label={t("overview.flowAriaLabel")}');
+    expect(source).toContain('{t("overview.flowLegend")}');
+    expect(source).toContain('aria-label={t("overview.relationshipAriaLabel")}');
+    expect(source).toContain('{t("overview.relationshipEyebrow")}');
+    expect(source).not.toContain("Architecture concept map");
+    expect(source).not.toContain("MCP -&gt; PG -&gt; GRAPH");
+    expect(source).not.toContain("Architecture relationship map");
+    expect(source).not.toContain("TYPED LINKS");
+  });
+
+  it("uses an eight-column desktop flow whenever rightward connectors are visible", async () => {
+    const source = await readFile(new URL("../../app/page.tsx", import.meta.url), "utf8");
+    const css = await readFile(new URL("../../app/styles/globals.css", import.meta.url), "utf8");
+
     expect(source).toContain('className="sf-overview-flow"');
-    expect(source).toContain("data-motion");
+    expect(source).toContain('sf-overview-flow-connector');
+    expect(source).toContain("xl:block");
+    expect(css).toContain("@media (min-width: 1280px)");
+    expect(css).toContain("grid-template-columns: repeat(8, minmax(0, 1fr));");
+    expect(css).not.toContain("grid-template-columns: repeat(6, minmax(0, 1fr));");
+  });
+
+  it("uses staged canvas motion with an explicit reduced-motion fallback", async () => {
+    const css = await readFile(new URL("../../app/styles/globals.css", import.meta.url), "utf8");
+
+    expect(css).toContain(".sf-overview-canvas");
+    expect(css).toContain(".sf-overview-stage");
+    expect(css).toContain(".sf-overview-asset-node");
+    expect(css).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(css).toContain(".sf-overview-canvas [data-motion]");
   });
 
   it("renders three localized explanation sections for the core platform model", async () => {

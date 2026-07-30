@@ -44,7 +44,32 @@ it("includes the scope-safe architecture overview decision with bilingual govern
   expect(decision?.relatedAssetIds).toEqual(["data-specforge-assets", "adr-design-fact-dual-record-governance"]);
   expect(decision?.localizedContent?.en.decision).toContain("static bilingual architecture orientation");
   expect(decision?.localizedContent?.zh.decision).toContain("静态双语架构定位页");
-  expect(decision?.evidence).toHaveLength(2);
+  expect(decision?.evidence).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      command: ".\\node_modules\\.bin\\vitest.cmd run apps/web/lib/__tests__/overview.test.ts scripts/design-fact-manifest.test.ts",
+      result: expect.stringContaining("2 test files")
+    }),
+    expect.objectContaining({
+      command: "pnpm --filter @specforge/web lint",
+      result: expect.stringContaining("Exited 0")
+    }),
+    expect.objectContaining({
+      command: expect.stringContaining("Bundled Playwright browser inspection"),
+      result: expect.stringContaining("stage 6 remained directly before stages 7 and 8")
+    }),
+    expect.objectContaining({
+      command: expect.stringContaining("Bundled Playwright reduced-motion inspection"),
+      result: expect.stringContaining("window.matchMedia('(prefers-reduced-motion: reduce)').matches was true")
+    }),
+    expect.objectContaining({
+      command: "$env:DATABASE_URL='postgresql://specforge:local-deployment-verification-only@localhost:15433/specforge_canonical?schema=public'; pnpm design-facts:sync",
+      result: expect.stringContaining("Exit code 0")
+    }),
+    expect.objectContaining({
+      command: "$env:DATABASE_URL='postgresql://specforge:local-deployment-verification-only@localhost:15433/specforge_canonical?schema=public'; pnpm design-facts:check",
+      result: expect.stringContaining("exit code 0")
+    })
+  ]));
 });
 
 it("records the verified federated sync fact with canonical metadata and valid bilingual ADR overlays", () => {
