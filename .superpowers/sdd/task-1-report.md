@@ -1,44 +1,46 @@
-# Task 1 Report: Overview Navigation and Bilingual Copy
-
-## Scope
-
-Implemented the navigation and localization foundation only. No routes,
-components, styles, data loaders, design facts, or `docs/TODO.md` were changed.
-
-## Changes
-
-- Added `overviewDestinations(scopeId?)`, delegating scoped URLs to the existing
-  `buildScopedHref` helper.
-- Added unit coverage for unscoped and scoped destination sets.
-- Added `nav.overview`, `nav.workspace`, and a complete bilingual `overview.`
-  message set.
-- Added a localization regression test requiring more than twelve English
-  `overview.` keys and verifying every one has a Chinese counterpart.
+# Task 1 Report: Lock the Static Introduction Contract
 
 ## TDD Evidence
 
 ### RED
 
+`pnpm exec vitest run apps/web/lib/__tests__/overview.test.ts` could not locate
+the Vitest executable in this worktree. The required local Windows command then
+ran the suite and failed as expected: the required localized keys were missing
+and `apps/web/app/page.tsx` did not contain either required test ID.
+
 Command:
 
 ```powershell
-pnpm exec vitest run apps/web/lib/__tests__/overview.test.ts
+.\node_modules\.bin\vitest.cmd run apps/web/lib/__tests__/overview.test.ts
 ```
 
-Result: failed as expected before production implementation. Vite could not
-load `../overview` because `apps/web/lib/overview.ts` did not exist.
+Result: 1 test file failed; 2 tests failed and 5 passed.
 
 ### GREEN
 
 Command:
 
 ```powershell
-pnpm exec vitest run apps/web/lib/__tests__/overview.test.ts
+.\node_modules\.bin\vitest.cmd run apps/web/lib/__tests__/overview.test.ts
 ```
 
-Result: passed. One test file ran with three passing tests.
+Result: 1 test file passed; 7 tests passed.
+
+## Changed Paths
+
+- `apps/web/lib/i18n.ts`
+- `apps/web/lib/__tests__/overview.test.ts`
+- `apps/web/app/page.tsx`
+- `.superpowers/sdd/task-1-report.md`
+
+## Commit
+
+`HEAD` - `feat: enrich architecture overview narrative`
 
 ## Concerns
 
-- This task deliberately establishes copy and destination generation only; the
-  routes and navigation surfaces will be updated by later plan tasks.
+- The plan's `pnpm exec vitest` command could not resolve Vitest locally; the
+  required direct Windows Vitest command supplied the red and green evidence.
+- Design-fact synchronization and associated records are intentionally deferred
+  to Task 3, as directed by the implementation plan.

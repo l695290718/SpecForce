@@ -7,10 +7,12 @@ import { T } from "../components/language-provider";
 import { overviewDestinations } from "../lib/overview";
 
 const factFlow = [
+  ["overview.change", GitBranch],
   ["overview.flowProposal", FileText],
   ["overview.flowAdr", Scale],
   ["overview.flowAssets", Waypoints],
   ["overview.flowRules", ShieldCheck],
+  ["overview.governance", ShieldCheck],
   ["overview.flowContextPack", Network],
   ["overview.flowEvidence", FileCheck2]
 ] as const;
@@ -32,7 +34,7 @@ export default function ArchitectureOverviewPage() {
 
   return (
     <div className="space-y-8 pb-4">
-      <section className="sf-scan overflow-hidden rounded-lg border border-slate-700 bg-ink px-6 py-8 text-white shadow-elevated sm:px-8">
+      <section className="sf-scan overflow-hidden rounded-lg border border-slate-700 bg-ink px-6 py-8 text-white shadow-elevated sm:px-8" data-testid="architecture-introduction-canvas">
         <div className="max-w-4xl">
           <p className="font-mono text-[11px] font-semibold uppercase text-blue-200"><T k="overview.eyebrow" /></p>
           <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-normal sm:text-4xl"><T k="overview.title" /></h1>
@@ -45,20 +47,23 @@ export default function ArchitectureOverviewPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section aria-labelledby="architecture-concepts-title" className="grid gap-4 lg:grid-cols-2">
+        <div className="lg:col-span-2">
+          <h2 className="text-xl font-semibold text-ink" id="architecture-concepts-title"><T k="overview.conceptsTitle" /></h2>
+        </div>
         <article className="border-l-2 border-rule bg-panel px-5 py-5 shadow-panel">
-          <div className="flex items-center gap-2 text-rule"><GitBranch size={18} /><h2 className="text-base font-semibold text-ink"><T k="overview.authoringTitle" /></h2></div>
+          <div className="flex items-center gap-2 text-rule"><GitBranch size={18} /><h3 className="text-base font-semibold text-ink"><T k="overview.ownershipTitle" /></h3></div>
           <p className="mt-3 max-w-xl text-sm leading-6 text-muted"><T k="overview.authoringDescription" /></p>
         </article>
         <article className="border-l-2 border-accent bg-panel px-5 py-5 shadow-panel">
-          <div className="flex items-center gap-2 text-accent"><Database size={18} /><h2 className="text-base font-semibold text-ink"><T k="overview.storageTitle" /></h2></div>
+          <div className="flex items-center gap-2 text-accent"><Database size={18} /><h3 className="text-base font-semibold text-ink"><T k="overview.projectionTitle" /></h3></div>
           <p className="mt-3 max-w-xl text-sm leading-6 text-muted"><T k="overview.storageDescription" /></p>
         </article>
       </section>
 
       <section aria-label="Architecture concept map" className="border-y border-border py-7">
         <div className="mb-5 flex items-end justify-between gap-4">
-          <div><p className="font-mono text-[11px] font-semibold uppercase text-rule">SYSTEM OF DESIGN</p><h2 className="mt-2 text-xl font-semibold text-ink"><T k="overview.flowTitle" /></h2></div>
+          <div><h2 className="text-xl font-semibold text-ink"><T k="overview.flowTitle" /></h2><p className="mt-2 text-sm text-muted"><T k="overview.flowCaption" /></p></div>
           <span className="hidden font-mono text-xs text-muted sm:block">MCP -&gt; PG -&gt; GRAPH</span>
         </div>
         <ol className="sf-overview-flow" data-testid="architecture-fact-flow">
@@ -80,7 +85,7 @@ export default function ArchitectureOverviewPage() {
           <p className="mt-3 max-w-xl text-sm leading-6 text-muted"><T k="overview.relationshipDescription" /></p>
           <p className="mt-5 border-l-2 border-amber-400 pl-3 text-sm leading-6 text-muted"><T k="overview.scopeNotice" /></p>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="architecture-asset-constellation">
           {assetTypes.map((labelKey, index) => (
             <div className="relative min-h-24 border border-border bg-panel px-3 py-3 shadow-sm" key={labelKey}>
               <span className="font-mono text-[11px] text-muted">{String(index + 1).padStart(2, "0")}</span>

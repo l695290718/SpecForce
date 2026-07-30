@@ -29,12 +29,35 @@ describe("overview localization", () => {
     expect(overviewKeys.length).toBeGreaterThan(12);
     expect(overviewKeys.every((key) => key in messages.zh)).toBe(true);
   });
+
+  it("keeps the product-introduction copy localized in Chinese", () => {
+    const requiredKeys = [
+      "overview.change",
+      "overview.governance",
+      "overview.flowCaption",
+      "overview.conceptsTitle",
+      "overview.ownershipTitle",
+      "overview.projectionTitle"
+    ];
+
+    expect(requiredKeys.every((key) => key in messages.en && key in messages.zh)).toBe(true);
+  });
 });
 
 describe("overview route isolation", () => {
   it("keeps the root route free of scoped data loaders", async () => {
     const source = await readFile(new URL("../../app/page.tsx", import.meta.url), "utf8");
 
+    expect(source).not.toContain("getScopedAssetCatalog");
+    expect(source).not.toContain("getAgentServiceWorkspace");
+    expect(source).not.toContain("getScopedGovernanceOverview");
+  });
+
+  it("keeps the overview visual explanatory and scope-data-free", async () => {
+    const source = await readFile(new URL("../../app/page.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain('data-testid="architecture-introduction-canvas"');
+    expect(source).toContain('data-testid="architecture-asset-constellation"');
     expect(source).not.toContain("getScopedAssetCatalog");
     expect(source).not.toContain("getAgentServiceWorkspace");
     expect(source).not.toContain("getScopedGovernanceOverview");
