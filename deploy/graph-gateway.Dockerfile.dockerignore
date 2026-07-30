@@ -1,0 +1,7 @@
+**
+!apps/
+!apps/graph-gateway/
+!apps/graph-gateway/**
+!deploy/
+!deploy/graph/
+!deploy/graph/gateway-healthcheck.go
