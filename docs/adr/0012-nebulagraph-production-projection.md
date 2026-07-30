@@ -122,6 +122,14 @@ Focused evidence: the Compose configuration assertions passed; Graph Projector t
 
 MCP synchronization remains required before this amendment can be considered fully closed. Retry trigger: synchronize and read back this ADR, its matching Proposal, Context Pack, typed links, and updated evidence in the exact Designer scope.
 
+## Synchronization Closure (2026-07-30)
+
+The MCP client lifecycle now closes both the Client and its stdio Transport. After correcting the Chinese consequence overlay to match the seven canonical English consequences, `pnpm design-facts:sync` persisted all twelve manifest decisions and `pnpm design-facts:check` read them back with no missing, mismatched, out-of-scope, or blocked facts. The exact Designer-scope federation reconciliation returned `blocking: false`. This result supersedes the historical MCP synchronization blocker above; legacy outbox migration remains a separate deferred operational concern.
+
+## 同步闭环（2026-07-30）
+
+MCP 客户端生命周期现在会同时关闭 Client 和 stdio Transport。将中文后果覆盖补齐为与七条英文规范后果相同的结构后，`pnpm design-facts:sync` 已持久化全部十二项清单决策，`pnpm design-facts:check` 回读结果无缺失、不匹配、越界或阻塞事实。精确 Designer Scope 的联邦对账返回 `blocking: false`。该结果取代上文历史 MCP 同步受阻说明；legacy Outbox 迁移仍是独立延期的运行事项。
+
 ## 规范 PostgreSQL 切换补充（2026-07-30）
 
 本地 NebulaGraph 兼容配置现仅启动 Nebula Meta、Storage、Graphd、一次性存储主机自举、Gateway 和 Projector。它加入外部 `deploy_default` 网络，Projector 使用规范连接 `deploy-postgres-1:5432/specforge_canonical`，不再启动或读取隔离的 PostgreSQL 服务。

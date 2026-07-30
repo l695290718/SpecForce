@@ -71,15 +71,27 @@ The Web console and authoritative PostgreSQL database are packaged as separate D
 
 ### Reconfigure graph verification for the canonical PostgreSQL authority
 
-**Status:** Deferred after local database consolidation.
+**Status:** Complete for the canonical runtime; legacy graph-stack retirement in progress.
 
 **Owner:** SpecForge Architecture.
 
 **Rationale:** The complete authored catalog was restored into `deploy-postgres/specforge_canonical` and local Web/MCP now use that single authority. The legacy `specforge-graph-verify-postgres` container remains preserved as a rollback source because the graph verification Compose stack still depends on its isolated PostgreSQL service.
 
-**Trigger:** Update the graph verification Compose profile so its projector and gateway read the canonical PostgreSQL connection, validate a rebuilt derived projection, then stop the isolated graph-verification PostgreSQL container without deleting its backup.
+**Completion evidence (2026-07-30):** The `specforge-canonical-graph` Projector connects only to `deploy-postgres-1/specforge_canonical` through the external `deploy_default` network. Gateway and Projector are healthy; MCP synchronization and exact-Designer-scope reconciliation complete with no missing, mismatched, out-of-scope, or blocked facts.
+
+**Legacy retirement:** Back up and stop `specforge-graph-verify-*` without removing its Docker volumes. It is no longer an active authoring or projection authority.
 
 **Completion evidence:** The graph verifier uses the canonical PostgreSQL connection, projection checkpoints and an impact query pass, no active application process reads `specforge-graph-verify-postgres`, and the scoped MCP reconciliation remains clean.
+
+### Resolve legacy graph-outbox migration state
+
+**Status:** Deferred, scope-safe migration required.
+
+**Owner:** SpecForge Runtime.
+
+**Rationale:** `legacy-enterprise` has historical `RelationshipOutbox` records (`169 PENDING`, `76 DELIVERING`, `48 DEAD_LETTER`) restored with legacy data. They must not be silently deleted, replayed into `enterprise-1`, or treated as current Designer-scope evidence.
+
+**Trigger:** Approve an explicit legacy-enterprise migration or archival policy, then export a scoped reconciliation report and either replay to an equally scoped derived graph or archive with audit evidence.
 
 ### NebulaGraph production projection
 
