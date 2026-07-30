@@ -541,6 +541,7 @@ async function main(): Promise<void> {
     console.log(JSON.stringify(receipts, null, 2));
   } finally {
     await client.close();
+    await transport.close();
   }
 }
 

@@ -356,9 +356,18 @@
                                                                                   "Do not claim outbox projection, checkpoint advancement, restart idempotency, or MCP synchronization until the elected authority is reachable and the resulting records are read back in the exact Designer Scope."
                                                                               ]
                                                           },
-                                                   "zh":  {
-                                                              "decision":  "PostgreSQL 保持权威；NebulaGraph 是只能通过有类型 Gateway 和带租约 Outbox Projector 访问的精确 Scope 派生投影。",
-                                                              "constraints":  [
+                            "zh":  {
+                                      "decision":  "PostgreSQL 保持权威；NebulaGraph 是只能通过有类型 Gateway 和带租约 Outbox Projector 访问的精确 Scope 派生投影。",
+                                      "consequences":  [
+                                                           "图运行时不可用时，PostgreSQL 写入仍然可用。",
+                                                           "NebulaGraph 可以从保留的 PostgreSQL 关系事件和 Outbox 状态重建。",
+                                                           "至少一次投递要求图写入幂等、带租约领取、重试、死信处理和单调检查点。",
+                                                           "精确 Scope 身份和同级 Scope 测试使应用服务隔离可在投影与查询边界得到执行。",
+                                                           "本地与企业配置共享契约，但仍需在运行中的 NebulaGraph 3.8.0 服务上证明实时兼容性。",
+                                                           "运行人员必须监控投影延迟，并在图运行时事件期间显式选择 PostgreSQL 回退。",
+                                                           "多节点生产规格、亿级边容量认证、Kubernetes 部署和企业密钥托管仍处于延期状态。"
+                                                       ],
+                                      "constraints":  [
                                                                                   "在已选权威库可达且精确 Designer Scope 内的结果完成回读前，不得声明 Outbox 投影、检查点推进、重启幂等或 MCP 同步完成。"
                                                                               ]
                                                           }
