@@ -289,8 +289,8 @@
                                                },
                           "evidence":  [
                                            {
-                                               "command":  ".\\node_modules\\.bin\\vitest.cmd run apps/web/lib/__tests__/overview.test.ts scripts/design-fact-manifest.test.ts",
-                                               "result":  "Exited 0: 2 test files and 14 tests passed."
+                                               "command":  ".\\node_modules\\.bin\\vitest.cmd run --root . --exclude \".worktrees/**\" --exclude \".pnpm-store/**\" apps/web/lib/__tests__/overview.test.ts scripts/design-fact-manifest.test.ts",
+                                               "result":  "Exited 0: 2 test files and 17 tests passed."
                                            },
                                            {
                                                "command":  "pnpm --filter @specforge/web lint",

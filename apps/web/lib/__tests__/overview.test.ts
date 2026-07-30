@@ -8,6 +8,7 @@ const requiredLocalizedOverviewKeys = [
   "overview.flowAriaLabel",
   "overview.flowLegend",
   "overview.relationshipAriaLabel",
+  "overview.relationshipFigureAriaLabel",
   "overview.relationshipEyebrow"
 ] as const;
 
@@ -96,10 +97,12 @@ describe("overview route isolation", () => {
     expect(source).toContain('aria-label={t("overview.flowAriaLabel")}');
     expect(source).toContain('{t("overview.flowLegend")}');
     expect(source).toContain('aria-label={t("overview.relationshipAriaLabel")}');
+    expect(source).toContain('aria-label={t("overview.relationshipFigureAriaLabel")}');
     expect(source).toContain('{t("overview.relationshipEyebrow")}');
     expect(source).not.toContain("Architecture concept map");
     expect(source).not.toContain("MCP -&gt; PG -&gt; GRAPH");
     expect(source).not.toContain("Architecture relationship map");
+    expect(source).not.toContain("Architecture relationship constellation");
     expect(source).not.toContain("TYPED LINKS");
   });
 
@@ -138,7 +141,7 @@ describe("overview route isolation", () => {
     const css = await readFile(new URL("../../app/styles/globals.css", import.meta.url), "utf8");
 
     expect(source).toContain("const relationshipEdges = [");
-    expect(source).toContain('aria-label="Architecture relationship constellation"');
+    expect(source).toContain('aria-label={t("overview.relationshipFigureAriaLabel")}');
     expect(source).toContain('data-testid="typed-relationship-list"');
     expect(source).toContain("typeKey:");
     expect(source).toContain("setActiveHighlight");

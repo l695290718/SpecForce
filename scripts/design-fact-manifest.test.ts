@@ -46,8 +46,8 @@ it("includes the scope-safe architecture overview decision with bilingual govern
   expect(decision?.localizedContent?.zh.decision).toContain("静态双语架构定位页");
   expect(decision?.evidence).toEqual(expect.arrayContaining([
     expect.objectContaining({
-      command: ".\\node_modules\\.bin\\vitest.cmd run apps/web/lib/__tests__/overview.test.ts scripts/design-fact-manifest.test.ts",
-      result: expect.stringContaining("2 test files")
+      command: ".\\node_modules\\.bin\\vitest.cmd run --root . --exclude \".worktrees/**\" --exclude \".pnpm-store/**\" apps/web/lib/__tests__/overview.test.ts scripts/design-fact-manifest.test.ts",
+      result: "Exited 0: 2 test files and 17 tests passed."
     }),
     expect.objectContaining({
       command: "pnpm --filter @specforge/web lint",

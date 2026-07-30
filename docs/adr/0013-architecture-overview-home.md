@@ -44,7 +44,7 @@ Use `/` as a static bilingual architecture orientation. The refined introduction
 
 ## Evidence
 
-- **Verified:** `.\\node_modules\\.bin\\vitest.cmd run apps/web/lib/__tests__/overview.test.ts scripts/design-fact-manifest.test.ts` exited 0: 2 test files and 14 tests passed.
+- **Verified:** `.\\node_modules\\.bin\\vitest.cmd run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" apps/web/lib/__tests__/overview.test.ts scripts/design-fact-manifest.test.ts` exited 0: 2 test files and 17 tests passed.
 - **Verified:** `pnpm --filter @specforge/web lint` exited 0 with no ESLint warnings or errors. Next.js emitted its deprecation and workspace-root/extra-lockfile warnings.
 - **Verified:** Bundled Playwright browser inspection on the system Chrome channel checked `http://localhost:3002/?scope=com.huawei.celon.desiner` at 1440x960 and 390x844 in English and Chinese. Desktop English and Chinese kept all eight stages on one logical row with only 2px and 3px vertical variance respectively, so stage 6 remained directly before stages 7 and 8 instead of pointing into empty space. Desktop connectors stayed visible, mobile connectors stayed hidden, action links did not overlap, mobile had no horizontal overflow, `/` showed no dashboard signals, and all three action links preserved the exact scoped destinations.
 - **Verified:** Bundled Playwright reduced-motion inspection on the system Chrome channel checked `http://localhost:3002/?scope=com.huawei.celon.desiner` at 1440x960 in English with `reducedMotion: 'reduce'`. `window.matchMedia('(prefers-reduced-motion: reduce)').matches` was true, overview motion targets resolved to `animationName: none`, `animationDuration: 0s`, `transitionDuration: 0s`, `transform: none`, and `opacity: 1`, the connector animation resolved to `none`, and sampled stage positions stayed unchanged over 250ms.
@@ -100,7 +100,7 @@ SpecForge 需要一个系统导向入口，用于解释其以 MCP 为先的设�
 
 ### 证据
 
-- **已验证：** `.\\node_modules\\.bin\\vitest.cmd run apps/web/lib/__tests__/overview.test.ts scripts/design-fact-manifest.test.ts` 以退出码 0 完成：2 个测试文件、14 个测试通过。
+- **已验证：** `.\\node_modules\\.bin\\vitest.cmd run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" apps/web/lib/__tests__/overview.test.ts scripts/design-fact-manifest.test.ts` 以退出码 0 完成：2 个测试文件、17 个测试通过。
 - **已验证：** `pnpm --filter @specforge/web lint` 以退出码 0 完成，未发现 ESLint 警告或错误。Next.js 输出了弃用和工作区根目录/额外锁文件警告。
 - **已验证：** 通过系统 Chrome 通道上的 bundled Playwright，在 1440x960 与 390x844 下分别以英文和中文检查 `http://localhost:3002/?scope=com.huawei.celon.desiner`。英文与中文桌面视图都让 8 个阶段保持在同一逻辑行内，顶部偏差分别仅为 2px 和 3px，因此第 6 阶段直接位于第 7、8 阶段之前，而不是指向空白区域。桌面连接箭头保持可见，移动端连接箭头保持隐藏，操作链接无重叠，移动端无水平溢出，`/` 未显示仪表盘信号，且 3 个操作链接都保留了精确的 Scope 目标地址。
 - **已验证：** 通过系统 Chrome 通道上的 bundled Playwright，在英文 1440x960 视口下以 `reducedMotion: 'reduce'` 检查 `http://localhost:3002/?scope=com.huawei.celon.desiner`。`window.matchMedia('(prefers-reduced-motion: reduce)').matches` 为 true，概览动效目标解析为 `animationName: none`、`animationDuration: 0s`、`transitionDuration: 0s`、`transform: none` 与 `opacity: 1`，连接箭头动画也解析为 `none`，并且连续 250ms 采样的阶段位置保持不变。

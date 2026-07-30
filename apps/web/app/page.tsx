@@ -221,7 +221,7 @@ export default function ArchitectureOverviewPage() {
           <p className="mt-3 max-w-xl text-sm leading-6 text-muted"><T k="overview.relationshipDescription" /></p>
           <p className="mt-5 border-l-2 border-amber-400 pl-3 text-sm leading-6 text-muted"><T k="overview.scopeNotice" /></p>
         </div>
-        <figure aria-label="Architecture relationship constellation" className="sf-relationship-constellation" data-has-active={hasActiveHighlight ? "true" : "false"}>
+        <figure aria-label={t("overview.relationshipFigureAriaLabel")} className="sf-relationship-constellation" data-has-active={hasActiveHighlight ? "true" : "false"}>
           <figcaption className="border-b border-border/80 px-4 py-4 sm:px-5">
             <h3 className="text-sm font-semibold text-ink"><T k="overview.relationshipLegendTitle" /></h3>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted"><T k="overview.relationshipLegendDescription" /></p>
