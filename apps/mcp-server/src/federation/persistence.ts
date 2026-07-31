@@ -55,6 +55,14 @@ export interface AppendFederationOutboxInput {
   availableAt?: string;
 }
 
+export interface CloseDesignChangeSessionInput {
+  id: string;
+  architectureScope: ArchitectureScopeRef;
+  status: Extract<DesignChangeSessionStatus, "CONVERGED" | "BLOCKED">;
+  verificationEvidenceRefs: string[];
+  closureReason?: string;
+}
+
 export interface ReconcilePersistedScopeInput {
   architectureScope: ArchitectureScopeRef;
   relationshipDrift?: boolean;
@@ -232,8 +240,8 @@ export async function createDesignChangeSession(input: CreateDesignChangeSession
     const tx = transaction as FederationTransaction;
     const row = await tx.designChangeSession.upsert({
       where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } },
-      create: { ...scope, id: input.id, actorId: input.actorId, intent: input.intent, affectedFactIds: json(input.affectedFactIds), expectedEvidenceRefs: json(input.expectedEvidenceRefs), status: input.status, openedAt: input.openedAt ? new Date(input.openedAt) : undefined },
-      update: { actorId: input.actorId, intent: input.intent, affectedFactIds: json(input.affectedFactIds), expectedEvidenceRefs: json(input.expectedEvidenceRefs), status: input.status }
+      create: { ...scope, id: input.id, actorId: input.actorId, intent: input.intent, affectedFactIds: json(input.affectedFactIds), expectedEvidenceRefs: json(input.expectedEvidenceRefs), preflightDigest: input.preflightDigest ?? null, preflightRelationshipDigest: input.preflightRelationshipDigest ?? null, preflightReadAssetIds: json(input.preflightReadAssetIds ?? []), closureReason: input.closureReason ?? null, status: input.status, openedAt: input.openedAt ? new Date(input.openedAt) : undefined },
+      update: { actorId: input.actorId, intent: input.intent, affectedFactIds: json(input.affectedFactIds), expectedEvidenceRefs: json(input.expectedEvidenceRefs), preflightDigest: input.preflightDigest ?? null, preflightRelationshipDigest: input.preflightRelationshipDigest ?? null, preflightReadAssetIds: json(input.preflightReadAssetIds ?? []), closureReason: input.closureReason ?? null, status: input.status }
     });
     await createOutbox(tx, {
       eventType: "FEDERATION_DESIGN_CHANGE_SESSION_CREATED",
@@ -243,6 +251,33 @@ export async function createDesignChangeSession(input: CreateDesignChangeSession
       architectureScope: scope
     });
     return session(row);
+  });
+}
+
+export async function closeDesignChangeSession(input: CloseDesignChangeSessionInput): Promise<DesignChangeSession> {
+  const scope = writableScope(input.architectureScope);
+  if (!input.verificationEvidenceRefs.length) throw new Error("DESIGN_CHANGE_SESSION_EVIDENCE_REQUIRED");
+  return prisma.$transaction(async (transaction) => {
+    const tx = transaction as FederationTransaction;
+    const row = await tx.designChangeSession.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } } });
+    if (!row) throw new Error("DESIGN_CHANGE_SESSION_NOT_FOUND");
+    if ((row.status === "CONVERGED" || row.status === "BLOCKED") && row.status !== input.status) {
+      throw new Error("DESIGN_CHANGE_SESSION_ALREADY_CLOSED");
+    }
+    const existingEvidenceRefs = Array.isArray(row.expectedEvidenceRefs) ? row.expectedEvidenceRefs as string[] : [];
+    const expectedEvidenceRefs = [...new Set([...existingEvidenceRefs, ...input.verificationEvidenceRefs])];
+    const updated = await tx.designChangeSession.update({
+      where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } },
+      data: { status: input.status, expectedEvidenceRefs: json(expectedEvidenceRefs), closureReason: input.closureReason ?? null }
+    });
+    await createOutbox(tx, {
+      eventType: "FEDERATION_DESIGN_CHANGE_SESSION_CLOSED",
+      payload: { designChangeSessionId: input.id, status: input.status, verificationEvidenceRefs: input.verificationEvidenceRefs, closureReason: input.closureReason },
+      idempotencyKey: federationEventKey("FEDERATION_DESIGN_CHANGE_SESSION_CLOSED", scope, `${input.id}:${input.status}`),
+      designChangeSessionId: input.id,
+      architectureScope: scope
+    });
+    return session(updated);
   });
 }
 
@@ -404,8 +439,8 @@ function observation(row: { id: string; connectorId: string; sourceNamespace: st
   return { id: row.id, connectorInstanceId: row.connectorId, sourceNamespace: row.sourceNamespace, externalAssetType: row.externalAssetType, externalId: row.externalId, payload: row.payload as Record<string, unknown>, normalizedDigest: row.normalizedDigest, sourceVersion: row.sourceVersion, observedAt: row.observedAt.toISOString(), status: row.status as CandidateFactStatus, provenance: row.provenance as unknown as SourceObservation["provenance"], architectureScope: scopeOf(row) };
 }
 
-function session(row: { id: string; actorId: string; intent: string; affectedFactIds: Prisma.JsonValue; expectedEvidenceRefs: Prisma.JsonValue; status: string; openedAt: Date; updatedAt: Date; applicationServiceId: string; scopePath: string }): DesignChangeSession {
-  return { id: row.id, actorId: row.actorId, intent: row.intent, affectedFactIds: row.affectedFactIds as string[], expectedEvidenceRefs: row.expectedEvidenceRefs as string[], status: row.status as DesignChangeSessionStatus, openedAt: row.openedAt.toISOString(), updatedAt: row.updatedAt.toISOString(), architectureScope: scopeOf(row) };
+function session(row: { id: string; actorId: string; intent: string; affectedFactIds: Prisma.JsonValue; expectedEvidenceRefs: Prisma.JsonValue; preflightDigest?: string | null; preflightRelationshipDigest?: string | null; preflightReadAssetIds?: Prisma.JsonValue; closureReason?: string | null; status: string; openedAt: Date; updatedAt: Date; applicationServiceId: string; scopePath: string }): DesignChangeSession {
+  return { id: row.id, actorId: row.actorId, intent: row.intent, affectedFactIds: row.affectedFactIds as string[], expectedEvidenceRefs: row.expectedEvidenceRefs as string[], ...(row.preflightDigest ? { preflightDigest: row.preflightDigest } : {}), ...(row.preflightRelationshipDigest ? { preflightRelationshipDigest: row.preflightRelationshipDigest } : {}), preflightReadAssetIds: (row.preflightReadAssetIds as string[] | undefined) ?? [], ...(row.closureReason ? { closureReason: row.closureReason } : {}), status: row.status as DesignChangeSessionStatus, openedAt: row.openedAt.toISOString(), updatedAt: row.updatedAt.toISOString(), architectureScope: scopeOf(row) };
 }
 
 function outbox(row: { dbId: string; eventType: string; payload: Prisma.JsonValue; idempotencyKey: string; status: string; availableAt: Date; sentAt: Date | null; attemptCount: number; lastError: string | null; designChangeSessionId: string | null; applicationServiceId: string; scopePath: string }): FederationOutboxRecord {

@@ -106,6 +106,10 @@ export interface DesignChangeSession {
   intent: string;
   affectedFactIds: string[];
   expectedEvidenceRefs: string[];
+  preflightDigest?: string;
+  preflightRelationshipDigest?: string;
+  preflightReadAssetIds?: string[];
+  closureReason?: string;
   status: DesignChangeSessionStatus;
   openedAt: string;
   updatedAt: string;

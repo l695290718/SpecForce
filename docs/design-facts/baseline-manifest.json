@@ -349,6 +349,45 @@
                                        ]
                       },
                       {
+                          "id":  "adr-design-context-preflight-gate",
+                          "repositoryAdr":  "docs/adr/0016-design-context-preflight-gate.md",
+                          "mcpAdrId":  "adr-design-context-preflight-gate",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-design-context-preflight-gate",
+                          "contextPackId":  "context-pack-design-context-preflight-gate",
+                          "relatedAssetIds":  [
+                                                  "api-specforge-mcp-tools",
+                                                  "data-specforge-assets",
+                                                  "adr-design-fact-dual-record-governance",
+                                                  "adr-federated-design-fact-synchronization"
+                                              ],
+                          "owner":  "SpecForge Architecture",
+                          "status":  "MCP synchronized and read back; implementation complete",
+                          "reason":  "The design introduces an audited MCP preflight and close lifecycle that reads the exact Scope before implementation and records convergence or blockage after verification.",
+                          "retryTrigger":  "After a future preflight-gate change, rerun design-facts:sync and design-facts:check, then read back all companion records and typed links in the exact Designer Scope.",
+                          "evidence":  [
+                                           {
+                                               "command":  "pnpm design-facts:check",
+                                               "result":  "Pre-implementation MCP read passed for all 14 baseline decisions with no missing, mismatched, out-of-scope, or blocked records."
+                                           },
+                                           {
+                                               "command":  "pnpm --filter @specforge/mcp-server typecheck; pnpm --filter @specforge/core typecheck",
+                                               "result":  "Both TypeScript typechecks passed."
+                                           },
+                                           {
+                                               "command":  "vitest run apps/mcp-server/src/federation/tools.test.ts apps/mcp-server/src/federation/persistence.test.ts --exclude .worktrees/** --exclude .pnpm-store/**",
+                                               "result":  "Passed: 2 files and 101 tests, including exact-Scope preflight, blocked reconciliation, and evidence-backed session closure."
+                                           },
+                                           {
+                                               "command":  "pnpm design-context:preflight; pnpm design-context:close",
+                                               "result":  "The live Designer Scope preflight read 104 assets, created session design-change-session:86e2d333-937f-4a88-acbc-813cdf11fb69, and closed it as CONVERGED with four verification evidence references."
+                                           }
+                                       ]
+                      },
+                      {
                           "id":  "adr-agent-driven-legacy-baseline-discovery",
                           "repositoryAdr":  "docs/adr/0015-agent-driven-legacy-baseline-discovery.md",
                           "mcpAdrId":  "adr-agent-driven-legacy-baseline-discovery",

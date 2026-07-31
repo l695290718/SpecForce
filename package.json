@@ -18,6 +18,8 @@
     "design-facts:relations:check": "tsx scripts/check-legacy-relations.ts",
     "design-facts:sync": "tsx scripts/sync-design-facts.ts",
     "design-facts:check": "tsx scripts/reconcile-design-facts.ts",
+    "design-context:preflight": "tsx scripts/design-context.ts preflight",
+    "design-context:close": "tsx scripts/design-context.ts close",
     "design-facts:federation:check": "tsx scripts/reconcile-federated-facts.ts",
     "graph-outbox:archive": "tsx scripts/archive-legacy-graph-outbox.ts",
     "format": "prettier --write ."

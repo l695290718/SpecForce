@@ -114,4 +114,32 @@ export function registerPrompts(server: McpServer): void {
     },
     ({ applicationServiceId, locale, proposalId }) => promptResult("Generate Codex context", `Generate coding context for Codex from proposal ${proposalId} in application service ${applicationServiceId} with locale ${locale ?? "en"}. Call generate_context_pack with the same applicationServiceId and targetAgent=codex, then produce implementation tasks, tests, constraints, and do-not rules.`)
   );
+
+  server.registerPrompt(
+    "implementation_preflight",
+    {
+      title: "Implementation preflight",
+      description: "Read the exact Scope design context and open a governed change session before coding.",
+      argsSchema: {
+        applicationServiceId: z.string(),
+        scopePath: z.string(),
+        intent: z.string(),
+        affectedFactIds: z.string(),
+        expectedEvidenceRefs: z.string()
+      }
+    },
+    ({ applicationServiceId, scopePath, intent, affectedFactIds, expectedEvidenceRefs }) => promptResult(
+      "Prepare and close a governed implementation session.",
+      [
+        "Before changing code, call prepare_design_change with the exact architectureScope.",
+        `Scope: ${applicationServiceId} (${scopePath})`,
+        `Intent: ${intent}`,
+        `Affected facts: ${affectedFactIds}`,
+        `Expected evidence: ${expectedEvidenceRefs}`,
+        "Do not implement if the receipt is missing, the affected fact is absent, or reconciliation is BLOCKED.",
+        "Record the returned sessionId. After focused verification, call close_design_change_session with CONVERGED and command/result evidence, or BLOCKED with a reason and retry trigger.",
+        "Keep repository ADRs and MCP ADR/Proposal/Context Pack/design facts synchronized in the same exact Scope."
+      ].join("\n")
+    )
+  );
 }

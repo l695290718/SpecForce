@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { contentDigest } from "@specforge/core";
 import { prisma } from "../persistence";
-import { appendFederationOutbox, createDesignChangeSession, listConnectors, listPersistedCanonicalFederatedFacts, promoteCandidate, reconcilePersistedScope, recordObservation, registerConnector } from "./persistence";
+import { appendFederationOutbox, closeDesignChangeSession, createDesignChangeSession, listConnectors, listPersistedCanonicalFederatedFacts, promoteCandidate, reconcilePersistedScope, recordObservation, registerConnector } from "./persistence";
 
 const designerScope = {
   applicationServiceId: "com.huawei.celon.desiner",
@@ -109,10 +109,17 @@ beforeEach(() => {
     findFirst: vi.fn(async ({ where }: { where: Row }) => rows.policies.find((row) => Object.entries(where).every(([name, value]) => row[name] === value)) ?? null),
     findMany: vi.fn(async ({ where }: { where: Row }) => rows.policies.filter((row) => Object.entries(where).every(([name, value]) => row[name] === value)))
   };
-  client.designChangeSession = { findUnique: vi.fn(async ({ where }: { where: { applicationServiceId_scopePath_id: Row } }) => {
-    const key = where.applicationServiceId_scopePath_id;
-    return rows.sessions.find((row) => row.id === key.id && row.applicationServiceId === key.applicationServiceId && row.scopePath === key.scopePath) ?? null;
-  }) };
+  client.designChangeSession = {
+    findUnique: vi.fn(async ({ where }: { where: { applicationServiceId_scopePath_id: Row } }) => {
+      const key = where.applicationServiceId_scopePath_id;
+      return rows.sessions.find((row) => row.id === key.id && row.applicationServiceId === key.applicationServiceId && row.scopePath === key.scopePath) ?? null;
+    }),
+    update: vi.fn(async ({ where, data }: { where: { applicationServiceId_scopePath_id: Row }; data: Row }) => {
+      const key = where.applicationServiceId_scopePath_id;
+      const row = rows.sessions.find((candidate) => candidate.id === key.id && candidate.applicationServiceId === key.applicationServiceId && candidate.scopePath === key.scopePath);
+      return Object.assign(row!, data, { updatedAt: new Date() });
+    })
+  };
   client.reconciliationSnapshot = { upsert: vi.fn() };
   client.sourceObservation = {
     findUnique: vi.fn(async ({ where }: { where: Row }) => {
@@ -235,6 +242,11 @@ beforeEach(() => {
       findUnique: vi.fn(async ({ where }: { where: { applicationServiceId_scopePath_id: Row } }) => {
         const key = where.applicationServiceId_scopePath_id;
         return rows.sessions.find((row) => row.id === key.id && row.applicationServiceId === key.applicationServiceId && row.scopePath === key.scopePath) ?? null;
+      }),
+      update: vi.fn(async ({ where, data }: { where: { applicationServiceId_scopePath_id: Row }; data: Row }) => {
+        const key = where.applicationServiceId_scopePath_id;
+        const row = rows.sessions.find((candidate) => candidate.id === key.id && candidate.applicationServiceId === key.applicationServiceId && candidate.scopePath === key.scopePath);
+        return Object.assign(row!, data, { updatedAt: new Date() });
       })
     }
     }); } catch (error) { Object.assign(rows, snapshot); throw error; } finally { release(); }
@@ -661,6 +673,32 @@ describe("federation persistence", () => {
 
     expect(rows.sessions).toHaveLength(0);
     expect(rows.outbox).toHaveLength(0);
+  });
+
+  it("closes an exact-Scope session with verification evidence and an outbox event", async () => {
+    await createDesignChangeSession({ ...changeSession, affectedFactIds: [...changeSession.affectedFactIds], expectedEvidenceRefs: [...changeSession.expectedEvidenceRefs], openedAt: "2026-07-19T00:00:00.000Z", architectureScope: designerScope });
+
+    const closed = await closeDesignChangeSession({
+      id: changeSession.id,
+      status: "CONVERGED",
+      verificationEvidenceRefs: ["pnpm test=passed"],
+      architectureScope: designerScope
+    });
+
+    expect(closed).toMatchObject({ id: changeSession.id, status: "CONVERGED", architectureScope: designerScope, expectedEvidenceRefs: ["pnpm test=passed"] });
+    expect(rows.outbox).toEqual(expect.arrayContaining([expect.objectContaining({
+      eventType: "FEDERATION_DESIGN_CHANGE_SESSION_CLOSED",
+      designChangeSessionId: changeSession.id,
+      applicationServiceId: designerScope.applicationServiceId,
+      scopePath: designerScope.scopePath
+    })]));
+  });
+
+  it("does not reopen a closed session with a different final status", async () => {
+    await createDesignChangeSession({ ...changeSession, affectedFactIds: [...changeSession.affectedFactIds], expectedEvidenceRefs: [...changeSession.expectedEvidenceRefs], openedAt: "2026-07-19T00:00:00.000Z", architectureScope: designerScope });
+    await closeDesignChangeSession({ id: changeSession.id, status: "CONVERGED", verificationEvidenceRefs: ["pnpm test=passed"], architectureScope: designerScope });
+
+    await expect(closeDesignChangeSession({ id: changeSession.id, status: "BLOCKED", verificationEvidenceRefs: ["reconciliation=blocked"], architectureScope: designerScope })).rejects.toThrow("DESIGN_CHANGE_SESSION_ALREADY_CLOSED");
   });
 
   it("retires an earlier revision and reconciles only the current canonical fact", async () => {

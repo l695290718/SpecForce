@@ -3,8 +3,10 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { prisma, resolveWritableScope } from "../persistence";
+import { listPersistedAssetLinks, prisma, resolveWritableScope } from "../persistence";
+import { loadScopedAssetCatalog } from "../scoped-derived";
 import {
+  closeDesignChangeSession,
   createDesignChangeSession,
   promoteCandidate,
   reconcilePersistedScope,
@@ -67,6 +69,11 @@ const stableErrorCodes = new Set([
   "CONNECTOR_CAPABILITY_MISSING",
   "DELIVERY_BLOCKED",
   "DESIGN_CHANGE_SESSION_SCOPE_MISMATCH",
+  "DESIGN_CHANGE_SESSION_EVIDENCE_REQUIRED",
+  "DESIGN_CHANGE_SESSION_NOT_FOUND",
+  "DESIGN_CHANGE_SESSION_ALREADY_CLOSED",
+  "DESIGN_CONTEXT_FACT_NOT_FOUND",
+  "DESIGN_CONTEXT_RECONCILIATION_BLOCKED",
   "FEDERATION_TOOL_ERROR",
   "HUMAN_FACING_REQUIRED",
   "IDENTITY_CONFLICT",
@@ -102,6 +109,11 @@ function safeClientMessage(code: string): string {
     CANDIDATE_PROVENANCE_INVALID: "The selected candidate observation failed provenance validation.",
     CANDIDATE_PROVENANCE_MISMATCH: "The promoted fact does not match the selected candidate observation.",
     DELIVERY_BLOCKED: "Federation delivery is currently blocked.",
+    DESIGN_CHANGE_SESSION_EVIDENCE_REQUIRED: "A design change session requires verification evidence before it can close.",
+    DESIGN_CHANGE_SESSION_NOT_FOUND: "The design change session was not found in the requested Scope.",
+    DESIGN_CHANGE_SESSION_ALREADY_CLOSED: "The design change session is already closed with a different final status.",
+    DESIGN_CONTEXT_FACT_NOT_FOUND: "One or more affected design facts were not found in the requested Scope.",
+    DESIGN_CONTEXT_RECONCILIATION_BLOCKED: "The requested Scope has a blocked design reconciliation state.",
     CONNECTOR_NOT_ACTIVE: "The federation connector is not active.",
     CONNECTOR_CAPABILITY_MISSING: "The federation connector does not support observation.",
     FEDERATION_TOOL_ERROR: "The federation tool request could not be completed.",
@@ -148,6 +160,20 @@ function federationTarget(name: string, input: Record<string, unknown>) {
 
 function requestActor(extra: FederationRequestExtra | undefined): FederationCaller {
   const claims = extra?.authInfo;
+  if (!claims && process.env.SPECFORGE_MCP_SEED === "1" && process.env.SPECFORGE_MCP_SEED_SCOPE) {
+    const seedScope = scopeById(process.env.SPECFORGE_MCP_SEED_SCOPE);
+    if (seedScope) {
+      return {
+        actorType: "agent",
+        actorId: "local-design-context",
+        grants: [
+          { scopeId: seedScope.id, action: "read" },
+          { scopeId: seedScope.id, action: "write" }
+        ],
+        permissions: ["asset:read", "asset:write", "governance:run", "graph:read"]
+      };
+    }
+  }
   const rawClaims = claims?.extra;
   const rawActor = isRecord(rawClaims?.actor) ? rawClaims.actor : rawClaims;
   const actorType = rawActor?.actorType;
@@ -359,6 +385,12 @@ function isRecord(value: unknown): value is Record<string, any> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function scopedCatalogAssetIds(catalog: Record<string, unknown>): Array<{ id: string; type: string }> {
+  return Object.entries(catalog).flatMap(([type, value]) => Array.isArray(value)
+    ? value.filter(isRecord).flatMap((asset) => typeof asset.id === "string" ? [{ id: asset.id, type }] : [])
+    : []);
+}
+
 function candidateCanonicalPayload(payload: Record<string, unknown>): Record<string, unknown> {
   const { localizedContent: _localizedContent, ...canonicalPayload } = payload;
   return canonicalPayload;
@@ -524,6 +556,90 @@ export function registerFederationTools(server: McpServer): void {
     affectedFactIds: input.affectedFactIds,
     expectedEvidenceRefs: input.expectedEvidenceRefs ?? [],
     status: "OPEN",
+    architectureScope: assertWritableExactScope(input.architectureScope, caller)
+  }));
+
+  registerFederationJsonTool(server, "prepare_design_change", {
+    title: "Prepare design change",
+    description: "Reads the exact Scope design context, captures a digest, and opens an audited change session before implementation.",
+    inputSchema: {
+      intent: z.string().min(1),
+      affectedFactIds: z.array(z.string().min(1)).min(1),
+      expectedEvidenceRefs: z.array(z.string().min(1)).min(1),
+      architectureScope: architectureScopeSchema
+    },
+    permissions: ["asset:read", "asset:write", "graph:read"],
+    readOnly: false
+  }, async (input, caller) => {
+    const architectureScope = assertWritableExactScope(input.architectureScope, caller);
+    const catalog = await loadScopedAssetCatalog(architectureScope.applicationServiceId);
+    const allAssets = scopedCatalogAssetIds(catalog as unknown as Record<string, unknown>);
+    const knownAssetIds = new Set(allAssets.map((asset) => asset.id));
+    const missing = input.affectedFactIds.filter((id) => !knownAssetIds.has(id));
+    if (missing.length) throw new FederationToolError("DESIGN_CONTEXT_FACT_NOT_FOUND", missing.join(","));
+    const links = (await listPersistedAssetLinks(architectureScope.applicationServiceId)).filter((link) => link.architectureScope?.scopePath === architectureScope.scopePath);
+    const latestReconciliation = await prisma.reconciliationSnapshot.findFirst({ where: architectureScope, orderBy: { createdAt: "desc" } });
+    if (latestReconciliation?.status === "BLOCKED") throw new FederationToolError("DESIGN_CONTEXT_RECONCILIATION_BLOCKED");
+    const affectedIds = new Set(input.affectedFactIds);
+    const relatedAssetIds = new Set(input.affectedFactIds);
+    for (const link of links) {
+      if (affectedIds.has(link.sourceId)) relatedAssetIds.add(link.targetId);
+      if (affectedIds.has(link.targetId)) relatedAssetIds.add(link.sourceId);
+    }
+    const preflightDigest = contentDigest({
+      architectureScope,
+      catalog,
+      links,
+      reconciliation: latestReconciliation ? { root: latestReconciliation.root, status: latestReconciliation.status, factDigests: latestReconciliation.factDigests } : null
+    });
+    const preflightRelationshipDigest = contentDigest(links);
+    const session = await createDesignChangeSession({
+      id: `design-change-session:${randomUUID()}`,
+      actorId: caller.actorId,
+      intent: input.intent,
+      affectedFactIds: input.affectedFactIds,
+      expectedEvidenceRefs: input.expectedEvidenceRefs,
+      preflightDigest,
+      preflightRelationshipDigest,
+      preflightReadAssetIds: [...relatedAssetIds].sort(),
+      status: "OPEN",
+      architectureScope
+    });
+    return {
+      receipt: {
+        sessionId: session.id,
+        actorId: caller.actorId,
+        architectureScope,
+        intent: input.intent,
+        affectedFactIds: input.affectedFactIds,
+        readAssetIds: [...relatedAssetIds].sort(),
+        readAssetCount: allAssets.length,
+        relationshipDigest: preflightRelationshipDigest,
+        designContextDigest: preflightDigest,
+        reconciliation: latestReconciliation ? { root: latestReconciliation.root, status: latestReconciliation.status } : { status: "UNVERIFIED" },
+        status: session.status
+      },
+      session
+    };
+  });
+
+  registerFederationJsonTool(server, "close_design_change_session", {
+    title: "Close design change session",
+    description: "Closes an exact-Scope change session as converged or blocked with verification evidence.",
+    inputSchema: {
+      sessionId: z.string().min(1),
+      status: z.enum(["CONVERGED", "BLOCKED"]),
+      verificationEvidenceRefs: z.array(z.string().min(1)).min(1),
+      closureReason: z.string().min(1).optional(),
+      architectureScope: architectureScopeSchema
+    },
+    permissions: ["asset:write", "governance:run"],
+    readOnly: false
+  }, async (input, caller) => closeDesignChangeSession({
+    id: input.sessionId,
+    status: input.status,
+    verificationEvidenceRefs: input.verificationEvidenceRefs,
+    closureReason: input.closureReason,
     architectureScope: assertWritableExactScope(input.architectureScope, caller)
   }));
 

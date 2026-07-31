@@ -7,6 +7,7 @@ const federationPersistence = vi.hoisted(() => ({
   recordObservation: vi.fn(),
   promoteCandidate: vi.fn(),
   createDesignChangeSession: vi.fn(),
+  closeDesignChangeSession: vi.fn(),
   reconcilePersistedScope: vi.fn()
 }));
 
@@ -14,6 +15,7 @@ const persistence = vi.hoisted(() => ({
   isSeedMode: vi.fn(() => false),
   deletePersistedDesignData: vi.fn(),
   searchPersistedDesignAssets: vi.fn(),
+  listPersistedAssetLinks: vi.fn(),
   upsertAssetLink: vi.fn(),
   upsertContextPack: vi.fn(),
   upsertDesignAsset: vi.fn(),
@@ -36,9 +38,8 @@ const persistence = vi.hoisted(() => ({
   }
 }));
 
-vi.mock("./persistence", () => federationPersistence);
-vi.mock("../persistence", () => persistence);
-vi.mock("../scoped-derived", () => ({
+const scopedDerived = vi.hoisted(() => ({
+  loadScopedAssetCatalog: vi.fn(),
   analyzeScopedProposalImpact: vi.fn(),
   buildScopedAssetGraph: vi.fn(),
   exportScopedContextPack: vi.fn(),
@@ -47,6 +48,10 @@ vi.mock("../scoped-derived", () => ({
   renderScopedAssetMarkdown: vi.fn(),
   runScopedGovernanceChecks: vi.fn()
 }));
+
+vi.mock("./persistence", () => federationPersistence);
+vi.mock("../persistence", () => persistence);
+vi.mock("../scoped-derived", () => scopedDerived);
 
 import { registerTools } from "../tools";
 import { registerFederationTools, retryFederationAuditFinalization } from "./tools";
@@ -90,7 +95,7 @@ const authorizedExtra: ToolExtra = {
   authInfo: {
     token: "test-token",
     clientId: "test-client",
-    scopes: ["asset:read", "asset:write", "governance:run"],
+    scopes: ["asset:read", "asset:write", "governance:run", "graph:read"],
     extra: {
       actor: {
         actorType: "agent",
@@ -99,7 +104,7 @@ const authorizedExtra: ToolExtra = {
           { scopeId: designerScope.applicationServiceId, action: "read" },
           { scopeId: designerScope.applicationServiceId, action: "write" }
         ],
-        permissions: ["asset:read", "asset:write", "governance:run"]
+        permissions: ["asset:read", "asset:write", "governance:run", "graph:read"]
       }
     }
   }
@@ -150,7 +155,14 @@ beforeEach(() => {
   federationPersistence.recordObservation.mockResolvedValue({ id: "observation-1", architectureScope: designerScope });
   federationPersistence.promoteCandidate.mockResolvedValue({ id: "fact-1", status: "PROMOTED", architectureScope: designerScope });
   federationPersistence.createDesignChangeSession.mockResolvedValue({ id: "session-1", architectureScope: designerScope });
+  federationPersistence.closeDesignChangeSession.mockResolvedValue({ id: "session-1", status: "CONVERGED", architectureScope: designerScope });
   federationPersistence.reconcilePersistedScope.mockResolvedValue({ architectureScope: designerScope, root: "root-1", status: "CONVERGED", issues: [], factDigests: [] });
+  persistence.listPersistedAssetLinks.mockResolvedValue([]);
+  scopedDerived.loadScopedAssetCatalog.mockResolvedValue({
+    proposals: [{ id: "proposal-1" }],
+    adrs: [{ id: "adr-1" }],
+    dataModels: [{ id: "fact-1" }]
+  });
   persistence.prisma.auditLog.create.mockResolvedValue({ id: "audit-1" });
   persistence.prisma.auditLog.update.mockResolvedValue({ id: "audit-1" });
   persistence.prisma.auditLog.findUnique.mockResolvedValue({ id: "audit-1", status: "SUCCESS_REPAIR_REQUIRED", outputSummary: "{\"ok\":true}", inputSummary: JSON.stringify({ architectureScope: designerScope }) });
@@ -170,6 +182,8 @@ describe("federation MCP tools", () => {
       "record_external_observation",
       "promote_candidate_fact",
       "create_design_change_session",
+      "prepare_design_change",
+      "close_design_change_session",
       "reconcile_federated_scope",
       "retry_federated_audit_finalization",
       "get_federated_sync_status"
@@ -178,6 +192,71 @@ describe("federation MCP tools", () => {
     expect((tools.get("get_federated_sync_status")!.config.annotations as { readOnlyHint: boolean }).readOnlyHint).toBe(true);
     expect((tools.get("retry_federated_audit_finalization")!.config.annotations as { readOnlyHint: boolean }).readOnlyHint).toBe(false);
     expect(tools.get("promote_candidate_fact")!.config.inputSchema).not.toHaveProperty("humanFacing");
+  });
+
+  it("prepares an exact-Scope design context before implementation", async () => {
+    const result = await callTool("prepare_design_change", {
+      intent: "Update the Payments API contract.",
+      affectedFactIds: ["fact-1"],
+      expectedEvidenceRefs: ["pnpm test"],
+      architectureScope: designerScope
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(federationPersistence.createDesignChangeSession).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: "caller-agent",
+      affectedFactIds: ["fact-1"],
+      expectedEvidenceRefs: ["pnpm test"],
+      architectureScope: designerScope,
+      status: "OPEN",
+      preflightDigest: expect.any(String),
+      preflightRelationshipDigest: expect.any(String),
+      preflightReadAssetIds: ["fact-1"]
+    }));
+    expect(JSON.parse(result.content[0]!.text)).toMatchObject({ receipt: { sessionId: "session-1", architectureScope: designerScope } });
+  });
+
+  it("fails closed when an affected fact is outside the requested design catalog", async () => {
+    const result = await callTool("prepare_design_change", {
+      intent: "Change an unknown contract.",
+      affectedFactIds: ["missing-fact"],
+      expectedEvidenceRefs: ["pnpm test"],
+      architectureScope: designerScope
+    });
+
+    expect(errorCode(result)).toBe("DESIGN_CONTEXT_FACT_NOT_FOUND");
+    expect(federationPersistence.createDesignChangeSession).not.toHaveBeenCalled();
+  });
+
+  it("blocks preflight when the latest exact-Scope reconciliation is blocked", async () => {
+    persistence.prisma.reconciliationSnapshot.findFirst.mockResolvedValueOnce({ status: "BLOCKED", root: "root-1", factDigests: [] });
+
+    const result = await callTool("prepare_design_change", {
+      intent: "Change a blocked design context.",
+      affectedFactIds: ["fact-1"],
+      expectedEvidenceRefs: ["pnpm test"],
+      architectureScope: designerScope
+    });
+
+    expect(errorCode(result)).toBe("DESIGN_CONTEXT_RECONCILIATION_BLOCKED");
+  });
+
+  it("closes the same exact-Scope session only with verification evidence", async () => {
+    const result = await callTool("close_design_change_session", {
+      sessionId: "session-1",
+      status: "CONVERGED",
+      verificationEvidenceRefs: ["pnpm --filter @specforge/mcp-server typecheck=passed"],
+      architectureScope: designerScope
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(federationPersistence.closeDesignChangeSession).toHaveBeenCalledWith({
+      id: "session-1",
+      status: "CONVERGED",
+      verificationEvidenceRefs: ["pnpm --filter @specforge/mcp-server typecheck=passed"],
+      closureReason: undefined,
+      architectureScope: designerScope
+    });
   });
 
   it("declares the required permissions for federation writes and reads", () => {

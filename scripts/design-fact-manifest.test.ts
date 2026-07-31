@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(13);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(13);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(13);
+  expect(manifest.decisions).toHaveLength(14);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(14);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(14);
   const proposalByContextPack = new Map<string, string>();
 
   for (const decision of manifest.decisions) {
@@ -36,6 +36,10 @@ it("includes federated design-fact governance in the baseline", () => {
 
 it("includes Agent-driven legacy baseline discovery in the baseline", () => {
   expect(manifest.decisions.some((decision) => decision.mcpAdrId === "adr-agent-driven-legacy-baseline-discovery")).toBe(true);
+});
+
+it("includes design-context preflight governance in the baseline", () => {
+  expect(manifest.decisions.some((decision) => decision.mcpAdrId === "adr-design-context-preflight-gate")).toBe(true);
 });
 
 it("includes the single-host Docker deployment decision in the baseline", () => {

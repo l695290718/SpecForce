@@ -250,6 +250,10 @@ model DesignChangeSession {
   intent               String
   affectedFactIds      Json     @default("[]") @db.JsonB
   expectedEvidenceRefs Json     @default("[]") @db.JsonB
+  preflightDigest      String?
+  preflightRelationshipDigest String?
+  preflightReadAssetIds Json    @default("[]") @db.JsonB
+  closureReason        String?
   status               String
   openedAt             DateTime @default(now())
   applicationServiceId String

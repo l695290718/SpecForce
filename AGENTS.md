@@ -21,6 +21,12 @@ Before completion, synchronously write the matching MCP assets and links, then v
 
 An implementation is incomplete while either record is missing, inconsistent, pending, or out of scope. If an MCP write cannot be persisted, record **`MCP synchronization blocked`** in the repository record with the failure reason and retry trigger, create or update the corresponding backlog fact, and do not claim completion until synchronization succeeds.
 
+## Implementation Preflight Gate
+
+Before changing code, schema, APIs, relationships, behavior, or agent-facing contracts, synchronously call the MCP tool `prepare_design_change` in the exact owning application-service Scope, or run `pnpm design-context:preflight -- --intent "..." --affected "asset-id,..." --evidence "verification-ref,..."`. The preflight must read the current scoped design catalog, typed relationships, and latest reconciliation status, and return a `DesignChangeSession` receipt with a design-context digest. Do not start implementation when the receipt is missing, the Scope is mismatched, an affected fact is missing, or reconciliation is blocked. Record the session ID in the implementation notes.
+
+After implementation and focused verification, close the same session through MCP `close_design_change_session`, or run `pnpm design-context:close -- --session <id> --status CONVERGED --evidence "command=result,..."`. A `BLOCKED` closure must include the reason and retry trigger. The closing evidence must include exact commands and results; a successful code test without the matching MCP closure is incomplete. Documentation-only edits may skip preflight only when they do not change a design fact, contract, rule, relationship, or user-visible behavior.
+
 ## Federated Governance Increment
 
 For federated design facts, record the governance-core increment independently from connector delivery. Only scoped federation contracts, persistence, MCP authorization, durable audit/outbox behavior, candidate promotion, and read-only reconciliation may be described as implemented after focused evidence. Do not claim legacy scanners, continuous inbound synchronization, outbound proposals, or external `APPLY` until separately designed, evidenced, synchronized, and reconciled through MCP.
@@ -48,3 +54,9 @@ Evidence 政策要求为每项变更记录精确命令、操作检查及其结�
 ## Evidence
 
 Focused tests and operational checks are required for each change. Put the exact commands and their results in the relevant ADR or design record. A failed check, failed MCP write, missing evidence, or scope mismatch blocks completion.
+
+## 实施前置门禁
+
+在修改代码、Schema、API、关系、行为或面向代理的契约前，必须在精确的应用服务 Scope 下同步调用 MCP `prepare_design_change`，或运行 `pnpm design-context:preflight -- --intent "..." --affected "asset-id,..." --evidence "verification-ref,..."`。预检必须读取当前 Scope 的设计资产目录、有类型关系和最近一次对账状态，并返回带设计上下文摘要的 `DesignChangeSession` 回执。回执缺失、Scope 不匹配、受影响事实不存在或对账被阻塞时，不得开始实现；必须记录会话 ID。
+
+实现并完成针对性验证后，必须通过 MCP `close_design_change_session` 关闭同一会话，或运行 `pnpm design-context:close -- --session <id> --status CONVERGED --evidence "command=result,..."`。`BLOCKED` 关闭必须包含原因和重试触发条件。关闭证据必须包含精确命令及结果；只有代码测试通过而没有对应 MCP 关闭记录，仍视为未完成。纯文档编辑只有在不改变设计事实、契约、规则、关系或用户可见行为时才可跳过预检。

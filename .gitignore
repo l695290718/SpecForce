@@ -11,5 +11,6 @@ coverage
 *.tsbuildinfo
 *.log
 artifacts/db-consolidation/
+.specforge/design-context/
 .worktrees
 worktrees
