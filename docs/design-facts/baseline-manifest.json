@@ -349,6 +349,40 @@
                                        ]
                       },
                       {
+                          "id":  "adr-agent-driven-legacy-baseline-discovery",
+                          "repositoryAdr":  "docs/adr/0015-agent-driven-legacy-baseline-discovery.md",
+                          "mcpAdrId":  "adr-agent-driven-legacy-baseline-discovery",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-agent-driven-legacy-baseline-discovery",
+                          "contextPackId":  "context-pack-agent-driven-legacy-baseline-discovery",
+                          "relatedAssetIds":  [
+                                                  "api-specforge-mcp-tools",
+                                                  "data-specforge-assets",
+                                                  "adr-federated-design-fact-synchronization"
+                                              ],
+                          "owner":  "SpecForge Architecture and Agent Integration",
+                          "status":  "MCP synchronized and read back; implementation pending",
+                          "reason":  "The approved design uses existing coding Agents, a signed ephemeral deterministic scanner, evidence-backed semantic extraction, exact application-service authorization, and risk-tiered ReviewBundles without requiring users to deploy scanner infrastructure. Its design facts are persisted and verified in the exact Designer Scope.",
+                          "retryTrigger":  "After a future design change, re-run design-facts:sync and design-facts:check. Begin implementation only after the written specification is reviewed and an implementation plan is approved.",
+                          "evidence":  [
+                                           {
+                                               "command":  "node .\\node_modules\\vitest\\vitest.mjs run --root . --exclude \".worktrees/**\" --exclude \".pnpm-store/**\" scripts\\design-fact-manifest.test.ts",
+                                               "result":  "Passed: 1 file and 6 tests, including explicit ADR-0015 registration and unique repository/MCP IDs for all 13 decisions."
+                                           },
+                                           {
+                                               "command":  "pnpm design-facts:sync",
+                                               "result":  "With DATABASE_URL loaded from the repository .env, all 13 baseline decisions returned complete, including ADR-0015 and its generated companion records."
+                                           },
+                                           {
+                                               "command":  "pnpm design-facts:check",
+                                               "result":  "Verified all 13 decisions with empty missing, mismatched, outOfScope, and blocked results."
+                                           }
+                                       ]
+                      },
+                      {
                           "id":  "adr-nebulagraph-production-projection",
                           "repositoryAdr":  "docs/adr/0012-nebulagraph-production-projection.md",
                           "mcpAdrId":  "adr-nebulagraph-production-projection",
