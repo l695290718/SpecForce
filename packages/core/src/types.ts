@@ -181,7 +181,9 @@ export type Permission =
   | "context-pack:generate"
   | "governance:run"
   | "adr:write"
-  | "graph:read";
+  | "graph:read"
+  | "knowledge:read"
+  | "knowledge:write";
 
 export interface BaseAsset<TLocalizedFields extends object = BaseAssetLocalizedFields> {
   id: string;

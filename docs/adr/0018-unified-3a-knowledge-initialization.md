@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted design. MCP design facts are synchronized and read back; implementation has not started.**
+**Phase 1 generic foundation implemented. MCP design facts are synchronized and read back; initialization governance, scanning, 3A projections, and migration hardening remain pending.**
 
 - Stable ADR/MCP ID: `adr-unified-3a-knowledge-initialization`
 - Owning `architectureScope.applicationServiceId`: `com.huawei.celon.desiner`
@@ -69,11 +69,14 @@ Reuse the existing federation `SourceObservation`, `Candidate`, `Promotion`, and
 
 - **Design review:** On 2026-08-01 the user accepted the unified 3A perspectives, profile-neutral core, derived KL model, assertion conflicts, ChangeSet and Baseline semantics, and phased delivery.
 - **Industry review:** ISO/IEC/IEEE 42010, ArchiMate, W3C PROV-O, OSLC Configuration Management, and W3C SHACL were reviewed as architecture-viewpoint, provenance, baseline, and validation references.
-- **Pre-implementation design read:** `pnpm design-context:preflight -- --intent "Formalize the approved unified 3A knowledge initialization architecture and profile-neutral legacy discovery model." --affected "adr-agent-driven-legacy-baseline-discovery,adr-federated-design-fact-synchronization,data-specforge-assets,data-specforge-asset-graph,api-specforge-mcp-tools" --evidence "approved bilingual design review,ADR and manifest validation,MCP design-fact synchronization and read-back"` read 119 exact-Scope assets and opened `design-change-session:e51c9bff-6a1f-4ed2-8e75-887b67042203`.
+- **Pre-implementation design read:** `pnpm design-context:preflight -- --intent "Formalize the approved unified 3A knowledge initialization architecture and profile-neutral legacy discovery model." --affected "adr-agent-driven-legacy-baseline-discovery,adr-federated-design-fact-synchronization,data-specforge-assets,data-specforge-asset-graph,api-specforge-mcp-tools" --evidence "approved bilingual design review,ADR and manifest validation,MCP design-fact synchronization and read-back"` read 126 exact-Scope assets and opened `design-change-session:f7bad4e6-b4f4-4506-a28c-a86f14633257`.
 - **Repository consistency:** `node .\node_modules\vitest\vitest.mjs run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" scripts\design-fact-manifest.test.ts` passed 1 file and 9 tests, including ADR-0018 registration and 16 unique repository and MCP IDs.
-- **MCP persistence:** `pnpm design-facts:sync` returned all 16 baseline decisions as complete, including ADR-0018 and its generated Proposal, Context Pack, Evidence, and typed links.
-- **MCP read-back:** `pnpm design-facts:check` verified all 16 decisions with empty `missing`, `mismatched`, `outOfScope`, and `blocked` results.
-- **Implementation evidence:** None. This ADR authorizes design and planning only.
+- **MCP persistence:** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-unified-3a-knowledge-initialization'; pnpm design-facts:sync` completed ADR-0018 and its generated Proposal, Context Pack, Evidence, and typed links in the exact owning Scope.
+- **MCP read-back:** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-unified-3a-knowledge-initialization'; pnpm design-facts:check` returned empty `missing`, `mismatched`, `outOfScope`, and `blocked` lists for ADR-0018. The unchanged fifteen baseline decisions were not rewritten in this increment; a later full-batch run timed out and remains a tooling follow-up.
+- **Core and MCP verification:** `pnpm test` passed 13 files and 140 tests; the focused MCP tool suite passed 20 tests; and `pnpm typecheck` passed Core, MCP Server, and Web type checks.
+- **Database verification:** `pnpm db:push` synchronized the five foundation tables into `localhost:15433/specforge_canonical`, and the gated PostgreSQL integration test passed assertion persistence, idempotent ChangeSet retry, converged Baseline publication, projection-manifest persistence, and exact-Scope read-back.
+- **Build boundary:** `pnpm build` compiled Core, typechecked MCP and Web, generated all 18 static pages, and then failed at Next.js standalone trace copying because the Windows host disallowed pnpm symlink creation, including an elevated retry. Retry after enabling Windows Developer Mode or using a symlink-capable build environment.
+- **Implementation boundary:** Repository scanning, semantic extraction, ReviewBundles, real 3A KL generation, and Huawei-profile migration are not implemented in this increment.
 
 ## MCP Record
 
@@ -83,7 +86,7 @@ Reuse the existing federation `SourceObservation`, `Candidate`, `Promotion`, and
 - Matching Context Pack: `context-pack-unified-3a-knowledge-initialization`
 - Related assets: `data-specforge-assets`, `data-specforge-asset-graph`, `api-specforge-mcp-tools`, `adr-agent-driven-legacy-baseline-discovery`, and `adr-federated-design-fact-synchronization`
 - Required typed links: Proposal `--IMPLEMENTS_DECISION-->` ADR; Context Pack `--IMPLEMENTS_CONTEXT_FOR-->` Proposal; ADR `--DECIDES-->` related assets; Evidence `--VALIDATES-->` ADR
-- Current status: MCP synchronized and read back from the configured canonical PostgreSQL authority; implementation remains pending.
+- Current status: MCP synchronized and read back from the configured canonical PostgreSQL authority; Phase 1 foundation is implemented, while later increments and the Windows standalone artifact check remain pending.
 
 ## Chinese Localization
 
@@ -153,9 +156,12 @@ ADR-0015 已经确定由 Agent 驱动、基于证据发现存量应用。整体�
 - **业界审视：** 已参考 ISO/IEC/IEEE 42010、ArchiMate、W3C PROV-O、OSLC 配置管理和 W3C SHACL 对视角、来源、基线和校验的定义。
 - **实现前设计读取：** 上述 `pnpm design-context:preflight` 命令读取了 119 项精确 Scope 资产，并创建 `design-change-session:e51c9bff-6a1f-4ed2-8e75-887b67042203`。
 - **仓库一致性：** `node .\node_modules\vitest\vitest.mjs run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" scripts\design-fact-manifest.test.ts` 通过 1 个文件和 9 项测试，其中包含 ADR-0018 注册以及 16 个唯一仓库和 MCP ID。
-- **MCP 持久化：** `pnpm design-facts:sync` 返回全部 16 项基线决策均为完成，其中包含 ADR-0018 及其生成的 Proposal、Context Pack、Evidence 和类型化关系。
-- **MCP 回读：** `pnpm design-facts:check` 验证全部 16 项决策，`missing`、`mismatched`、`outOfScope` 和 `blocked` 均为空。
-- **实现证据：** 当前没有。本 ADR 仅批准设计与后续计划。
+- **MCP 持久化：** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-unified-3a-knowledge-initialization'; pnpm design-facts:sync` 已在精确所属 Scope 内完成 ADR-0018 及其生成的 Proposal、Context Pack、Evidence 和类型化关系。
+- **MCP 回读：** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-unified-3a-knowledge-initialization'; pnpm design-facts:check` 对 ADR-0018 返回空的 `missing`、`mismatched`、`outOfScope` 和 `blocked` 列表。其余 15 项未在本增量中重写；后续整批运行曾超时，作为工具链待办保留。
+- **核心与 MCP 验证：** `pnpm test` 通过 13 个文件和 140 项测试；定向 MCP 工具测试通过 20 项；`pnpm typecheck` 通过 Core、MCP Server 和 Web 类型检查。
+- **数据库验证：** `pnpm db:push` 已将五张基础表同步到 `localhost:15433/specforge_canonical`；带门控的 PostgreSQL 集成测试通过断言持久化、ChangeSet 幂等重试、收敛 Baseline 发布、投影清单持久化和精确 Scope 回读。
+- **构建边界：** `pnpm build` 已完成 Core 编译、MCP 与 Web 类型检查以及全部 18 个静态页面生成，随后在 Next.js standalone 追踪复制阶段因 Windows 主机禁止创建 pnpm 符号链接失败，提权重试结果相同。启用 Windows Developer Mode 或使用支持符号链接的构建环境后重试。
+- **实现边界：** 本增量尚未实现仓库扫描、语义提取、ReviewBundle、真实 3A KL 生成和 Huawei Profile 迁移。
 
 ### MCP 记录
 

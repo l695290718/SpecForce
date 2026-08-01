@@ -1,4 +1,4 @@
-export type ArchitectureScopeLevel = "productFamily" | "product" | "subProduct" | "module" | "applicationService";
+export type ArchitectureScopeLevel = "productFamily" | "product" | "subProduct" | "module" | "applicationService" | (string & {});
 export type ScopeAction = "read" | "write";
 
 export interface ArchitectureScope {
@@ -15,6 +15,11 @@ export interface ArchitectureScope {
 export interface ArchitectureScopeRef {
   applicationServiceId: string;
   scopePath: string;
+}
+
+export interface ArchitectureScopeRegistry {
+  scopes: ArchitectureScope[];
+  minimumWriteLevel?: string;
 }
 
 export interface ScopeGrant {

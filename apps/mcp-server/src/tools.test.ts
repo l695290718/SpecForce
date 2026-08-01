@@ -29,8 +29,19 @@ const scopedDerived = vi.hoisted(() => ({
   runScopedGovernanceChecks: vi.fn().mockResolvedValue({ status: "passed", results: [] })
 }));
 
+const knowledge = vi.hoisted(() => ({
+  commitKnowledgeChangeSet: vi.fn().mockResolvedValue({ id: "changeset-1", status: "COMMITTED" }),
+  createIdentityCandidate: vi.fn().mockResolvedValue({ id: "identity-1", decision: "UNDECIDED" }),
+  createKnowledgeAssertion: vi.fn().mockResolvedValue({ id: "assertion-1", layer: "SYS" }),
+  createProjectionManifest: vi.fn().mockResolvedValue({ id: "projection-1", projectionType: "SYS_KL" }),
+  createWorkingStream: vi.fn().mockResolvedValue({ id: "stream-1", status: "ACTIVE" }),
+  listKnowledgeAssertions: vi.fn().mockResolvedValue([]),
+  publishKnowledgeBaseline: vi.fn().mockResolvedValue({ id: "baseline-1", status: "PUBLISHED" })
+}));
+
 vi.mock("./persistence", () => persistence);
 vi.mock("./scoped-derived", () => scopedDerived);
+vi.mock("./knowledge/persistence", () => knowledge);
 
 import { registerTools } from "./tools";
 
@@ -229,5 +240,40 @@ describe("scoped localized derived tools", () => {
 
     expect(result.isError).toBe(true);
     expect(persistence.upsertProposal).not.toHaveBeenCalled();
+  });
+});
+
+describe("3A knowledge foundation tools", () => {
+  it("registers the scoped assertion, ChangeSet, Baseline, and projection operations", () => {
+    const tools = captureTools();
+    expect([...tools.keys()]).toEqual(expect.arrayContaining([
+      "create_knowledge_assertion",
+      "create_identity_candidate",
+      "create_working_stream",
+      "commit_knowledge_changeset",
+      "publish_knowledge_baseline",
+      "create_projection_manifest",
+      "list_knowledge_assertions"
+    ]));
+  });
+
+  it("routes the knowledge operations through the MCP write boundary", async () => {
+    const tools = captureTools();
+    const architectureScope = { applicationServiceId: "com.huawei.celon.desiner", scopePath: "designer" };
+    await tools.get("create_knowledge_assertion")!.handler({ architectureScope, assertion: { id: "assertion-1" } });
+    await tools.get("create_identity_candidate")!.handler({ architectureScope, candidate: { id: "identity-1" } });
+    await tools.get("create_working_stream")!.handler({ architectureScope, id: "stream-1", name: "Main" });
+    await tools.get("commit_knowledge_changeset")!.handler({ architectureScope, id: "changeset-1", streamId: "stream-1", assetRevisionIds: [], relationshipRevisionIds: [], evidenceRefs: [] });
+    await tools.get("publish_knowledge_baseline")!.handler({ architectureScope, id: "baseline-1", streamId: "stream-1", changeSetId: "changeset-1", sourceRevisionIds: ["asset-1"], relationshipVersion: "1", reconciliationStatus: "CONVERGED" });
+    await tools.get("create_projection_manifest")!.handler({ architectureScope, id: "projection-1", baselineId: "baseline-1", projectionType: "SYS_KL", projectionSchemaVersion: "1", sourceRevisionIds: ["asset-1"], relationshipVersion: "1", query: {} });
+    await tools.get("list_knowledge_assertions")!.handler({ applicationServiceId: architectureScope.applicationServiceId });
+
+    expect(knowledge.createKnowledgeAssertion).toHaveBeenCalledOnce();
+    expect(knowledge.createIdentityCandidate).toHaveBeenCalledOnce();
+    expect(knowledge.createWorkingStream).toHaveBeenCalledOnce();
+    expect(knowledge.commitKnowledgeChangeSet).toHaveBeenCalledOnce();
+    expect(knowledge.publishKnowledgeBaseline).toHaveBeenCalledOnce();
+    expect(knowledge.createProjectionManifest).toHaveBeenCalledOnce();
+    expect(knowledge.listKnowledgeAssertions).toHaveBeenCalledWith(architectureScope.applicationServiceId);
   });
 });

@@ -625,7 +625,12 @@ function localizedTitle(content: string): string {
 }
 
 async function main(): Promise<void> {
-  const manifest = JSON.parse(await readFile("docs/design-facts/baseline-manifest.json", "utf8")) as DesignFactManifest;
+  const fullManifest = JSON.parse(await readFile("docs/design-facts/baseline-manifest.json", "utf8")) as DesignFactManifest;
+  const requestedIds = (process.env.SPECFORGE_DESIGN_FACT_IDS ?? "").split(",").map((id) => id.trim()).filter(Boolean);
+  const manifest: DesignFactManifest = requestedIds.length === 0
+    ? fullManifest
+    : { ...fullManifest, decisions: fullManifest.decisions.filter((decision) => requestedIds.includes(decision.id) || requestedIds.includes(decision.mcpAdrId)) };
+  if (requestedIds.length > 0 && manifest.decisions.length === 0) throw new Error(`DESIGN_FACT_SELECTION_EMPTY: ${requestedIds.join(",")}`);
   // The SDK is owned by the MCP workspace, not duplicated at the repository root.
   const requireFromMcpWorkspace = createRequire(resolve(process.cwd(), "apps/mcp-server/package.json"));
   const { Client } = requireFromMcpWorkspace("@modelcontextprotocol/sdk/client/index.js");

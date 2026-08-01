@@ -574,3 +574,125 @@ model ImpactResultPath {
   @@unique([impactResultNodeId, rank], map: "ImpactResultPath_impactResultNodeId_rank_key")
   @@index([enterpriseId, applicationServiceId, scopePath, impactResultNodeId])
 }
+
+model KnowledgeAssertion {
+  dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                    String
+  semanticIdentity      String
+  factType              String
+  layer                 String
+  aspect                String
+  value                 Json     @default("{}") @db.JsonB
+  status                String
+  confidence            Float
+  matchingEvidence      Json     @default("[]") @db.JsonB
+  counterEvidence       Json     @default("[]") @db.JsonB
+  unresolvedQuestions   Json     @default("[]") @db.JsonB
+  evidenceRefs          Json     @default("[]") @db.JsonB
+  sourceObservationIds  Json     @default("[]") @db.JsonB
+  extractorId           String
+  revision              Int
+  changeSetId           String?
+  applicationServiceId  String
+  scopePath             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "KnowledgeAssertion_scope_id_key")
+  @@index([applicationServiceId, scopePath, semanticIdentity, revision], map: "KnowledgeAssertion_scope_identity_revision_idx")
+  @@index([applicationServiceId, scopePath, status], map: "KnowledgeAssertion_scope_status_idx")
+  @@index([applicationServiceId, scopePath, changeSetId], map: "KnowledgeAssertion_scope_changeset_idx")
+}
+
+model IdentityCandidate {
+  dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                    String
+  semanticIdentity      String
+  sourceObservationId  String
+  targetAssetType       String
+  targetAssetId         String?
+  confidence            Float
+  matchingEvidence      Json     @default("[]") @db.JsonB
+  counterEvidence       Json     @default("[]") @db.JsonB
+  decision              String
+  reviewedBy            String?
+  reviewedAt            DateTime?
+  applicationServiceId  String
+  scopePath             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "IdentityCandidate_scope_id_key")
+  @@index([applicationServiceId, scopePath, sourceObservationId], map: "IdentityCandidate_scope_observation_idx")
+  @@index([applicationServiceId, scopePath, decision], map: "IdentityCandidate_scope_decision_idx")
+}
+
+model KnowledgeChangeSet {
+  dbId                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                      String
+  streamId                String
+  sequence                BigInt
+  status                  String
+  assetRevisionIds        Json     @default("[]") @db.JsonB
+  relationshipRevisionIds Json     @default("[]") @db.JsonB
+  evidenceRefs            Json     @default("[]") @db.JsonB
+  digest                  String
+  committedAt             DateTime?
+  applicationServiceId    String
+  scopePath               String
+  createdAt               DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, id], map: "KnowledgeChangeSet_scope_id_key")
+  @@unique([applicationServiceId, scopePath, streamId, sequence], map: "KnowledgeChangeSet_scope_stream_sequence_key")
+  @@index([applicationServiceId, scopePath, streamId, status], map: "KnowledgeChangeSet_scope_stream_status_idx")
+}
+
+model WorkingStream {
+  dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                    String
+  name                  String
+  status                String
+  headChangeSetId       String?
+  applicationServiceId  String
+  scopePath             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "WorkingStream_scope_id_key")
+  @@index([applicationServiceId, scopePath, status], map: "WorkingStream_scope_status_idx")
+}
+
+model KnowledgeBaseline {
+  dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                    String
+  streamId              String
+  changeSetId           String
+  status                String
+  manifest              Json     @default("{}") @db.JsonB
+  publishedAt           DateTime?
+  applicationServiceId  String
+  scopePath             String
+  createdAt             DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, id], map: "KnowledgeBaseline_scope_id_key")
+  @@index([applicationServiceId, scopePath, streamId, status], map: "KnowledgeBaseline_scope_stream_status_idx")
+}
+
+model ProjectionManifest {
+  dbId                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                      String
+  baselineId              String
+  projectionType          String
+  projectionSchemaVersion String
+  sourceRevisionIds       Json     @default("[]") @db.JsonB
+  relationshipVersion     String
+  query                   Json     @default("{}") @db.JsonB
+  digest                  String
+  generatedAt             DateTime
+  applicationServiceId    String
+  scopePath               String
+  createdAt               DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, id], map: "ProjectionManifest_scope_id_key")
+  @@index([applicationServiceId, scopePath, baselineId, projectionType], map: "ProjectionManifest_scope_baseline_type_idx")
+}

@@ -201,6 +201,119 @@ export async function ensureMcpPersistenceSchema() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_source_idx" ON "AssetLink"("sourceType", "sourceId")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_target_idx" ON "AssetLink"("targetType", "targetId")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_relationType_idx" ON "AssetLink"("relationType")`);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "KnowledgeAssertion" (
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
+      "semanticIdentity" TEXT NOT NULL,
+      "factType" TEXT NOT NULL,
+      layer TEXT NOT NULL,
+      aspect TEXT NOT NULL,
+      value JSONB NOT NULL DEFAULT '{}'::jsonb,
+      status TEXT NOT NULL,
+      confidence DOUBLE PRECISION NOT NULL,
+      "matchingEvidence" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "counterEvidence" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "unresolvedQuestions" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "evidenceRefs" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "sourceObservationIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "extractorId" TEXT NOT NULL,
+      revision INTEGER NOT NULL,
+      "changeSetId" TEXT,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id)
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "IdentityCandidate" (
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
+      "semanticIdentity" TEXT NOT NULL,
+      "sourceObservationId" TEXT NOT NULL,
+      "targetAssetType" TEXT NOT NULL,
+      "targetAssetId" TEXT,
+      confidence DOUBLE PRECISION NOT NULL,
+      "matchingEvidence" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "counterEvidence" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      decision TEXT NOT NULL,
+      "reviewedBy" TEXT,
+      "reviewedAt" TIMESTAMP,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id)
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "KnowledgeChangeSet" (
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
+      "streamId" TEXT NOT NULL,
+      sequence BIGINT NOT NULL,
+      status TEXT NOT NULL,
+      "assetRevisionIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "relationshipRevisionIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "evidenceRefs" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      digest TEXT NOT NULL,
+      "committedAt" TIMESTAMP,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id),
+      UNIQUE("applicationServiceId", "scopePath", "streamId", sequence)
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "WorkingStream" (
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      status TEXT NOT NULL,
+      "headChangeSetId" TEXT,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id)
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "KnowledgeBaseline" (
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
+      "streamId" TEXT NOT NULL,
+      "changeSetId" TEXT NOT NULL,
+      status TEXT NOT NULL,
+      manifest JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "publishedAt" TIMESTAMP,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id)
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "ProjectionManifest" (
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
+      "baselineId" TEXT NOT NULL,
+      "projectionType" TEXT NOT NULL,
+      "projectionSchemaVersion" TEXT NOT NULL,
+      "sourceRevisionIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "relationshipVersion" TEXT NOT NULL,
+      query JSONB NOT NULL DEFAULT '{}'::jsonb,
+      digest TEXT NOT NULL,
+      "generatedAt" TIMESTAMP NOT NULL,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id)
+    )
+  `);
   await upgradeLegacyPersistedIdentitySchema();
   for (const table of ["DesignAsset", "Proposal", "ContextPack", "AssetLink"]) {
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "${table}_applicationServiceId_idx" ON "${table}"("applicationServiceId")`);

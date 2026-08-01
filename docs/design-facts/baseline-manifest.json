@@ -555,7 +555,7 @@
                                                   "adr-federated-design-fact-synchronization"
                                               ],
                           "owner":  "SpecForge Architecture and Agent Integration",
-                          "status":  "MCP synchronized and read back; implementation pending",
+                          "status":  "MCP synchronized and read back; phase 1 implemented; web artifact verification pending",
                           "reason":  "The approved design models Business, System, and Technical Architecture as versioned perspectives over one authoritative fact graph, preserves multiple evidence-backed assertions per semantic identity, and keeps KLs, Context Packs, reports, and graph stores as derived projections.",
                           "retryTrigger":  "After written-spec review, prepare and approve an implementation plan. After any design change, rerun exact-Scope synchronization and read-back before implementation is claimed complete.",
                           "evidence":  [
@@ -572,8 +572,20 @@
                                                "result":  "Passed 1 file and 9 tests, including ADR-0018 registration and 16 unique repository and MCP IDs."
                                            },
                                            {
-                                               "command":  "pnpm design-facts:sync; pnpm design-facts:check",
-                                               "result":  "All 16 decisions synchronized and verified; missing, mismatched, outOfScope, and blocked lists were empty."
+                                               "command":  "$env:SPECFORGE_DESIGN_FACT_IDS='adr-unified-3a-knowledge-initialization'; pnpm design-facts:sync; $env:SPECFORGE_DESIGN_FACT_IDS='adr-unified-3a-knowledge-initialization'; pnpm design-facts:check",
+                                               "result":  "ADR-0018 and its generated records synchronized and verified in the exact owning Scope; missing, mismatched, outOfScope, and blocked lists were empty. The unchanged fifteen baseline decisions were not rewritten in this increment."
+                                           },
+                                           {
+                                               "command":  "pnpm test; pnpm typecheck; pnpm --filter @specforge/mcp-server typecheck",
+                                               "result":  "Core tests passed 13 files and 140 tests; Core, MCP Server, and Web type checks passed; the focused MCP tool suite passed 20 tests."
+                                           },
+                                           {
+                                               "command":  "$env:SPECFORGE_KNOWLEDGE_INTEGRATION='1'; node .\\node_modules\\vitest\\vitest.mjs run --root apps\\mcp-server --exclude \".worktrees/**\" --exclude \".pnpm-store/**\" src\\knowledge\\persistence.integration.test.ts",
+                                               "result":  "Passed the gated PostgreSQL test for assertion persistence, idempotent ChangeSet retry, converged Baseline, projection manifest, and exact-Scope read-back against localhost:15433/specforge_canonical; fixtures were cleaned up."
+                                           },
+                                           {
+                                               "command":  "pnpm build",
+                                               "result":  "Core and MCP compiled and Web generated 18 static pages, but Next.js standalone trace copying failed with Windows EPERM while creating pnpm symlinks; elevated retry had the same host limitation."
                                            }
                                        ]
                       }

@@ -145,7 +145,12 @@ export function reconciliationExitCode(report: DesignFactReconciliationReport): 
 }
 
 async function main(): Promise<void> {
-  const manifest = JSON.parse(await readFile("docs/design-facts/baseline-manifest.json", "utf8")) as Manifest;
+  const fullManifest = JSON.parse(await readFile("docs/design-facts/baseline-manifest.json", "utf8")) as Manifest;
+  const requestedIds = (process.env.SPECFORGE_DESIGN_FACT_IDS ?? "").split(",").map((id) => id.trim()).filter(Boolean);
+  const manifest: Manifest = requestedIds.length === 0
+    ? fullManifest
+    : { ...fullManifest, decisions: fullManifest.decisions.filter((decision) => requestedIds.includes(decision.id) || requestedIds.includes(decision.mcpAdrId)) };
+  if (requestedIds.length > 0 && manifest.decisions.length === 0) throw new Error(`DESIGN_FACT_SELECTION_EMPTY: ${requestedIds.join(",")}`);
   const requireFromMcp = createRequire(resolve(process.cwd(), "apps/mcp-server/package.json"));
   const { Client } = requireFromMcp("@modelcontextprotocol/sdk/client/index.js");
   const { StdioClientTransport } = requireFromMcp("@modelcontextprotocol/sdk/client/stdio.js");

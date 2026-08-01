@@ -5,7 +5,8 @@ import {
   seedHuaweiActor,
   filterByReadableScope,
   hasScopeAccess,
-  scopeById
+  scopeById,
+  type ArchitectureScopeRegistry
 } from "../index";
 
 describe("Huawei architecture scope authorization", () => {
@@ -79,5 +80,21 @@ describe("Huawei architecture scope authorization", () => {
     const assets: Array<{ id: string; architectureScope?: undefined }> = [{ id: "legacy-asset" }];
 
     expect(filterByReadableScope(defaultHuaweiActor, assets)).toEqual(assets);
+  });
+});
+
+describe("profile-neutral architecture scope registry", () => {
+  it("supports an organization hierarchy without Huawei-specific levels", () => {
+    const registry: ArchitectureScopeRegistry = {
+      minimumWriteLevel: "service",
+      scopes: [
+        { id: "org-example", code: "EXAMPLE", name: "Example", description: "Example org", owner: "Example", level: "organization", scopePath: "org-example" },
+        { id: "service-orders", code: "ORDERS", name: "Orders", description: "Orders service", owner: "Orders", level: "service", parentId: "org-example", scopePath: "org-example/service-orders" }
+      ]
+    };
+    const actor = { actorType: "agent" as const, actorId: "generic-agent", grants: [{ scopeId: "service-orders", action: "write" as const }] };
+    const service = registry.scopes[1]!;
+
+    expect(assertWritableApplicationService(actor, service, registry)).toEqual({ applicationServiceId: "service-orders", scopePath: "org-example/service-orders" });
   });
 });

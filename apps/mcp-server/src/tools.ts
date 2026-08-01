@@ -5,6 +5,7 @@ import { z } from "zod";
 import { auditToolCall } from "./audit";
 import { allowAllPolicy, getDefaultActor } from "./auth";
 import { deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
+import { commitKnowledgeChangeSet, createIdentityCandidate, createKnowledgeAssertion, createProjectionManifest, createWorkingStream, listKnowledgeAssertions, publishKnowledgeBaseline } from "./knowledge/persistence";
 import {
   analyzeScopedProposalImpact,
   buildScopedAssetGraph,
@@ -418,4 +419,60 @@ export function registerTools(server: McpServer): void {
       return input.format === "markdown" ? result.contextPack.generatedMarkdown : result;
     }
   );
+
+  registerJsonTool(server, "create_knowledge_assertion", {
+    title: "Create knowledge assertion",
+    description: "Persists an evidence-backed BIZ, SYS, or TECH assertion in one exact application-service scope.",
+    inputSchema: { architectureScope: architectureScopeSchema, assertion: z.record(z.unknown()) },
+    permissions: ["knowledge:write"],
+    readOnly: false
+  }, async (input) => createKnowledgeAssertion(input as unknown as Parameters<typeof createKnowledgeAssertion>[0]));
+
+  registerJsonTool(server, "create_identity_candidate", {
+    title: "Create identity candidate",
+    description: "Persists a reviewed-later identity mapping candidate without silently merging source concepts.",
+    inputSchema: { architectureScope: architectureScopeSchema, candidate: z.record(z.unknown()) },
+    permissions: ["knowledge:write"],
+    readOnly: false
+  }, async (input) => createIdentityCandidate(input as unknown as Parameters<typeof createIdentityCandidate>[0]));
+
+  registerJsonTool(server, "create_working_stream", {
+    title: "Create working stream",
+    description: "Creates or reopens a mutable scoped Working Stream for atomic ChangeSets.",
+    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), name: z.string().min(1) },
+    permissions: ["knowledge:write"],
+    readOnly: false
+  }, createWorkingStream);
+
+  registerJsonTool(server, "commit_knowledge_changeset", {
+    title: "Commit knowledge ChangeSet",
+    description: "Commits asset revisions, relationship revisions, and Evidence references into one monotonic scoped ChangeSet.",
+    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), streamId: z.string().min(1), assetRevisionIds: z.array(z.string()), relationshipRevisionIds: z.array(z.string()), evidenceRefs: z.array(z.string()) },
+    permissions: ["knowledge:write"],
+    readOnly: false
+  }, commitKnowledgeChangeSet);
+
+  registerJsonTool(server, "publish_knowledge_baseline", {
+    title: "Publish knowledge baseline",
+    description: "Publishes an immutable scoped Baseline only after a converged reconciliation result.",
+    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), streamId: z.string().min(1), changeSetId: z.string().min(1), sourceRevisionIds: z.array(z.string()).min(1), relationshipVersion: z.string().min(1), reconciliationStatus: z.enum(["CONVERGED", "DRIFTED", "BLOCKED"]) },
+    permissions: ["knowledge:write"],
+    readOnly: false
+  }, publishKnowledgeBaseline);
+
+  registerJsonTool(server, "create_projection_manifest", {
+    title: "Create projection manifest",
+    description: "Records the exact baseline, revisions, query, schema version, and digest used for a derived 3A projection.",
+    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), baselineId: z.string().min(1), projectionType: z.enum(["BIZ_KL", "SYS_KL", "TECH_KL", "DIAGRAM", "CATALOG", "ALIGNMENT", "DRIFT", "CONTEXT_PACK"]), projectionSchemaVersion: z.string().min(1), sourceRevisionIds: z.array(z.string()), relationshipVersion: z.string().min(1), query: z.record(z.unknown()) },
+    permissions: ["knowledge:write"],
+    readOnly: false
+  }, createProjectionManifest);
+
+  registerJsonTool(server, "list_knowledge_assertions", {
+    title: "List knowledge assertions",
+    description: "Lists BIZ, SYS, and TECH assertions inside one authorized application-service scope.",
+    inputSchema: { applicationServiceId: z.string().min(1) },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, async (input) => listKnowledgeAssertions(input.applicationServiceId));
 }
