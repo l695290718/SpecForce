@@ -2,6 +2,30 @@
 
 ## Design-Fact Governance
 
+### Enforce SpecForge attestations in CodeArts/CodeHub
+
+**Status:** Deferred by product decision; local Git Hook is the first increment.
+
+**Owner:** SpecForge Enterprise Integration and Repository Governance.
+
+**Rationale:** A local `pre-commit` gate improves normal developer and Agent behavior but Git permits `--no-verify` and Hooks are not installed automatically by clone. Repository-authoritative enforcement therefore requires CodeArts/CodeHub to independently recompute the committed tree, validate the SpecForge Change Attestation with a CI service identity, and make the result mandatory for protected-branch merge.
+
+**Trigger:** Start only after the standalone Go Hook CLI, remote MCP attestation contract, strict `CONVERGED` policy, signing-key lifecycle, and local developer workflow are implemented and reviewed.
+
+**Completion evidence:** A CodeHub merge request without a proof, with a bypassed Hook, stale tree, wrong repository or Scope, expired/revoked signature, incomplete multi-Scope coverage, or non-converged design must be rejected by a required protected-branch status check.
+
+**中文本地化：**
+
+**状态：** 根据产品决策延期，第一增量先实现本地 Git Hook。
+
+**负责人：** SpecForge 企业集成与仓库治理。
+
+**理由：** 本地 `pre-commit` 门禁可以约束普通开发者和 Agent 行为，但 Git 允许 `--no-verify`，且 clone 不会自动安装 Hook。要形成仓库权威控制，CodeArts/CodeHub 必须使用 CI 服务身份重新计算提交 tree、独立验证 SpecForge Change Attestation，并把结果设为受保护分支合入必选状态。
+
+**启动条件：** Go 单文件 Hook CLI、远程 MCP 证明契约、严格 `CONVERGED` 策略、签名密钥生命周期和本地开发流程完成实现与评审后再启动。
+
+**完成证据：** 缺少证明、绕过 Hook、tree 过期、仓库或 Scope 错误、签名过期或撤销、多 Scope 覆盖不完整以及设计未收敛的 CodeHub 合并请求，都必须被受保护分支必选状态拒绝。
+
 ### Implement Agent-driven legacy baseline discovery
 
 **Status:** Design accepted and MCP synchronized; implementation pending.

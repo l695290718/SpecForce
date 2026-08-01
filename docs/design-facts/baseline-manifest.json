@@ -388,6 +388,41 @@
                                        ]
                       },
                       {
+                          "id":  "adr-local-git-hook-change-attestation",
+                          "repositoryAdr":  "docs/adr/0017-local-git-hook-change-attestation.md",
+                          "mcpAdrId":  "adr-local-git-hook-change-attestation",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-local-git-hook-change-attestation",
+                          "contextPackId":  "context-pack-local-git-hook-change-attestation",
+                          "relatedAssetIds":  [
+                                                  "api-specforge-mcp-tools",
+                                                  "data-specforge-assets",
+                                                  "adr-design-context-preflight-gate",
+                                                  "adr-federated-design-fact-synchronization"
+                                              ],
+                          "owner":  "SpecForge Architecture and Enterprise Integration",
+                          "status":  "Design accepted; implementation pending explicit user approval",
+                          "reason":  "The first enforcement increment is a standalone Go pre-commit gate that binds staged Git evidence, exact application-service design coverage, CONVERGED reconciliation, and verification evidence to a short-lived Ed25519-signed Change Attestation.",
+                          "retryTrigger":  "Begin implementation only after the user reviews this written specification and explicitly approves Go CLI, remote MCP, persistence, signing, and Hook code changes. Implement CodeHub protected-branch enforcement only after the local protocol is proven.",
+                          "evidence":  [
+                                           {
+                                               "command":  "pnpm design-context:preflight -- --intent \"Design the standalone Go local Git hook and signed change-attestation gate; defer CodeHub enforcement.\" --affected \"adr-design-context-preflight-gate\" --evidence \"bilingual design spec review,manifest validation,MCP design-fact synchronization and read-back\"",
+                                               "result":  "Opened design-change-session:4ad91d6a-e33c-46f3-bb3c-1d4987fedfb6 after reading 107 exact-Designer-Scope assets and related links."
+                                           },
+                                           {
+                                               "command":  "User design review",
+                                               "result":  "Approved the local Hook first increment, repository mapping, attestation fields, strict failure policy, deferred CodeHub control, and standalone Go CLI; implementation must be announced and approved separately."
+                                           },
+                                           {
+                                               "command":  "vitest run scripts/design-fact-manifest.test.ts --exclude .worktrees/** --exclude .pnpm-store/**",
+                                               "result":  "Passed one test file and eight tests, including explicit ADR-0017 registration and stable repository/MCP IDs."
+                                           }
+                                       ]
+                      },
+                      {
                           "id":  "adr-agent-driven-legacy-baseline-discovery",
                           "repositoryAdr":  "docs/adr/0015-agent-driven-legacy-baseline-discovery.md",
                           "mcpAdrId":  "adr-agent-driven-legacy-baseline-discovery",

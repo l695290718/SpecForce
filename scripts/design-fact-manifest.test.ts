@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(14);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(14);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(14);
+  expect(manifest.decisions).toHaveLength(15);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(15);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(15);
   const proposalByContextPack = new Map<string, string>();
 
   for (const decision of manifest.decisions) {
@@ -40,6 +40,13 @@ it("includes Agent-driven legacy baseline discovery in the baseline", () => {
 
 it("includes design-context preflight governance in the baseline", () => {
   expect(manifest.decisions.some((decision) => decision.mcpAdrId === "adr-design-context-preflight-gate")).toBe(true);
+});
+
+it("includes the local Git Hook change-attestation decision", () => {
+  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-local-git-hook-change-attestation");
+  expect(decision?.proposalId).toBe("proposal-local-git-hook-change-attestation");
+  expect(decision?.contextPackId).toBe("context-pack-local-git-hook-change-attestation");
+  expect(decision?.status).toContain("implementation pending");
 });
 
 it("includes the single-host Docker deployment decision in the baseline", () => {
