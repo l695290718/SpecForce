@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted design. Implementation has not started and requires explicit user approval.
+Accepted design. Local enforcement increment implemented; CodeArts/CodeHub enforcement remains deferred.
 
 ## Context
 
@@ -31,7 +31,7 @@ The service resolves canonical `scopePath` values, applies server-owned policy, 
 
 ## Constraints
 
-- Implementation must not start until the user explicitly approves it after reviewing this written specification.
+- The local first increment is implemented only within the reviewed boundaries; CodeHub enforcement still requires a separate approval and design change.
 - `.specforge.yaml` may declare identity and mappings but cannot weaken server policy or contain credentials.
 - PostgreSQL is authoritative for sessions, attestations, audit, and Outbox; graph stores remain derived.
 - Every exact Scope must resolve server-side and have token authorization.
@@ -39,12 +39,19 @@ The service resolves canonical `scopePath` values, applies server-owned policy, 
 - Attestations use canonical JSON, Ed25519, key IDs, short expiry, and staged-tree binding.
 - Hook logic is read-only with respect to Git index, code, and authored design facts.
 - Human-facing records are English-canonical with complete Chinese localization.
+- The remote MCP transport uses Streamable HTTP at `/mcp`; bearer authentication and the Ed25519 signing key are process configuration, never repository configuration.
 
 ## Evidence
 
 - `pnpm design-context:preflight -- --intent "Design the standalone Go local Git hook and signed change-attestation gate; defer CodeHub enforcement." --affected "adr-design-context-preflight-gate" --evidence "bilingual design spec review,manifest validation,MCP design-fact synchronization and read-back"` opened session `design-change-session:4ad91d6a-e33c-46f3-bb3c-1d4987fedfb6` after reading 107 scoped assets and related links.
 - The user approved the local Hook scope, `.specforge.yaml` model, signed attestation payload, strict failure policy, deferred CodeHub control, and standalone Go CLI during the design review.
 - `vitest run scripts/design-fact-manifest.test.ts --exclude .worktrees/** --exclude .pnpm-store/**` passed one test file and eight tests, including explicit ADR-0017 registration and stable IDs.
+- `go test ./...` in `apps/specforge-cli/` passed the standalone CLI tests in offline mode.
+- `go build -o specforge.exe .` in `apps/specforge-cli/` produced the standalone Windows binary.
+- `pnpm --filter @specforge/mcp-server typecheck` passed after adding HTTP MCP transport, attestation issuance, and scoped persistence.
+- `vitest run apps/mcp-server/src/federation/tools.test.ts apps/mcp-server/src/federation/persistence.test.ts --exclude .worktrees/** --exclude .pnpm-store/**` passed 102 tests.
+- `pnpm db:push` synchronized `ChangeAttestation` into the authoritative `localhost:15433/specforge_canonical` database.
+- `pnpm design-facts:sync` returned `complete` for all 15 baseline decisions; `pnpm design-facts:check` returned empty `missing`, `mismatched`, `outOfScope`, and `blocked` lists with all 15 verified.
 
 ## MCP Record
 
@@ -87,7 +94,7 @@ SpecForge 已提供 MCP 设计上下文预检和带证据的 Design Change Sessi
 
 ### 约束
 
-- 用户评审书面规范并再次明确批准前，不得开始实现。
+- 本地第一增量只在已评审边界内实现；CodeHub 门禁仍需独立批准和设计变更。
 - `.specforge.yaml` 只能声明身份和映射，不能降低服务端策略或保存凭据。
 - PostgreSQL 对会话、证明、审计和 Outbox 保持权威，图存储仍是派生投影。
 - 每个精确 Scope 必须由服务端解析并具备 Token 授权。
@@ -95,9 +102,13 @@ SpecForge 已提供 MCP 设计上下文预检和带证据的 Design Change Sessi
 - 证明使用规范化 JSON、Ed25519、密钥 ID、短有效期和暂存 tree 绑定。
 - Hook 对 Git 暂存区、代码和已编写设计事实保持只读。
 - 面向人的记录以英文为规范内容，并提供完整中文本地化。
+- 远程 MCP 使用 `/mcp` Streamable HTTP；Bearer 鉴权和 Ed25519 私钥由服务进程配置提供，不进入仓库配置。
 
 ### 证据
 
 - `pnpm design-context:preflight` 在精确 Designer Scope 下读取 107 条资产和相关关系，并创建会话 `design-change-session:4ad91d6a-e33c-46f3-bb3c-1d4987fedfb6`。
 - 用户在设计评审中确认本地 Hook 范围、`.specforge.yaml` 模型、签名证明字段、严格失败规则、CodeHub 延期控制和 Go 单文件 CLI。
 - `vitest run scripts/design-fact-manifest.test.ts --exclude .worktrees/** --exclude .pnpm-store/**` 通过 1 个测试文件和 8 项测试，包括 ADR-0017 显式登记及稳定 ID 校验。
+- `go build -o specforge.exe .` 在 `apps/specforge-cli/` 生成了独立 Windows 可执行文件。
+- `pnpm db:push` 已将 `ChangeAttestation` 同步到权威 `localhost:15433/specforge_canonical` 数据库。
+- `pnpm design-facts:sync` 的 15 条基线决策全部返回 `complete`；`pnpm design-facts:check` 的 `missing`、`mismatched`、`outOfScope` 和 `blocked` 均为空，15 条全部 verified。

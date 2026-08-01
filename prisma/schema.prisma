@@ -265,6 +265,31 @@ model DesignChangeSession {
   @@index([applicationServiceId, scopePath, status, openedAt], map: "DesignChangeSession_scope_status_idx")
 }
 
+model ChangeAttestation {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  attestationId        String
+  issuer               String
+  keyId                String
+  algorithm            String
+  payload              Json     @db.JsonB
+  signature            String
+  repositoryId         String
+  parentCommit         String
+  stagedTreeHash       String
+  fileManifestDigest   String
+  scopeMappingDigest   String
+  actorId              String
+  expiresAt            DateTime
+  policyVersion        String
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, attestationId], map: "ChangeAttestation_scope_id_key")
+  @@index([applicationServiceId, scopePath, expiresAt], map: "ChangeAttestation_scope_expiry_idx")
+  @@index([repositoryId, stagedTreeHash], map: "ChangeAttestation_repository_tree_idx")
+}
+
 model FederationOutbox {
   dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   eventType             String

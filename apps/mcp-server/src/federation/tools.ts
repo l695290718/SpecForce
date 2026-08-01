@@ -14,6 +14,7 @@ import {
   registerConnector,
   type PromoteCandidateInput
 } from "./persistence";
+import { issueChangeAttestation } from "./attestation";
 
 const architectureScopeSchema = z.object({
   applicationServiceId: z.string().min(1),
@@ -51,6 +52,9 @@ function errorResult(error: unknown): CallToolResult {
 
 const stableErrorCodes = new Set([
   "AUTHENTICATION_REQUIRED",
+  "ATTESTATION_INPUT_INVALID",
+  "ATTESTATION_SIGNING_KEY_INVALID",
+  "ATTESTATION_SIGNING_KEY_UNAVAILABLE",
   "AUDIT_PERSISTENCE_FAILED",
   "AUTHORITY_CONFLICT",
   "AUTHORITY_MISSING",
@@ -72,6 +76,7 @@ const stableErrorCodes = new Set([
   "DESIGN_CHANGE_SESSION_EVIDENCE_REQUIRED",
   "DESIGN_CHANGE_SESSION_NOT_FOUND",
   "DESIGN_CHANGE_SESSION_ALREADY_CLOSED",
+  "DESIGN_CHANGE_SESSION_BLOCKED",
   "DESIGN_CONTEXT_FACT_NOT_FOUND",
   "DESIGN_CONTEXT_RECONCILIATION_BLOCKED",
   "FEDERATION_TOOL_ERROR",
@@ -99,6 +104,9 @@ function errorCode(error: unknown): string {
 function safeClientMessage(code: string): string {
   return {
     AUTHENTICATION_REQUIRED: "An authenticated MCP caller is required.",
+    ATTESTATION_INPUT_INVALID: "The change attestation request is incomplete.",
+    ATTESTATION_SIGNING_KEY_INVALID: "The attestation signing key is invalid.",
+    ATTESTATION_SIGNING_KEY_UNAVAILABLE: "The attestation signing key is not configured.",
     AUDIT_PERSISTENCE_FAILED: "The federation audit record could not be persisted.",
     AUTHORITY_CONFLICT: "The requested fact has an authority conflict.",
     CANDIDATE_INPUT_UNSUPPORTED: "Promotion accepts only the selected candidate and exact Scope.",
@@ -112,6 +120,7 @@ function safeClientMessage(code: string): string {
     DESIGN_CHANGE_SESSION_EVIDENCE_REQUIRED: "A design change session requires verification evidence before it can close.",
     DESIGN_CHANGE_SESSION_NOT_FOUND: "The design change session was not found in the requested Scope.",
     DESIGN_CHANGE_SESSION_ALREADY_CLOSED: "The design change session is already closed with a different final status.",
+    DESIGN_CHANGE_SESSION_BLOCKED: "The design change session is blocked.",
     DESIGN_CONTEXT_FACT_NOT_FOUND: "One or more affected design facts were not found in the requested Scope.",
     DESIGN_CONTEXT_RECONCILIATION_BLOCKED: "The requested Scope has a blocked design reconciliation state.",
     CONNECTOR_NOT_ACTIVE: "The federation connector is not active.",
@@ -642,6 +651,40 @@ export function registerFederationTools(server: McpServer): void {
     closureReason: input.closureReason,
     architectureScope: assertWritableExactScope(input.architectureScope, caller)
   }));
+
+  registerFederationJsonTool(server, "issue_change_attestation", {
+    title: "Issue change attestation",
+    description: "Closes converged exact-Scope sessions and issues a short-lived signed attestation bound to staged Git evidence.",
+    inputSchema: {
+      repositoryId: z.string().min(1),
+      parentCommit: z.string().min(1),
+      stagedTreeHash: z.string().min(1),
+      fileManifestDigest: z.string().min(1),
+      configDigest: z.string().min(1),
+      scopeMappingDigest: z.string().min(1),
+      manifest: z.array(z.record(z.unknown())),
+      scopes: z.array(z.object({
+        architectureScope: architectureScopeSchema,
+        sessionId: z.string().min(1)
+      })).min(1),
+      actorId: z.string().min(1),
+      verificationEvidenceRefs: z.array(z.string().min(1)).min(1),
+      architectureScope: architectureScopeSchema
+    },
+    permissions: ["asset:write", "governance:run"],
+    readOnly: false
+  }, async (input, caller) => {
+    const primaryScope = assertWritableExactScope(input.architectureScope, caller);
+    const scopes = input.scopes.map((binding) => ({
+      architectureScope: assertWritableExactScope(binding.architectureScope, caller),
+      sessionId: binding.sessionId
+    }));
+    if (!scopes.some((binding) => binding.architectureScope.applicationServiceId === primaryScope.applicationServiceId && binding.architectureScope.scopePath === primaryScope.scopePath)) {
+      throw new FederationToolError("SCOPE_MISMATCH");
+    }
+    const { architectureScope: _architectureScope, ...attestationInput } = input;
+    return issueChangeAttestation({ ...attestationInput, scopes });
+  });
 
   registerFederationJsonTool(server, "reconcile_federated_scope", {
     title: "Reconcile federated Scope",

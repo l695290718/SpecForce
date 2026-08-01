@@ -46,7 +46,7 @@ it("includes the local Git Hook change-attestation decision", () => {
   const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-local-git-hook-change-attestation");
   expect(decision?.proposalId).toBe("proposal-local-git-hook-change-attestation");
   expect(decision?.contextPackId).toBe("context-pack-local-git-hook-change-attestation");
-  expect(decision?.status).toContain("implementation pending");
+  expect(decision?.status).toContain("Local enforcement increment implemented");
 });
 
 it("includes the single-host Docker deployment decision in the baseline", () => {

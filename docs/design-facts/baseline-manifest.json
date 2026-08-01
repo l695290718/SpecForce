@@ -404,9 +404,9 @@
                                                   "adr-federated-design-fact-synchronization"
                                               ],
                           "owner":  "SpecForge Architecture and Enterprise Integration",
-                          "status":  "Design accepted; implementation pending explicit user approval",
+                          "status":  "Local enforcement increment implemented; CodeHub enforcement deferred",
                           "reason":  "The first enforcement increment is a standalone Go pre-commit gate that binds staged Git evidence, exact application-service design coverage, CONVERGED reconciliation, and verification evidence to a short-lived Ed25519-signed Change Attestation.",
-                          "retryTrigger":  "Begin implementation only after the user reviews this written specification and explicitly approves Go CLI, remote MCP, persistence, signing, and Hook code changes. Implement CodeHub protected-branch enforcement only after the local protocol is proven.",
+                          "retryTrigger":  "Implement CodeHub protected-branch enforcement only after the local protocol is proven and separately approved; after future changes rerun the exact-Scope MCP synchronization and read-back checks.",
                           "evidence":  [
                                            {
                                                "command":  "pnpm design-context:preflight -- --intent \"Design the standalone Go local Git hook and signed change-attestation gate; defer CodeHub enforcement.\" --affected \"adr-design-context-preflight-gate\" --evidence \"bilingual design spec review,manifest validation,MCP design-fact synchronization and read-back\"",
@@ -419,6 +419,30 @@
                                            {
                                                "command":  "vitest run scripts/design-fact-manifest.test.ts --exclude .worktrees/** --exclude .pnpm-store/**",
                                                "result":  "Passed one test file and eight tests, including explicit ADR-0017 registration and stable repository/MCP IDs."
+                                           },
+                                           {
+                                               "command":  "go test ./... (apps/specforge-cli)",
+                                               "result":  "Standalone Go CLI tests passed in offline mode."
+                                           },
+                                           {
+                                               "command":  "pnpm --filter @specforge/mcp-server typecheck",
+                                               "result":  "MCP HTTP transport, scoped attestation issuance, and Prisma persistence typechecked successfully."
+                                           },
+                                           {
+                                               "command":  "vitest run apps/mcp-server/src/federation/tools.test.ts apps/mcp-server/src/federation/persistence.test.ts --exclude .worktrees/** --exclude .pnpm-store/**",
+                                               "result":  "Passed 2 files and 102 MCP federation tests."
+                                           },
+                                           {
+                                               "command":  "go build -o specforge.exe . (apps/specforge-cli)",
+                                               "result":  "Standalone Windows CLI binary built successfully."
+                                           },
+                                           {
+                                               "command":  "pnpm db:push",
+                                               "result":  "ChangeAttestation schema synchronized into localhost:15433/specforge_canonical."
+                                           },
+                                           {
+                                               "command":  "pnpm design-facts:sync && pnpm design-facts:check",
+                                               "result":  "All 15 baseline decisions synchronized and verified; missing, mismatched, outOfScope, and blocked lists were empty."
                                            }
                                        ]
                       },

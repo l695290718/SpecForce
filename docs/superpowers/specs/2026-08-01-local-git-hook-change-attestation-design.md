@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted design. Implementation has not started and requires explicit user approval before any Go CLI, remote MCP transport, persistence, or hook code is changed.
+Accepted design. The local enforcement increment is implemented; CodeArts/CodeHub protected-branch enforcement remains deferred.
 
 - Owning `architectureScope.applicationServiceId`: `com.huawei.celon.desiner`
 - Owning `architectureScope.scopePath`: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
@@ -104,7 +104,7 @@ Implementation requires focused tests for configuration parsing, single-service 
 
 ### 状态
 
-设计已确认，尚未开始实现。任何 Go CLI、远程 MCP 传输、数据库持久化或 Git Hook 代码变更前，必须再次明确告知用户并取得批准。第一增量只交付本地 `pre-commit` 门禁，CodeArts/CodeHub 受保护分支强制校验作为独立待办。
+设计已确认，本地门禁第一增量已实现。第一增量交付本地 `pre-commit`、HTTP MCP 签发、PostgreSQL 证明持久化和 Ed25519 验签；CodeArts/CodeHub 受保护分支强制校验继续作为独立待办。
 
 ### 目标
 
@@ -117,6 +117,8 @@ Implementation requires focused tests for configuration parsing, single-service 
 第一增量由三个可独立替换的组件构成：SpecForge 治理服务负责精确 Scope、服务端策略、覆盖度、对账、会话关闭和证明签名；Go 单文件 CLI 负责 Git 确定性证据、MCP 调用、签名验证和 Hook 生命周期；`.specforge.yaml` 只负责仓库身份及路径到应用服务的映射，不保存凭据，也不能降低服务端策略。
 
 CLI 位于 `apps/specforge-cli/`，按配置、Git 证据、MCP 传输、证明验证、凭据存储和 Hook 生命周期划分边界。服务端仅开放仓库登记、预检、证明签发、密钥发现和状态检查所需的最小远程 MCP 工具集。
+
+本地实现使用 Streamable HTTP `/mcp`，通过 bearer Token 鉴权；Token 由 Git credential helper 保存，Ed25519 PKCS#8 私钥由服务进程配置提供。Session ID 必须由治理预检产生并显式配置，Hook 不会自行推断或绕过会话治理。
 
 ### 仓库配置与 Scope
 
