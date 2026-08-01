@@ -4,6 +4,8 @@
 
 **Accepted design. MCP design facts are synchronized and read back; implementation has not started.**
 
+ADR-0018 refines this discovery boundary with the unified 3A ontology, profile separation, semantic assertions, atomic ChangeSets, immutable Baselines, and derived Knowledge Layer contracts. This ADR remains authoritative for the local-Agent trust boundary, exact-Scope session, deterministic scanner, and ReviewBundle policy.
+
 - Stable ADR/MCP ID: `adr-agent-driven-legacy-baseline-discovery`
 - Owning `architectureScope.applicationServiceId`: `com.huawei.celon.desiner`
 - Owning `architectureScope.scopePath`: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
@@ -91,6 +93,8 @@ Agent 驱动的存量系统基线发现
 SpecForge 需要在不要求各产品团队部署扫描服务的情况下接入企业存量应用。企业用户已经在源码工作区中使用 Claude Code、OpenCode 等 Coding Agent，但完全依靠 Agent 阅读仓库会导致结果不稳定、Token 成本高且难以审计；固定扫描工具虽然可以提取实现结构，却无法可靠恢复代码中没有明确表达的业务意图。
 
 企业架构层级在扫描前已经维护。一个 Token 可以授权多个应用服务，但当前写入维度仍是每次操作精确绑定一个应用服务。大规模候选事实也无法依赖逐条人工审批。
+
+ADR-0018 在本 ADR 基础上补充统一 3A 本体、Profile 分离、语义断言、原子 ChangeSet、不可变 Baseline 和派生知识层契约。本 ADR 继续作为本地 Agent 信任边界、精确 Scope Session、确定性扫描器和 ReviewBundle 策略的权威记录。
 
 ### 决策
 

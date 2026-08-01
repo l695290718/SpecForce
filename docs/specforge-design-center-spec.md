@@ -290,6 +290,7 @@ The MCP smoke covers scoped resources/tools, localized graph output, export, mis
 
 Near-term but not implemented:
 
+- unified 3A knowledge initialization with a generic core, configurable organization and analysis profiles, evidence-backed semantic assertions, atomic ChangeSets, immutable Baselines, and derived Knowledge Layers as specified by ADR-0018;
 - authorized multi-service comparison and impact views;
 - production OAuth/RBAC replacing the permissive capability policy;
 - durable audit-log persistence and operational retention policy;

@@ -26,23 +26,23 @@
 
 **完成证据：** 缺少证明、绕过 Hook、tree 过期、仓库或 Scope 错误、签名过期或撤销、多 Scope 覆盖不完整以及设计未收敛的 CodeHub 合并请求，都必须被受保护分支必选状态拒绝。
 
-### Implement Agent-driven legacy baseline discovery
+### Implement unified 3A knowledge initialization
 
 **Status:** Design accepted and MCP synchronized; implementation pending.
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
-**Rationale:** Existing enterprise application services need a low-friction baseline path that reuses Claude Code, OpenCode, and compatible coding Agents. Users must not deploy a scanner daemon. A signed ephemeral scanner will build deterministic evidence locally, while the Agent derives evidence-backed semantic candidates. Exact application-service Scope, multi-service token grants, four-tier ReviewBundle governance, MCP promotion, and atomic baseline publication are defined in ADR-0015.
+**Rationale:** Existing enterprise application services need a low-friction baseline path that reuses Claude Code, OpenCode, and compatible coding Agents. ADR-0015 defines the local-Agent discovery boundary. ADR-0018 extends it with a generic 3A ontology, multiple evidence-backed assertions per semantic identity, configurable organization and analysis profiles, atomic ChangeSets, immutable Baselines, and derived Knowledge Layers.
 
-**Initial delivery:** Remote authenticated MCP control, provider-neutral Agent integration, an ephemeral scanner contract, deterministic evidence indexing, semantic candidate submission, T0-T3 ReviewBundle policy, and manual Baseline v1 publication for one exact application service.
+**Delivery increments:** Generic foundation; initialization governance; generic scanning; 3A projections; and Huawei-profile migration plus hardening. The first usable path includes remote authenticated MCP control, a provider-neutral Agent integration, an ephemeral scanner contract, deterministic evidence indexing, semantic candidate submission, T0-T3 ReviewBundles, and manual Baseline publication for one exact application service.
 
-**Deferred:** Continuous CI synchronization, live database/API-gateway/CMDB/runtime connectors, outbound proposals, external `APPLY`, and automatic cross-Scope relationship creation.
+**Deferred:** Continuous inbound synchronization, live database/API-gateway/CMDB/runtime connectors, outbound proposals, external `APPLY`, automatic cross-Scope merging, production object storage, and complete billion-scale capacity certification.
 
-**Trigger:** Begin implementation only after `docs/superpowers/specs/2026-08-01-agent-driven-legacy-baseline-discovery-design.md` is reviewed and its implementation plan is approved.
+**Trigger:** Begin implementation only after `docs/superpowers/specs/2026-08-01-unified-3a-knowledge-initialization-design.md` is reviewed and its implementation plan is approved.
 
-**Completion evidence:** Claude Code and OpenCode must scan a fixture legacy service without a deployed scanner service; repeated scans must be idempotent; exact-Scope authorization, semantic separation of duties, partial-scan blocking, bundle review, atomic baseline publication, MCP persistence/read-back, and reconciliation must pass.
+**Completion evidence:** The core must run without the Huawei profile; a non-DDD fixture must initialize through the Generic System profile; repeated scans must be idempotent; conflicting assertions must remain visible; partial scan, blocked review, and failed reconciliation must not activate a Baseline; and exact-Scope MCP persistence, reproducible deterministic KL context, pinned Context Pack retrieval, PostgreSQL authority, and graph-outage behavior must pass.
 
-**Design-fact evidence:** `pnpm design-facts:sync` returned all 13 baseline decisions as complete. `pnpm design-facts:check` verified all 13 with no missing, mismatched, out-of-scope, or blocked records, including ADR-0015, its Proposal, Context Pack, Evidence, and typed links.
+**Design-fact evidence:** `pnpm design-facts:sync` returned all 16 baseline decisions as complete. `pnpm design-facts:check` verified all 16 with no missing, mismatched, out-of-scope, or blocked records, including ADR-0018, its Proposal, Context Pack, Evidence, and typed links.
 
 **中文本地化：**
 
@@ -50,15 +50,17 @@
 
 **负责人：** SpecForge 架构与 Agent 集成。
 
-**理由：** 企业存量应用需要复用 Claude Code、OpenCode 等现有 Coding Agent 的低门槛基线方案，用户不得被要求部署扫描服务。签名的临时扫描工具在本地生成确定性证据，Agent 基于证据生成语义候选。ADR-0015 定义精确应用服务 Scope、多应用服务 Token、四级 ReviewBundle 治理、MCP 提升和原子基线发布。
+**理由：** 企业存量应用需要复用 Claude Code、OpenCode 等现有 Coding Agent 的低门槛基线方案。ADR-0015 定义本地 Agent 发现边界；ADR-0018 进一步定义通用 3A 本体、同一语义身份的多证据断言、可配置组织与分析 Profile、原子 ChangeSet、不可变 Baseline 和派生知识层。
 
-**首期范围：** 远程鉴权 MCP、Provider 无关的 Agent 集成、临时扫描工具契约、确定性证据索引、语义候选提交、T0-T3 审核策略，以及单个精确应用服务的手动 Baseline v1 发布。
+**交付增量：** 通用基础、初始化治理、通用扫描、3A 投影，以及华为 Profile 迁移与加固。首个可用路径包括远程鉴权 MCP、Provider 无关 Agent 集成、临时扫描工具契约、确定性证据索引、语义候选、T0-T3 ReviewBundle 和单个精确应用服务的手动 Baseline 发布。
 
-**延期范围：** 持续 CI 同步、实时数据库/API 网关/CMDB/运行时连接器、出站提案、外部 `APPLY` 和自动跨 Scope 关系创建。
+**延期范围：** 持续入站同步、实时数据库/API 网关/CMDB/运行时连接器、出站 Proposal、外部 `APPLY`、自动跨 Scope 合并、生产对象存储和完整亿级容量认证。
 
-**启动条件：** 用户评审 `docs/superpowers/specs/2026-08-01-agent-driven-legacy-baseline-discovery-design.md` 并批准实施计划后开始开发。
+**启动条件：** 用户评审 `docs/superpowers/specs/2026-08-01-unified-3a-knowledge-initialization-design.md` 并批准实施计划后开始开发。
 
-**设计事实证据：** `pnpm design-facts:sync` 返回全部 13 项基线决策均为完成；`pnpm design-facts:check` 验证全部 13 项记录，未发现缺失、不匹配、越界或阻塞，其中包含 ADR-0015、Proposal、Context Pack、Evidence 和类型化关系。
+**完成证据：** 核心必须可以脱离华为 Profile 运行；非 DDD Fixture 必须能通过 Generic System Profile 初始化；重复扫描幂等；冲突断言保持可见；部分扫描、阻塞审核和对账失败不能激活 Baseline；精确 Scope MCP 持久化、确定性 KL 上下文重现、固定 Context Pack 读取、PostgreSQL 权威和图故障回退都必须通过。
+
+**设计事实证据：** `pnpm design-facts:sync` 返回全部 16 项基线决策均为完成；`pnpm design-facts:check` 验证全部 16 项记录，未发现缺失、不匹配、越界或阻塞，其中包含 ADR-0018、Proposal、Context Pack、Evidence 和类型化关系。
 
 ### Synchronize architecture overview design facts
 

@@ -536,6 +536,46 @@
                                                "result":  "The MCP stdio client reached create_adr, then failed with Prisma P1001 because the elected localhost:5433 authority is unreachable; localhost:5432 was not substituted."
                                            }
                                        ]
+                      },
+                      {
+                          "id":  "adr-unified-3a-knowledge-initialization",
+                          "repositoryAdr":  "docs/adr/0018-unified-3a-knowledge-initialization.md",
+                          "mcpAdrId":  "adr-unified-3a-knowledge-initialization",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-unified-3a-knowledge-initialization",
+                          "contextPackId":  "context-pack-unified-3a-knowledge-initialization",
+                          "relatedAssetIds":  [
+                                                  "data-specforge-assets",
+                                                  "data-specforge-asset-graph",
+                                                  "api-specforge-mcp-tools",
+                                                  "adr-agent-driven-legacy-baseline-discovery",
+                                                  "adr-federated-design-fact-synchronization"
+                                              ],
+                          "owner":  "SpecForge Architecture and Agent Integration",
+                          "status":  "MCP synchronized and read back; implementation pending",
+                          "reason":  "The approved design models Business, System, and Technical Architecture as versioned perspectives over one authoritative fact graph, preserves multiple evidence-backed assertions per semantic identity, and keeps KLs, Context Packs, reports, and graph stores as derived projections.",
+                          "retryTrigger":  "After written-spec review, prepare and approve an implementation plan. After any design change, rerun exact-Scope synchronization and read-back before implementation is claimed complete.",
+                          "evidence":  [
+                                           {
+                                               "command":  "User design review on 2026-08-01",
+                                               "result":  "Approved the unified 3A ontology, profile-neutral core, semantic assertion model, atomic ChangeSets, immutable Baselines, derived KLs, failure semantics, scale boundaries, and phased delivery."
+                                           },
+                                           {
+                                               "command":  "pnpm design-context:preflight -- --intent \"Formalize the approved unified 3A knowledge initialization architecture and profile-neutral legacy discovery model.\" --affected \"adr-agent-driven-legacy-baseline-discovery,adr-federated-design-fact-synchronization,data-specforge-assets,data-specforge-asset-graph,api-specforge-mcp-tools\" --evidence \"approved bilingual design review,ADR and manifest validation,MCP design-fact synchronization and read-back\"",
+                                               "result":  "Read 119 exact-Designer-Scope assets and opened design-change-session:e51c9bff-6a1f-4ed2-8e75-887b67042203."
+                                           },
+                                           {
+                                               "command":  "node .\\node_modules\\vitest\\vitest.mjs run --root . --exclude \".worktrees/**\" --exclude \".pnpm-store/**\" scripts\\design-fact-manifest.test.ts",
+                                               "result":  "Passed 1 file and 9 tests, including ADR-0018 registration and 16 unique repository and MCP IDs."
+                                           },
+                                           {
+                                               "command":  "pnpm design-facts:sync; pnpm design-facts:check",
+                                               "result":  "All 16 decisions synchronized and verified; missing, mismatched, outOfScope, and blocked lists were empty."
+                                           }
+                                       ]
                       }
                   ]
 }

@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(15);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(15);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(15);
+  expect(manifest.decisions).toHaveLength(16);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(16);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(16);
   const proposalByContextPack = new Map<string, string>();
 
   for (const decision of manifest.decisions) {
@@ -36,6 +36,13 @@ it("includes federated design-fact governance in the baseline", () => {
 
 it("includes Agent-driven legacy baseline discovery in the baseline", () => {
   expect(manifest.decisions.some((decision) => decision.mcpAdrId === "adr-agent-driven-legacy-baseline-discovery")).toBe(true);
+});
+
+it("includes unified 3A knowledge initialization in the baseline", () => {
+  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-unified-3a-knowledge-initialization");
+  expect(decision?.proposalId).toBe("proposal-unified-3a-knowledge-initialization");
+  expect(decision?.contextPackId).toBe("context-pack-unified-3a-knowledge-initialization");
+  expect(decision?.status).toContain("implementation pending");
 });
 
 it("includes design-context preflight governance in the baseline", () => {
