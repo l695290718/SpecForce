@@ -2,7 +2,7 @@
 
 ## Status
 
-**Phase 2 initialization governance implemented. MCP design facts are synchronized and read back; generic scanning, 3A projections, and migration hardening remain pending.**
+**Phase 3 scanner foundation implemented. MCP design facts are synchronized and read back; semantic extraction, 3A projections, and migration hardening remain pending.**
 
 - Stable ADR/MCP ID: `adr-unified-3a-knowledge-initialization`
 - Owning `architectureScope.applicationServiceId`: `com.huawei.celon.desiner`
@@ -75,8 +75,9 @@ Reuse the existing federation `SourceObservation`, `Candidate`, `Promotion`, and
 - **MCP read-back:** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-unified-3a-knowledge-initialization'; pnpm design-facts:check` returned empty `missing`, `mismatched`, `outOfScope`, and `blocked` lists for ADR-0018. The unchanged fifteen baseline decisions were not rewritten in this increment; a later full-batch run timed out and remains a tooling follow-up.
 - **Phase 2 verification:** `pnpm typecheck` passed Core, MCP Server, and Web; the focused core, MCP, and manifest suites passed 35 tests; and the gated PostgreSQL integration test passed the Session → READY ReviewBundle → APPROVE decision → gated ChangeSet → Baseline path, including idempotent retry and exact-Scope read-back.
 - **Database verification:** `pnpm db:push` synchronized the foundation tables plus `KnowledgeReviewBundle`, `KnowledgePromotionDecision`, and the ChangeSet promotion-decision reference into `localhost:15433/specforge_canonical`.
+- **Scanner verification:** `pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <temp-file>` produced 56 source-minimized manifest entries, 56 structural observations, and a deterministic report digest; the gated MCP scanner integration persisted the report and idempotent observations.
 - **Build boundary:** `pnpm build` compiled Core, typechecked MCP and Web, generated all 18 static pages, and then failed at Next.js standalone trace copying because the Windows host disallowed pnpm symlink creation, including an elevated retry. Retry after enabling Windows Developer Mode or using a symlink-capable build environment.
-- **Implementation boundary:** Repository scanning, semantic extraction, real 3A KL generation, and Huawei-profile migration are not implemented in this increment. ReviewBundle creation, fail-closed coverage evaluation, MCP-only promotion decisions, and ChangeSet promotion gating are implemented.
+- **Implementation boundary:** Repository scanning foundation, deterministic evidence indexing, source-minimized observations, and MCP report persistence are implemented. Signed scanner packaging, semantic extraction, real 3A KL generation, and Huawei-profile migration are not implemented in this increment. ReviewBundle creation, fail-closed coverage evaluation, MCP-only promotion decisions, and ChangeSet promotion gating remain implemented.
 
 ## MCP Record
 
@@ -86,7 +87,7 @@ Reuse the existing federation `SourceObservation`, `Candidate`, `Promotion`, and
 - Matching Context Pack: `context-pack-unified-3a-knowledge-initialization`
 - Related assets: `data-specforge-assets`, `data-specforge-asset-graph`, `api-specforge-mcp-tools`, `adr-agent-driven-legacy-baseline-discovery`, and `adr-federated-design-fact-synchronization`
 - Required typed links: Proposal `--IMPLEMENTS_DECISION-->` ADR; Context Pack `--IMPLEMENTS_CONTEXT_FOR-->` Proposal; ADR `--DECIDES-->` related assets; Evidence `--VALIDATES-->` ADR
-- Current status: MCP synchronized and read back from the configured canonical PostgreSQL authority; Phase 2 initialization governance is implemented, while later increments and the Windows standalone artifact check remain pending.
+- Current status: MCP synchronized and read back from the configured canonical PostgreSQL authority; Phase 3 scanner foundation is implemented, while semantic extraction, later increments, and the Windows standalone artifact check remain pending.
 
 ## Chinese Localization
 
@@ -160,8 +161,9 @@ ADR-0015 已经确定由 Agent 驱动、基于证据发现存量应用。整体�
 - **MCP 回读：** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-unified-3a-knowledge-initialization'; pnpm design-facts:check` 对 ADR-0018 返回空的 `missing`、`mismatched`、`outOfScope` 和 `blocked` 列表。其余 15 项未在本增量中重写；后续整批运行曾超时，作为工具链待办保留。
 - **Phase 2 验证：** `pnpm typecheck` 通过 Core、MCP Server 和 Web；核心、MCP 和清单定向测试共 35 项通过；带门控的 PostgreSQL 集成测试通过 Session → READY ReviewBundle → APPROVE 决策 → ChangeSet 提升门禁 → Baseline 路径，并验证幂等重试和精确 Scope 回读。
 - **数据库验证：** `pnpm db:push` 已将基础表、`KnowledgeReviewBundle`、`KnowledgePromotionDecision` 以及 ChangeSet 的提升决策引用同步到 `localhost:15433/specforge_canonical`。
+- **扫描器验证：** `pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <临时文件>` 生成 56 个最小化源码清单条目、56 个结构观察和确定性报告摘要；带门控的 MCP 扫描集成测试已持久化报告并验证观察幂等。
 - **构建边界：** `pnpm build` 已完成 Core 编译、MCP 与 Web 类型检查以及全部 18 个静态页面生成，随后在 Next.js standalone 追踪复制阶段因 Windows 主机禁止创建 pnpm 符号链接失败，提权重试结果相同。启用 Windows Developer Mode 或使用支持符号链接的构建环境后重试。
-- **实现边界：** 本增量尚未实现仓库扫描、语义提取、真实 3A KL 生成和 Huawei Profile 迁移；ReviewBundle 创建、覆盖不足 fail-closed、MCP-only 提升决策和 ChangeSet 提升门禁已经实现。
+- **实现边界：** 本增量已实现仓库扫描基础、确定性证据索引、最小化源码结构观察和 MCP 报告持久化；尚未实现签名扫描包、语义提取、真实 3A KL 生成和 Huawei Profile 迁移。ReviewBundle 创建、覆盖不足 fail-closed、MCP-only 提升决策和 ChangeSet 提升门禁已经实现。
 
 ### MCP 记录
 

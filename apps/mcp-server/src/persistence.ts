@@ -357,6 +357,28 @@ export async function ensureMcpPersistenceSchema() {
     )
   `);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "KnowledgePromotionDecision_scope_bundle_decision_idx" ON "KnowledgePromotionDecision"("applicationServiceId", "scopePath", "reviewBundleId", decision)`);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "KnowledgeScanReport" (
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
+      "designChangeSessionId" TEXT NOT NULL,
+      "scannerId" TEXT NOT NULL,
+      "scannerVersion" TEXT NOT NULL,
+      "rootLabel" TEXT NOT NULL,
+      manifest JSONB NOT NULL DEFAULT '[]'::jsonb,
+      coverage JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "manifestDigest" TEXT NOT NULL,
+      "reportDigest" TEXT NOT NULL,
+      status TEXT NOT NULL,
+      "generatedAt" TIMESTAMP NOT NULL,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id),
+      UNIQUE("applicationServiceId", "scopePath", "reportDigest")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "KnowledgeScanReport_scope_session_status_idx" ON "KnowledgeScanReport"("applicationServiceId", "scopePath", "designChangeSessionId", status)`);
   await upgradeLegacyPersistedIdentitySchema();
   for (const table of ["DesignAsset", "Proposal", "ContextPack", "AssetLink"]) {
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "${table}_applicationServiceId_idx" ON "${table}"("applicationServiceId")`);

@@ -24,3 +24,4 @@ export * from "./relationships/extract";
 export * from "./graph-store/types";
 export * from "./federation";
 export * from "./knowledge";
+export * from "./scanner";

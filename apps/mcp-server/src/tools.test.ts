@@ -41,9 +41,14 @@ const knowledge = vi.hoisted(() => ({
   publishKnowledgeBaseline: vi.fn().mockResolvedValue({ id: "baseline-1", status: "PUBLISHED" })
 }));
 
+const scanner = vi.hoisted(() => ({
+  submitScanReport: vi.fn().mockResolvedValue({ id: "scan-1", status: "RECEIVED" })
+}));
+
 vi.mock("./persistence", () => persistence);
 vi.mock("./scoped-derived", () => scopedDerived);
 vi.mock("./knowledge/persistence", () => knowledge);
+vi.mock("./scanner/persistence", () => scanner);
 
 import { registerTools } from "./tools";
 
@@ -250,6 +255,7 @@ describe("3A knowledge foundation tools", () => {
     const tools = captureTools();
     expect([...tools.keys()]).toEqual(expect.arrayContaining([
       "create_knowledge_assertion",
+      "submit_scan_report",
       "create_identity_candidate",
       "create_knowledge_review_bundle",
       "decide_knowledge_review_bundle",
@@ -265,6 +271,7 @@ describe("3A knowledge foundation tools", () => {
     const tools = captureTools();
     const architectureScope = { applicationServiceId: "com.huawei.celon.desiner", scopePath: "designer" };
     await tools.get("create_knowledge_assertion")!.handler({ architectureScope, assertion: { id: "assertion-1" } });
+    await tools.get("submit_scan_report")!.handler({ architectureScope, id: "scan-1", connectorId: "scanner-1", designChangeSessionId: "session-1", report: { reportDigest: "digest" } });
     await tools.get("create_identity_candidate")!.handler({ architectureScope, candidate: { id: "identity-1" } });
     await tools.get("create_knowledge_review_bundle")!.handler({ architectureScope, id: "review-1", designChangeSessionId: "session-1", riskTier: "T1", assertionIds: ["assertion-1"], identityCandidateIds: [], evidenceRefs: ["evidence-1"], coverage: { totalSources: 1, processedSources: 1, supportedSources: 1, candidateCount: 1, complete: true }, blockingIssues: [] });
     await tools.get("decide_knowledge_review_bundle")!.handler({ architectureScope, id: "decision-1", reviewBundleId: "review-1", decision: "APPROVE", approvedAssertionIds: ["assertion-1"], approvedIdentityCandidateIds: [], evidenceRefs: ["evidence-1"], reason: "Reviewed" });
@@ -275,6 +282,7 @@ describe("3A knowledge foundation tools", () => {
     await tools.get("list_knowledge_assertions")!.handler({ applicationServiceId: architectureScope.applicationServiceId });
 
     expect(knowledge.createKnowledgeAssertion).toHaveBeenCalledOnce();
+    expect(scanner.submitScanReport).toHaveBeenCalledOnce();
     expect(knowledge.createIdentityCandidate).toHaveBeenCalledOnce();
     expect(knowledge.createKnowledgeReviewBundle).toHaveBeenCalledOnce();
     expect(knowledge.decideKnowledgeReviewBundle).toHaveBeenCalledOnce();

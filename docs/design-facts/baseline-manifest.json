@@ -462,7 +462,7 @@
                                                   "adr-federated-design-fact-synchronization"
                                               ],
                           "owner":  "SpecForge Architecture and Agent Integration",
-                          "status":  "MCP synchronized and read back; implementation pending",
+                            "status":  "MCP synchronized and read back; scanner foundation implemented; signed packaging and semantic extraction pending",
                           "reason":  "The approved design uses existing coding Agents, a signed ephemeral deterministic scanner, evidence-backed semantic extraction, exact application-service authorization, and risk-tiered ReviewBundles without requiring users to deploy scanner infrastructure. Its design facts are persisted and verified in the exact Designer Scope.",
                           "retryTrigger":  "After a future design change, re-run design-facts:sync and design-facts:check. Begin implementation only after the written specification is reviewed and an implementation plan is approved.",
                           "evidence":  [
@@ -474,10 +474,14 @@
                                                "command":  "pnpm design-facts:sync",
                                                "result":  "With DATABASE_URL loaded from the repository .env, all 13 baseline decisions returned complete, including ADR-0015 and its generated companion records."
                                            },
-                                           {
-                                               "command":  "pnpm design-facts:check",
-                                               "result":  "Verified all 13 decisions with empty missing, mismatched, outOfScope, and blocked results."
-                                           }
+                                             {
+                                                 "command":  "pnpm design-facts:check",
+                                                 "result":  "Verified all 13 decisions with empty missing, mismatched, outOfScope, and blocked results."
+                                             },
+                                             {
+                                                 "command":  "pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <temp-file>",
+                                                 "result":  "Produced 56 source-minimized manifest entries, 56 structural observations, and a deterministic report digest; the gated MCP scanner integration persisted the report and idempotent observations."
+                                             }
                                        ]
                       },
                       {
@@ -555,7 +559,7 @@
                                                   "adr-federated-design-fact-synchronization"
                                               ],
                           "owner":  "SpecForge Architecture and Agent Integration",
-                            "status":  "MCP synchronized and read back; phase 2 initialization governance implemented; web artifact verification pending",
+                              "status":  "MCP synchronized and read back; phase 3 scanner foundation implemented; web artifact verification pending",
                           "reason":  "The approved design models Business, System, and Technical Architecture as versioned perspectives over one authoritative fact graph, preserves multiple evidence-backed assertions per semantic identity, and keeps KLs, Context Packs, reports, and graph stores as derived projections.",
                           "retryTrigger":  "After written-spec review, prepare and approve an implementation plan. After any design change, rerun exact-Scope synchronization and read-back before implementation is claimed complete.",
                           "evidence":  [
@@ -579,10 +583,14 @@
                                                  "command":  "pnpm typecheck; node .\\node_modules\\vitest\\vitest.mjs run --root . --exclude \".worktrees/**\" --exclude \".pnpm-store/**\" packages/core/src/__tests__/knowledge-foundation.test.ts apps/mcp-server/src/tools.test.ts scripts/design-fact-manifest.test.ts",
                                                  "result":  "Core, MCP Server, and Web type checks passed; the focused core, MCP, and manifest suites passed 35 tests, including fail-closed ReviewBundle and promotion-gate cases."
                                            },
-                                           {
-                                               "command":  "$env:SPECFORGE_KNOWLEDGE_INTEGRATION='1'; node .\\node_modules\\vitest\\vitest.mjs run --root apps\\mcp-server --exclude \".worktrees/**\" --exclude \".pnpm-store/**\" src\\knowledge\\persistence.integration.test.ts",
-                                                 "result":  "Passed the gated PostgreSQL test for Session, READY ReviewBundle, APPROVE decision, gated ChangeSet, idempotent retry, converged Baseline, projection manifest, and exact-Scope read-back against localhost:15433/specforge_canonical; fixtures were cleaned up."
-                                           },
+                                             {
+                                                 "command":  "$env:SPECFORGE_KNOWLEDGE_INTEGRATION='1'; node .\\node_modules\\vitest\\vitest.mjs run --root apps\\mcp-server --exclude \".worktrees/**\" --exclude \".pnpm-store/**\" src\\knowledge\\persistence.integration.test.ts",
+                                                   "result":  "Passed the gated PostgreSQL test for Session, READY ReviewBundle, APPROVE decision, gated ChangeSet, idempotent retry, converged Baseline, projection manifest, and exact-Scope read-back against localhost:15433/specforge_canonical; fixtures were cleaned up."
+                                             },
+                                             {
+                                                 "command":  "pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <temp-file>",
+                                                 "result":  "Produced 56 source-minimized manifest entries, 56 structural observations, and a deterministic report digest; the gated MCP scanner integration persisted the report and idempotent observations."
+                                             },
                                            {
                                                "command":  "pnpm build",
                                                "result":  "Core and MCP compiled and Web generated 18 static pages, but Next.js standalone trace copying failed with Windows EPERM while creating pnpm symlinks; elevated retry had the same host limitation."

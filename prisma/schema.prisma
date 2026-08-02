@@ -738,3 +738,25 @@ model KnowledgePromotionDecision {
   @@unique([applicationServiceId, scopePath, id], map: "KnowledgePromotionDecision_scope_id_key")
   @@index([applicationServiceId, scopePath, reviewBundleId, decision], map: "KnowledgePromotionDecision_scope_bundle_decision_idx")
 }
+
+model KnowledgeScanReport {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  designChangeSessionId String
+  scannerId            String
+  scannerVersion       String
+  rootLabel            String
+  manifest             Json     @default("[]") @db.JsonB
+  coverage             Json     @default("{}") @db.JsonB
+  manifestDigest       String
+  reportDigest         String
+  status               String
+  generatedAt          DateTime
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, id], map: "KnowledgeScanReport_scope_id_key")
+  @@unique([applicationServiceId, scopePath, reportDigest], map: "KnowledgeScanReport_scope_digest_key")
+  @@index([applicationServiceId, scopePath, designChangeSessionId, status], map: "KnowledgeScanReport_scope_session_status_idx")
+}

@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted design. MCP design facts are synchronized and read back; implementation has not started.**
+**Scanner foundation implemented. MCP design facts are synchronized and read back; signed packaging, semantic extraction, and Agent integration remain pending.**
 
 ADR-0018 refines this discovery boundary with the unified 3A ontology, profile separation, semantic assertions, atomic ChangeSets, immutable Baselines, and derived Knowledge Layer contracts. This ADR remains authoritative for the local-Agent trust boundary, exact-Scope session, deterministic scanner, and ReviewBundle policy.
 
@@ -70,7 +70,7 @@ Accepted facts, ADRs, Proposals, Context Packs, Evidence, and typed links remain
 - **Repository consistency check:** `node .\node_modules\vitest\vitest.mjs run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" scripts\design-fact-manifest.test.ts` passed 1 file and 6 tests.
 - **MCP persistence:** With `DATABASE_URL` loaded from the repository `.env`, `pnpm design-facts:sync` returned all 13 baseline decisions as complete, including this ADR and its generated Proposal, Context Pack, Evidence, and typed links.
 - **MCP read-back:** With the same configured authority, `pnpm design-facts:check` verified all 13 decisions with empty `missing`, `mismatched`, `outOfScope`, and `blocked` results.
-- **Implementation evidence:** None. The Scan CLI, remote MCP transport, Agent integration pack, ReviewBundle flow, and baseline publication are not implemented.
+- **Implementation evidence:** `pnpm typecheck` passed Core, MCP Server, and Web; the scanner core and MCP tool suites passed; the gated scanner integration test persisted a source-minimized report and idempotent observations in `localhost:15433/specforge_canonical`; and `pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <temp-file>` produced 56 manifest entries, 56 structural observations, and a deterministic report digest. The implementation does not yet sign scanner packages, provide remote Agent integration, infer semantic candidates, or publish a baseline.
 
 ## MCP Record
 
@@ -80,7 +80,7 @@ Accepted facts, ADRs, Proposals, Context Packs, Evidence, and typed links remain
 - Matching Context Pack: `context-pack-agent-driven-legacy-baseline-discovery`
 - Related assets: `api-specforge-mcp-tools`, `data-specforge-assets`, and `adr-federated-design-fact-synchronization`
 - Typed links: Proposal `--IMPLEMENTS_DECISION-->` ADR; Context Pack `--IMPLEMENTS_CONTEXT_FOR-->` Proposal; ADR `--DECIDES-->` related assets; Evidence `--VALIDATES-->` ADR
-- Status: MCP synchronized and read back from the configured canonical PostgreSQL authority; implementation remains pending.
+- Status: MCP synchronized and read back from the configured canonical PostgreSQL authority; scanner foundation is implemented, while signed packaging, semantic extraction, Agent integration, and baseline publication remain pending.
 
 ## Chinese Localization
 
@@ -146,7 +146,7 @@ ADR-0018 在本 ADR 基础上补充统一 3A 本体、Profile 分离、语义断
 - **仓库一致性检查：** `node .\node_modules\vitest\vitest.mjs run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" scripts\design-fact-manifest.test.ts` 已通过 1 个文件和 6 项测试。
 - **MCP 持久化：** 从仓库 `.env` 加载 `DATABASE_URL` 后，`pnpm design-facts:sync` 返回全部 13 项基线决策均为完成，其中包含本 ADR 及其生成的 Proposal、Context Pack、Evidence 和类型化关系。
 - **MCP 回读：** 使用同一权威库执行 `pnpm design-facts:check`，全部 13 项决策通过验证，`missing`、`mismatched`、`outOfScope` 和 `blocked` 均为空。
-- **实现证据：** 当前没有。Scan CLI、远程 MCP、Agent 集成包、ReviewBundle 流程和基线发布尚未实现。
+- **实现证据：** `pnpm typecheck` 已通过 Core、MCP Server 和 Web；扫描器核心与 MCP 工具定向测试通过；带门控的扫描器集成测试已将最小化源码报告和幂等观察写入 `localhost:15433/specforge_canonical`；`pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <临时文件>` 生成 56 个清单条目、56 个结构观察和确定性报告摘要。当前尚未实现扫描器签名包、远程 Agent 集成、语义候选推断和 Baseline 发布。
 
 ### MCP 记录
 
@@ -156,4 +156,4 @@ ADR-0018 在本 ADR 基础上补充统一 3A 本体、Profile 分离、语义断
 - 匹配 Context Pack：`context-pack-agent-driven-legacy-baseline-discovery`
 - 相关资产：`api-specforge-mcp-tools`、`data-specforge-assets`、`adr-federated-design-fact-synchronization`
 - 类型化关系：Proposal `--IMPLEMENTS_DECISION-->` ADR；Context Pack `--IMPLEMENTS_CONTEXT_FOR-->` Proposal；ADR `--DECIDES-->` 相关资产；Evidence `--VALIDATES-->` ADR
-- 状态：已通过 MCP 写入配置的规范 PostgreSQL 权威库并完成回读；实现仍待开始。
+- 状态：已通过 MCP 写入配置的规范 PostgreSQL 权威库并完成回读；扫描器基础已实现，签名包、语义提取、Agent 集成和 Baseline 发布仍待实现。

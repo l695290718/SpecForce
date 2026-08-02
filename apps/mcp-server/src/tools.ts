@@ -6,6 +6,7 @@ import { auditToolCall } from "./audit";
 import { allowAllPolicy, getDefaultActor } from "./auth";
 import { deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
 import { commitKnowledgeChangeSet, createIdentityCandidate, createKnowledgeAssertion, createKnowledgeReviewBundle, createProjectionManifest, createWorkingStream, decideKnowledgeReviewBundle, listKnowledgeAssertions, publishKnowledgeBaseline } from "./knowledge/persistence";
+import { submitScanReport } from "./scanner/persistence";
 import {
   analyzeScopedProposalImpact,
   buildScopedAssetGraph,
@@ -427,6 +428,14 @@ export function registerTools(server: McpServer): void {
     permissions: ["knowledge:write"],
     readOnly: false
   }, async (input) => createKnowledgeAssertion(input as unknown as Parameters<typeof createKnowledgeAssertion>[0]));
+
+  registerJsonTool(server, "submit_scan_report", {
+    title: "Submit local scan report",
+    description: "Accepts a deterministic, source-minimized local scanner report through the exact-Scope MCP boundary and persists its observations as candidates.",
+    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), connectorId: z.string().min(1), designChangeSessionId: z.string().min(1), report: z.record(z.unknown()) },
+    permissions: ["knowledge:write", "asset:write"],
+    readOnly: false
+  }, async (input) => submitScanReport(input as unknown as Parameters<typeof submitScanReport>[0]));
 
   registerJsonTool(server, "create_identity_candidate", {
     title: "Create identity candidate",

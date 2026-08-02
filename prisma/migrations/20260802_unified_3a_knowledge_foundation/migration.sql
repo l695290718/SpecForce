@@ -164,3 +164,26 @@ CREATE TABLE "KnowledgePromotionDecision" (
 
 CREATE UNIQUE INDEX "KnowledgePromotionDecision_scope_id_key" ON "KnowledgePromotionDecision"("applicationServiceId", "scopePath", "id");
 CREATE INDEX "KnowledgePromotionDecision_scope_bundle_decision_idx" ON "KnowledgePromotionDecision"("applicationServiceId", "scopePath", "reviewBundleId", "decision");
+
+CREATE TABLE "KnowledgeScanReport" (
+    "dbId" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "id" TEXT NOT NULL,
+    "designChangeSessionId" TEXT NOT NULL,
+    "scannerId" TEXT NOT NULL,
+    "scannerVersion" TEXT NOT NULL,
+    "rootLabel" TEXT NOT NULL,
+    "manifest" JSONB NOT NULL DEFAULT '[]'::jsonb,
+    "coverage" JSONB NOT NULL DEFAULT '{}'::jsonb,
+    "manifestDigest" TEXT NOT NULL,
+    "reportDigest" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "generatedAt" TIMESTAMP(3) NOT NULL,
+    "applicationServiceId" TEXT NOT NULL,
+    "scopePath" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "KnowledgeScanReport_pkey" PRIMARY KEY ("dbId")
+);
+
+CREATE UNIQUE INDEX "KnowledgeScanReport_scope_id_key" ON "KnowledgeScanReport"("applicationServiceId", "scopePath", "id");
+CREATE UNIQUE INDEX "KnowledgeScanReport_scope_digest_key" ON "KnowledgeScanReport"("applicationServiceId", "scopePath", "reportDigest");
+CREATE INDEX "KnowledgeScanReport_scope_session_status_idx" ON "KnowledgeScanReport"("applicationServiceId", "scopePath", "designChangeSessionId", "status");
