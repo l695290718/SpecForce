@@ -1,8 +1,8 @@
 import type { ArchitectureScopeRef } from "../architecture/types";
-import { contentDigest } from "../federation/digest";
 import type { AnalysisProfile } from "./types";
 import { assertAnalysisProfile } from "./profiles";
-import type { Baseline, ChangeSet, KnowledgeAssertion, ProjectionManifest } from "./types";
+import { contentDigest } from "../federation/digest";
+import type { Baseline, ChangeSet, KnowledgeAssertion, KnowledgePromotionDecision, ProjectionManifest, ReviewBundle, ReviewCoverage } from "./types";
 
 export function assertExactScope(actual: ArchitectureScopeRef, expected: ArchitectureScopeRef): void {
   if (actual.applicationServiceId !== expected.applicationServiceId || actual.scopePath !== expected.scopePath) {
@@ -36,5 +36,37 @@ export function assertBaselinePublishable(baseline: Pick<Baseline, "status" | "m
   if (reconciliationStatus !== "CONVERGED") throw new Error(`BASELINE_RECONCILIATION_${reconciliationStatus}`);
   if (!baseline.manifest.changeSetId || baseline.manifest.sourceRevisionIds.length === 0) {
     throw new Error("BASELINE_MANIFEST_INCOMPLETE");
+  }
+}
+
+export function reviewBundleDigest(input: Pick<ReviewBundle, "architectureScope" | "designChangeSessionId" | "riskTier" | "assertionIds" | "identityCandidateIds" | "evidenceRefs" | "coverage" | "blockingIssues">): string {
+  return contentDigest({
+    architectureScope: input.architectureScope,
+    designChangeSessionId: input.designChangeSessionId,
+    riskTier: input.riskTier,
+    assertionIds: [...input.assertionIds].sort(),
+    identityCandidateIds: [...input.identityCandidateIds].sort(),
+    evidenceRefs: [...input.evidenceRefs].sort(),
+    coverage: input.coverage,
+    blockingIssues: [...input.blockingIssues].sort()
+  });
+}
+
+export function evaluateReviewBundle(coverage: ReviewCoverage, blockingIssues: string[]): "READY" | "BLOCKED" {
+  if (!coverage.complete || coverage.processedSources < coverage.totalSources || coverage.supportedSources > coverage.processedSources || blockingIssues.length > 0) return "BLOCKED";
+  return "READY";
+}
+
+export function assertReviewBundleApprovable(bundle: Pick<ReviewBundle, "status" | "coverage" | "blockingIssues">): void {
+  if (bundle.status !== "READY") throw new Error("REVIEW_BUNDLE_NOT_READY");
+  if (!bundle.coverage.complete || bundle.blockingIssues.length > 0) throw new Error("REVIEW_BUNDLE_BLOCKED");
+}
+
+export function assertPromotionDecisionValid(input: Pick<KnowledgePromotionDecision, "decision" | "reason" | "evidenceRefs" | "approvedAssertionIds" | "approvedIdentityCandidateIds">, bundle: Pick<ReviewBundle, "status" | "assertionIds" | "identityCandidateIds" | "coverage" | "blockingIssues">): void {
+  if (!input.reason.trim() || input.evidenceRefs.length === 0) throw new Error("PROMOTION_DECISION_EVIDENCE_REQUIRED");
+  if (input.decision === "APPROVE") {
+    assertReviewBundleApprovable(bundle);
+    if (input.approvedAssertionIds.length === 0 && input.approvedIdentityCandidateIds.length === 0) throw new Error("PROMOTION_TARGETS_REQUIRED");
+    if (input.approvedAssertionIds.some((id) => !bundle.assertionIds.includes(id)) || input.approvedIdentityCandidateIds.some((id) => !bundle.identityCandidateIds.includes(id))) throw new Error("PROMOTION_TARGET_OUTSIDE_REVIEW_BUNDLE");
   }
 }

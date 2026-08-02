@@ -7,6 +7,9 @@ export type IdentityCandidateDecision = "UNDECIDED" | "ACCEPTED" | "REJECTED" | 
 export type ChangeSetStatus = "OPEN" | "COMMITTED" | "REJECTED";
 export type WorkingStreamStatus = "ACTIVE" | "FROZEN" | "ARCHIVED";
 export type BaselineStatus = "PUBLISHED" | "SUPERSEDED" | "BLOCKED";
+export type ReviewBundleStatus = "DRAFT" | "READY" | "BLOCKED" | "APPROVED" | "REJECTED";
+export type ReviewRiskTier = "T0" | "T1" | "T2" | "T3";
+export type PromotionDecision = "APPROVE" | "REJECT";
 
 export interface LocalePolicy {
   canonicalLocale: string;
@@ -83,6 +86,7 @@ export interface ChangeSet {
   relationshipRevisionIds: string[];
   evidenceRefs: string[];
   digest: string;
+  promotionDecisionId?: string;
   createdAt: string;
   committedAt?: string;
 }
@@ -128,4 +132,43 @@ export interface ProjectionManifest {
   query: Record<string, unknown>;
   digest: string;
   generatedAt: string;
+}
+
+export interface ReviewCoverage {
+  totalSources: number;
+  processedSources: number;
+  supportedSources: number;
+  candidateCount: number;
+  complete: boolean;
+}
+
+export interface ReviewBundle {
+  id: string;
+  architectureScope: ArchitectureScopeRef;
+  designChangeSessionId: string;
+  status: ReviewBundleStatus;
+  riskTier: ReviewRiskTier;
+  assertionIds: string[];
+  identityCandidateIds: string[];
+  evidenceRefs: string[];
+  coverage: ReviewCoverage;
+  blockingIssues: string[];
+  digest: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KnowledgePromotionDecision {
+  id: string;
+  architectureScope: ArchitectureScopeRef;
+  reviewBundleId: string;
+  designChangeSessionId: string;
+  decision: PromotionDecision;
+  approvedAssertionIds: string[];
+  approvedIdentityCandidateIds: string[];
+  evidenceRefs: string[];
+  reason: string;
+  actorId: string;
+  createdAt: string;
 }

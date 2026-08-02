@@ -42,7 +42,7 @@ it("includes unified 3A knowledge initialization in the baseline", () => {
   const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-unified-3a-knowledge-initialization");
   expect(decision?.proposalId).toBe("proposal-unified-3a-knowledge-initialization");
   expect(decision?.contextPackId).toBe("context-pack-unified-3a-knowledge-initialization");
-  expect(decision?.status).toContain("phase 1 implemented");
+  expect(decision?.status).toContain("phase 2 initialization governance implemented");
 });
 
 it("includes design-context preflight governance in the baseline", () => {

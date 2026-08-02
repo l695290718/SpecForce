@@ -5,7 +5,7 @@ import { z } from "zod";
 import { auditToolCall } from "./audit";
 import { allowAllPolicy, getDefaultActor } from "./auth";
 import { deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
-import { commitKnowledgeChangeSet, createIdentityCandidate, createKnowledgeAssertion, createProjectionManifest, createWorkingStream, listKnowledgeAssertions, publishKnowledgeBaseline } from "./knowledge/persistence";
+import { commitKnowledgeChangeSet, createIdentityCandidate, createKnowledgeAssertion, createKnowledgeReviewBundle, createProjectionManifest, createWorkingStream, decideKnowledgeReviewBundle, listKnowledgeAssertions, publishKnowledgeBaseline } from "./knowledge/persistence";
 import {
   analyzeScopedProposalImpact,
   buildScopedAssetGraph,
@@ -436,6 +436,22 @@ export function registerTools(server: McpServer): void {
     readOnly: false
   }, async (input) => createIdentityCandidate(input as unknown as Parameters<typeof createIdentityCandidate>[0]));
 
+  registerJsonTool(server, "create_knowledge_review_bundle", {
+    title: "Create knowledge ReviewBundle",
+    description: "Builds a scoped T0-T3 review bundle from assertions, identity candidates, evidence, coverage, and blocking issues. Partial or blocked coverage cannot be approved.",
+    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), designChangeSessionId: z.string().min(1), riskTier: z.enum(["T0", "T1", "T2", "T3"]), assertionIds: z.array(z.string()), identityCandidateIds: z.array(z.string()), evidenceRefs: z.array(z.string()).min(1), coverage: z.object({ totalSources: z.number().int().min(0), processedSources: z.number().int().min(0), supportedSources: z.number().int().min(0), candidateCount: z.number().int().min(0), complete: z.boolean() }), blockingIssues: z.array(z.string()) },
+    permissions: ["knowledge:write"],
+    readOnly: false
+  }, createKnowledgeReviewBundle);
+
+  registerJsonTool(server, "decide_knowledge_review_bundle", {
+    title: "Decide knowledge ReviewBundle",
+    description: "Records an auditable MCP-only promotion decision. Approval marks selected assertions and identity candidates accepted for a later ChangeSet.",
+    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), reviewBundleId: z.string().min(1), decision: z.enum(["APPROVE", "REJECT"]), approvedAssertionIds: z.array(z.string()), approvedIdentityCandidateIds: z.array(z.string()), evidenceRefs: z.array(z.string()).min(1), reason: z.string().min(1) },
+    permissions: ["knowledge:write", "governance:run"],
+    readOnly: false
+  }, decideKnowledgeReviewBundle);
+
   registerJsonTool(server, "create_working_stream", {
     title: "Create working stream",
     description: "Creates or reopens a mutable scoped Working Stream for atomic ChangeSets.",
@@ -447,8 +463,8 @@ export function registerTools(server: McpServer): void {
   registerJsonTool(server, "commit_knowledge_changeset", {
     title: "Commit knowledge ChangeSet",
     description: "Commits asset revisions, relationship revisions, and Evidence references into one monotonic scoped ChangeSet.",
-    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), streamId: z.string().min(1), assetRevisionIds: z.array(z.string()), relationshipRevisionIds: z.array(z.string()), evidenceRefs: z.array(z.string()) },
-    permissions: ["knowledge:write"],
+    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), streamId: z.string().min(1), assetRevisionIds: z.array(z.string()), relationshipRevisionIds: z.array(z.string()), evidenceRefs: z.array(z.string()), promotionDecisionId: z.string().min(1) },
+    permissions: ["knowledge:write", "governance:run"],
     readOnly: false
   }, commitKnowledgeChangeSet);
 

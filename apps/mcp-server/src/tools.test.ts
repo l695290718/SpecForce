@@ -33,8 +33,10 @@ const knowledge = vi.hoisted(() => ({
   commitKnowledgeChangeSet: vi.fn().mockResolvedValue({ id: "changeset-1", status: "COMMITTED" }),
   createIdentityCandidate: vi.fn().mockResolvedValue({ id: "identity-1", decision: "UNDECIDED" }),
   createKnowledgeAssertion: vi.fn().mockResolvedValue({ id: "assertion-1", layer: "SYS" }),
+  createKnowledgeReviewBundle: vi.fn().mockResolvedValue({ id: "review-1", status: "READY" }),
   createProjectionManifest: vi.fn().mockResolvedValue({ id: "projection-1", projectionType: "SYS_KL" }),
   createWorkingStream: vi.fn().mockResolvedValue({ id: "stream-1", status: "ACTIVE" }),
+  decideKnowledgeReviewBundle: vi.fn().mockResolvedValue({ id: "decision-1", decision: "APPROVE" }),
   listKnowledgeAssertions: vi.fn().mockResolvedValue([]),
   publishKnowledgeBaseline: vi.fn().mockResolvedValue({ id: "baseline-1", status: "PUBLISHED" })
 }));
@@ -249,6 +251,8 @@ describe("3A knowledge foundation tools", () => {
     expect([...tools.keys()]).toEqual(expect.arrayContaining([
       "create_knowledge_assertion",
       "create_identity_candidate",
+      "create_knowledge_review_bundle",
+      "decide_knowledge_review_bundle",
       "create_working_stream",
       "commit_knowledge_changeset",
       "publish_knowledge_baseline",
@@ -262,14 +266,18 @@ describe("3A knowledge foundation tools", () => {
     const architectureScope = { applicationServiceId: "com.huawei.celon.desiner", scopePath: "designer" };
     await tools.get("create_knowledge_assertion")!.handler({ architectureScope, assertion: { id: "assertion-1" } });
     await tools.get("create_identity_candidate")!.handler({ architectureScope, candidate: { id: "identity-1" } });
+    await tools.get("create_knowledge_review_bundle")!.handler({ architectureScope, id: "review-1", designChangeSessionId: "session-1", riskTier: "T1", assertionIds: ["assertion-1"], identityCandidateIds: [], evidenceRefs: ["evidence-1"], coverage: { totalSources: 1, processedSources: 1, supportedSources: 1, candidateCount: 1, complete: true }, blockingIssues: [] });
+    await tools.get("decide_knowledge_review_bundle")!.handler({ architectureScope, id: "decision-1", reviewBundleId: "review-1", decision: "APPROVE", approvedAssertionIds: ["assertion-1"], approvedIdentityCandidateIds: [], evidenceRefs: ["evidence-1"], reason: "Reviewed" });
     await tools.get("create_working_stream")!.handler({ architectureScope, id: "stream-1", name: "Main" });
-    await tools.get("commit_knowledge_changeset")!.handler({ architectureScope, id: "changeset-1", streamId: "stream-1", assetRevisionIds: [], relationshipRevisionIds: [], evidenceRefs: [] });
+    await tools.get("commit_knowledge_changeset")!.handler({ architectureScope, id: "changeset-1", streamId: "stream-1", assetRevisionIds: [], relationshipRevisionIds: [], evidenceRefs: [], promotionDecisionId: "decision-1" });
     await tools.get("publish_knowledge_baseline")!.handler({ architectureScope, id: "baseline-1", streamId: "stream-1", changeSetId: "changeset-1", sourceRevisionIds: ["asset-1"], relationshipVersion: "1", reconciliationStatus: "CONVERGED" });
     await tools.get("create_projection_manifest")!.handler({ architectureScope, id: "projection-1", baselineId: "baseline-1", projectionType: "SYS_KL", projectionSchemaVersion: "1", sourceRevisionIds: ["asset-1"], relationshipVersion: "1", query: {} });
     await tools.get("list_knowledge_assertions")!.handler({ applicationServiceId: architectureScope.applicationServiceId });
 
     expect(knowledge.createKnowledgeAssertion).toHaveBeenCalledOnce();
     expect(knowledge.createIdentityCandidate).toHaveBeenCalledOnce();
+    expect(knowledge.createKnowledgeReviewBundle).toHaveBeenCalledOnce();
+    expect(knowledge.decideKnowledgeReviewBundle).toHaveBeenCalledOnce();
     expect(knowledge.createWorkingStream).toHaveBeenCalledOnce();
     expect(knowledge.commitKnowledgeChangeSet).toHaveBeenCalledOnce();
     expect(knowledge.publishKnowledgeBaseline).toHaveBeenCalledOnce();

@@ -53,6 +53,7 @@ CREATE TABLE "KnowledgeChangeSet" (
     "relationshipRevisionIds" JSONB NOT NULL DEFAULT '[]',
     "evidenceRefs" JSONB NOT NULL DEFAULT '[]',
     "digest" TEXT NOT NULL,
+    "promotionDecisionId" TEXT,
     "committedAt" TIMESTAMP(3),
     "applicationServiceId" TEXT NOT NULL,
     "scopePath" TEXT NOT NULL,
@@ -120,3 +121,46 @@ CREATE INDEX "KnowledgeChangeSet_scope_stream_status_idx" ON "KnowledgeChangeSet
 CREATE INDEX "WorkingStream_scope_status_idx" ON "WorkingStream"("applicationServiceId", "scopePath", "status");
 CREATE INDEX "KnowledgeBaseline_scope_stream_status_idx" ON "KnowledgeBaseline"("applicationServiceId", "scopePath", "streamId", "status");
 CREATE INDEX "ProjectionManifest_scope_baseline_type_idx" ON "ProjectionManifest"("applicationServiceId", "scopePath", "baselineId", "projectionType");
+
+CREATE TABLE "KnowledgeReviewBundle" (
+    "dbId" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "id" TEXT NOT NULL,
+    "designChangeSessionId" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "riskTier" TEXT NOT NULL,
+    "assertionIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
+    "identityCandidateIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
+    "evidenceRefs" JSONB NOT NULL DEFAULT '[]'::jsonb,
+    "coverage" JSONB NOT NULL DEFAULT '{}'::jsonb,
+    "blockingIssues" JSONB NOT NULL DEFAULT '[]'::jsonb,
+    "digest" TEXT NOT NULL,
+    "createdBy" TEXT NOT NULL,
+    "applicationServiceId" TEXT NOT NULL,
+    "scopePath" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "KnowledgeReviewBundle_pkey" PRIMARY KEY ("dbId")
+);
+
+CREATE UNIQUE INDEX "KnowledgeReviewBundle_scope_id_key" ON "KnowledgeReviewBundle"("applicationServiceId", "scopePath", "id");
+CREATE INDEX "KnowledgeReviewBundle_scope_session_status_idx" ON "KnowledgeReviewBundle"("applicationServiceId", "scopePath", "designChangeSessionId", "status");
+
+CREATE TABLE "KnowledgePromotionDecision" (
+    "dbId" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "id" TEXT NOT NULL,
+    "reviewBundleId" TEXT NOT NULL,
+    "designChangeSessionId" TEXT NOT NULL,
+    "decision" TEXT NOT NULL,
+    "approvedAssertionIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
+    "approvedIdentityCandidateIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
+    "evidenceRefs" JSONB NOT NULL DEFAULT '[]'::jsonb,
+    "reason" TEXT NOT NULL,
+    "actorId" TEXT NOT NULL,
+    "applicationServiceId" TEXT NOT NULL,
+    "scopePath" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "KnowledgePromotionDecision_pkey" PRIMARY KEY ("dbId")
+);
+
+CREATE UNIQUE INDEX "KnowledgePromotionDecision_scope_id_key" ON "KnowledgePromotionDecision"("applicationServiceId", "scopePath", "id");
+CREATE INDEX "KnowledgePromotionDecision_scope_bundle_decision_idx" ON "KnowledgePromotionDecision"("applicationServiceId", "scopePath", "reviewBundleId", "decision");

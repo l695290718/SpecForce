@@ -637,6 +637,7 @@ model KnowledgeChangeSet {
   relationshipRevisionIds Json     @default("[]") @db.JsonB
   evidenceRefs            Json     @default("[]") @db.JsonB
   digest                  String
+  promotionDecisionId     String?
   committedAt             DateTime?
   applicationServiceId    String
   scopePath               String
@@ -695,4 +696,45 @@ model ProjectionManifest {
 
   @@unique([applicationServiceId, scopePath, id], map: "ProjectionManifest_scope_id_key")
   @@index([applicationServiceId, scopePath, baselineId, projectionType], map: "ProjectionManifest_scope_baseline_type_idx")
+}
+
+model KnowledgeReviewBundle {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  designChangeSessionId String
+  status               String
+  riskTier             String
+  assertionIds         Json     @default("[]") @db.JsonB
+  identityCandidateIds Json     @default("[]") @db.JsonB
+  evidenceRefs         Json     @default("[]") @db.JsonB
+  coverage             Json     @default("{}") @db.JsonB
+  blockingIssues       Json     @default("[]") @db.JsonB
+  digest               String
+  createdBy            String
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "KnowledgeReviewBundle_scope_id_key")
+  @@index([applicationServiceId, scopePath, designChangeSessionId, status], map: "KnowledgeReviewBundle_scope_session_status_idx")
+}
+
+model KnowledgePromotionDecision {
+  dbId                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                      String
+  reviewBundleId          String
+  designChangeSessionId   String
+  decision                String
+  approvedAssertionIds    Json     @default("[]") @db.JsonB
+  approvedIdentityCandidateIds Json @default("[]") @db.JsonB
+  evidenceRefs            Json     @default("[]") @db.JsonB
+  reason                  String
+  actorId                 String
+  applicationServiceId    String
+  scopePath               String
+  createdAt               DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, id], map: "KnowledgePromotionDecision_scope_id_key")
+  @@index([applicationServiceId, scopePath, reviewBundleId, decision], map: "KnowledgePromotionDecision_scope_bundle_decision_idx")
 }

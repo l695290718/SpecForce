@@ -28,7 +28,7 @@
 
 ### Implement unified 3A knowledge initialization
 
-**Status:** Phase 1 generic foundation implemented and MCP synchronized; initialization governance and later increments pending. Web standalone artifact verification is blocked by the current Windows symlink policy.
+**Status:** Phase 2 initialization governance implemented and MCP synchronized; generic scanning, 3A projections, and later increments pending. Web standalone artifact verification is blocked by the current Windows symlink policy.
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
@@ -42,13 +42,13 @@
 
 **Completion evidence:** The core must run without the Huawei profile; a non-DDD fixture must initialize through the Generic System profile; repeated scans must be idempotent; conflicting assertions must remain visible; partial scan, blocked review, and failed reconciliation must not activate a Baseline; and exact-Scope MCP persistence, reproducible deterministic KL context, pinned Context Pack retrieval, PostgreSQL authority, and graph-outage behavior must pass.
 
-**Phase 1 evidence:** Core contracts, Profile-neutral Scope registry, assertion validation, content digests, PostgreSQL models and migration, and scoped MCP operations are implemented. `pnpm test` passed 13 files and 140 tests; MCP tools passed 20 tests; the gated PostgreSQL integration test passed persistence, idempotent ChangeSet, Baseline, projection-manifest, and exact-Scope read-back checks. `pnpm build` compiled and generated static pages but failed at Windows pnpm standalone symlink tracing; retry after enabling Developer Mode or using a symlink-capable build environment.
+**Phase 2 evidence:** Core contracts, Profile-neutral Scope registry, assertion validation, content digests, PostgreSQL models and migration, scoped MCP operations, ReviewBundles, fail-closed coverage, MCP-only promotion decisions, and ChangeSet promotion gates are implemented. `pnpm typecheck` passed all three packages; focused core/MCP/manifest suites passed 35 tests; the gated PostgreSQL integration test passed Session → READY ReviewBundle → APPROVE decision → gated ChangeSet → Baseline, idempotent retry, and exact-Scope read-back. `pnpm build` compiled and generated static pages but failed at Windows pnpm standalone symlink tracing; retry after enabling Developer Mode or using a symlink-capable build environment.
 
 **Design-fact evidence:** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-unified-3a-knowledge-initialization'; pnpm design-facts:sync` completed ADR-0018 and its generated Proposal, Context Pack, Evidence, and typed links. The matching exact-Scope check returned empty `missing`, `mismatched`, `outOfScope`, and `blocked` lists. A later full-batch synchronization timed out and remains a tooling follow-up.
 
 **中文本地化：**
 
-**状态：** 通用基础 Phase 1 已实现并完成 MCP 同步，初始化治理和后续增量待实现；Web standalone 产物验证受当前 Windows 符号链接策略阻塞。
+**状态：** 通用基础和初始化治理 Phase 2 已实现并完成 MCP 同步，通用扫描、3A 投影和后续增量待实现；Web standalone 产物验证受当前 Windows 符号链接策略阻塞。
 
 **负责人：** SpecForge 架构与 Agent 集成。
 
@@ -62,7 +62,7 @@
 
 **完成证据：** 核心必须可以脱离华为 Profile 运行；非 DDD Fixture 必须能通过 Generic System Profile 初始化；重复扫描幂等；冲突断言保持可见；部分扫描、阻塞审核和对账失败不能激活 Baseline；精确 Scope MCP 持久化、确定性 KL 上下文重现、固定 Context Pack 读取、PostgreSQL 权威和图故障回退都必须通过。
 
-**Phase 1 证据：** 已实现核心契约、Profile 无关 Scope 注册表、断言校验、内容摘要、PostgreSQL 模型与迁移以及精确 Scope MCP 操作。`pnpm test` 通过 13 个文件和 140 项测试；MCP 工具通过 20 项；带门控的 PostgreSQL 集成测试通过持久化、ChangeSet 幂等、Baseline、投影清单和精确 Scope 回读。`pnpm build` 已完成编译和静态页面生成，但在 Windows pnpm standalone 符号链接追踪时失败；启用 Developer Mode 或使用支持符号链接的构建环境后重试。
+**Phase 2 证据：** 已实现核心契约、Profile 无关 Scope 注册表、断言校验、内容摘要、PostgreSQL 模型与迁移、精确 Scope MCP 操作、ReviewBundle、覆盖不足 fail-closed、MCP-only 提升决策和 ChangeSet 提升门禁。`pnpm typecheck` 三个包均通过；核心、MCP 和清单定向测试共 35 项通过；带门控的 PostgreSQL 集成测试通过 Session → READY ReviewBundle → APPROVE 决策 → ChangeSet 提升门禁 → Baseline、幂等重试和精确 Scope 回读。`pnpm build` 已完成编译和静态页面生成，但在 Windows pnpm standalone 符号链接追踪时失败；启用 Developer Mode 或使用支持符号链接的构建环境后重试。
 
 **设计事实证据：** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-unified-3a-knowledge-initialization'; pnpm design-facts:sync` 已完成 ADR-0018 及其 Proposal、Context Pack、Evidence 和类型化关系；精确 Scope 回读的 `missing`、`mismatched`、`outOfScope` 和 `blocked` 均为空。后续整批同步曾超时，保留为工具链待办。
 

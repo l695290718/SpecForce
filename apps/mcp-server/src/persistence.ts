@@ -259,6 +259,7 @@ export async function ensureMcpPersistenceSchema() {
       "relationshipRevisionIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
       "evidenceRefs" JSONB NOT NULL DEFAULT '[]'::jsonb,
       digest TEXT NOT NULL,
+      "promotionDecisionId" TEXT,
       "committedAt" TIMESTAMP,
       "applicationServiceId" TEXT NOT NULL,
       "scopePath" TEXT NOT NULL,
@@ -314,6 +315,48 @@ export async function ensureMcpPersistenceSchema() {
       UNIQUE("applicationServiceId", "scopePath", id)
     )
   `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "KnowledgeReviewBundle" (
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
+      "designChangeSessionId" TEXT NOT NULL,
+      status TEXT NOT NULL,
+      "riskTier" TEXT NOT NULL,
+      "assertionIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "identityCandidateIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "evidenceRefs" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      coverage JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "blockingIssues" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      digest TEXT NOT NULL,
+      "createdBy" TEXT NOT NULL,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id)
+    )
+  `);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "KnowledgeChangeSet" ADD COLUMN IF NOT EXISTS "promotionDecisionId" TEXT`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "KnowledgeReviewBundle_scope_session_status_idx" ON "KnowledgeReviewBundle"("applicationServiceId", "scopePath", "designChangeSessionId", status)`);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "KnowledgePromotionDecision" (
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
+      "reviewBundleId" TEXT NOT NULL,
+      "designChangeSessionId" TEXT NOT NULL,
+      decision TEXT NOT NULL,
+      "approvedAssertionIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "approvedIdentityCandidateIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "evidenceRefs" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      reason TEXT NOT NULL,
+      "actorId" TEXT NOT NULL,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id)
+    )
+  `);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "KnowledgePromotionDecision_scope_bundle_decision_idx" ON "KnowledgePromotionDecision"("applicationServiceId", "scopePath", "reviewBundleId", decision)`);
   await upgradeLegacyPersistedIdentitySchema();
   for (const table of ["DesignAsset", "Proposal", "ContextPack", "AssetLink"]) {
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "${table}_applicationServiceId_idx" ON "${table}"("applicationServiceId")`);

@@ -555,7 +555,7 @@
                                                   "adr-federated-design-fact-synchronization"
                                               ],
                           "owner":  "SpecForge Architecture and Agent Integration",
-                          "status":  "MCP synchronized and read back; phase 1 implemented; web artifact verification pending",
+                            "status":  "MCP synchronized and read back; phase 2 initialization governance implemented; web artifact verification pending",
                           "reason":  "The approved design models Business, System, and Technical Architecture as versioned perspectives over one authoritative fact graph, preserves multiple evidence-backed assertions per semantic identity, and keeps KLs, Context Packs, reports, and graph stores as derived projections.",
                           "retryTrigger":  "After written-spec review, prepare and approve an implementation plan. After any design change, rerun exact-Scope synchronization and read-back before implementation is claimed complete.",
                           "evidence":  [
@@ -565,7 +565,7 @@
                                            },
                                            {
                                                "command":  "pnpm design-context:preflight -- --intent \"Formalize the approved unified 3A knowledge initialization architecture and profile-neutral legacy discovery model.\" --affected \"adr-agent-driven-legacy-baseline-discovery,adr-federated-design-fact-synchronization,data-specforge-assets,data-specforge-asset-graph,api-specforge-mcp-tools\" --evidence \"approved bilingual design review,ADR and manifest validation,MCP design-fact synchronization and read-back\"",
-                                               "result":  "Read 119 exact-Designer-Scope assets and opened design-change-session:e51c9bff-6a1f-4ed2-8e75-887b67042203."
+                                                 "result":  "Read 126 exact-Designer-Scope assets and opened design-change-session:f7bad4e6-b4f4-4506-a28c-a86f14633257."
                                            },
                                            {
                                                "command":  "node .\\node_modules\\vitest\\vitest.mjs run --root . --exclude \".worktrees/**\" --exclude \".pnpm-store/**\" scripts\\design-fact-manifest.test.ts",
@@ -576,12 +576,12 @@
                                                "result":  "ADR-0018 and its generated records synchronized and verified in the exact owning Scope; missing, mismatched, outOfScope, and blocked lists were empty. The unchanged fifteen baseline decisions were not rewritten in this increment."
                                            },
                                            {
-                                               "command":  "pnpm test; pnpm typecheck; pnpm --filter @specforge/mcp-server typecheck",
-                                               "result":  "Core tests passed 13 files and 140 tests; Core, MCP Server, and Web type checks passed; the focused MCP tool suite passed 20 tests."
+                                                 "command":  "pnpm typecheck; node .\\node_modules\\vitest\\vitest.mjs run --root . --exclude \".worktrees/**\" --exclude \".pnpm-store/**\" packages/core/src/__tests__/knowledge-foundation.test.ts apps/mcp-server/src/tools.test.ts scripts/design-fact-manifest.test.ts",
+                                                 "result":  "Core, MCP Server, and Web type checks passed; the focused core, MCP, and manifest suites passed 35 tests, including fail-closed ReviewBundle and promotion-gate cases."
                                            },
                                            {
                                                "command":  "$env:SPECFORGE_KNOWLEDGE_INTEGRATION='1'; node .\\node_modules\\vitest\\vitest.mjs run --root apps\\mcp-server --exclude \".worktrees/**\" --exclude \".pnpm-store/**\" src\\knowledge\\persistence.integration.test.ts",
-                                               "result":  "Passed the gated PostgreSQL test for assertion persistence, idempotent ChangeSet retry, converged Baseline, projection manifest, and exact-Scope read-back against localhost:15433/specforge_canonical; fixtures were cleaned up."
+                                                 "result":  "Passed the gated PostgreSQL test for Session, READY ReviewBundle, APPROVE decision, gated ChangeSet, idempotent retry, converged Baseline, projection manifest, and exact-Scope read-back against localhost:15433/specforge_canonical; fixtures were cleaned up."
                                            },
                                            {
                                                "command":  "pnpm build",
