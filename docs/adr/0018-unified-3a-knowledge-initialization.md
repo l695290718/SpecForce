@@ -2,7 +2,7 @@
 
 ## Status
 
-**Phase 3 scanner foundation implemented. MCP design facts are synchronized and read back; semantic extraction, 3A projections, and migration hardening remain pending.**
+**Phase 3 scanner foundation and provider-neutral MockAI semantic candidate generation implemented. MCP design facts are synchronized and read back; signed packaging, identity matching, 3A projections, and migration hardening remain pending.**
 
 - Stable ADR/MCP ID: `adr-unified-3a-knowledge-initialization`
 - Owning `architectureScope.applicationServiceId`: `com.huawei.celon.desiner`
@@ -76,8 +76,9 @@ Reuse the existing federation `SourceObservation`, `Candidate`, `Promotion`, and
 - **Phase 2 verification:** `pnpm typecheck` passed Core, MCP Server, and Web; the focused core, MCP, and manifest suites passed 35 tests; and the gated PostgreSQL integration test passed the Session → READY ReviewBundle → APPROVE decision → gated ChangeSet → Baseline path, including idempotent retry and exact-Scope read-back.
 - **Database verification:** `pnpm db:push` synchronized the foundation tables plus `KnowledgeReviewBundle`, `KnowledgePromotionDecision`, and the ChangeSet promotion-decision reference into `localhost:15433/specforge_canonical`.
 - **Scanner verification:** `pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <temp-file>` produced 56 source-minimized manifest entries, 56 structural observations, and a deterministic report digest; the gated MCP scanner integration persisted the report and idempotent observations.
+- **Semantic verification:** `pnpm typecheck` passed all three packages; the core suite passed 145 tests; the scoped MCP tool suite passed 20 tests; and the gated PostgreSQL scanner integration passed MockAI semantic candidate generation, bilingual summaries, candidate-only assertion status, automatic ReviewBundle assembly, and idempotent retry.
 - **Build boundary:** `pnpm build` compiled Core, typechecked MCP and Web, generated all 18 static pages, and then failed at Next.js standalone trace copying because the Windows host disallowed pnpm symlink creation, including an elevated retry. Retry after enabling Windows Developer Mode or using a symlink-capable build environment.
-- **Implementation boundary:** Repository scanning foundation, deterministic evidence indexing, source-minimized observations, and MCP report persistence are implemented. Signed scanner packaging, semantic extraction, real 3A KL generation, and Huawei-profile migration are not implemented in this increment. ReviewBundle creation, fail-closed coverage evaluation, MCP-only promotion decisions, and ChangeSet promotion gating remain implemented.
+- **Implementation boundary:** Repository scanning foundation, deterministic evidence indexing, source-minimized observations, provider-neutral semantic candidate generation through MockAIProvider, bilingual candidate summaries, and MCP ReviewBundle assembly are implemented. Signed scanner packaging, real Agent transport, identity matching, real 3A KL generation, and Huawei-profile migration are not implemented in this increment. ReviewBundle creation, fail-closed coverage evaluation, MCP-only promotion decisions, and ChangeSet promotion gating remain implemented.
 
 ## MCP Record
 
@@ -87,7 +88,7 @@ Reuse the existing federation `SourceObservation`, `Candidate`, `Promotion`, and
 - Matching Context Pack: `context-pack-unified-3a-knowledge-initialization`
 - Related assets: `data-specforge-assets`, `data-specforge-asset-graph`, `api-specforge-mcp-tools`, `adr-agent-driven-legacy-baseline-discovery`, and `adr-federated-design-fact-synchronization`
 - Required typed links: Proposal `--IMPLEMENTS_DECISION-->` ADR; Context Pack `--IMPLEMENTS_CONTEXT_FOR-->` Proposal; ADR `--DECIDES-->` related assets; Evidence `--VALIDATES-->` ADR
-- Current status: MCP synchronized and read back from the configured canonical PostgreSQL authority; Phase 3 scanner foundation is implemented, while semantic extraction, later increments, and the Windows standalone artifact check remain pending.
+- Current status: MCP synchronized and read back from the configured canonical PostgreSQL authority; Phase 3 scanner foundation and MockAI semantic candidate generation are implemented, while signed packaging, identity matching, later increments, and the Windows standalone artifact check remain pending.
 
 ## Chinese Localization
 
@@ -163,7 +164,8 @@ ADR-0015 已经确定由 Agent 驱动、基于证据发现存量应用。整体�
 - **数据库验证：** `pnpm db:push` 已将基础表、`KnowledgeReviewBundle`、`KnowledgePromotionDecision` 以及 ChangeSet 的提升决策引用同步到 `localhost:15433/specforge_canonical`。
 - **扫描器验证：** `pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <临时文件>` 生成 56 个最小化源码清单条目、56 个结构观察和确定性报告摘要；带门控的 MCP 扫描集成测试已持久化报告并验证观察幂等。
 - **构建边界：** `pnpm build` 已完成 Core 编译、MCP 与 Web 类型检查以及全部 18 个静态页面生成，随后在 Next.js standalone 追踪复制阶段因 Windows 主机禁止创建 pnpm 符号链接失败，提权重试结果相同。启用 Windows Developer Mode 或使用支持符号链接的构建环境后重试。
-- **实现边界：** 本增量已实现仓库扫描基础、确定性证据索引、最小化源码结构观察和 MCP 报告持久化；尚未实现签名扫描包、语义提取、真实 3A KL 生成和 Huawei Profile 迁移。ReviewBundle 创建、覆盖不足 fail-closed、MCP-only 提升决策和 ChangeSet 提升门禁已经实现。
+- **语义验证：** `pnpm typecheck` 三个包均通过；核心测试 145 项通过；范围化 MCP 工具测试 20 项通过；带门控的 PostgreSQL 扫描集成测试通过 MockAI 语义候选生成、双语摘要、候选状态、ReviewBundle 自动组装和幂等重试。
+- **实现边界：** 本增量已实现仓库扫描基础、确定性证据索引、最小化源码结构观察、Provider 无关的 MockAI 语义候选生成、双语候选摘要和 MCP ReviewBundle 组装；尚未实现签名扫描包、真实 Agent 传输、身份匹配、真实 3A KL 生成和 Huawei Profile 迁移。ReviewBundle 创建、覆盖不足 fail-closed、MCP-only 提升决策和 ChangeSet 提升门禁已经实现。
 
 ### MCP 记录
 
@@ -172,4 +174,4 @@ ADR-0015 已经确定由 Agent 驱动、基于证据发现存量应用。整体�
 - 匹配 Proposal：`proposal-unified-3a-knowledge-initialization`
 - 匹配 Context Pack：`context-pack-unified-3a-knowledge-initialization`
 - 相关资产：`data-specforge-assets`、`data-specforge-asset-graph`、`api-specforge-mcp-tools`、`adr-agent-driven-legacy-baseline-discovery` 和 `adr-federated-design-fact-synchronization`
-- 当前状态：已通过 MCP 写入配置的规范 PostgreSQL 权威库并完成回读；实现仍待开始。
+- 当前状态：已通过 MCP 写入配置的规范 PostgreSQL 权威库并完成回读；扫描器基础和 Provider 无关的 MockAI 语义候选生成已实现，签名包、真实 Agent 传输、身份匹配、3A 投影和迁移加固仍待后续增量。

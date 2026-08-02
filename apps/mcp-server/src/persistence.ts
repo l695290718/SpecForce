@@ -366,6 +366,7 @@ export async function ensureMcpPersistenceSchema() {
       "scannerVersion" TEXT NOT NULL,
       "rootLabel" TEXT NOT NULL,
       manifest JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "observationIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
       coverage JSONB NOT NULL DEFAULT '{}'::jsonb,
       "manifestDigest" TEXT NOT NULL,
       "reportDigest" TEXT NOT NULL,
@@ -378,6 +379,7 @@ export async function ensureMcpPersistenceSchema() {
       UNIQUE("applicationServiceId", "scopePath", "reportDigest")
     )
   `);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "KnowledgeScanReport" ADD COLUMN IF NOT EXISTS "observationIds" JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "KnowledgeScanReport_scope_session_status_idx" ON "KnowledgeScanReport"("applicationServiceId", "scopePath", "designChangeSessionId", status)`);
   await upgradeLegacyPersistedIdentitySchema();
   for (const table of ["DesignAsset", "Proposal", "ContextPack", "AssetLink"]) {

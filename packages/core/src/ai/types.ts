@@ -3,7 +3,8 @@ export type AIProviderCapability =
   | "adr"
   | "businessRule"
   | "testSuggestions"
-  | "agentContextPack";
+  | "agentContextPack"
+  | "semanticCandidates";
 
 export interface AIProviderRequest {
   capability: AIProviderCapability;
@@ -72,4 +73,17 @@ export interface AgentContextPackDraft {
   markdown: string;
   constraints: string[];
   instructions: string[];
+}
+
+export interface SemanticCandidateDraft {
+  sourceObservationId: string;
+  semanticIdentity: string;
+  factType: string;
+  layer: "BIZ" | "SYS" | "TECH";
+  aspect: "structure" | "behavior" | "information" | "contract" | "constraint";
+  value: Record<string, unknown>;
+  confidence: number;
+  matchingEvidence: string[];
+  counterEvidence: string[];
+  unresolvedQuestions: string[];
 }

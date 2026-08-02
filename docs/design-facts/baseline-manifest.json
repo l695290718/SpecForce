@@ -462,7 +462,7 @@
                                                   "adr-federated-design-fact-synchronization"
                                               ],
                           "owner":  "SpecForge Architecture and Agent Integration",
-                            "status":  "MCP synchronized and read back; scanner foundation implemented; signed packaging and semantic extraction pending",
+        "status":  "MCP synchronized and read back; scanner foundation and MockAI semantic candidate generation implemented; signed packaging, real Agent transport, identity matching, and baseline publication pending",
                           "reason":  "The approved design uses existing coding Agents, a signed ephemeral deterministic scanner, evidence-backed semantic extraction, exact application-service authorization, and risk-tiered ReviewBundles without requiring users to deploy scanner infrastructure. Its design facts are persisted and verified in the exact Designer Scope.",
                           "retryTrigger":  "After a future design change, re-run design-facts:sync and design-facts:check. Begin implementation only after the written specification is reviewed and an implementation plan is approved.",
                           "evidence":  [
@@ -478,10 +478,14 @@
                                                  "command":  "pnpm design-facts:check",
                                                  "result":  "Verified all 13 decisions with empty missing, mismatched, outOfScope, and blocked results."
                                              },
-                                             {
-                                                 "command":  "pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <temp-file>",
-                                                 "result":  "Produced 56 source-minimized manifest entries, 56 structural observations, and a deterministic report digest; the gated MCP scanner integration persisted the report and idempotent observations."
-                                             }
+                         {
+                             "command":  "pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <temp-file>",
+                             "result":  "Produced 56 source-minimized manifest entries, 56 structural observations, and a deterministic report digest; the gated MCP scanner integration persisted the report and idempotent observations."
+                         },
+                         {
+                             "command":  "pnpm typecheck; .\\node_modules\\.bin\\vitest.cmd run apps/mcp-server/src/scanner/persistence.integration.test.ts",
+                             "result":  "Core, MCP Server, and Web type checks passed; the gated PostgreSQL scanner integration passed MockAI semantic candidate generation, candidate-only assertion status, bilingual summaries, automatic ReviewBundle assembly, and idempotent retry."
+                         }
                                        ]
                       },
                       {
@@ -559,7 +563,7 @@
                                                   "adr-federated-design-fact-synchronization"
                                               ],
                           "owner":  "SpecForge Architecture and Agent Integration",
-                              "status":  "MCP synchronized and read back; phase 3 scanner foundation implemented; web artifact verification pending",
+        "status":  "MCP synchronized and read back; phase 3 scanner foundation and MockAI semantic candidate generation implemented; signed packaging, identity matching, 3A projections, and web artifact verification pending",
                           "reason":  "The approved design models Business, System, and Technical Architecture as versioned perspectives over one authoritative fact graph, preserves multiple evidence-backed assertions per semantic identity, and keeps KLs, Context Packs, reports, and graph stores as derived projections.",
                           "retryTrigger":  "After written-spec review, prepare and approve an implementation plan. After any design change, rerun exact-Scope synchronization and read-back before implementation is claimed complete.",
                           "evidence":  [
@@ -587,10 +591,14 @@
                                                  "command":  "$env:SPECFORGE_KNOWLEDGE_INTEGRATION='1'; node .\\node_modules\\vitest\\vitest.mjs run --root apps\\mcp-server --exclude \".worktrees/**\" --exclude \".pnpm-store/**\" src\\knowledge\\persistence.integration.test.ts",
                                                    "result":  "Passed the gated PostgreSQL test for Session, READY ReviewBundle, APPROVE decision, gated ChangeSet, idempotent retry, converged Baseline, projection manifest, and exact-Scope read-back against localhost:15433/specforge_canonical; fixtures were cleaned up."
                                              },
-                                             {
-                                                 "command":  "pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <temp-file>",
-                                                 "result":  "Produced 56 source-minimized manifest entries, 56 structural observations, and a deterministic report digest; the gated MCP scanner integration persisted the report and idempotent observations."
-                                             },
+                         {
+                             "command":  "pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <temp-file>",
+                             "result":  "Produced 56 source-minimized manifest entries, 56 structural observations, and a deterministic report digest; the gated MCP scanner integration persisted the report and idempotent observations."
+                         },
+                         {
+                             "command":  "pnpm typecheck; .\\node_modules\\.bin\\vitest.cmd run apps/mcp-server/src/scanner/persistence.integration.test.ts",
+                             "result":  "Core, MCP Server, and Web type checks passed; the gated PostgreSQL scanner integration passed MockAI semantic candidate generation, candidate-only assertion status, bilingual summaries, automatic ReviewBundle assembly, and idempotent retry."
+                         },
                                            {
                                                "command":  "pnpm build",
                                                "result":  "Core and MCP compiled and Web generated 18 static pages, but Next.js standalone trace copying failed with Windows EPERM while creating pnpm symlinks; elevated retry had the same host limitation."

@@ -747,6 +747,7 @@ model KnowledgeScanReport {
   scannerVersion       String
   rootLabel            String
   manifest             Json     @default("[]") @db.JsonB
+  observationIds       Json     @default("[]") @db.JsonB
   coverage             Json     @default("{}") @db.JsonB
   manifestDigest       String
   reportDigest         String

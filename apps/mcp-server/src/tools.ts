@@ -7,6 +7,7 @@ import { allowAllPolicy, getDefaultActor } from "./auth";
 import { deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
 import { commitKnowledgeChangeSet, createIdentityCandidate, createKnowledgeAssertion, createKnowledgeReviewBundle, createProjectionManifest, createWorkingStream, decideKnowledgeReviewBundle, listKnowledgeAssertions, publishKnowledgeBaseline } from "./knowledge/persistence";
 import { submitScanReport } from "./scanner/persistence";
+import { generateKnowledgeCandidates } from "./knowledge/semantic-persistence";
 import {
   analyzeScopedProposalImpact,
   buildScopedAssetGraph,
@@ -436,6 +437,14 @@ export function registerTools(server: McpServer): void {
     permissions: ["knowledge:write", "asset:write"],
     readOnly: false
   }, async (input) => submitScanReport(input as unknown as Parameters<typeof submitScanReport>[0]));
+
+  registerJsonTool(server, "generate_knowledge_candidates", {
+    title: "Generate semantic knowledge candidates",
+    description: "Uses the configured AI Provider to analyze persisted scan observations and atomically create candidate assertions plus a scoped ReviewBundle. It never promotes facts or publishes a baseline.",
+    inputSchema: { architectureScope: architectureScopeSchema, scanReportId: z.string().min(1), provider: z.string().min(1).optional() },
+    permissions: ["knowledge:write"],
+    readOnly: false
+  }, async (input) => generateKnowledgeCandidates(input as unknown as Parameters<typeof generateKnowledgeCandidates>[0]));
 
   registerJsonTool(server, "create_identity_candidate", {
     title: "Create identity candidate",

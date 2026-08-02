@@ -34,13 +34,14 @@ export async function submitScanReport(input: SubmitScanReportInput): Promise<Pe
         update: {}
       });
     }
+    const observationIds = input.report.observations.map((observation) => `source:${input.report.reportDigest}:${observation.id}`);
     const status = input.report.coverage.complete ? "RECEIVED" : "BLOCKED";
-    const created = await transaction.knowledgeScanReport.create({ data: { ...scope, id: input.id, designChangeSessionId: input.designChangeSessionId, scannerId: input.report.scannerId, scannerVersion: input.report.scannerVersion, rootLabel: input.report.rootLabel, manifest: jsonValue(input.report.manifest), coverage: jsonValue(input.report.coverage), manifestDigest: input.report.manifestDigest, reportDigest: input.report.reportDigest, status, generatedAt: new Date(input.report.generatedAt) } });
+    const created = await transaction.knowledgeScanReport.create({ data: { ...scope, id: input.id, designChangeSessionId: input.designChangeSessionId, scannerId: input.report.scannerId, scannerVersion: input.report.scannerVersion, rootLabel: input.report.rootLabel, manifest: jsonValue(input.report.manifest), observationIds: jsonValue(observationIds), coverage: jsonValue(input.report.coverage), manifestDigest: input.report.manifestDigest, reportDigest: input.report.reportDigest, status, generatedAt: new Date(input.report.generatedAt) } });
     await transaction.designChangeSession.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.designChangeSessionId } }, data: { status: status === "RECEIVED" ? "WAITING_FOR_REVIEW" : "CONFLICTED" } });
     await transaction.federationOutbox.upsert({ where: { applicationServiceId_scopePath_idempotencyKey: { ...scope, idempotencyKey: `scan-report:${input.report.reportDigest}` } }, create: { ...scope, eventType: "FEDERATION_SCAN_REPORT_RECEIVED", payload: jsonValue({ scanReportId: input.id, reportDigest: input.report.reportDigest, observationCount: input.report.observations.length, coverage: input.report.coverage }), idempotencyKey: `scan-report:${input.report.reportDigest}`, status: "PENDING", designChangeSessionId: input.designChangeSessionId }, update: {} });
     return created;
   });
-  return persistedScanReport(row, input.report.observations.map((observation) => `source:${input.report.reportDigest}:${observation.id}`));
+  return persistedScanReport(row, (row.observationIds as string[] | undefined) ?? input.report.observations.map((observation) => `source:${input.report.reportDigest}:${observation.id}`));
 }
 
 function persistedScanReport(row: any, observationIds: string[]): PersistedScanReport {

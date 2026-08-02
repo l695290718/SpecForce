@@ -7,8 +7,10 @@ import type {
   AIProviderResponse,
   BusinessRuleDraft,
   ProposalDraft,
+  SemanticCandidateDraft,
   TestSuggestionsDraft
 } from "./types";
+import type { ScanObservation } from "../scanner/types";
 
 export function createDefaultAIProviderRegistry(): AIProviderRegistry {
   const registry = new AIProviderRegistry();
@@ -39,4 +41,13 @@ export async function generateTestSuggestions(request: DraftRequest): Promise<AI
 
 export async function generateAgentContextPackDraft(request: DraftRequest): Promise<AIProviderResponse<AgentContextPackDraft>> {
   return defaultRegistry.generate<AgentContextPackDraft>({ ...request, capability: "agentContextPack" });
+}
+
+export async function generateSemanticCandidates(request: { observations: ScanObservation[]; provider?: string }): Promise<AIProviderResponse<SemanticCandidateDraft[]>> {
+  return defaultRegistry.generate<SemanticCandidateDraft[]>({
+    provider: request.provider,
+    capability: "semanticCandidates",
+    prompt: "Generate evidence-backed semantic candidates for scanned observations. Never promote or accept facts.",
+    context: { observations: request.observations }
+  });
 }

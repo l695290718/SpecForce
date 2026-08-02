@@ -28,7 +28,7 @@
 
 ### Implement unified 3A knowledge initialization
 
-**Status:** Phase 3 scanner foundation implemented and MCP synchronized; semantic extraction, 3A projections, and later increments pending. Web standalone artifact verification is blocked by the current Windows symlink policy.
+**Status:** Phase 3 scanner foundation and MockAI semantic candidate generation implemented and MCP synchronized; signed packaging, identity matching, 3A projections, and later increments pending. Web standalone artifact verification is blocked by the current Windows symlink policy.
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
@@ -42,13 +42,13 @@
 
 **Completion evidence:** The core must run without the Huawei profile; a non-DDD fixture must initialize through the Generic System profile; repeated scans must be idempotent; conflicting assertions must remain visible; partial scan, blocked review, and failed reconciliation must not activate a Baseline; and exact-Scope MCP persistence, reproducible deterministic KL context, pinned Context Pack retrieval, PostgreSQL authority, and graph-outage behavior must pass.
 
-**Phase 3 evidence:** Core contracts, Profile-neutral Scope registry, assertion validation, content digests, PostgreSQL models and migration, scoped MCP operations, ReviewBundles, fail-closed coverage, MCP-only promotion decisions, ChangeSet promotion gates, deterministic local scanning, source-minimized observations, and idempotent scan-report persistence are implemented. `pnpm typecheck` passed all three packages; scanner/core/MCP/manifest suites passed; the gated PostgreSQL scanner integration test persisted a report and two observations without duplicates; and the CLI smoke scan produced 56 manifest entries, 56 structural observations, and a deterministic digest. `pnpm build` compiled and generated static pages but failed at Windows pnpm standalone symlink tracing; retry after enabling Developer Mode or using a symlink-capable build environment.
+**Phase 3 evidence:** Core contracts, Profile-neutral Scope registry, assertion validation, content digests, PostgreSQL models and migration, scoped MCP operations, ReviewBundles, fail-closed coverage, MCP-only promotion decisions, ChangeSet promotion gates, deterministic local scanning, source-minimized observations, idempotent scan-report persistence, provider-neutral MockAI semantic candidate generation, bilingual candidate summaries, and atomic ReviewBundle assembly are implemented. `pnpm typecheck` passed all three packages; the core suite passed 145 tests; the scoped MCP tool suite passed 20 tests; the gated PostgreSQL scanner integration test passed report persistence, idempotency, candidate-only assertions, semantic generation, and ReviewBundle idempotency; and the CLI smoke scan produced 56 manifest entries, 56 structural observations, and a deterministic digest. `pnpm build` compiled and generated static pages but failed at Windows pnpm standalone symlink tracing; retry after enabling Developer Mode or using a symlink-capable build environment.
 
 **Design-fact evidence:** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-unified-3a-knowledge-initialization'; pnpm design-facts:sync` completed ADR-0018 and its generated Proposal, Context Pack, Evidence, and typed links. The matching exact-Scope check returned empty `missing`, `mismatched`, `outOfScope`, and `blocked` lists. A later full-batch synchronization timed out and remains a tooling follow-up.
 
 **中文本地化：**
 
-**状态：** 通用基础、初始化治理和扫描器基础 Phase 3 已实现并完成 MCP 同步，语义提取、3A 投影和后续增量待实现；Web standalone 产物验证受当前 Windows 符号链接策略阻塞。
+**状态：** 通用基础、初始化治理、扫描器基础和 MockAI 语义候选生成 Phase 3 已实现并完成 MCP 同步；签名包、身份匹配、3A 投影和后续增量待实现；Web standalone 产物验证受当前 Windows 符号链接策略阻塞。
 
 **负责人：** SpecForge 架构与 Agent 集成。
 
@@ -62,7 +62,7 @@
 
 **完成证据：** 核心必须可以脱离华为 Profile 运行；非 DDD Fixture 必须能通过 Generic System Profile 初始化；重复扫描幂等；冲突断言保持可见；部分扫描、阻塞审核和对账失败不能激活 Baseline；精确 Scope MCP 持久化、确定性 KL 上下文重现、固定 Context Pack 读取、PostgreSQL 权威和图故障回退都必须通过。
 
-**Phase 3 证据：** 已实现核心契约、Profile 无关 Scope 注册表、断言校验、内容摘要、PostgreSQL 模型与迁移、精确 Scope MCP 操作、ReviewBundle、覆盖不足 fail-closed、MCP-only 提升决策、ChangeSet 提升门禁、确定性本地扫描、最小化源码结构观察和幂等扫描报告持久化。`pnpm typecheck` 三个包均通过；扫描器、核心、MCP 和清单测试通过；带门控的 PostgreSQL 扫描集成测试已持久化报告和两个观察且无重复；CLI 烟测生成 56 个清单条目、56 个结构观察和确定性摘要。`pnpm build` 已完成编译和静态页面生成，但在 Windows pnpm standalone 符号链接追踪时失败；启用 Developer Mode 或使用支持符号链接的构建环境后重试。
+**Phase 3 证据：** 已实现核心契约、Profile 无关 Scope 注册表、断言校验、内容摘要、PostgreSQL 模型与迁移、精确 Scope MCP 操作、ReviewBundle、覆盖不足 fail-closed、MCP-only 提升决策、ChangeSet 提升门禁、确定性本地扫描、最小化源码结构观察、幂等扫描报告持久化、Provider 无关的 MockAI 语义候选生成、双语候选摘要和原子 ReviewBundle 组装。`pnpm typecheck` 三个包均通过；核心测试 145 项、范围化 MCP 工具测试 20 项通过；带门控的 PostgreSQL 扫描集成测试通过报告持久化、幂等、候选状态、语义生成和 ReviewBundle 幂等；CLI 烟测生成 56 个清单条目、56 个结构观察和确定性摘要。`pnpm build` 已完成编译和静态页面生成，但在 Windows pnpm standalone 符号链接追踪时失败；启用 Developer Mode 或使用支持符号链接的构建环境后重试。
 
 **设计事实证据：** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-unified-3a-knowledge-initialization'; pnpm design-facts:sync` 已完成 ADR-0018 及其 Proposal、Context Pack、Evidence 和类型化关系；精确 Scope 回读的 `missing`、`mismatched`、`outOfScope` 和 `blocked` 均为空。后续整批同步曾超时，保留为工具链待办。
 
