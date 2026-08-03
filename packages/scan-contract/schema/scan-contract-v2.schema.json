@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specforge.dev/schema/scan-contract-v2.schema.json",
+  "title": "SpecForge Scan Contract v2",
+  "description": "Canonical language-neutral contract for signed scanner releases, exact-Scope scan sessions, deterministic observations, resumable batches, checkpoints, and finalization.",
+  "oneOf": [
+    { "$ref": "#/$defs/ScannerReleaseManifest" },
+    { "$ref": "#/$defs/ScanSessionDescriptor" },
+    { "$ref": "#/$defs/KnowledgeScanBatch" },
+    { "$ref": "#/$defs/ScanCheckpoint" },
+    { "$ref": "#/$defs/ScanFinalization" }
+  ],
+  "$defs": {
+    "ArchitectureScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicationServiceId", "scopePath"],
+      "properties": {
+        "applicationServiceId": { "type": "string", "minLength": 1 },
+        "scopePath": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ScanLimits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxObservationsPerBatch", "maxBatchBytes", "maxExcerptBytes", "maxSourceFileBytes", "maxObservationsPerSession"],
+      "properties": {
+        "maxObservationsPerBatch": { "type": "integer", "minimum": 1, "maximum": 500 },
+        "maxBatchBytes": { "type": "integer", "minimum": 1, "maximum": 4194304 },
+        "maxExcerptBytes": { "type": "integer", "minimum": 0, "maximum": 8192 },
+        "maxSourceFileBytes": { "type": "integer", "minimum": 1, "maximum": 10485760 },
+        "maxObservationsPerSession": { "type": "integer", "minimum": 1, "maximum": 100000 }
+      }
+    },
+    "RepositoryPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowDirtyWorktree", "ignorePatterns"],
+      "properties": {
+        "allowDirtyWorktree": { "type": "boolean" },
+        "ignorePatterns": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      }
+    },
+    "ScannerArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri", "sha256", "sizeBytes"],
+      "properties": {
+        "uri": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/Sha256" },
+        "sizeBytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "ExtractorDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ScannerReleaseStatus": {
+      "type": "string",
+      "enum": ["ACTIVE", "REVOKED", "RETIRED"]
+    },
+    "ScannerReleaseManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "releaseId", "scannerVersion", "platform", "artifact", "schemaVersions", "extractors", "signingKeyId", "algorithm", "issuedAt", "expiresAt", "status", "signature"],
+      "properties": {
+        "contractVersion": { "const": "2.0" },
+        "releaseId": { "type": "string", "minLength": 1 },
+        "scannerVersion": { "type": "string", "minLength": 1 },
+        "platform": { "type": "string", "minLength": 1 },
+        "artifact": { "$ref": "#/$defs/ScannerArtifact" },
+        "schemaVersions": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "extractors": { "type": "array", "items": { "$ref": "#/$defs/ExtractorDescriptor" } },
+        "signingKeyId": { "type": "string", "minLength": 1 },
+        "algorithm": { "const": "Ed25519" },
+        "issuedAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "status": { "$ref": "#/$defs/ScannerReleaseStatus" },
+        "signature": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ScanSessionDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "sessionId", "architectureScope", "actorId", "connectorId", "scannerReleaseId", "sessionNonce", "expiresAt", "repositoryPolicy", "limits", "expectedPreviousBatchDigest"],
+      "properties": {
+        "contractVersion": { "const": "2.0" },
+        "sessionId": { "type": "string", "minLength": 1 },
+        "architectureScope": { "$ref": "#/$defs/ArchitectureScope" },
+        "actorId": { "type": "string", "minLength": 1 },
+        "connectorId": { "type": "string", "minLength": 1 },
+        "scannerReleaseId": { "type": "string", "minLength": 1 },
+        "sessionNonce": { "type": "string", "minLength": 16 },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "repositoryPolicy": { "$ref": "#/$defs/RepositoryPolicy" },
+        "limits": { "$ref": "#/$defs/ScanLimits" },
+        "expectedPreviousBatchDigest": {
+          "anyOf": [{ "$ref": "#/$defs/Sha256" }, { "type": "null" }]
+        }
+      }
+    },
+    "ArchitectureLayer": {
+      "type": "string",
+      "enum": ["BIZ", "SYS", "TECH", "UNKNOWN"]
+    },
+    "RepositorySnapshotKind": {
+      "type": "string",
+      "enum": ["COMMIT", "DIRTY_MANIFEST"]
+    },
+    "RepositoryIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repositoryId", "snapshotKind", "snapshotDigest", "commit"],
+      "properties": {
+        "repositoryId": { "type": "string", "minLength": 1 },
+        "snapshotKind": { "$ref": "#/$defs/RepositorySnapshotKind" },
+        "snapshotDigest": { "$ref": "#/$defs/Sha256" },
+        "commit": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] }
+      }
+    },
+    "SourceLocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "symbol", "lineStart", "lineEnd"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "symbol": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+        "lineStart": { "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] },
+        "lineEnd": { "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] }
+      }
+    },
+    "ParserDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "SensitivityClassification": {
+      "type": "string",
+      "enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+    },
+    "RedactionStatus": {
+      "type": "string",
+      "enum": ["NONE", "REDACTED", "BLOCKED"]
+    },
+    "RedactionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reasons"],
+      "properties": {
+        "status": { "$ref": "#/$defs/RedactionStatus" },
+        "reasons": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "EvidenceKind": {
+      "type": "string",
+      "enum": ["SOURCE_EXCERPT", "CONTENT_ADDRESS", "MANIFEST_ENTRY"]
+    },
+    "ObservationEvidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "digest"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "$ref": "#/$defs/EvidenceKind" },
+        "digest": { "$ref": "#/$defs/Sha256" },
+        "excerpt": { "type": "string", "maxLength": 8192 }
+      }
+    },
+    "SourceObservationV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "observationType", "architectureLayer", "aspectHint", "repository", "source", "parser", "payload", "sensitivity", "redaction", "evidenceRefs", "normalizedDigest", "warnings", "coverageGaps"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "observationType": { "type": "string", "minLength": 1 },
+        "architectureLayer": { "$ref": "#/$defs/ArchitectureLayer" },
+        "aspectHint": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+        "repository": { "$ref": "#/$defs/RepositoryIdentity" },
+        "source": { "$ref": "#/$defs/SourceLocation" },
+        "parser": { "$ref": "#/$defs/ParserDescriptor" },
+        "payload": { "type": "object", "additionalProperties": true },
+        "sensitivity": { "$ref": "#/$defs/SensitivityClassification" },
+        "redaction": { "$ref": "#/$defs/RedactionResult" },
+        "evidenceRefs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/ObservationEvidenceRef" } },
+        "normalizedDigest": { "$ref": "#/$defs/Sha256" },
+        "warnings": { "type": "array", "items": { "type": "string" } },
+        "coverageGaps": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "ScanCoverageDelta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["indexedFiles", "skippedFiles", "observationCount", "coverageGaps"],
+      "properties": {
+        "indexedFiles": { "type": "integer", "minimum": 0 },
+        "skippedFiles": { "type": "integer", "minimum": 0 },
+        "observationCount": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "coverageGaps": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "KnowledgeScanBatch": {
+      "type": "object",
+      "x-maxCanonicalJsonBytes": 4194304,
+      "additionalProperties": false,
+      "required": ["contractVersion", "sessionId", "sequence", "previousBatchDigest", "sessionNonceDigest", "architectureScope", "observations", "coverageDelta", "batchDigest"],
+      "properties": {
+        "contractVersion": { "const": "2.0" },
+        "sessionId": { "type": "string", "minLength": 1 },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "previousBatchDigest": { "anyOf": [{ "$ref": "#/$defs/Sha256" }, { "type": "null" }] },
+        "sessionNonceDigest": { "$ref": "#/$defs/Sha256" },
+        "architectureScope": { "$ref": "#/$defs/ArchitectureScope" },
+        "observations": { "type": "array", "maxItems": 500, "items": { "$ref": "#/$defs/SourceObservationV2" } },
+        "coverageDelta": { "$ref": "#/$defs/ScanCoverageDelta" },
+        "batchDigest": { "$ref": "#/$defs/Sha256" }
+      }
+    },
+    "ScanSessionStatus": {
+      "type": "string",
+      "enum": ["OPEN", "RECEIVING", "FINALIZING", "READY_FOR_ANALYSIS", "BLOCKED", "PUBLISHED", "EXPIRED"]
+    },
+    "ScanCheckpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "sessionId", "architectureScope", "latestAcceptedSequence", "cumulativeDigest", "observationCount", "status"],
+      "properties": {
+        "contractVersion": { "const": "2.0" },
+        "sessionId": { "type": "string", "minLength": 1 },
+        "architectureScope": { "$ref": "#/$defs/ArchitectureScope" },
+        "latestAcceptedSequence": { "type": "integer", "minimum": -1 },
+        "cumulativeDigest": { "anyOf": [{ "$ref": "#/$defs/Sha256" }, { "type": "null" }] },
+        "observationCount": { "type": "integer", "minimum": 0, "maximum": 100000 },
+        "status": { "$ref": "#/$defs/ScanSessionStatus" }
+      }
+    },
+    "ScanFinalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "sessionId", "architectureScope", "repositorySnapshotDigest", "manifestDigest", "finalBatchDigest", "batchCount", "observationCount", "coverage", "generatedAt"],
+      "properties": {
+        "contractVersion": { "const": "2.0" },
+        "sessionId": { "type": "string", "minLength": 1 },
+        "architectureScope": { "$ref": "#/$defs/ArchitectureScope" },
+        "repositorySnapshotDigest": { "$ref": "#/$defs/Sha256" },
+        "manifestDigest": { "$ref": "#/$defs/Sha256" },
+        "finalBatchDigest": { "$ref": "#/$defs/Sha256" },
+        "batchCount": { "type": "integer", "minimum": 0 },
+        "observationCount": { "type": "integer", "minimum": 0, "maximum": 100000 },
+        "coverage": { "$ref": "#/$defs/ScanCoverageDelta" },
+        "generatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

@@ -71,6 +71,9 @@ importers:
       '@specforge/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@specforge/scan-contract':
+        specifier: workspace:*
+        version: link:../../packages/scan-contract
       zod:
         specifier: ^3.24.1
         version: 3.25.76
@@ -142,10 +145,25 @@ importers:
 
   packages/core:
     dependencies:
+      '@specforge/scan-contract':
+        specifier: workspace:*
+        version: link:../scan-contract
       zod:
         specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)
+
+  packages/scan-contract:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)

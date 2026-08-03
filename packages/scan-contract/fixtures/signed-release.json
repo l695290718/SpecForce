@@ -1,0 +1,22 @@
+{
+  "contractVersion": "2.0",
+  "releaseId": "scanner-release:2.0.0-windows-amd64",
+  "scannerVersion": "2.0.0",
+  "platform": "windows-amd64",
+  "artifact": {
+    "uri": "https://artifacts.example.invalid/specforge/scanner/2.0.0/windows-amd64",
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "sizeBytes": 12582912
+  },
+  "schemaVersions": ["2.0"],
+  "extractors": [
+    { "id": "repository-manifest", "version": "1.0.0" },
+    { "id": "typescript-ast", "version": "1.0.0" }
+  ],
+  "signingKeyId": "scanner-release-fixture-key-1",
+  "algorithm": "Ed25519",
+  "issuedAt": "2026-08-03T08:00:00.000Z",
+  "expiresAt": "2027-08-03T08:00:00.000Z",
+  "status": "ACTIVE",
+  "signature": "yZncRPFt74e3957B2qETJbBJoJBwtXrO+6eSfXF04pX+o7yUCfCE4lPR5TUPMDlQYHtIhiTNm14Uwf+yIcEbBg=="
+}

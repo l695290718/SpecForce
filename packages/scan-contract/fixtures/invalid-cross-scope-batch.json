@@ -1,0 +1,25 @@
+{
+  "expectedArchitectureScope": {
+    "applicationServiceId": "com.huawei.celon.desiner",
+    "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+  },
+  "batch": {
+    "contractVersion": "2.0",
+    "sessionId": "scan-session:fixture-001",
+    "sequence": 0,
+    "previousBatchDigest": null,
+    "sessionNonceDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "architectureScope": {
+      "applicationServiceId": "com.huawei.celon.policyhub",
+      "scopePath": "pf-huawei/product-celon/subproduct-platform/module-policyhub/com.huawei.celon.policyhub"
+    },
+    "observations": [],
+    "coverageDelta": {
+      "indexedFiles": 0,
+      "skippedFiles": 0,
+      "observationCount": 0,
+      "coverageGaps": []
+    },
+    "batchDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "contractVersion": "2.0",
+  "sessionId": "scan-session:fixture-001",
+  "architectureScope": {
+    "applicationServiceId": "com.huawei.celon.desiner",
+    "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+  },
+  "actorId": "agent:fixture",
+  "connectorId": "connector:local-agent",
+  "scannerReleaseId": "scanner-release:2.0.0-windows-amd64",
+  "sessionNonce": "fixture-session-nonce",
+  "expiresAt": "2026-08-03T09:00:00.000Z",
+  "repositoryPolicy": {
+    "allowDirtyWorktree": false,
+    "ignorePatterns": ["node_modules/**", ".git/**"]
+  },
+  "limits": {
+    "maxObservationsPerBatch": 500,
+    "maxBatchBytes": 4194304,
+    "maxExcerptBytes": 8192,
+    "maxSourceFileBytes": 10485760,
+    "maxObservationsPerSession": 100000
+  },
+  "expectedPreviousBatchDigest": null
+}

@@ -1,0 +1,62 @@
+{
+  "contractVersion": "2.0",
+  "sessionId": "scan-session:fixture-001",
+  "sequence": 0,
+  "previousBatchDigest": null,
+  "sessionNonceDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "architectureScope": {
+    "applicationServiceId": "com.huawei.celon.desiner",
+    "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+  },
+  "observations": [
+    {
+      "id": "observation:fixture-api-001",
+      "observationType": "api-operation",
+      "architectureLayer": "SYS",
+      "aspectHint": "public-contract",
+      "repository": {
+        "repositoryId": "repo:specforge",
+        "snapshotKind": "COMMIT",
+        "snapshotDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "commit": "0123456789abcdef0123456789abcdef01234567"
+      },
+      "source": {
+        "path": "apps/mcp-server/src/tools.ts",
+        "symbol": "registerTools",
+        "lineStart": 420,
+        "lineEnd": 470
+      },
+      "parser": {
+        "id": "typescript-ast",
+        "version": "1.0.0"
+      },
+      "payload": {
+        "method": "POST",
+        "operation": "submit_scan_batch"
+      },
+      "sensitivity": "INTERNAL",
+      "redaction": {
+        "status": "NONE",
+        "reasons": []
+      },
+      "evidenceRefs": [
+        {
+          "id": "evidence:fixture-api-001",
+          "kind": "SOURCE_EXCERPT",
+          "digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "excerpt": "server.tool(\"submit_scan_batch\", ...)"
+        }
+      ],
+      "normalizedDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "warnings": [],
+      "coverageGaps": []
+    }
+  ],
+  "coverageDelta": {
+    "indexedFiles": 1,
+    "skippedFiles": 0,
+    "observationCount": 1,
+    "coverageGaps": []
+  },
+  "batchDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
