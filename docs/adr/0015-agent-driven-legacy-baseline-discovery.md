@@ -2,7 +2,7 @@
 
 ## Status
 
-**Scanner foundation and MockAI semantic candidate generation implemented. MCP design facts are synchronized and read back; signed packaging, real Agent transport, identity matching, and baseline publication remain pending.**
+**Scanner foundation, MockAI semantic candidate generation, and deterministic identity matching implemented. MCP design facts are synchronized and read back; signed packaging, real Agent transport, and baseline publication remain pending.**
 
 ADR-0018 refines this discovery boundary with the unified 3A ontology, profile separation, semantic assertions, atomic ChangeSets, immutable Baselines, and derived Knowledge Layer contracts. This ADR remains authoritative for the local-Agent trust boundary, exact-Scope session, deterministic scanner, and ReviewBundle policy.
 
@@ -69,9 +69,9 @@ Accepted facts, ADRs, Proposals, Context Packs, Evidence, and typed links remain
 
 - **Design reviewed:** The user approved Agent-executed baseline discovery, multi-service token grants with one-Scope-per-operation enforcement, hybrid deterministic and semantic extraction, and four-tier ReviewBundle governance on 2026-08-01.
 - **Repository consistency check:** `node .\node_modules\vitest\vitest.mjs run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" scripts\design-fact-manifest.test.ts` passed 1 file and 6 tests.
-- **MCP persistence:** With `DATABASE_URL` loaded from the repository `.env`, `pnpm design-facts:sync` returned all 13 baseline decisions as complete, including this ADR and its generated Proposal, Context Pack, Evidence, and typed links.
-- **MCP read-back:** With the same configured authority, `pnpm design-facts:check` verified all 13 decisions with empty `missing`, `mismatched`, `outOfScope`, and `blocked` results.
-- **Implementation evidence:** `pnpm typecheck` passed Core, MCP Server, and Web; the core suite passed 145 tests; the scoped MCP tool suite passed 20 tests; the gated PostgreSQL scanner integration passed report persistence, idempotency, MockAI semantic candidate generation, candidate-only status, and ReviewBundle idempotency against `localhost:15433/specforge_canonical`; and `pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <temp-file>` produced 56 manifest entries, 56 structural observations, and a deterministic report digest. The implementation does not yet sign scanner packages, provide remote Agent transport, perform identity matching, or publish a baseline.
+- **MCP persistence:** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-agent-driven-legacy-baseline-discovery,adr-unified-3a-knowledge-initialization'; pnpm design-facts:sync` returned both selected ADRs as `complete`, including their generated Proposal, Context Pack, Evidence, and typed links in the exact owning Scope.
+- **MCP read-back:** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-agent-driven-legacy-baseline-discovery,adr-unified-3a-knowledge-initialization'; pnpm design-facts:check` verified both selected ADRs with empty `missing`, `mismatched`, `outOfScope`, and `blocked` results.
+- **Implementation evidence:** `pnpm typecheck` passed Core, MCP Server, and Web; the core suite passed 148 tests; the scoped MCP tool suite passed 20 tests; the gated PostgreSQL scanner integration passed report persistence, idempotency, MockAI semantic candidate generation, candidate-only status, deterministic identity candidates, sibling-Scope exclusion, ambiguity blocking, and ReviewBundle idempotency against `localhost:15433/specforge_canonical`; and `pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <temp-file>` produced 56 manifest entries, 56 structural observations, and a deterministic report digest. The implementation does not yet sign scanner packages, provide remote Agent transport, or publish a baseline.
 
 ## MCP Record
 
@@ -81,7 +81,7 @@ Accepted facts, ADRs, Proposals, Context Packs, Evidence, and typed links remain
 - Matching Context Pack: `context-pack-agent-driven-legacy-baseline-discovery`
 - Related assets: `api-specforge-mcp-tools`, `data-specforge-assets`, and `adr-federated-design-fact-synchronization`
 - Typed links: Proposal `--IMPLEMENTS_DECISION-->` ADR; Context Pack `--IMPLEMENTS_CONTEXT_FOR-->` Proposal; ADR `--DECIDES-->` related assets; Evidence `--VALIDATES-->` ADR
-- Status: MCP synchronized and read back from the configured canonical PostgreSQL authority; scanner foundation and MockAI semantic candidate generation are implemented, while signed packaging, real Agent transport, identity matching, and baseline publication remain pending.
+- Status: MCP synchronized and read back from the configured canonical PostgreSQL authority; scanner foundation, MockAI semantic candidate generation, and deterministic identity matching are implemented, while signed packaging, real Agent transport, and baseline publication remain pending.
 
 ## Chinese Localization
 
@@ -146,8 +146,8 @@ ADR-0018 在本 ADR 基础上补充统一 3A 本体、Profile 分离、语义断
 
 - **设计已评审：** 用户于 2026-08-01 确认 Agent 临时执行、多应用服务 Token 与单 Scope 操作、确定性扫描和语义提取混合模式，以及四级 ReviewBundle 治理。
 - **仓库一致性检查：** `node .\node_modules\vitest\vitest.mjs run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" scripts\design-fact-manifest.test.ts` 已通过 1 个文件和 6 项测试。
-- **MCP 持久化：** 从仓库 `.env` 加载 `DATABASE_URL` 后，`pnpm design-facts:sync` 返回全部 13 项基线决策均为完成，其中包含本 ADR 及其生成的 Proposal、Context Pack、Evidence 和类型化关系。
-- **MCP 回读：** 使用同一权威库执行 `pnpm design-facts:check`，全部 13 项决策通过验证，`missing`、`mismatched`、`outOfScope` 和 `blocked` 均为空。
+- **MCP 持久化：** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-agent-driven-legacy-baseline-discovery,adr-unified-3a-knowledge-initialization'; pnpm design-facts:sync` 返回选定的两个 ADR 均为 `complete`，并在精确所属 Scope 内同步其 Proposal、Context Pack、Evidence 和类型化关系。
+- **MCP 回读：** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-agent-driven-legacy-baseline-discovery,adr-unified-3a-knowledge-initialization'; pnpm design-facts:check` 验证选定的两个 ADR，`missing`、`mismatched`、`outOfScope` 和 `blocked` 均为空。
 - **实现证据：** `pnpm typecheck` 已通过 Core、MCP Server 和 Web；核心测试 145 项通过；范围化 MCP 工具测试 20 项通过；带门控的 PostgreSQL 扫描集成测试已通过报告持久化、幂等、MockAI 语义候选生成、候选状态和 ReviewBundle 幂等；`pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <临时文件>` 生成 56 个清单条目、56 个结构观察和确定性报告摘要。当前尚未实现扫描器签名包、真实 Agent 传输、身份匹配和 Baseline 发布。
 
 ### MCP 记录
@@ -158,4 +158,4 @@ ADR-0018 在本 ADR 基础上补充统一 3A 本体、Profile 分离、语义断
 - 匹配 Context Pack：`context-pack-agent-driven-legacy-baseline-discovery`
 - 相关资产：`api-specforge-mcp-tools`、`data-specforge-assets`、`adr-federated-design-fact-synchronization`
 - 类型化关系：Proposal `--IMPLEMENTS_DECISION-->` ADR；Context Pack `--IMPLEMENTS_CONTEXT_FOR-->` Proposal；ADR `--DECIDES-->` 相关资产；Evidence `--VALIDATES-->` ADR
-- 状态：已通过 MCP 写入配置的规范 PostgreSQL 权威库并完成回读；扫描器基础和 MockAI 语义候选生成已实现，签名包、真实 Agent 传输、身份匹配和 Baseline 发布仍待后续增量。
+- 状态：已通过 MCP 写入配置的规范 PostgreSQL 权威库并完成回读；扫描器基础、MockAI 语义候选生成和确定性身份匹配已实现，签名包、真实 Agent 传输和 Baseline 发布仍待后续增量。

@@ -8,6 +8,7 @@ import { deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, searchP
 import { commitKnowledgeChangeSet, createIdentityCandidate, createKnowledgeAssertion, createKnowledgeReviewBundle, createProjectionManifest, createWorkingStream, decideKnowledgeReviewBundle, listKnowledgeAssertions, publishKnowledgeBaseline } from "./knowledge/persistence";
 import { submitScanReport } from "./scanner/persistence";
 import { generateKnowledgeCandidates } from "./knowledge/semantic-persistence";
+import { matchKnowledgeIdentities } from "./knowledge/identity-persistence";
 import {
   analyzeScopedProposalImpact,
   buildScopedAssetGraph,
@@ -445,6 +446,14 @@ export function registerTools(server: McpServer): void {
     permissions: ["knowledge:write"],
     readOnly: false
   }, async (input) => generateKnowledgeCandidates(input as unknown as Parameters<typeof generateKnowledgeCandidates>[0]));
+
+  registerJsonTool(server, "match_knowledge_identities", {
+    title: "Match knowledge identities",
+    description: "Matches persisted scan observations to existing design assets in the same exact Scope and creates auditable IdentityCandidates. Ambiguous and unmatched results block the ReviewBundle; no asset is merged automatically.",
+    inputSchema: { architectureScope: architectureScopeSchema, scanReportId: z.string().min(1) },
+    permissions: ["knowledge:write", "asset:read"],
+    readOnly: false
+  }, async (input) => matchKnowledgeIdentities(input as unknown as Parameters<typeof matchKnowledgeIdentities>[0]));
 
   registerJsonTool(server, "create_identity_candidate", {
     title: "Create identity candidate",

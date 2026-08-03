@@ -5,6 +5,7 @@ import { disconnectMcpPersistence, prisma } from "../persistence";
 import { createDesignChangeSession } from "../federation/persistence";
 import { submitScanReport } from "./persistence";
 import { generateKnowledgeCandidates } from "../knowledge/semantic-persistence";
+import { matchKnowledgeIdentities } from "../knowledge/identity-persistence";
 
 const integrationEnabled = process.env.SPECFORGE_KNOWLEDGE_INTEGRATION === "1";
 const scope = scopeById("com.huawei.celon.desiner")!;
@@ -56,15 +57,49 @@ describe.runIf(integrationEnabled)("local scanner MCP persistence", () => {
     expect(assertions.every((assertion) => assertion.status === "CANDIDATE")).toBe(true);
     expect(await prisma.federationOutbox.count({ where: { ...architectureScope, idempotencyKey: `semantic-candidates:${report.reportDigest}` } })).toBe(1);
   }, 30000);
+
+  it("creates deterministic identity candidates, excludes sibling Scope assets, and blocks ambiguity", async () => {
+    const siblingScope = scopeById("com.huawei.celon.policyhub")!;
+    const siblingArchitectureScope = { applicationServiceId: siblingScope.id, scopePath: siblingScope.scopePath };
+    const connectorId = `${prefix}-identity-connector`;
+    const sessionId = `${prefix}-identity-session`;
+    const report = identityReport();
+    await registerConnector({ id: connectorId, kind: "local-scanner", capabilities: ["OBSERVE"], status: "ACTIVE", architectureScope });
+    await createDesignChangeSession({ id: sessionId, actorId: "identity-agent", intent: "Match scanned API identity", affectedFactIds: [`${prefix}-identity-pending`], expectedEvidenceRefs: [`${prefix}-identity-report`], status: "OPEN", architectureScope });
+    await submitScanReport({ id: `${prefix}-identity-report`, connectorId, designChangeSessionId: sessionId, architectureScope, report });
+    await generateKnowledgeCandidates({ scanReportId: `${prefix}-identity-report`, architectureScope, provider: "mock" });
+    await prisma.designAsset.create({ data: { id: `${prefix}-orders-api`, type: "api", name: "Orders API", code: "orders", description: "", domainId: null, applicationServiceId: architectureScope.applicationServiceId, scopePath: architectureScope.scopePath, payload: JSON.stringify({ id: `${prefix}-orders-api`, name: "Orders API", code: "orders" }), createdAt: new Date(), updatedAt: new Date() } });
+    await prisma.designAsset.create({ data: { id: `${prefix}-sibling-orders-api`, type: "api", name: "Orders API", code: "orders", description: "", domainId: null, applicationServiceId: siblingArchitectureScope.applicationServiceId, scopePath: siblingArchitectureScope.scopePath, payload: JSON.stringify({ id: `${prefix}-sibling-orders-api`, name: "Orders API", code: "orders" }), createdAt: new Date(), updatedAt: new Date() } });
+
+    const unique = await matchKnowledgeIdentities({ scanReportId: `${prefix}-identity-report`, architectureScope });
+    const retried = await matchKnowledgeIdentities({ scanReportId: `${prefix}-identity-report`, architectureScope });
+    expect(unique.decisions).toEqual({ UNMATCHED: 0, UNAMBIGUOUS: 1, AMBIGUOUS: 0 });
+    expect(unique.reviewBundle.status).toBe("READY");
+    expect(retried.identityCandidateIds).toEqual(unique.identityCandidateIds);
+    expect(await prisma.identityCandidate.count({ where: { ...architectureScope, id: { startsWith: `identity:${report.reportDigest}:` } } })).toBe(1);
+    expect((await prisma.identityCandidate.findFirst({ where: { ...architectureScope, id: { startsWith: `identity:${report.reportDigest}:` } } }))?.targetAssetId).toBe(`${prefix}-orders-api`);
+
+    await prisma.designAsset.create({ data: { id: `${prefix}-orders-api-legacy`, type: "api", name: "Orders API Legacy", code: "orders", description: "", domainId: null, applicationServiceId: architectureScope.applicationServiceId, scopePath: architectureScope.scopePath, payload: JSON.stringify({ id: `${prefix}-orders-api-legacy`, name: "Orders API Legacy", code: "orders" }), createdAt: new Date(), updatedAt: new Date() } });
+    const ambiguous = await matchKnowledgeIdentities({ scanReportId: `${prefix}-identity-report`, architectureScope });
+    expect(ambiguous.decisions).toEqual({ UNMATCHED: 0, UNAMBIGUOUS: 0, AMBIGUOUS: 1 });
+    expect(ambiguous.reviewBundle.status).toBe("BLOCKED");
+    expect(ambiguous.reviewBundle.blockingIssues).toContain(`IDENTITY_AMBIGUOUS:contracts/openapi-orders.yaml`);
+    expect(await prisma.identityCandidate.count({ where: { ...architectureScope, id: { startsWith: `identity:${report.reportDigest}:` } } })).toBe(2);
+  }, 30000);
 });
 
 async function deleteFixtures(): Promise<void> {
   await prisma.sourceObservation.deleteMany({ where: { ...architectureScope, connectorId: { startsWith: prefix } } });
   const reportDigest = semanticReport().reportDigest;
+  const identityDigest = identityReport().reportDigest;
   await prisma.knowledgeReviewBundle.deleteMany({ where: { ...architectureScope, id: `knowledge-review:${reportDigest}` } });
+  await prisma.knowledgeReviewBundle.deleteMany({ where: { ...architectureScope, id: `knowledge-review:${identityDigest}` } });
   await prisma.knowledgeAssertion.deleteMany({ where: { ...architectureScope, id: { startsWith: `knowledge:${reportDigest}:` } } });
+  await prisma.knowledgeAssertion.deleteMany({ where: { ...architectureScope, id: { startsWith: `knowledge:${identityDigest}:` } } });
+  await prisma.identityCandidate.deleteMany({ where: { ...architectureScope, id: { startsWith: `identity:${identityDigest}:` } } });
   await prisma.knowledgeScanReport.deleteMany({ where: { ...architectureScope, id: { startsWith: prefix } } });
-  await prisma.federationOutbox.deleteMany({ where: { ...architectureScope, OR: [{ idempotencyKey: { startsWith: "scan-report:" } }, { idempotencyKey: `semantic-candidates:${reportDigest}` }] } });
+  await prisma.federationOutbox.deleteMany({ where: { ...architectureScope, OR: [{ idempotencyKey: { startsWith: "scan-report:" } }, { idempotencyKey: `semantic-candidates:${reportDigest}` }, { idempotencyKey: `scan-report:${identityDigest}` }, { idempotencyKey: `semantic-candidates:${identityDigest}` }, { idempotencyKey: `identity-candidates:${identityDigest}` }] } });
+  await prisma.designAsset.deleteMany({ where: { id: { startsWith: prefix } } });
   await prisma.designChangeSession.deleteMany({ where: { ...architectureScope, id: { startsWith: prefix } } });
   await prisma.connectorInstance.deleteMany({ where: { ...architectureScope, id: { startsWith: prefix } } });
 }
@@ -72,6 +107,12 @@ async function deleteFixtures(): Promise<void> {
 function semanticReport() {
   return buildScanReport({ rootLabel: "semantic-fixture", architectureScope, generatedAt: "2026-08-02T00:00:00.000Z", files: [
     { path: "src/orders.ts", content: "export const orders = true;", sizeBytes: 28 },
+    { path: "contracts/openapi-orders.yaml", content: "openapi: 3.0.0", sizeBytes: 15 }
+  ] });
+}
+
+function identityReport() {
+  return buildScanReport({ rootLabel: "identity-fixture", architectureScope, generatedAt: "2026-08-02T00:00:00.000Z", files: [
     { path: "contracts/openapi-orders.yaml", content: "openapi: 3.0.0", sizeBytes: 15 }
   ] });
 }
