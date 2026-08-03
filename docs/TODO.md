@@ -28,45 +28,45 @@
 
 ### Implement unified 3A knowledge initialization
 
-**Status:** Phase 3 scanner foundation, MockAI semantic candidate generation, and deterministic identity matching implemented and MCP synchronized; signed packaging, 3A projections, and later increments pending. Web standalone artifact verification is blocked by the current Windows symlink policy.
+**Status:** Phase 1 Baseline discovery runtime implemented, locally verified, MCP synchronized, and read back. Phases 2-5 remain pending.
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
 **Rationale:** Existing enterprise application services need a low-friction baseline path that reuses Claude Code, OpenCode, and compatible coding Agents. ADR-0015 defines the local-Agent discovery boundary. ADR-0018 extends it with a generic 3A ontology, multiple evidence-backed assertions per semantic identity, configurable organization and analysis profiles, atomic ChangeSets, immutable Baselines, and derived Knowledge Layers.
 
-**Delivery increments:** Generic foundation; initialization governance; generic scanning; 3A projections; and Huawei-profile migration plus hardening. The first usable path includes remote authenticated MCP control, a provider-neutral Agent integration, an ephemeral scanner contract, deterministic evidence indexing, semantic candidate submission, T0-T3 ReviewBundles, and manual Baseline publication for one exact application service.
+**Delivery increments:** Phase 1 delivers signed native scanning, resumable MCP ingestion, semantic review, atomic promotion, reconciliation, and immutable Baseline publication. Phase 2 delivers deterministic 3A projections. Phase 3 expands continuous observation and live connectors. Phase 4 adds CodeHub/CI enforcement. Phase 5 covers enterprise profile migration, object storage, graph projection, and billion-scale certification.
 
 **Deferred:** Continuous inbound synchronization, live database/API-gateway/CMDB/runtime connectors, outbound proposals, external `APPLY`, automatic cross-Scope merging, production object storage, and complete billion-scale capacity certification.
 
-**Trigger:** Begin implementation only after `docs/superpowers/specs/2026-08-01-unified-3a-knowledge-initialization-design.md` is reviewed and its implementation plan is approved.
+**Trigger:** Begin Phase 2 only after the Phase 1 MCP records and exact design-change session are converged, then review and approve a dedicated Phase 2 design and implementation plan.
 
-**Completion evidence:** The core must run without the Huawei profile; a non-DDD fixture must initialize through the Generic System profile; repeated scans must be idempotent; conflicting assertions must remain visible; partial scan, blocked review, and failed reconciliation must not activate a Baseline; and exact-Scope MCP persistence, reproducible deterministic KL context, pinned Context Pack retrieval, PostgreSQL authority, and graph-outage behavior must pass.
+**Completion evidence:** Phase 1 requires signed-release verification, safe source-minimized extraction, exact checkpoint resume, bilingual semantic review, actor separation, atomic promotion, durable reconciliation, immutable Baseline publication, stable rescan IDs, sibling-Scope isolation, exact-Scope MCP synchronization, and read-back. Phase 2 retains the additional projection and pinned-context acceptance criteria.
 
-**Phase 3 evidence:** Core contracts, Profile-neutral Scope registry, assertion validation, content digests, PostgreSQL models and migration, scoped MCP operations, ReviewBundles, fail-closed coverage, MCP-only promotion decisions, ChangeSet promotion gates, deterministic local scanning, source-minimized observations, idempotent scan-report persistence, provider-neutral MockAI semantic candidate generation, bilingual candidate summaries, deterministic identity matching, sibling-Scope exclusion, ambiguity blocking, and atomic ReviewBundle assembly are implemented. `pnpm typecheck` passed all three packages; the core suite passed 148 tests; the scoped MCP tool suite passed 20 tests; the gated PostgreSQL scanner integration test passed report persistence, idempotency, candidate-only assertions, semantic generation, deterministic identity candidates, ambiguity blocking, and ReviewBundle idempotency; and the CLI smoke scan produced 56 manifest entries, 56 structural observations, and a deterministic digest. `pnpm build` compiled and generated static pages but failed at Windows pnpm standalone symlink tracing; retry after enabling Developer Mode or using a symlink-capable build environment.
+**Phase 1 evidence:** `pnpm legacy-baseline:verify` exited `0`; `artifacts/legacy-baseline-verification.json` records all ten checks as `PASSED`, including contract drift, Go tests/build, 155 Core tests, MCP scanner/knowledge tests, PostgreSQL integration, real signed-binary E2E, 100,000-observation scale, typecheck, and production build. The local Windows build used `SPECFORGE_NEXT_STANDALONE=0` to avoid OneDrive/pnpm symlink creation; Docker/Linux keeps standalone output enabled.
 
-**Design-fact evidence:** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-agent-driven-legacy-baseline-discovery,adr-unified-3a-knowledge-initialization'; pnpm design-facts:sync` returned both selected ADRs as `complete`, including their generated Proposal, Context Pack, Evidence, and typed links. The matching exact-Scope check returned empty `missing`, `mismatched`, `outOfScope`, and `blocked` lists for both selected ADRs.
+**Design-fact evidence:** Full MCP synchronization returned all 16 decisions as `complete`; MCP read-back returned all 16 as `verified` with empty issue lists; exact-Scope federation reconciliation returned `blocking:false` and no issues. ADR-0015, ADR-0018, the Phase 1 Proposal, Agent Context Pack, seven managed facts, Evidence, and directional typed links are present in the canonical authority.
 
 **Design-fact synchronization retry hardening:** Deferred after a transient `MCP synchronization blocked` event when the Docker PostgreSQL tunnel at `localhost:15433` was temporarily unreachable. **Owner:** SpecForge Architecture. **Retry trigger:** reproduce or observe a tunnel outage, then add bounded retry, reachability diagnostics, and an operator-visible failure receipt without changing the exact-Scope or PostgreSQL authority rules. **Rationale:** A transient tunnel interruption must be diagnosable and recoverable without weakening the MCP-only write boundary.
 
 **中文本地化：**
 
-**状态：** 通用基础、初始化治理、扫描器基础、MockAI 语义候选生成和确定性身份匹配 Phase 3 已实现并完成 MCP 同步；签名包、3A 投影和后续增量待实现；Web standalone 产物验证受当前 Windows 符号链接策略阻塞。
+**状态：** 第一阶段 Baseline 发现运行时已实现、完成本地验证、通过 MCP 同步并完成回读。第二至第五阶段保持待办。
 
 **负责人：** SpecForge 架构与 Agent 集成。
 
 **理由：** 企业存量应用需要复用 Claude Code、OpenCode 等现有 Coding Agent 的低门槛基线方案。ADR-0015 定义本地 Agent 发现边界；ADR-0018 进一步定义通用 3A 本体、同一语义身份的多证据断言、可配置组织与分析 Profile、原子 ChangeSet、不可变 Baseline 和派生知识层。
 
-**交付增量：** 通用基础、初始化治理、通用扫描、3A 投影，以及华为 Profile 迁移与加固。首个可用路径包括远程鉴权 MCP、Provider 无关 Agent 集成、临时扫描工具契约、确定性证据索引、语义候选、T0-T3 ReviewBundle 和单个精确应用服务的手动 Baseline 发布。
+**交付增量：** 第一阶段交付签名原生扫描、可恢复 MCP 摄取、语义评审、原子提升、对账和不可变 Baseline 发布。第二阶段交付确定性 3A 投影。第三阶段扩展持续观察和实时连接器。第四阶段增加 CodeHub/CI 门禁。第五阶段完成企业 Profile 迁移、对象存储、图投影和亿级认证。
 
 **延期范围：** 持续入站同步、实时数据库/API 网关/CMDB/运行时连接器、出站 Proposal、外部 `APPLY`、自动跨 Scope 合并、生产对象存储和完整亿级容量认证。
 
-**启动条件：** 用户评审 `docs/superpowers/specs/2026-08-01-unified-3a-knowledge-initialization-design.md` 并批准实施计划后开始开发。
+**启动条件：** 第一阶段 MCP 记录和精确设计变更会话收敛后，再评审并批准独立的第二阶段设计与实施计划。
 
-**完成证据：** 核心必须可以脱离华为 Profile 运行；非 DDD Fixture 必须能通过 Generic System Profile 初始化；重复扫描幂等；冲突断言保持可见；部分扫描、阻塞审核和对账失败不能激活 Baseline；精确 Scope MCP 持久化、确定性 KL 上下文重现、固定 Context Pack 读取、PostgreSQL 权威和图故障回退都必须通过。
+**完成证据：** 第一阶段要求签名发布校验、安全源码最小化提取、精确检查点恢复、双语语义评审、角色分离、原子提升、持久对账、不可变 Baseline 发布、重扫 ID 稳定、同级 Scope 隔离以及精确 Scope MCP 同步与回读。第二阶段继续保留投影和固定上下文验收标准。
 
-**Phase 3 证据：** 已实现核心契约、Profile 无关 Scope 注册表、断言校验、内容摘要、PostgreSQL 模型与迁移、精确 Scope MCP 操作、ReviewBundle、覆盖不足 fail-closed、MCP-only 提升决策、ChangeSet 提升门禁、确定性本地扫描、最小化源码结构观察、幂等扫描报告持久化、Provider 无关的 MockAI 语义候选生成、双语候选摘要、确定性身份匹配、同级 Scope 排除、歧义阻塞和原子 ReviewBundle 组装。`pnpm typecheck` 三个包均通过；核心测试 148 项、范围化 MCP 工具测试 20 项通过；带门控的 PostgreSQL 扫描集成测试通过报告持久化、幂等、候选状态、语义生成、确定性身份候选、歧义阻塞和 ReviewBundle 幂等；CLI 烟测生成 56 个清单条目、56 个结构观察和确定性摘要。`pnpm build` 已完成编译和静态页面生成，但在 Windows pnpm standalone 符号链接追踪时失败；启用 Developer Mode 或使用支持符号链接的构建环境后重试。
+**第一阶段证据：** `pnpm legacy-baseline:verify` 退出码为 `0`；`artifacts/legacy-baseline-verification.json` 对全部十项检查记录为 `PASSED`，包括契约漂移、Go 测试与构建、155 项 Core 测试、MCP 扫描器/知识测试、PostgreSQL 集成、真实签名二进制端到端、10 万条观察规模、类型检查和生产构建。本地 Windows 构建使用 `SPECFORGE_NEXT_STANDALONE=0` 规避 OneDrive/pnpm 符号链接创建限制；Docker/Linux 仍启用 standalone 输出。
 
-**设计事实证据：** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-agent-driven-legacy-baseline-discovery,adr-unified-3a-knowledge-initialization'; pnpm design-facts:sync` 已返回选定的两个 ADR 均为 `complete`，并同步其 Proposal、Context Pack、Evidence 和类型化关系；精确 Scope 回读中两个 ADR 的 `missing`、`mismatched`、`outOfScope` 和 `blocked` 均为空。
+**设计事实证据：** 完整 MCP 同步返回全部 16 项决策为 `complete`；MCP 回读返回全部 16 项为 `verified` 且问题列表为空；精确 Scope 联邦对账返回 `blocking:false` 且无问题。ADR-0015、ADR-0018、第一阶段 Proposal、Agent Context Pack、七项托管事实、Evidence 和有向类型关系均已存在于规范权威库中。
 
 **设计事实同步重试加固：** 因 Docker PostgreSQL 隧道 `localhost:15433` 暂时不可达而出现过一次 `MCP synchronization blocked`，现已通过重试恢复，后续延期加固。**负责人：** SpecForge Architecture。**重试触发条件：** 再次复现或观测隧道中断后，增加有界重试、可达性诊断和面向运维的失败收据，同时不得改变精确 Scope 或 PostgreSQL 权威规则。**理由：** 短暂隧道中断必须可诊断、可恢复，且不能弱化 MCP-only 写入边界。
 

@@ -35,14 +35,30 @@ it("includes federated design-fact governance in the baseline", () => {
 });
 
 it("includes Agent-driven legacy baseline discovery in the baseline", () => {
-  expect(manifest.decisions.some((decision) => decision.mcpAdrId === "adr-agent-driven-legacy-baseline-discovery")).toBe(true);
+  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-agent-driven-legacy-baseline-discovery");
+  expect(decision?.proposalId).toBe("proposal-agent-driven-legacy-baseline-discovery");
+  expect(decision?.contextPackId).toBe("context-pack-agent-driven-legacy-baseline-discovery");
+  expect(decision?.managedAssets?.map((managed) => managed.asset.id)).toEqual([
+    "api-specforge-scanner-release-contract",
+    "data-specforge-scan-session",
+    "data-specforge-scan-batch",
+    "data-specforge-source-observation-v2",
+    "rule-specforge-knowledge-risk-policy",
+    "rule-specforge-knowledge-promotion-transaction",
+    "api-specforge-knowledge-baseline-publication"
+  ]);
+  expect(decision?.managedRelationships?.every((relationship) => relationship.sourceId && relationship.targetId && relationship.relationType)).toBe(true);
+  expect(decision?.managedAssets?.every((managed) => {
+    const localized = managed.asset.localizedContent as { en?: { name?: string; description?: string }; zh?: { name?: string; description?: string } };
+    return localized.en?.name && localized.en.description && localized.zh?.name && localized.zh.description;
+  })).toBe(true);
 });
 
 it("includes unified 3A knowledge initialization in the baseline", () => {
   const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-unified-3a-knowledge-initialization");
   expect(decision?.proposalId).toBe("proposal-unified-3a-knowledge-initialization");
   expect(decision?.contextPackId).toBe("context-pack-unified-3a-knowledge-initialization");
-  expect(decision?.status).toContain("phase 3 scanner foundation and MockAI semantic candidate generation implemented");
+  expect(decision?.status).toContain("Phase 1");
 });
 
 it("includes design-context preflight governance in the baseline", () => {

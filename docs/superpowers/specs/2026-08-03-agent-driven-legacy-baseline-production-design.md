@@ -2,7 +2,7 @@
 
 ## Status
 
-**Approved for Phase 1 implementation planning on 2026-08-03. No production-completion claim is made by this document.**
+**Approved and implemented for Phase 1 on 2026-08-03. Local stage verification, exact-Scope MCP synchronization/read-back, federation reconciliation, and exact design-session closure passed. Phases 2-5 remain deferred.**
 
 - Owning `architectureScope.applicationServiceId`: `com.huawei.celon.desiner`
 - Owning `architectureScope.scopePath`: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
@@ -17,18 +17,11 @@ The production path combines a server-signed Scanner release, an exact-Scope Sca
 
 ## Current Implementation Baseline
 
-The repository already provides:
+Phase 1 now provides exact application-service Scope authorization, Design Change Sessions, a pretrusted Ed25519 scanner release contract, a standalone Go scanner, safe workspace traversal, static evidence extractors, resumable hash-chained batches, provider-neutral Agent semantic candidate submission, deterministic identity matching, T0-T3 risk policy, actor separation, atomic canonical promotion, durable reconciliation, immutable Baseline publication, release operations, and focused production proof.
 
-- exact application-service Scope resolution and MCP authorization;
-- Design Change Sessions and connector registration;
-- a source-minimized file scanner contract and deterministic report digests;
-- idempotent PostgreSQL persistence of Scan Reports and Source Observations;
-- provider-neutral MockAI semantic candidate generation;
-- deterministic same-Scope identity candidates and ambiguity blocking;
-- ReviewBundle, promotion-decision, ChangeSet, Baseline, and ProjectionManifest primitives; and
-- a standalone Go CLI with Ed25519 change-attestation verification.
+`pnpm legacy-baseline:verify` passed contract drift, Go tests/build, 155 Core tests, scanner/knowledge tests, PostgreSQL integration, real signed-binary end-to-end behavior, a 100,000-observation bounded scale run, typecheck, and production build. The local Windows build disables standalone trace copying only for the verifier because OneDrive/pnpm symlink creation is restricted; Docker/Linux retains standalone output. The native GitHub release workflow is configured but is not claimed as remotely executed evidence.
 
-The current scanner records file identity and type but does not yet parse implementation semantics. Report submission is a single request and transaction. Semantic bundles are hard-coded to T1. Approved knowledge assertions are not yet materialized into canonical DesignAsset and AssetLink revisions. No real Scanner release trust chain, Agent transport workflow, or scan-to-Baseline end-to-end path exists.
+Continuous observation, live enterprise connectors, deterministic 3A projections, CodeHub enforcement, production object storage, graph projection, and complete billion-scale certification remain outside Phase 1.
 
 ## Goals
 
@@ -284,7 +277,7 @@ Each slice updates its repository ADR, Proposal, Context Pack, contracts, relati
 
 ### 状态
 
-**已于 2026-08-03 批准进入第一阶段实施规划；本文档不代表生产能力已经完成。**
+**已于 2026-08-03 批准并完成第一阶段实现。本地阶段验证、精确 Scope MCP 同步/回读、联邦对账和精确设计会话关闭均已通过。第二至第五阶段保持延期。**
 
 - 精确所属应用服务：`com.huawei.celon.desiner`
 - 精确 Scope 路径：`pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
@@ -295,9 +288,11 @@ Each slice updates its repository ADR, Proposal, Context Pack, contracts, relati
 
 SpecForge 必须让企业用户直接复用 Claude Code、OpenCode 等现有 Coding Agent，为一个存量应用服务建立可信的 Baseline v1。用户不需要部署 Scanner 守护进程，不上传无限制源码压缩包，也不向导入工具提供 PostgreSQL 直连权限。
 
-仓库当前已经具备精确 Scope 鉴权、Design Change Session、连接器注册、文件级扫描摘要、扫描报告与 Observation 幂等持久化、MockAI 语义候选、同 Scope 身份候选、歧义阻塞，以及 ReviewBundle、提升结论、ChangeSet、Baseline 和 ProjectionManifest 基础能力。Go CLI 已具备 Ed25519 证明验签能力。
+第一阶段现已具备精确 Scope 鉴权、Design Change Session、预置信任 Ed25519 扫描器发布契约、独立 Go 扫描器、安全工作区遍历、静态证据提取器、可恢复哈希链批次、Provider 无关 Agent 语义候选提交、确定性身份匹配、T0-T3 风险策略、角色分离、原子规范提升、持久对账、不可变 Baseline 发布、发布运维和定向生产验证。
 
-当前缺口包括：Scanner 尚未解析实现语义；报告仍通过单请求和单事务提交；语义审核固定为 T1；批准的 KnowledgeAssertion 尚不能转成正式 DesignAsset 和 AssetLink 修订；也没有 Scanner 发布信任链、真实 Agent 传输和扫描到 Baseline 的端到端闭环。
+`pnpm legacy-baseline:verify` 已通过契约漂移、Go 测试与构建、155 项 Core 测试、扫描器/知识测试、PostgreSQL 集成、真实签名二进制端到端、10 万条观察规模、类型检查和生产构建。本地 Windows 验证器仅为规避 OneDrive/pnpm 符号链接创建限制而关闭 standalone 追踪复制；Docker/Linux 仍保留 standalone 输出。GitHub 原生发布工作流已配置，但不把远程运行描述为本地已验证证据。
+
+持续观察、实时企业连接器、确定性 3A 投影、CodeHub 门禁、生产对象存储、图投影和完整亿级认证不属于第一阶段。
 
 ### 信任架构
 

@@ -459,32 +459,250 @@
                           "relatedAssetIds":  [
                                                   "api-specforge-mcp-tools",
                                                   "data-specforge-assets",
+                                                  "api-specforge-scanner-release-contract",
+                                                  "data-specforge-scan-session",
+                                                  "data-specforge-scan-batch",
+                                                  "data-specforge-source-observation-v2",
+                                                  "rule-specforge-knowledge-risk-policy",
+                                                  "rule-specforge-knowledge-promotion-transaction",
+                                                  "api-specforge-knowledge-baseline-publication",
                                                   "adr-federated-design-fact-synchronization"
                                               ],
+                          "managedAssets":  [
+                                                {
+                                                    "assetType":  "api",
+                                                    "asset":  {
+                                                                  "id":  "api-specforge-scanner-release-contract",
+                                                                  "name":  "Signed Scanner Release Contract",
+                                                                  "description":  "Defines the pretrusted Ed25519 manifest, native artifact digest, compatibility, revocation, and rollback rules for the standalone scanner.",
+                                                                  "method":  "GET",
+                                                                  "path":  "mcp://tools/get_scanner_release",
+                                                                  "domainId":  "domain-specforge-platform",
+                                                                  "providerSystem":  "SpecForge MCP Server",
+                                                                  "consumers":  ["SpecForge native scanner", "Authorized coding Agent"],
+                                                                  "requestSchema":  { "applicationServiceId":  "string", "platform":  "string" },
+                                                                  "responseSchema":  { "manifest":  "ScannerReleaseManifestV2", "signature":  "Ed25519" },
+                                                                  "errorCodes":  ["SCANNER_RELEASE_NOT_FOUND", "SCANNER_RELEASE_REVOKED", "SCANNER_RELEASE_INCOMPATIBLE"],
+                                                                  "authType":  "Exact application-service grant",
+                                                                  "idempotency":  "Read-only and stable for one release ID.",
+                                                                  "rateLimit":  "Operator and Agent bootstrap traffic only.",
+                                                                  "timeout":  "10s",
+                                                                  "compatibilityPolicy":  "Contract v2 is additive; revoked or rollback versions fail closed.",
+                                                                  "openapiSpec":  "MCP tool schema: get_scanner_release",
+                                                                  "exposure":  "internal",
+                                                                  "createdAt":  "2026-08-03T10:10:21.427Z",
+                                                                  "updatedAt":  "2026-08-03T10:10:21.427Z",
+                                                                  "localizedContent":  {
+                                                                                             "en":  { "name":  "Signed Scanner Release Contract", "description":  "Defines the pretrusted Ed25519 manifest, native artifact digest, compatibility, revocation, and rollback rules for the standalone scanner.", "authType":  "Exact application-service grant", "idempotency":  "Read-only and stable for one release ID.", "rateLimit":  "Operator and Agent bootstrap traffic only.", "timeout":  "10s", "compatibilityPolicy":  "Contract v2 is additive; revoked or rollback versions fail closed." },
+                                                                                             "zh":  { "name":  "签名扫描器发布契约", "description":  "定义独立扫描器的预置信任 Ed25519 清单、原生制品摘要、兼容性、撤销和防回滚规则。", "authType":  "精确应用服务授权", "idempotency":  "同一发布 ID 的只读结果保持稳定。", "rateLimit":  "仅用于运维人员和 Agent 的启动流量。", "timeout":  "10 秒", "compatibilityPolicy":  "契约 v2 仅允许兼容性扩展；已撤销或回滚版本必须拒绝。" }
+                                                                                         }
+                                                              }
+                                                },
+                                                {
+                                                    "assetType":  "dataModel",
+                                                    "asset":  {
+                                                                  "id":  "data-specforge-scan-session",
+                                                                  "name":  "Knowledge Scan Session",
+                                                                  "description":  "Authoritative exact-Scope lifecycle record for one immutable repository snapshot and scanner release.",
+                                                                  "code":  "KnowledgeScanSession",
+                                                                  "modelType":  "logical",
+                                                                  "domainId":  "domain-specforge-platform",
+                                                                  "tables":  ["KnowledgeScanSession"],
+                                                                  "entities":  ["Scan Session", "Scan Checkpoint"],
+                                                                  "fields":  [],
+                                                                  "relationships":  ["One session owns ordered Scan Batches.", "One finalized session can feed one or more governed review bundles."],
+                                                                  "constraints":  ["One exact application-service Scope per session.", "Snapshot and final digests are immutable after finalization."],
+                                                                  "dataClassification":  "internal metadata",
+                                                                  "lifecycle":  "CREATED to INGESTING to FINALIZED, FAILED, or ABORTED; finalized records are immutable.",
+                                                                  "lineage":  "MCP start_knowledge_scan, submit_scan_batch, and finalize_knowledge_scan.",
+                                                                  "createdAt":  "2026-08-03T10:10:21.427Z",
+                                                                  "updatedAt":  "2026-08-03T10:10:21.427Z",
+                                                                  "localizedContent":  {
+                                                                                             "en":  { "name":  "Knowledge Scan Session", "description":  "Authoritative exact-Scope lifecycle record for one immutable repository snapshot and scanner release.", "relationships":  ["One session owns ordered Scan Batches.", "One finalized session can feed one or more governed review bundles."], "constraints":  ["One exact application-service Scope per session.", "Snapshot and final digests are immutable after finalization."], "lifecycle":  "CREATED to INGESTING to FINALIZED, FAILED, or ABORTED; finalized records are immutable.", "lineage":  "MCP start_knowledge_scan, submit_scan_batch, and finalize_knowledge_scan.", "fields":  {} },
+                                                                                             "zh":  { "name":  "知识扫描会话", "description":  "面向一个不可变仓库快照和扫描器发布版本的精确 Scope 权威生命周期记录。", "relationships":  ["一个会话拥有有序的扫描批次。", "一个已完成会话可以进入一个或多个受治理的评审包。"], "constraints":  ["每个会话只能属于一个精确应用服务 Scope。", "完成后的快照摘要和最终摘要不可变。"], "lifecycle":  "从 CREATED 进入 INGESTING，最终为 FINALIZED、FAILED 或 ABORTED；完成记录不可变。", "lineage":  "来自 MCP 的 start_knowledge_scan、submit_scan_batch 和 finalize_knowledge_scan。", "fields":  {} }
+                                                                                         }
+                                                              }
+                                                },
+                                                {
+                                                    "assetType":  "dataModel",
+                                                    "asset":  {
+                                                                  "id":  "data-specforge-scan-batch",
+                                                                  "name":  "Knowledge Scan Batch",
+                                                                  "description":  "Idempotent hash-chained ingestion batch with bounded observation count and resumable sequence.",
+                                                                  "code":  "KnowledgeScanBatch",
+                                                                  "modelType":  "logical",
+                                                                  "domainId":  "domain-specforge-platform",
+                                                                  "tables":  ["KnowledgeScanBatch"],
+                                                                  "entities":  ["Scan Batch"],
+                                                                  "fields":  [],
+                                                                  "relationships":  ["Each batch belongs to one Scan Session.", "Each batch contains ordered Source Observation v2 records."],
+                                                                  "constraints":  ["At most 500 observations per batch.", "Sequence, previous digest, and payload digest must match on retry."],
+                                                                  "dataClassification":  "internal metadata",
+                                                                  "lifecycle":  "Accepted once and safely replayable with the identical digest.",
+                                                                  "lineage":  "Native scanner private spool to MCP submit_scan_batch.",
+                                                                  "createdAt":  "2026-08-03T10:10:21.427Z",
+                                                                  "updatedAt":  "2026-08-03T10:10:21.427Z",
+                                                                  "localizedContent":  {
+                                                                                             "en":  { "name":  "Knowledge Scan Batch", "description":  "Idempotent hash-chained ingestion batch with bounded observation count and resumable sequence.", "relationships":  ["Each batch belongs to one Scan Session.", "Each batch contains ordered Source Observation v2 records."], "constraints":  ["At most 500 observations per batch.", "Sequence, previous digest, and payload digest must match on retry."], "lifecycle":  "Accepted once and safely replayable with the identical digest.", "lineage":  "Native scanner private spool to MCP submit_scan_batch.", "fields":  {} },
+                                                                                             "zh":  { "name":  "知识扫描批次", "description":  "具备数量上限、哈希链和可恢复序列的幂等摄取批次。", "relationships":  ["每个批次属于一个扫描会话。", "每个批次包含有序的 Source Observation v2 记录。"], "constraints":  ["每批最多 500 条观察。", "重试时序号、前序摘要和载荷摘要必须完全一致。"], "lifecycle":  "每个批次只接收一次，并可使用相同摘要安全重放。", "lineage":  "从原生扫描器私有暂存目录进入 MCP submit_scan_batch。", "fields":  {} }
+                                                                                         }
+                                                              }
+                                                },
+                                                {
+                                                    "assetType":  "dataModel",
+                                                    "asset":  {
+                                                                  "id":  "data-specforge-source-observation-v2",
+                                                                  "name":  "Source Observation v2",
+                                                                  "description":  "Source-minimized deterministic implementation observation with canonical identity, evidence references, and explicit coverage gaps.",
+                                                                  "code":  "SourceObservationV2",
+                                                                  "modelType":  "logical",
+                                                                  "domainId":  "domain-specforge-platform",
+                                                                  "tables":  ["KnowledgeSourceObservation"],
+                                                                  "entities":  ["Source Observation", "Coverage Gap", "Evidence Reference"],
+                                                                  "fields":  [],
+                                                                  "relationships":  ["Observations are contained by Scan Batches.", "Semantic candidates cite one or more observations."],
+                                                                  "constraints":  ["No source excerpt is persisted in Phase 1.", "Canonical IDs and digests are deterministic for the same snapshot."],
+                                                                  "dataClassification":  "source-minimized internal metadata",
+                                                                  "lifecycle":  "Immutable after its containing Scan Session is finalized.",
+                                                                  "lineage":  "Static extractors in the signed native scanner.",
+                                                                  "createdAt":  "2026-08-03T10:10:21.427Z",
+                                                                  "updatedAt":  "2026-08-03T10:10:21.427Z",
+                                                                  "localizedContent":  {
+                                                                                             "en":  { "name":  "Source Observation v2", "description":  "Source-minimized deterministic implementation observation with canonical identity, evidence references, and explicit coverage gaps.", "relationships":  ["Observations are contained by Scan Batches.", "Semantic candidates cite one or more observations."], "constraints":  ["No source excerpt is persisted in Phase 1.", "Canonical IDs and digests are deterministic for the same snapshot."], "lifecycle":  "Immutable after its containing Scan Session is finalized.", "lineage":  "Static extractors in the signed native scanner.", "fields":  {} },
+                                                                                             "zh":  { "name":  "源代码观察 v2", "description":  "包含规范身份、证据引用和显式覆盖缺口的源码最小化确定性实现观察。", "relationships":  ["观察记录由扫描批次包含。", "语义候选必须引用一条或多条观察。"], "constraints":  ["第一阶段不持久化任何源码摘录。", "同一快照的规范 ID 和摘要必须确定一致。"], "lifecycle":  "所属扫描会话完成后不可变。", "lineage":  "来自签名原生扫描器中的静态提取器。", "fields":  {} }
+                                                                                         }
+                                                              }
+                                                },
+                                                {
+                                                    "assetType":  "businessRule",
+                                                    "asset":  {
+                                                                  "id":  "rule-specforge-knowledge-risk-policy",
+                                                                  "name":  "Knowledge Candidate Risk Policy",
+                                                                  "description":  "Assigns T0-T3 review risk and enforces actor separation, evidence, localization, and human escalation before promotion.",
+                                                                  "code":  "SPECFORGE_KNOWLEDGE_RISK_POLICY",
+                                                                  "domainId":  "domain-specforge-platform",
+                                                                  "ruleType":  "permission",
+                                                                  "condition":  "A semantic candidate or ReviewBundle requests approval or promotion.",
+                                                                  "action":  "Apply T0-T3 policy, exact-Scope authorization, evidence coverage, bilingual completeness, and generator-versus-approver separation.",
+                                                                  "exception":  "T2 and T3 require an authorized human domain owner by default; unresolved or ambiguous candidates remain blocked.",
+                                                                  "examples":  ["A T1 bundle generated by Agent A is approved by Agent B.", "An ambiguous identity candidate is routed to T3 and cannot be promoted."],
+                                                                  "relatedAssets":  [{ "type":  "dataModel", "id":  "data-specforge-source-observation-v2", "label":  "Source Observation v2" }],
+                                                                  "severity":  "high",
+                                                                  "createdAt":  "2026-08-03T10:10:21.427Z",
+                                                                  "updatedAt":  "2026-08-03T10:10:21.427Z",
+                                                                  "localizedContent":  {
+                                                                                             "en":  { "name":  "Knowledge Candidate Risk Policy", "description":  "Assigns T0-T3 review risk and enforces actor separation, evidence, localization, and human escalation before promotion.", "condition":  "A semantic candidate or ReviewBundle requests approval or promotion.", "action":  "Apply T0-T3 policy, exact-Scope authorization, evidence coverage, bilingual completeness, and generator-versus-approver separation.", "exception":  "T2 and T3 require an authorized human domain owner by default; unresolved or ambiguous candidates remain blocked.", "examples":  ["A T1 bundle generated by Agent A is approved by Agent B.", "An ambiguous identity candidate is routed to T3 and cannot be promoted."] },
+                                                                                             "zh":  { "name":  "知识候选风险策略", "description":  "在提升前分配 T0-T3 评审风险，并执行角色分离、证据、本地化和人工升级规则。", "condition":  "语义候选或 ReviewBundle 请求批准或提升。", "action":  "执行 T0-T3 策略、精确 Scope 授权、证据覆盖、双语完整性以及生成者与批准者分离。", "exception":  "T2 和 T3 默认需要获授权的人工领域负责人；未解决或身份歧义候选必须保持阻塞。", "examples":  ["Agent A 生成的 T1 评审包由 Agent B 批准。", "身份歧义候选进入 T3，且不能被提升。"] }
+                                                                                         }
+                                                              }
+                                                },
+                                                {
+                                                    "assetType":  "businessRule",
+                                                    "asset":  {
+                                                                  "id":  "rule-specforge-knowledge-promotion-transaction",
+                                                                  "name":  "Atomic Knowledge Promotion Transaction",
+                                                                  "description":  "Promotes approved candidates into canonical assets, typed links, Evidence, outbox events, a ChangeSet, and one immutable receipt atomically.",
+                                                                  "code":  "SPECFORGE_KNOWLEDGE_PROMOTION_TRANSACTION",
+                                                                  "domainId":  "domain-specforge-platform",
+                                                                  "ruleType":  "validation",
+                                                                  "condition":  "A fully approved exact-Scope candidate set requests canonical promotion.",
+                                                                  "action":  "Validate risk, actors, evidence, localization, Scope, and digest, then commit every authored record and outbox event in one PostgreSQL transaction.",
+                                                                  "exception":  "Any mismatch rolls back the transaction; an identical retry returns the existing promotion receipt.",
+                                                                  "examples":  ["A successful retry returns the same receipt.", "A relationship failure leaves no partial canonical asset."],
+                                                                  "relatedAssets":  [{ "type":  "dataModel", "id":  "data-specforge-assets", "label":  "SpecForge Design Asset Data Model" }],
+                                                                  "severity":  "high",
+                                                                  "createdAt":  "2026-08-03T10:10:21.427Z",
+                                                                  "updatedAt":  "2026-08-03T10:10:21.427Z",
+                                                                  "localizedContent":  {
+                                                                                             "en":  { "name":  "Atomic Knowledge Promotion Transaction", "description":  "Promotes approved candidates into canonical assets, typed links, Evidence, outbox events, a ChangeSet, and one immutable receipt atomically.", "condition":  "A fully approved exact-Scope candidate set requests canonical promotion.", "action":  "Validate risk, actors, evidence, localization, Scope, and digest, then commit every authored record and outbox event in one PostgreSQL transaction.", "exception":  "Any mismatch rolls back the transaction; an identical retry returns the existing promotion receipt.", "examples":  ["A successful retry returns the same receipt.", "A relationship failure leaves no partial canonical asset."] },
+                                                                                             "zh":  { "name":  "原子知识提升事务", "description":  "在一个事务中将已批准候选提升为规范资产、有类型关系、Evidence、Outbox 事件、ChangeSet 和不可变回执。", "condition":  "一组已完全批准且属于精确 Scope 的候选请求规范提升。", "action":  "校验风险、角色、证据、本地化、Scope 和摘要，然后在一个 PostgreSQL 事务中提交全部编写记录与 Outbox 事件。", "exception":  "任何不匹配都会回滚事务；输入完全相同的重试返回既有提升回执。", "examples":  ["成功重试返回同一个回执。", "关系写入失败不会留下部分规范资产。"] }
+                                                                                         }
+                                                              }
+                                                },
+                                                {
+                                                    "assetType":  "api",
+                                                    "asset":  {
+                                                                  "id":  "api-specforge-knowledge-baseline-publication",
+                                                                  "name":  "Knowledge Baseline Publication Contract",
+                                                                  "description":  "Publishes an immutable exact-Scope Baseline only from a durable converged reconciliation receipt.",
+                                                                  "method":  "POST",
+                                                                  "path":  "mcp://tools/publish_knowledge_baseline",
+                                                                  "domainId":  "domain-specforge-platform",
+                                                                  "providerSystem":  "SpecForge MCP Server",
+                                                                  "consumers":  ["Authorized coding Agent", "SpecForge governance operations"],
+                                                                  "requestSchema":  { "streamId":  "string", "changeSetId":  "string", "reconciliationReceiptId":  "string" },
+                                                                  "responseSchema":  { "baseline":  "Immutable KnowledgeBaseline" },
+                                                                  "errorCodes":  ["RECONCILIATION_RECEIPT_REQUIRED", "RECONCILIATION_NOT_CONVERGED", "SCOPE_MISMATCH"],
+                                                                  "authType":  "Exact application-service knowledge:write grant",
+                                                                  "idempotency":  "Stable baseline ID and immutable source digest.",
+                                                                  "rateLimit":  "Governed operator or Agent publication only.",
+                                                                  "timeout":  "30s",
+                                                                  "compatibilityPolicy":  "A new Baseline supersedes but never mutates a previous Baseline.",
+                                                                  "openapiSpec":  "MCP tool schema: publish_knowledge_baseline",
+                                                                  "exposure":  "internal",
+                                                                  "createdAt":  "2026-08-03T10:10:21.427Z",
+                                                                  "updatedAt":  "2026-08-03T10:10:21.427Z",
+                                                                  "localizedContent":  {
+                                                                                             "en":  { "name":  "Knowledge Baseline Publication Contract", "description":  "Publishes an immutable exact-Scope Baseline only from a durable converged reconciliation receipt.", "authType":  "Exact application-service knowledge:write grant", "idempotency":  "Stable baseline ID and immutable source digest.", "rateLimit":  "Governed operator or Agent publication only.", "timeout":  "30s", "compatibilityPolicy":  "A new Baseline supersedes but never mutates a previous Baseline." },
+                                                                                             "zh":  { "name":  "知识基线发布契约", "description":  "仅允许使用持久化且已收敛的对账回执发布不可变的精确 Scope Baseline。", "authType":  "精确应用服务 knowledge:write 授权", "idempotency":  "基线 ID 稳定且源摘要不可变。", "rateLimit":  "仅允许受治理的运维人员或 Agent 发布。", "timeout":  "30 秒", "compatibilityPolicy":  "新 Baseline 可以取代旧 Baseline，但绝不能修改旧记录。" }
+                                                                                         }
+                                                              }
+                                                }
+                                            ],
+                          "managedRelationships":  [
+                                                       { "sourceType":  "api", "sourceId":  "api-specforge-mcp-tools", "targetType":  "api", "targetId":  "api-specforge-scanner-release-contract", "relationType":  "CONTAINS" },
+                                                       { "sourceType":  "api", "sourceId":  "api-specforge-mcp-tools", "targetType":  "api", "targetId":  "api-specforge-knowledge-baseline-publication", "relationType":  "CONTAINS" },
+                                                       { "sourceType":  "businessRule", "sourceId":  "rule-specforge-knowledge-risk-policy", "targetType":  "dataModel", "targetId":  "data-specforge-source-observation-v2", "relationType":  "GOVERNS" },
+                                                       { "sourceType":  "businessRule", "sourceId":  "rule-specforge-knowledge-promotion-transaction", "targetType":  "api", "targetId":  "api-specforge-knowledge-baseline-publication", "relationType":  "GOVERNS" },
+                                                       { "sourceType":  "api", "sourceId":  "api-specforge-knowledge-baseline-publication", "targetType":  "dataModel", "targetId":  "data-specforge-assets", "relationType":  "WRITES" },
+                                                       { "sourceType":  "proposal", "sourceId":  "proposal-agent-driven-legacy-baseline-discovery", "targetType":  "api", "targetId":  "api-specforge-scanner-release-contract", "relationType":  "IMPACTS" },
+                                                       { "sourceType":  "proposal", "sourceId":  "proposal-agent-driven-legacy-baseline-discovery", "targetType":  "dataModel", "targetId":  "data-specforge-scan-session", "relationType":  "IMPACTS" },
+                                                       { "sourceType":  "proposal", "sourceId":  "proposal-agent-driven-legacy-baseline-discovery", "targetType":  "dataModel", "targetId":  "data-specforge-scan-batch", "relationType":  "IMPACTS" },
+                                                       { "sourceType":  "proposal", "sourceId":  "proposal-agent-driven-legacy-baseline-discovery", "targetType":  "dataModel", "targetId":  "data-specforge-source-observation-v2", "relationType":  "IMPACTS" },
+                                                       { "sourceType":  "proposal", "sourceId":  "proposal-agent-driven-legacy-baseline-discovery", "targetType":  "businessRule", "targetId":  "rule-specforge-knowledge-risk-policy", "relationType":  "IMPACTS" },
+                                                       { "sourceType":  "proposal", "sourceId":  "proposal-agent-driven-legacy-baseline-discovery", "targetType":  "businessRule", "targetId":  "rule-specforge-knowledge-promotion-transaction", "relationType":  "IMPACTS" },
+                                                       { "sourceType":  "proposal", "sourceId":  "proposal-agent-driven-legacy-baseline-discovery", "targetType":  "api", "targetId":  "api-specforge-knowledge-baseline-publication", "relationType":  "IMPACTS" }
+                                                   ],
                           "owner":  "SpecForge Architecture and Agent Integration",
-        "status":  "MCP synchronized and read back; scanner foundation, MockAI semantic candidate generation, and deterministic identity matching implemented; signed packaging, real Agent transport, and baseline publication pending",
+                          "status":  "Phase 1 runtime implemented, locally verified, MCP synchronized, and read back; Phases 2-5 deferred",
                           "reason":  "The approved design uses existing coding Agents, a signed ephemeral deterministic scanner, evidence-backed semantic extraction, exact application-service authorization, and risk-tiered ReviewBundles without requiring users to deploy scanner infrastructure. Its design facts are persisted and verified in the exact Designer Scope.",
-                          "retryTrigger":  "After a future design change, re-run design-facts:sync and design-facts:check. Begin implementation only after the written specification is reviewed and an implementation plan is approved.",
+                          "retryTrigger":  "After a future design change, open a new exact-Scope design session and rerun implementation evidence, MCP synchronization, read-back, and federation reconciliation before completion.",
                           "evidence":  [
                                            {
                                                "command":  "node .\\node_modules\\vitest\\vitest.mjs run --root . --exclude \".worktrees/**\" --exclude \".pnpm-store/**\" scripts\\design-fact-manifest.test.ts",
-                                               "result":  "Passed: 1 file and 6 tests, including explicit ADR-0015 registration and unique repository/MCP IDs for all 13 decisions."
+                                               "result":  "Passed after adding stable Phase 1 managed asset IDs, bilingual metadata, and directional typed relationships."
                                            },
                                            {
-                                                 "command":  "$env:SPECFORGE_DESIGN_FACT_IDS='adr-agent-driven-legacy-baseline-discovery,adr-unified-3a-knowledge-initialization'; pnpm design-facts:sync",
-                                                 "result":  "Both selected ADRs returned complete, including their generated companion records in the exact owning Scope."
+                                                 "command":  "pnpm legacy-baseline:verify",
+                                                 "result":  "Exited 0; all ten verification stages were PASSED in artifacts/legacy-baseline-verification.json."
                                            },
                                              {
-                                                   "command":  "$env:SPECFORGE_DESIGN_FACT_IDS='adr-agent-driven-legacy-baseline-discovery,adr-unified-3a-knowledge-initialization'; pnpm design-facts:check",
-                                                   "result":  "Verified both selected ADRs with empty missing, mismatched, outOfScope, and blocked results."
+                                                   "command":  ".\\node_modules\\.bin\\vitest.cmd run --root apps/mcp-server src/scanner/legacy-baseline.e2e.test.ts src/scanner/legacy-baseline.scale.test.ts",
+                                                   "result":  "Passed the signed-binary exact-Scope Baseline E2E and 100,000-observation bounded scale tests."
                                              },
                          {
-                             "command":  "pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <temp-file>",
-                             "result":  "Produced 56 source-minimized manifest entries, 56 structural observations, and a deterministic report digest; the gated MCP scanner integration persisted the report and idempotent observations."
+                             "command":  "pnpm typecheck",
+                             "result":  "Core, MCP Server, Web, and design-fact synchronization code typechecked in the stage verifier."
                          },
                          {
-                             "command":  "pnpm typecheck; .\\node_modules\\.bin\\vitest.cmd run apps/mcp-server/src/scanner/persistence.integration.test.ts",
-                             "result":  "Core, MCP Server, and Web type checks passed; the gated PostgreSQL scanner integration passed MockAI semantic candidate generation, candidate-only assertion status, bilingual summaries, deterministic identity candidates, sibling-Scope exclusion, ambiguity blocking, automatic ReviewBundle assembly, and idempotent retry."
+                             "command":  "pnpm build",
+                             "result":  "Core and MCP compiled and the Web production build passed locally with SPECFORGE_NEXT_STANDALONE=0; Docker/Linux keeps standalone output enabled."
+                         },
+                         {
+                             "command":  "$env:DATABASE_URL='<canonical>'; pnpm design-facts:sync",
+                             "result":  "All 16 decisions returned complete, including the Phase 1 Proposal, Agent Context Pack, seven managed assets, Evidence, and directional links in the exact Designer Scope."
+                         },
+                         {
+                             "command":  "$env:DATABASE_URL='<canonical>'; pnpm design-facts:check",
+                             "result":  "All 16 decisions returned verified; missing, mismatched, outOfScope, and blocked were empty, including MCP read-back of managed assets and links."
+                         },
+                         {
+                             "command":  "$env:SPECFORGE_APPLICATION_SERVICE_ID='com.huawei.celon.desiner'; $env:SPECFORGE_SCOPE_PATH='pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner'; pnpm design-facts:federation:check",
+                             "result":  "Returned blocking=false, empty issueCounts, and root f04e3ad0981d2ce6a2e40032e359ab06b07dc4ed2255774b6515ba8cd87987dd."
+                         },
+                         {
+                             "command":  "pnpm design-context:close -- --session design-change-session:5e45b9a8-ca66-4d28-9bf4-757526d5e5b3 --status CONVERGED --evidence <three passed checks>",
+                             "result":  "Returned the exact design-change session with status CONVERGED and preserved the stage verification, MCP read-back, and federation reconciliation references."
                          }
                                        ]
                       },
@@ -563,7 +781,7 @@
                                                   "adr-federated-design-fact-synchronization"
                                               ],
                           "owner":  "SpecForge Architecture and Agent Integration",
-        "status":  "MCP synchronized and read back; phase 3 scanner foundation and MockAI semantic candidate generation implemented; deterministic identity matching implemented; signed packaging, 3A projections, and web artifact verification pending",
+                          "status":  "Phase 1 knowledge foundation and Baseline path implemented, locally verified, MCP synchronized, and read back; 3A projections and Phases 2-5 deferred",
                           "reason":  "The approved design models Business, System, and Technical Architecture as versioned perspectives over one authoritative fact graph, preserves multiple evidence-backed assertions per semantic identity, and keeps KLs, Context Packs, reports, and graph stores as derived projections.",
                           "retryTrigger":  "After written-spec review, prepare and approve an implementation plan. After any design change, rerun exact-Scope synchronization and read-back before implementation is claimed complete.",
                           "evidence":  [
@@ -600,8 +818,8 @@
                              "result":  "Core, MCP Server, and Web type checks passed; the gated PostgreSQL scanner integration passed MockAI semantic candidate generation, candidate-only assertion status, bilingual summaries, deterministic identity candidates, sibling-Scope exclusion, ambiguity blocking, automatic ReviewBundle assembly, and idempotent retry."
                          },
                                            {
-                                               "command":  "pnpm build",
-                                               "result":  "Core and MCP compiled and Web generated 18 static pages, but Next.js standalone trace copying failed with Windows EPERM while creating pnpm symlinks; elevated retry had the same host limitation."
+                             "command":  "pnpm legacy-baseline:verify",
+                             "result":  "Exited 0; contract, scanner, semantic review, PostgreSQL promotion/reconciliation, immutable Baseline, 100,000-observation scale, typecheck, and production build stages all passed."
                                            }
                                        ]
                       }

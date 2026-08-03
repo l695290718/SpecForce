@@ -110,7 +110,7 @@ function buildBatch(sessionId: string, nonce: string, overrides: { payload?: Rec
     payload: overrides.payload ?? { method: "GET" },
     sensitivity: "INTERNAL",
     redaction: { status: "NONE", reasons: [] },
-    evidenceRefs: [{ id: "evidence:api-1", kind: "SOURCE_EXCERPT", digest: "f".repeat(64), excerpt: "GET /policy" }],
+    evidenceRefs: [{ id: "evidence:api-1", kind: "CONTENT_ADDRESS", digest: "f".repeat(64) }],
     normalizedDigest: createHash("sha256").update(JSON.stringify(overrides.payload ?? { method: "GET" })).digest("hex"),
     warnings: [],
     coverageGaps: []
@@ -151,16 +151,17 @@ function signedRelease(): { manifest: ScannerReleaseManifest; trustBundle: Recor
 }
 
 async function deleteFixtures() {
-  const sessions = await prisma.knowledgeScanSession.findMany({ where: { ...architectureScope, id: { startsWith: prefix } }, select: { id: true } }).catch(() => []);
+  const sessions = await prisma.knowledgeScanSession.findMany({
+    where: { ...architectureScope, OR: [{ connectorId }, { designChangeSessionId }] },
+    select: { id: true }
+  }).catch(() => []);
   const sessionIds = sessions.map((session) => session.id);
   if (sessionIds.length > 0) {
     await prisma.knowledgeScanBatch.deleteMany({ where: { ...architectureScope, sessionId: { in: sessionIds } } });
-    for (const sessionId of sessionIds) {
-      await prisma.sourceObservation.deleteMany({ where: { ...architectureScope, idempotencyKey: { startsWith: `scan-batch:${sessionId}:` } } });
-    }
+    await prisma.sourceObservation.deleteMany({ where: { ...architectureScope, connectorId, sourceNamespace: "knowledge-scan-v2" } });
   }
-  await prisma.knowledgeScanSession.deleteMany({ where: { ...architectureScope, id: { startsWith: prefix } } }).catch(() => undefined);
-  await prisma.scannerRelease.deleteMany({ where: { id: releaseId } }).catch(() => undefined);
+  await prisma.knowledgeScanSession.deleteMany({ where: { ...architectureScope, OR: [{ connectorId }, { designChangeSessionId }] } }).catch(() => undefined);
+  await prisma.scannerRelease.deleteMany({ where: { id: { startsWith: `${prefix}-release-` } } }).catch(() => undefined);
   await prisma.designChangeSession.deleteMany({ where: { ...architectureScope, id: designChangeSessionId } }).catch(() => undefined);
   await prisma.connectorInstance.deleteMany({ where: { ...architectureScope, id: connectorId } }).catch(() => undefined);
 }

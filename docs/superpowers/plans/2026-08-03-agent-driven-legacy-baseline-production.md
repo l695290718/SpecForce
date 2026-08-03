@@ -8,6 +8,10 @@
 
 **Tech Stack:** Go 1.26, TypeScript 5.7, Node 22, pnpm 9, Prisma 6, PostgreSQL, Zod 3, Vitest 2, JSON Schema 2020-12, Ed25519, RFC 8785 canonical JSON, SHA-256, Tree-sitter Go bindings and statically linked Java/TypeScript grammars.
 
+## Implementation Status
+
+Tasks 0-7 are implemented in commits `bf9b7da` through `226cae8`. The unified stage verifier passed all ten checks, including the real signed-binary E2E and 100,000-observation scale proof. Task 8 repository records, managed facts, MCP synchronization, read-back, federation reconciliation, and exact session closure are complete; only the documentation commit remains.
+
 ## Global Constraints
 
 - This plan implements only Phase 1: repository discovery through Baseline v1 publication. Phase 2 3A projections, Phase 3 PostgreSQL-to-graph production projection, Phase 4 enterprise governance, and Phase 5 deployment/capacity hardening remain separate plans.
@@ -18,7 +22,7 @@
 - PostgreSQL is authoritative. Graph storage is not on the authoring or Baseline publication path in this phase.
 - The scanner never executes project code, build scripts, package managers, generated binaries, or dynamically discovered plugins.
 - Scanner release trust uses a configured Ed25519 trust root; trust-on-first-use and unsigned fallback are forbidden.
-- Batch limits are 500 observations, 4 MiB canonical JSON, 8 KiB excerpt per observation, 10 MiB maximum source file, and 100,000 observations per Scan Session.
+- Batch limits are 500 observations, 4 MiB canonical JSON, zero persisted source excerpts, 10 MiB maximum source file, and 100,000 observations per Scan Session.
 - Full repository regression runs once after each delivery slice. Individual tasks run focused RED/GREEN tests only.
 - Every task ends with a reviewable commit. Each delivery slice updates repository design records and synchronizes matching MCP facts before being described as complete.
 
@@ -722,7 +726,7 @@ Commit: `feat: promote reviewed knowledge into baseline assets`
 - Consumes: all Phase 1 runtime interfaces.
 - Produces: `pnpm legacy-baseline:verify`, signed scanner artifacts under `dist/scanner/<version>/`, and an operator runbook.
 
-- [ ] **Step 1: Write the end-to-end fixture test**
+- [x] **Step 1: Write the end-to-end fixture test**
 
 The test must create one exact-Scope Scan Session, run the Go scanner against `fixtures/legacy-scan`, submit at least three batches, simulate a transport interruption and checkpoint resume, submit Agent semantic fixtures, match identities, approve according to risk, promote, reconcile, publish Baseline v1, and rescan without duplicate canonical assets. A sibling Scope query must return zero Phase 1 records.
 
@@ -738,7 +742,7 @@ it("publishes Baseline v1 and keeps sibling Scope empty after resume and rescan"
 });
 ```
 
-- [ ] **Step 2: Write bounded scale and hostile-input tests**
+- [x] **Step 2: Write bounded scale and hostile-input tests**
 
 Generate 100,000 metadata-only observations without copying repository source. Assert 200 accepted batches of at most 500 observations, bounded process memory recorded by the script, exact resume after an injected failure, rejection of batch 201, and no source excerpt above 8 KiB. Exercise symlink escape, binary, private key, token, huge file, malformed OpenAPI, and workspace mutation cases.
 
@@ -753,15 +757,15 @@ it("accepts the session ceiling in bounded batches and rejects overflow", async 
 });
 ```
 
-- [ ] **Step 3: Implement the signed release builder**
+- [x] **Step 3: Implement the signed release builder**
 
 `scripts/build-scanner-release.ps1` builds and hashes one artifact for the current native runner and refuses to cross-compile Tree-sitter/CGO binaries. `.github/workflows/scanner-release.yml` runs native Windows, Linux amd64/arm64, and macOS amd64/arm64 jobs, aggregates their artifacts in a release job, emits one RFC-8785-compatible manifest, signs it using a CI-provided Ed25519 private key, and refuses to read the private key from the repository. The public key ID and minimum version are explicit release metadata. The same native-runner script remains reusable by CodeHub when its gate is delivered in Phase 4.
 
-- [ ] **Step 4: Write the operations runbook**
+- [x] **Step 4: Write the operations runbook**
 
 Document token prerequisites, release trust-root installation, Session creation, Agent invocation, spool location and permissions, checkpoint resume, coverage review, T0-T3 approval, promotion, reconciliation, Baseline publication, release revocation, key rotation overlap, rollback refusal, spool cleanup, audit queries, and failure codes. State that production Agent integrations, CodeHub gate, 3A projections, and graph projection are outside Phase 1.
 
-- [ ] **Step 5: Run one stage-level verification**
+- [x] **Step 5: Run one stage-level verification**
 
 Run: `pnpm legacy-baseline:verify`
 
@@ -791,15 +795,15 @@ Commit: `test: prove legacy baseline production flow`
 - Consumes: successful Task 7 evidence.
 - Produces: matching repository and MCP ADR, Proposal, Context Pack, contract/rule/data-model facts, typed links, Evidence, and backlog facts under the exact owning Scope.
 
-- [ ] **Step 1: Correct stale repository facts before synchronization**
+- [x] **Step 1: Correct stale repository facts before synchronization**
 
 Update ADR 0015 Chinese evidence to match the actual current core test count and implemented deterministic identity matching. Distinguish Phase 1 implemented behavior from Phase 2-5 deferred capability in both English and Chinese. Record exact commands and results from Task 7.
 
-- [ ] **Step 2: Update the design-fact manifest**
+- [x] **Step 2: Update the design-fact manifest**
 
 Add stable IDs for the scanner release contract, Scan Session, Scan Batch, Source Observation v2, risk policy, promotion transaction, Baseline publication, Phase 1 Proposal, Agent Context Pack, and their directional typed relationships. Preserve repository IDs as MCP IDs.
 
-- [ ] **Step 3: Synchronize the Task 0 exact-Scope session through MCP**
+- [x] **Step 3: Synchronize the Task 0 exact-Scope session through MCP**
 
 Run:
 
@@ -811,11 +815,11 @@ pnpm design-facts:federation:check
 
 Expected: no missing, mismatched, blocked, pending, or out-of-Scope facts.
 
-- [ ] **Step 4: Read back MCP assets and typed links**
+- [x] **Step 4: Read back MCP assets and typed links**
 
 Read ADR 0015, ADR 0018, the Phase 1 Proposal, Agent Context Pack, contract assets, and their links through MCP. Verify exact Scope, matching IDs, English canonical content, complete Chinese overlays, evidence refs, directional relationship types, and PostgreSQL authority statements.
 
-- [ ] **Step 5: Close the design context and commit**
+- [x] **Step 5: Close the design context and commit**
 
 Run:
 

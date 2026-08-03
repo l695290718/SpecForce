@@ -11,6 +11,8 @@ export interface DesignFactManifestDecision {
   proposalId: string;
   contextPackId: string;
   relatedAssetIds: string[];
+  managedAssets?: ManagedDesignAsset[];
+  managedRelationships?: ManagedDesignRelationship[];
   evidence: Array<{ command: string; result: string }>;
   status?: string;
   owner?: string;
@@ -97,6 +99,14 @@ export async function synchronizeDesignFacts(input: {
     if (!source.english.trim() || !source.chinese.trim()) throw new Error(`DESIGN_FACT_LOCALIZATION_MISSING: ${decision.id}`);
     const parsed = parseAdrSource(source);
 
+    for (const managed of decision.managedAssets ?? []) {
+      await callOrThrow(input.callTool, "upsert_design_asset", {
+        assetType: managed.assetType,
+        asset: { ...managed.asset, architectureScope: decision.scope },
+        architectureScope: decision.scope
+      }, decision.id);
+    }
+
     const result = await input.callTool("create_adr", {
       applicationServiceId: decision.scope.applicationServiceId,
       architectureScope: decision.scope,
@@ -117,6 +127,9 @@ export async function synchronizeDesignFacts(input: {
       await callOrThrow(input.callTool, "link_assets", link("contextPack", decision.contextPackId, "proposal", decision.proposalId, "IMPLEMENTS_CONTEXT_FOR", decision.scope), decision.id);
       for (const assetId of decision.relatedAssetIds) {
         await callOrThrow(input.callTool, "link_assets", link("adr", decision.mcpAdrId, assetTypeFor(assetId), assetId, "DECIDES", decision.scope), decision.id);
+      }
+      for (const relationship of decision.managedRelationships ?? []) {
+        await callOrThrow(input.callTool, "link_assets", { ...relationship, architectureScope: decision.scope }, decision.id);
       }
     }
 
@@ -181,6 +194,19 @@ function buildProposal(decision: DesignFactManifestDecision, parsed: ParsedAdr) 
       }
     }
   };
+}
+
+export interface ManagedDesignAsset {
+  assetType: "api" | "dataModel" | "businessRule" | "quality" | "observability";
+  asset: Record<string, unknown> & { id: string };
+}
+
+export interface ManagedDesignRelationship {
+  sourceType: string;
+  sourceId: string;
+  targetType: string;
+  targetId: string;
+  relationType: string;
 }
 
 function backfillProposal(
@@ -315,7 +341,11 @@ function assetTypeFor(id: string): string {
   if (id.startsWith("data-")) return "dataModel";
   if (id.startsWith("rule-")) return "businessRule";
   if (id.startsWith("quality-")) return "quality";
+  if (id.startsWith("observability-") || id.startsWith("obs-")) return "observability";
   if (id.startsWith("adr-")) return "adr";
+  if (id.startsWith("proposal-")) return "proposal";
+  if (id.startsWith("context-pack-") || id.startsWith("ctx-")) return "contextPack";
+  if (id.startsWith("evidence-")) return "evidence";
   throw new Error(`DESIGN_FACT_RELATED_ASSET_PREFIX_UNKNOWN: ${id}`);
 }
 
@@ -328,6 +358,38 @@ function assertDecision(decision: DesignFactManifestDecision): void {
     throw new Error(`DESIGN_FACT_SCOPE_MISSING: ${decision.id}`);
   }
   for (const relatedAssetId of decision.relatedAssetIds) assetTypeFor(relatedAssetId);
+  const managedIds = new Set<string>();
+  for (const managed of decision.managedAssets ?? []) {
+    if (assetTypeFor(managed.asset.id) !== managed.assetType) {
+      throw new Error(`DESIGN_FACT_MANAGED_ASSET_TYPE_MISMATCH: ${managed.asset.id}`);
+    }
+    if (managedIds.has(managed.asset.id)) throw new Error(`DESIGN_FACT_MANAGED_ASSET_DUPLICATE: ${managed.asset.id}`);
+    managedIds.add(managed.asset.id);
+    assertManagedAssetLocalization(decision.id, managed);
+  }
+  for (const relationship of decision.managedRelationships ?? []) {
+    assetTypeFor(relationship.sourceId);
+    assetTypeFor(relationship.targetId);
+    if (!relationship.relationType.trim()) throw new Error(`DESIGN_FACT_RELATIONSHIP_TYPE_MISSING: ${decision.id}`);
+  }
+}
+
+function assertManagedAssetLocalization(decisionId: string, managed: ManagedDesignAsset): void {
+  const localized = managed.asset.localizedContent;
+  if (!localized || typeof localized !== "object" || Array.isArray(localized)) {
+    throw new Error(`DESIGN_FACT_MANAGED_ASSET_LOCALIZATION_MISSING: ${decisionId}:${managed.asset.id}`);
+  }
+  const locales = localized as Record<string, unknown>;
+  for (const locale of ["en", "zh"] as const) {
+    const value = locales[locale];
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error(`DESIGN_FACT_MANAGED_ASSET_LOCALIZATION_MISSING: ${decisionId}:${managed.asset.id}:${locale}`);
+    }
+    const record = value as Record<string, unknown>;
+    if (typeof record.name !== "string" || !record.name.trim() || typeof record.description !== "string" || !record.description.trim()) {
+      throw new Error(`DESIGN_FACT_MANAGED_ASSET_LOCALIZATION_INCOMPLETE: ${decisionId}:${managed.asset.id}:${locale}`);
+    }
+  }
 }
 
 function buildAdr(decision: DesignFactManifestDecision, parsed: ParsedAdr) {

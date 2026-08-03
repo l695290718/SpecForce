@@ -2,9 +2,14 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { designEvidenceId, type DesignFactManifestDecision } from "./sync-design-facts";
+import {
+  designEvidenceId,
+  type DesignFactManifestDecision,
+  type ManagedDesignAsset,
+  type ManagedDesignRelationship
+} from "./sync-design-facts";
 
-type Decision = Pick<DesignFactManifestDecision, "id" | "mcpAdrId" | "proposalId" | "contextPackId" | "relatedAssetIds" | "evidence" | "scope">;
+type Decision = Pick<DesignFactManifestDecision, "id" | "mcpAdrId" | "proposalId" | "contextPackId" | "relatedAssetIds" | "managedAssets" | "managedRelationships" | "evidence" | "scope">;
 type Manifest = { decisions: Decision[] };
 type PersistedAdr = {
   id?: string;
@@ -15,7 +20,7 @@ type PersistedAdr = {
   architectureScope?: { applicationServiceId?: string; scopePath?: string };
   localizedContent?: { en?: unknown; zh?: unknown };
 };
-type RecordType = "adr" | "proposal" | "contextPack" | "evidence";
+type RecordType = "adr" | "proposal" | "contextPack" | "evidence" | ManagedDesignAsset["assetType"];
 type Link = {
   sourceLogicalId?: string;
   targetLogicalId?: string;
@@ -41,6 +46,9 @@ const contextPackLocalizationShape: LocalizationShape = {
 };
 const evidenceLocalizationShape: LocalizationShape = {
   stringFields: ["name", "description", "command", "result"]
+};
+const managedAssetLocalizationShape: LocalizationShape = {
+  stringFields: ["name", "description"]
 };
 
 export interface DesignFactReconciliationReport {
@@ -90,6 +98,18 @@ export async function reconcileDesignFacts(input: {
               else if (evidence.status !== "passed") report.blocked.push(`${decision.id}:evidence`);
               else if (!hasLink(links, decision.scope, evidenceId, decision.mcpAdrId, "VALIDATES")) report.missing.push(`${decision.id}:evidence-link`);
             }
+            for (const managed of decision.managedAssets ?? []) {
+              const asset = await input.find(managed.assetType, decision, managed.asset.id);
+              if (!asset) report.missing.push(`${decision.id}:managed-asset:${managed.asset.id}`);
+              else if (asset.id !== managed.asset.id) report.mismatched.push(`${decision.id}:managed-asset:${managed.asset.id}`);
+              else if (!matchesScope(asset, decision.scope)) report.outOfScope.push(`${decision.id}:managed-asset:${managed.asset.id}`);
+              else if (!hasLocalizedContent(asset, managedAssetLocalizationShape)) report.mismatched.push(`${decision.id}:managed-asset:${managed.asset.id}`);
+            }
+            for (const relationship of decision.managedRelationships ?? []) {
+              if (!hasManagedLink(links, decision.scope, relationship)) {
+                report.missing.push(`${decision.id}:managed-link:${relationship.sourceId}:${relationship.relationType}:${relationship.targetId}`);
+              }
+            }
             if (!hasDecisionIssue(report, decision.id)) report.verified.push(decision.id);
           }
         } else report.verified.push(decision.id);
@@ -138,6 +158,10 @@ function hasLink(links: Link[], expectedScope: Decision["scope"], sourceId: stri
     && (link.targetLogicalId === targetId || link.targetId === targetId)
     && (link.label === relationType || link.relationType === relationType)
     && matchesArchitectureScope(link.architectureScope, expectedScope));
+}
+
+function hasManagedLink(links: Link[], expectedScope: Decision["scope"], relationship: ManagedDesignRelationship): boolean {
+  return hasLink(links, expectedScope, relationship.sourceId, relationship.targetId, relationship.relationType);
 }
 
 export function reconciliationExitCode(report: DesignFactReconciliationReport): 0 | 1 {

@@ -2,94 +2,77 @@
 
 ## Status
 
-**Phase 3 scanner foundation, provider-neutral MockAI semantic candidate generation, and deterministic identity matching implemented. MCP design facts are synchronized and read back; signed packaging, 3A projections, and migration hardening remain pending.**
+**Accepted. The profile-neutral knowledge foundation and Phase 1 Baseline path are implemented, locally verified, synchronized through MCP, and read back in the exact Scope. Derived 3A projections and later enterprise hardening remain deferred.**
 
 - Stable ADR/MCP ID: `adr-unified-3a-knowledge-initialization`
-- Owning `architectureScope.applicationServiceId`: `com.huawei.celon.desiner`
-- Owning `architectureScope.scopePath`: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
-- Refines: `adr-agent-driven-legacy-baseline-discovery`
+- Owning application service: `com.huawei.celon.desiner`
+- Owning scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
+- Proposal: `proposal-unified-3a-knowledge-initialization`
+- Context Pack: `context-pack-unified-3a-knowledge-initialization`
 
 ## Context
 
-ADR-0015 established Agent-driven, evidence-backed discovery for existing application services. The broader architecture still needs a generic ontology for Business, System, and Technical Architecture; a precise distinction between authoritative facts and Knowledge Layer projections; atomic versioning; and a way to keep Huawei-specific hierarchy and terminology outside the reusable core.
-
-Enterprise sources can assert conflicting truths at different layers. A business policy can describe intended behavior while code or an API describes current behavior. Flattening these assertions loses drift evidence. Treating every KL as an editable copy creates multiple systems of record and prevents reproducible Agent context.
+Enterprise initialization must recover business, system, and technical architecture without assuming one company-specific methodology. The same implementation evidence can support several architectural claims, claims may conflict, and organization or analysis profiles may change independently from the underlying facts. A monolithic document or one mutable assertion per concept would erase provenance and make later reconciliation unsafe.
 
 ## Decision
 
-Adopt `docs/superpowers/specs/2026-08-01-unified-3a-knowledge-initialization-design.md`.
+Model Business Architecture, System Architecture, and Technical Architecture as three governed perspectives over one exact-Scope knowledge stream. Keep Evidence, Source Observation, Semantic Candidate, Knowledge Assertion, ReviewBundle, PromotionDecision, ChangeSet, Baseline, and Projection Manifest as distinct records. Multiple assertions may share one semantic identity when their evidence, source, confidence, or validity differs; disagreement remains visible until review resolves it.
 
-Model Business (`BIZ`), System (`SYS`), and Technical (`TECH`) Architecture as versioned perspectives over one authoritative fact graph. Facts also carry a structure, behavior, information, contract, or constraint aspect. Motivation, governance, provenance, evolution, Scope, permission, and localization are cross-cutting dimensions.
+Organization profiles map enterprise hierarchy and terminology. Analysis profiles select perspective, grouping, and rendering. Neither profile changes canonical facts. The generic core must work without a Huawei profile. English remains canonical and accepted human-facing records require a complete Chinese overlay.
 
-Use one semantic identity with multiple source and layer assertions. Preserve normative and observed assertions, evidence, counter-evidence, confidence, and conflicts. Identity mapping is a reviewed candidate rather than an implicit name match.
+Promotion is MCP-only and fail-closed. It validates exact Scope, evidence, identity, localization, risk, and actor separation, then writes canonical assets and typed relationships atomically in PostgreSQL. A durable reconciliation receipt proves the promoted records agree with the finalized Scan Session and ChangeSet. Only a converged receipt can publish an immutable Baseline. Business, System, and Technical Knowledge Layers, Context Packs, reports, and graph views are reproducible projections pinned to a Baseline and profile version.
 
-Keep typed asset revisions, typed relationship revisions, Evidence, existing federation observations and candidates, promotion decisions, identity candidates, ChangeSets, Streams, Baselines, Requirements, Proposals, and ADRs authoritative in PostgreSQL. A ChangeSet atomically commits asset revisions, relationship revisions, Evidence references, and a monotonic sequence. Working Streams are mutable and published Baselines are immutable.
-
-Treat 3A KLs, diagrams, catalogs, matrices, reports, generated documentation, Context Packs, caches, and graph stores as derived projections. Persist only pinned or attested projection snapshots long term, each with Scope, Baseline, projection schema, source revisions, relationship version, query, digest, and generation time. Preserve actual AI narrative output and its generation metadata instead of claiming deterministic regeneration.
-
-Separate the generic core from Analysis Profiles, Source Connectors or Extractors, and Organization Profiles. The default Generic System profile supports non-DDD systems. DDD, Workflow, Data Pipeline, and Integration remain optional profiles. The current Huawei hierarchy and English-canonical, Chinese-required policy move toward an organization profile; profile extensions are namespaced and cannot override core semantics, authority, relation direction, or Scope enforcement.
-
-Reuse the existing federation `SourceObservation`, `Candidate`, `Promotion`, and `Reconciliation` lifecycle. Do not introduce a parallel discovery persistence model. Baseline publication fails closed for partial coverage, blocking conflict, cross-Scope candidate, or failed reconciliation.
+Phase 1 implements the generic contracts, source-minimized scanning, semantic candidate review, atomic promotion, reconciliation, and Baseline publication. Phase 2 introduces deterministic 3A projections. Phase 3 expands connectors and continuous observation. Phase 4 adds CodeHub/CI enforcement. Phase 5 covers enterprise migration, object storage, graph projection, and billion-scale certification.
 
 ## Alternatives
 
-1. **Make 3A three independent stores.** Rejected because duplicated facts drift and no store can reliably explain cross-layer alignment.
-2. **Keep one mutable value per fact.** Rejected because normative business intent and observed implementation can legitimately disagree.
-3. **Store KL output as authored truth.** Rejected because projections then become competing authorities and cannot be safely regenerated.
-4. **Put Huawei hierarchy and terms in the core.** Rejected because it blocks adoption by organizations with different models.
-5. **Require DDD for System Architecture.** Rejected because workflow, integration, pipeline, layered, and legacy systems need neutral analysis.
-6. **Create new scan-specific Observation and Candidate tables.** Rejected because the federation lifecycle already owns ingestion, promotion, audit, and reconciliation semantics.
-7. **Use a graph database as the primary source of truth.** Rejected because authored assets, transactional publication, audit, and recovery remain PostgreSQL responsibilities.
+1. **Store one mutable architecture document.** Rejected because it loses per-fact provenance, conflict, identity, and incremental review.
+2. **Make 3A layers independent systems of record.** Rejected because the layers would drift and duplicate facts.
+3. **Embed the Huawei profile in the core ontology.** Rejected because enterprise-specific hierarchy and terminology are not universal semantics.
+4. **Overwrite lower-confidence assertions.** Rejected because conflicting evidence must remain visible and auditable.
+5. **Publish a Baseline directly from approved candidates.** Rejected because canonical persistence and typed links require durable reconciliation first.
+6. **Use the graph database as the authored fact store.** Rejected because PostgreSQL provides the authoritative transactional and audit boundary; graph stores are derived.
 
 ## Consequences
 
-- Positive: One fact graph supports 3A views without duplicating systems of record.
-- Positive: Conflicts become visible drift evidence instead of destructive overwrites.
-- Positive: Baselines and pinned Context Packs can identify the exact revisions used by an Agent.
-- Positive: Generic and non-DDD systems can be onboarded while Huawei behavior remains configurable.
-- Positive: Existing federation governance and durable MCP writes are reused.
-- Tradeoff: Versioned assertions, identity candidates, ChangeSets, and projection manifests add schema and workflow complexity.
-- Tradeoff: Profile compatibility and metamodel migrations require explicit versioning.
-- Tradeoff: Billion-scale readiness needs partitioning and asynchronous projections now, plus separate capacity proof later.
-- Tradeoff: Human review remains necessary for high-risk meaning, conflict, and cross-Scope implications.
+- One fact stream can produce consistent Business, System, and Technical views.
+- Profiles can evolve without rewriting canonical facts.
+- Conflicting assertions remain traceable instead of being silently overwritten.
+- Context Packs and reports can pin exact Baseline and profile versions.
+- Partial scans, blocked reviews, failed promotion, and failed reconciliation leave the active Baseline unchanged.
+- Phase 1 is useful without waiting for graph storage or 3A visualization.
+- Projection schemas and profile migration require explicit versioning and compatibility policies.
+- Complete billion-scale behavior remains a separate certification program, not an inference from the 100,000-observation test.
 
 ## Constraints
 
-- Every initialization, assertion, promotion, ChangeSet, Baseline, projection, and Context Pack is bound to one exact authorized application-service Scope.
-- PostgreSQL remains authoritative; graph stores and KLs remain derived and rebuildable.
-- Promotion of accepted facts and typed links occurs only through MCP.
-- English remains canonical and Chinese remains required for human-facing content in the current organization profile; the core locale set is configurable.
-- Organization and analysis profiles cannot override core identity, relation, authority, or Scope semantics.
-- Partial scans, unsupported coverage, unresolved blocking conflict, and failed reconciliation cannot activate a Baseline.
-- The server does not execute repository build scripts and full source upload is disabled by default.
-- Initial implementation must preserve current API and stored-data compatibility during profile extraction.
-- Continuous synchronization, live runtime connectors, external `APPLY`, automatic cross-Scope merging, production object storage, and complete billion-scale capacity certification remain deferred.
+- The generic core must initialize a non-Huawei and non-DDD fixture without loading a Huawei profile.
+- Every record and relationship is bound to one exact application-service Scope.
+- Evidence, observations, candidates, assertions, accepted facts, and projections must never be conflated.
+- Canonical identity is deterministic; ambiguous identity blocks automatic promotion.
+- English is canonical and accepted human-facing content requires complete Chinese localization.
+- Promotion and publication are MCP-governed operations; direct authored PostgreSQL writes are forbidden.
+- PostgreSQL remains authoritative; graph and 3A Knowledge Layers are rebuildable projections.
+- Projection manifests pin Baseline ID, profile ID/version, schema version, source revisions, and relationship version.
+- Phase 2-5 capabilities remain deferred until separately implemented, verified, synchronized, and read back.
 
 ## Evidence
 
-- **Design review:** On 2026-08-01 the user accepted the unified 3A perspectives, profile-neutral core, derived KL model, assertion conflicts, ChangeSet and Baseline semantics, and phased delivery.
-- **Industry review:** ISO/IEC/IEEE 42010, ArchiMate, W3C PROV-O, OSLC Configuration Management, and W3C SHACL were reviewed as architecture-viewpoint, provenance, baseline, and validation references.
-- **Pre-implementation design read:** `pnpm design-context:preflight -- --intent "Formalize the approved unified 3A knowledge initialization architecture and profile-neutral legacy discovery model." --affected "adr-agent-driven-legacy-baseline-discovery,adr-federated-design-fact-synchronization,data-specforge-assets,data-specforge-asset-graph,api-specforge-mcp-tools" --evidence "approved bilingual design review,ADR and manifest validation,MCP design-fact synchronization and read-back"` read 126 exact-Scope assets and opened `design-change-session:f7bad4e6-b4f4-4506-a28c-a86f14633257`.
-- **Repository consistency:** `node .\node_modules\vitest\vitest.mjs run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" scripts\design-fact-manifest.test.ts` passed 1 file and 9 tests, including ADR-0018 registration and 16 unique repository and MCP IDs.
-- **MCP persistence:** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-agent-driven-legacy-baseline-discovery,adr-unified-3a-knowledge-initialization'; pnpm design-facts:sync` returned both selected ADRs as `complete`, including their generated Proposal, Context Pack, Evidence, and typed links in the exact owning Scope.
-- **MCP read-back:** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-agent-driven-legacy-baseline-discovery,adr-unified-3a-knowledge-initialization'; pnpm design-facts:check` returned empty `missing`, `mismatched`, `outOfScope`, and `blocked` lists for both selected ADRs.
-- **MCP synchronization blocked (transient):** The first post-document synchronization attempt timed out because `localhost:15433` was temporarily unreachable. Retry trigger: restore the Docker `specforge-mcp-pg-tunnel` listener and rerun the exact selected synchronization and read-back. The retry completed with both ADRs `complete` and all four check lists empty.
-- **Phase 2 verification:** `pnpm typecheck` passed Core, MCP Server, and Web; the focused core, MCP, and manifest suites passed 35 tests; and the gated PostgreSQL integration test passed the Session → READY ReviewBundle → APPROVE decision → gated ChangeSet → Baseline path, including idempotent retry and exact-Scope read-back.
-- **Database verification:** `pnpm db:push` synchronized the foundation tables plus `KnowledgeReviewBundle`, `KnowledgePromotionDecision`, and the ChangeSet promotion-decision reference into `localhost:15433/specforge_canonical`.
-- **Scanner verification:** `pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <temp-file>` produced 56 source-minimized manifest entries, 56 structural observations, and a deterministic report digest; the gated MCP scanner integration persisted the report and idempotent observations.
-- **Semantic verification:** `pnpm typecheck` passed all three packages; the core suite passed 148 tests; the scoped MCP tool suite passed 20 tests; and the gated PostgreSQL scanner integration passed MockAI semantic candidate generation, bilingual summaries, candidate-only assertion status, deterministic identity candidates, sibling-Scope exclusion, ambiguity blocking, automatic ReviewBundle assembly, and idempotent retry.
-- **Build boundary:** `pnpm build` compiled Core, typechecked MCP and Web, generated all 18 static pages, and then failed at Next.js standalone trace copying because the Windows host disallowed pnpm symlink creation, including an elevated retry. Retry after enabling Windows Developer Mode or using a symlink-capable build environment.
-- **Implementation boundary:** Repository scanning foundation, deterministic evidence indexing, source-minimized observations, provider-neutral semantic candidate generation through MockAIProvider, bilingual candidate summaries, deterministic identity matching, and MCP ReviewBundle assembly are implemented. Identity matching maps observations to existing assets only within the exact owning Scope; unique matches create auditable candidates, while ambiguous or unmatched observations keep the ReviewBundle blocked and never auto-merge. Signed scanner packaging, real Agent transport, real 3A KL generation, and Huawei-profile migration are not implemented in this increment. ReviewBundle creation, fail-closed coverage evaluation, MCP-only promotion decisions, and ChangeSet promotion gating remain implemented.
+- **Foundation and Phase 1 implementation:** Commits through `226cae8` implement the profile-neutral contracts, exact-Scope persistence, deterministic scanner, semantic review, identity matching, risk policy, atomic promotion, reconciliation, and immutable Baseline publication.
+- **Stage verification:** `pnpm legacy-baseline:verify` exited `0`; the report records all ten stages as `PASSED`, including 155 Core tests, focused MCP tests, PostgreSQL integration, real signed-binary E2E, 100,000-observation scale, typecheck, and production build.
+- **Failure semantics:** Focused unit, integration, E2E, and scale tests verify that coverage gaps, unsafe input, Scope mismatch, actor conflict, ambiguous identity, batch overflow, promotion mismatch, and non-converged reconciliation fail closed without replacing the previous Baseline.
+- **Storage semantics:** Promotion tests verify one PostgreSQL transaction for canonical assets, typed links, Evidence, relationship/federation outboxes, ChangeSet, and receipt; graph state remains derived.
+- **Deferred boundary:** No test or record in this increment claims delivered 3A projection rendering, live enterprise connectors, CodeHub enforcement, production object storage, or billion-scale certification.
+- **MCP closure evidence:** Full synchronization returned 16 `complete` decisions; MCP read-back returned 16 `verified` decisions with no missing, mismatched, out-of-Scope, or blocked records; exact-Scope federation reconciliation returned `blocking:false` with no issues.
 
 ## MCP Record
 
-- Matching MCP ADR ID: `adr-unified-3a-knowledge-initialization`
-- Exact owning Scope: `com.huawei.celon.desiner` / `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
+- Matching ADR: `adr-unified-3a-knowledge-initialization`
 - Matching Proposal: `proposal-unified-3a-knowledge-initialization`
 - Matching Context Pack: `context-pack-unified-3a-knowledge-initialization`
-- Related assets: `data-specforge-assets`, `data-specforge-asset-graph`, `api-specforge-mcp-tools`, `adr-agent-driven-legacy-baseline-discovery`, and `adr-federated-design-fact-synchronization`
-- Required typed links: Proposal `--IMPLEMENTS_DECISION-->` ADR; Context Pack `--IMPLEMENTS_CONTEXT_FOR-->` Proposal; ADR `--DECIDES-->` related assets; Evidence `--VALIDATES-->` ADR
-- Current status: MCP synchronized and read back from the configured canonical PostgreSQL authority; Phase 3 scanner foundation, MockAI semantic candidate generation, and deterministic identity matching are implemented, while signed packaging, later increments, and the Windows standalone artifact check remain pending.
+- Related decisions: `adr-agent-driven-legacy-baseline-discovery` and `adr-federated-design-fact-synchronization`
+- Related authoritative assets: `data-specforge-assets`, `data-specforge-asset-graph`, and `api-specforge-mcp-tools`
+- Relationship policy: Proposal `IMPLEMENTS_DECISION` ADR; Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal; ADR `DECIDES` related assets and decisions; Evidence `VALIDATES` ADR.
 
 ## Chinese Localization
 
@@ -99,81 +82,64 @@ Reuse the existing federation `SourceObservation`, `Candidate`, `Promotion`, and
 
 ### 背景
 
-ADR-0015 已经确定由 Agent 驱动、基于证据发现存量应用。整体架构仍需要通用的业务架构、系统架构和技术架构本体，需要严格区分权威事实与知识层投影，需要原子版本机制，并需要把华为专属层级和术语移出可复用核心。
-
-企业不同来源可能对同一概念给出冲突断言。业务政策描述预期行为，代码或 API 描述当前行为。把它们压平会丢失漂移证据；把每个 KL 当成可编辑副本则会产生多个权威源，并使 Agent 上下文无法重现。
+企业初始化需要恢复业务架构、系统架构和技术架构，同时不能假设某一种企业专属方法。相同实现证据可以支持多个架构断言，断言之间可能冲突，组织 Profile 和分析 Profile 也可能独立于底层事实演进。单一大文档或每个概念只有一个可变断言会丢失来源，并使后续对账变得不安全。
 
 ### 决策
 
-采用 `docs/superpowers/specs/2026-08-01-unified-3a-knowledge-initialization-design.md`。
+把业务架构、系统架构和技术架构建模为同一个精确 Scope 知识流上的三个受治理视角。Evidence、Source Observation、Semantic Candidate、Knowledge Assertion、ReviewBundle、PromotionDecision、ChangeSet、Baseline 和 Projection Manifest 必须保持为不同记录。同一语义身份可以具有多条断言，只要其证据、来源、置信度或有效期不同；冲突在评审解决前保持可见。
 
-把业务架构 `BIZ`、系统架构 `SYS` 和技术架构 `TECH` 建模为同一权威事实图上的版本化视角。事实同时具有结构、行为、信息、契约或约束 Aspect；动机、治理、来源、演进、Scope、权限和本地化属于横切维度。
+组织 Profile 映射企业层级和术语，分析 Profile 选择视角、分组和呈现方式，二者都不能修改规范事实。通用核心必须在没有华为 Profile 的情况下运行。英文是规范内容，正式面向人的记录必须具有完整中文覆盖。
 
-采用“一个语义身份、多个来源和层级断言”。规范意图与实际实现可以同时存在，必须保留证据、反证、置信度和冲突。身份映射必须作为候选接受审核，不能仅按名称隐式合并。
+提升只能通过 MCP 执行并且必须失败关闭。提升过程校验精确 Scope、证据、身份、本地化、风险和角色分离，然后在 PostgreSQL 中原子写入规范资产及有类型关系。持久化对账回执证明提升结果与已完成扫描会话和 ChangeSet 一致；只有已收敛回执才能发布不可变 Baseline。业务、系统和技术知识层、Context Pack、报告和图视图都是固定到 Baseline 与 Profile 版本的可重现投影。
 
-资产修订、关系修订、Evidence、现有联邦 Observation 和 Candidate、提升结论、身份候选、ChangeSet、Stream、Baseline、Requirement、Proposal 和 ADR 在 PostgreSQL 中保持权威。ChangeSet 在一个事务中原子提交资产修订、关系修订、Evidence 引用和单调序号；Working Stream 可变，发布的 Baseline 不可变。
-
-3A KL、图表、目录、矩阵、报告、生成文档、Context Pack、缓存和图数据库都是派生投影。只长期保存固定或带证明的快照，并记录 Scope、Baseline、投影 Schema、来源修订、关系版本、查询、摘要和生成时间。AI 叙述保存真实输出和生成元数据，不宣称可以确定性重生成。
-
-通用核心与 Analysis Profile、Source Connector 或 Extractor、Organization Profile 分离。默认 Generic System Profile 必须支持非 DDD 系统；DDD、Workflow、Data Pipeline 和 Integration 都是可选 Profile。当前华为层级和英文规范、中文必填策略逐步迁入组织 Profile；扩展必须使用命名空间，且不能覆盖核心语义、权威规则、关系方向或 Scope 校验。
-
-复用现有联邦 `SourceObservation`、`Candidate`、`Promotion` 和 `Reconciliation` 生命周期，不新建平行的扫描持久化模型。部分扫描、阻塞冲突、跨 Scope 候选或对账失败时，Baseline 发布必须失败关闭。
+第一阶段实现通用契约、源码最小化扫描、语义候选评审、原子提升、对账和 Baseline 发布。第二阶段实现确定性 3A 投影。第三阶段扩展连接器和持续观察。第四阶段增加 CodeHub/CI 门禁。第五阶段完成企业迁移、对象存储、图投影和亿级认证。
 
 ### 备选方案
 
-1. 把 3A 建成三个独立存储：拒绝，因为重复事实会漂移，跨层对齐也缺少统一依据。
-2. 每项事实只保留一个可变值：拒绝，因为业务规范意图和实际实现可能合理冲突。
-3. 把 KL 输出作为编写事实：拒绝，因为投影会成为竞争权威且无法安全重建。
-4. 把华为层级和术语写入核心：拒绝，因为其他组织无法复用。
-5. 强制系统架构采用 DDD：拒绝，因为工作流、集成、数据流水线、分层和存量系统需要中性模型。
-6. 新建扫描专属 Observation 和 Candidate 表：拒绝，因为现有联邦生命周期已经负责摄取、提升、审计和对账。
-7. 使用图数据库作为主权威源：拒绝，因为编写事务、原子发布、审计和恢复仍属于 PostgreSQL。
+1. **存储一个可变架构文档。** 拒绝，因为会丢失逐事实来源、冲突、身份和增量评审能力。
+2. **让三个 3A 层分别成为记录源。** 拒绝，因为各层会漂移并重复事实。
+3. **把华为 Profile 固化到核心本体。** 拒绝，因为企业层级和术语不是通用语义。
+4. **用高置信断言覆盖低置信断言。** 拒绝，因为冲突证据必须保持可见和可审计。
+5. **从已批准候选直接发布 Baseline。** 拒绝，因为规范持久化和有类型关系必须先经过持久对账。
+6. **使用图数据库作为编写事实的记录源。** 拒绝，因为 PostgreSQL 承担权威事务和审计边界，图存储仅为派生结果。
 
 ### 后果
 
-- 积极影响：一套事实图可以生成 3A 视图，而不会产生多个记录系统。
-- 积极影响：冲突成为可分析的漂移证据，而不是被覆盖。
-- 积极影响：Baseline 和固定 Context Pack 可以精确定位 Agent 使用的修订。
-- 积极影响：通用和非 DDD 系统可以接入，华为行为仍可配置。
-- 积极影响：复用现有联邦治理和持久 MCP 写入链路。
-- 权衡：版本化断言、身份候选、ChangeSet 和投影清单会增加 Schema 与流程复杂度。
-- 权衡：Profile 兼容和元模型迁移需要显式版本管理。
-- 权衡：亿级就绪要求当前预留分区和异步投影，并在后续单独证明容量。
-- 权衡：高风险语义、冲突和跨 Scope 影响仍需要人工审核。
+- 一个事实流可以产生一致的业务、系统和技术视图。
+- Profile 可以演进而不重写规范事实。
+- 冲突断言保持可追溯，不会被静默覆盖。
+- Context Pack 和报告可以固定精确 Baseline 与 Profile 版本。
+- 部分扫描、阻塞评审、提升失败和对账失败不会改变活动 Baseline。
+- 第一阶段无需等待图存储或 3A 可视化即可投入使用。
+- 投影 Schema 和 Profile 迁移需要显式版本与兼容策略。
+- 完整亿级行为需要独立认证，不能从 10 万条观察测试直接推断。
 
 ### 约束
 
-- 每个初始化、断言、提升、ChangeSet、Baseline、投影和 Context Pack 必须绑定一个精确且已授权的应用服务 Scope。
-- PostgreSQL 保持权威；图数据库和 KL 必须是可重建派生结果。
-- 正式事实和类型化关系只能通过 MCP 提升。
-- 当前组织 Profile 继续要求英文为规范、中文为面向人内容必填；核心语言集合必须可配置。
-- 组织 Profile 和分析 Profile 不能覆盖核心身份、关系、权威或 Scope 语义。
-- 部分扫描、覆盖不支持、未解决的阻塞冲突和对账失败不能激活 Baseline。
-- 服务端不得执行项目构建脚本，默认禁止上传完整源码。
-- 首期实现必须在抽取 Profile 时保持现有 API 和存量数据兼容。
-- 持续同步、实时连接器、外部 `APPLY`、自动跨 Scope 合并、生产对象存储和完整亿级容量认证保持延期。
+- 通用核心必须在不加载华为 Profile 的情况下初始化非华为、非 DDD Fixture。
+- 每条记录和关系只能属于一个精确应用服务 Scope。
+- Evidence、观察、候选、断言、正式事实和投影绝不能混为一体。
+- 规范身份必须确定；身份歧义会阻止自动提升。
+- 英文是规范内容，正式面向人的内容必须具有完整中文本地化。
+- 提升和发布是 MCP 治理操作，禁止直接向 PostgreSQL 写入编写事实。
+- PostgreSQL 保持权威，图和 3A 知识层是可重建投影。
+- 投影清单必须固定 Baseline ID、Profile ID/版本、Schema 版本、源修订和关系版本。
+- 第二至第五阶段必须在独立实现、验证、同步和回读前保持延期状态。
 
 ### 证据
 
-- **设计评审：** 用户于 2026-08-01 确认统一 3A 视角、Profile 无关核心、派生 KL、冲突断言、ChangeSet 与 Baseline 语义以及分阶段交付。
-- **业界审视：** 已参考 ISO/IEC/IEEE 42010、ArchiMate、W3C PROV-O、OSLC 配置管理和 W3C SHACL 对视角、来源、基线和校验的定义。
-- **实现前设计读取：** 上述 `pnpm design-context:preflight` 命令读取了 126 项精确 Scope 资产，并创建 `design-change-session:f7bad4e6-b4f4-4506-a28c-a86f14633257`。
-- **仓库一致性：** `node .\node_modules\vitest\vitest.mjs run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" scripts\design-fact-manifest.test.ts` 通过 1 个文件和 9 项测试，其中包含 ADR-0018 注册以及 16 个唯一仓库和 MCP ID。
-- **MCP 持久化：** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-agent-driven-legacy-baseline-discovery,adr-unified-3a-knowledge-initialization'; pnpm design-facts:sync` 已在精确所属 Scope 内完成选定的两个 ADR 及其生成的 Proposal、Context Pack、Evidence 和类型化关系。
-- **MCP 回读：** `$env:SPECFORGE_DESIGN_FACT_IDS='adr-agent-driven-legacy-baseline-discovery,adr-unified-3a-knowledge-initialization'; pnpm design-facts:check` 对选定的两个 ADR 返回空的 `missing`、`mismatched`、`outOfScope` 和 `blocked` 列表。
-- **MCP synchronization blocked（短暂）：** 文档更新后的第一次同步因 `localhost:15433` 暂时不可达而超时。重试触发条件：恢复 Docker `specforge-mcp-pg-tunnel` 监听，并重新执行精确选择的同步与回读；随后重试已成功，两个 ADR 均为 `complete`，四类检查列表均为空。
-- **Phase 2 验证：** `pnpm typecheck` 通过 Core、MCP Server 和 Web；核心、MCP 和清单定向测试共 35 项通过；带门控的 PostgreSQL 集成测试通过 Session → READY ReviewBundle → APPROVE 决策 → ChangeSet 提升门禁 → Baseline 路径，并验证幂等重试和精确 Scope 回读。
-- **数据库验证：** `pnpm db:push` 已将基础表、`KnowledgeReviewBundle`、`KnowledgePromotionDecision` 以及 ChangeSet 的提升决策引用同步到 `localhost:15433/specforge_canonical`。
-- **扫描器验证：** `pnpm scan:workspace -- --root packages/core --application-service-id com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --output <临时文件>` 生成 56 个最小化源码清单条目、56 个结构观察和确定性报告摘要；带门控的 MCP 扫描集成测试已持久化报告并验证观察幂等。
-- **构建边界：** `pnpm build` 已完成 Core 编译、MCP 与 Web 类型检查以及全部 18 个静态页面生成，随后在 Next.js standalone 追踪复制阶段因 Windows 主机禁止创建 pnpm 符号链接失败，提权重试结果相同。启用 Windows Developer Mode 或使用支持符号链接的构建环境后重试。
-- **语义验证：** `pnpm typecheck` 三个包均通过；核心测试 148 项通过；范围化 MCP 工具测试 20 项通过；带门控的 PostgreSQL 扫描集成测试通过 MockAI 语义候选生成、双语摘要、候选状态、确定性身份候选、同级 Scope 排除、歧义阻塞、ReviewBundle 自动组装和幂等重试。
-- **实现边界：** 本增量已实现仓库扫描基础、确定性证据索引、最小化源码结构观察、Provider 无关的 MockAI 语义候选生成、双语候选摘要、确定性身份匹配和 MCP ReviewBundle 组装。身份匹配只在精确所属 Scope 内将观察映射到已有资产；唯一匹配创建可审计候选，歧义或未匹配观察保持 ReviewBundle 阻塞且不会自动合并。尚未实现签名扫描包、真实 Agent 传输、真实 3A KL 生成和 Huawei Profile 迁移。ReviewBundle 创建、覆盖不足 fail-closed、MCP-only 提升决策和 ChangeSet 提升门禁已经实现。
+- **基础与第一阶段实现：** 截至 `226cae8` 的提交实现了 Profile 无关契约、精确 Scope 持久化、确定性扫描器、语义评审、身份匹配、风险策略、原子提升、对账和不可变 Baseline 发布。
+- **阶段验证：** `pnpm legacy-baseline:verify` 退出码为 `0`；报告对全部十个阶段记录为 `PASSED`，包括 155 项 Core 测试、MCP 定向测试、PostgreSQL 集成、真实签名二进制端到端、10 万条观察规模、类型检查和生产构建。
+- **失败语义：** 单元、集成、端到端和规模测试证明覆盖缺口、不安全输入、Scope 不匹配、角色冲突、身份歧义、批次超限、提升不匹配和未收敛对账都会失败关闭，并保留之前的 Baseline。
+- **存储语义：** 提升测试证明规范资产、有类型关系、Evidence、关系/联邦 Outbox、ChangeSet 和回执在一个 PostgreSQL 事务中提交；图状态保持派生。
+- **延期边界：** 本增量没有任何测试或记录声称已经交付 3A 投影呈现、实时企业连接器、CodeHub 门禁、生产对象存储或亿级认证。
+- **MCP 闭环证据：** 完整同步返回 16 项 `complete` 决策；MCP 回读返回 16 项 `verified` 决策，且无缺失、不匹配、越界或阻塞记录；精确 Scope 联邦对账返回 `blocking:false` 且无问题。
 
 ### MCP 记录
 
-- 匹配 MCP ADR ID：`adr-unified-3a-knowledge-initialization`
-- 精确所属 Scope：`com.huawei.celon.desiner` / `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
+- 匹配 ADR：`adr-unified-3a-knowledge-initialization`
 - 匹配 Proposal：`proposal-unified-3a-knowledge-initialization`
 - 匹配 Context Pack：`context-pack-unified-3a-knowledge-initialization`
-- 相关资产：`data-specforge-assets`、`data-specforge-asset-graph`、`api-specforge-mcp-tools`、`adr-agent-driven-legacy-baseline-discovery` 和 `adr-federated-design-fact-synchronization`
-- 当前状态：已通过 MCP 写入配置的规范 PostgreSQL 权威库并完成回读；扫描器基础、Provider 无关的 MockAI 语义候选生成和确定性身份匹配已实现，签名包、真实 Agent 传输、3A 投影和迁移加固仍待后续增量。
+- 相关决策：`adr-agent-driven-legacy-baseline-discovery`、`adr-federated-design-fact-synchronization`
+- 相关权威资产：`data-specforge-assets`、`data-specforge-asset-graph`、`api-specforge-mcp-tools`
+- 关系策略：Proposal `IMPLEMENTS_DECISION` ADR；Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal；ADR `DECIDES` 相关资产与决策；Evidence `VALIDATES` ADR。

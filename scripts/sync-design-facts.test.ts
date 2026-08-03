@@ -220,6 +220,56 @@ describe("synchronizeDesignFacts", () => {
     expect(callTool).not.toHaveBeenCalled();
   });
 
+  it("writes managed bilingual assets and directional links through MCP", async () => {
+    const managedAsset = {
+      assetType: "api" as const,
+      asset: {
+        id: "api-specforge-managed-contract",
+        name: "Managed contract",
+        description: "Managed contract description.",
+        localizedContent: {
+          en: { name: "Managed contract", description: "Managed contract description." },
+          zh: { name: "受管契约", description: "受管契约说明。" }
+        }
+      }
+    };
+    const managedRelationship = {
+      sourceType: "proposal",
+      sourceId: "proposal-scope",
+      targetType: "api",
+      targetId: managedAsset.asset.id,
+      relationType: "IMPACTS"
+    };
+    const callTool = vi.fn().mockResolvedValue({ ok: true });
+
+    await synchronizeDesignFacts({
+      callTool,
+      manifest: {
+        decisions: [{
+          id: "adr-scope",
+          repositoryAdr: "docs/adr/0001-scope.md",
+          mcpAdrId: "adr-scope",
+          scope,
+          proposalId: "proposal-scope",
+          contextPackId: "ctx-scope",
+          relatedAssetIds: [managedAsset.asset.id],
+          managedAssets: [managedAsset],
+          managedRelationships: [managedRelationship],
+          evidence: []
+        }]
+      },
+      readAdr: async () => ({ title: "Scope isolation", english: simpleEnglishAdr, chinese: simpleChineseAdr }),
+      readExisting: async () => undefined
+    });
+
+    expect(callTool).toHaveBeenCalledWith("upsert_design_asset", {
+      assetType: "api",
+      asset: expect.objectContaining({ id: managedAsset.asset.id, architectureScope: scope }),
+      architectureScope: scope
+    });
+    expect(callTool).toHaveBeenCalledWith("link_assets", { ...managedRelationship, architectureScope: scope });
+  });
+
   it("writes every manifest ADR with exact scope and bilingual payload", async () => {
     const callTool = vi.fn().mockResolvedValue({ ok: true });
     const receipt = await synchronizeDesignFacts({
