@@ -1,6 +1,8 @@
 import {
   evaluateReviewBundle,
   generateSemanticCandidates,
+  classifyCandidateRisk,
+  maximumReviewRisk,
   reviewBundleDigest,
   validateKnowledgeAssertion,
   genericSystemAnalysisProfile,
@@ -8,7 +10,8 @@ import {
   type KnowledgeAssertion,
   type ReviewBundle,
   type ScanObservation,
-  type SemanticCandidateDraft
+  type SemanticCandidateDraft,
+  type SemanticCandidateSubmission
 } from "@specforge/core";
 import { Prisma } from "@prisma/client";
 import { ensureMcpPersistenceSchema, prisma, resolveWritableScope, writableActor } from "../persistence";
@@ -76,6 +79,8 @@ export async function generateKnowledgeCandidates(input: GenerateKnowledgeCandid
   const now = new Date();
   const evidenceRefs = [`scan-report:${report.reportDigest}`, `scanner:${report.scannerId}@${report.scannerVersion}`, `semantic-provider:${response.provider}`];
   const assertionIds = validDrafts.map((draft) => `knowledge:${report.reportDigest}:${draft.sourceObservationId}`);
+  const assertions = validDrafts.map((draft, index) => assertionFromDraft(draft, observations.find((observation) => observation.id === draft.sourceObservationId)!, report, scope, evidenceRefs, now, assertionIds[index]!));
+  const riskTier = maximumReviewRisk(assertions.map((assertion) => assertion.riskTier ?? "T1"));
   const coverage = {
     totalSources: coverageReport.totalFiles,
     processedSources: validDrafts.length,
@@ -84,14 +89,13 @@ export async function generateKnowledgeCandidates(input: GenerateKnowledgeCandid
     complete: issues.length === 0
   };
   const status = evaluateReviewBundle(coverage, issues);
-  const digest = reviewBundleDigest({ architectureScope: scope, designChangeSessionId: report.designChangeSessionId, riskTier: "T1", assertionIds, identityCandidateIds: [], evidenceRefs, coverage, blockingIssues: issues });
+  const digest = reviewBundleDigest({ architectureScope: scope, designChangeSessionId: report.designChangeSessionId, riskTier, assertionIds, identityCandidateIds: [], evidenceRefs, coverage, blockingIssues: issues });
 
   const bundle = await prisma.$transaction(async (transaction) => {
     const session = await transaction.designChangeSession.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: report.designChangeSessionId } } });
     if (!session) throw new Error("DESIGN_CHANGE_SESSION_NOT_FOUND");
     if (["BLOCKED", "CLOSED"].includes(session.status)) throw new Error("DESIGN_CHANGE_SESSION_NOT_OPEN");
-    for (const [index, draft] of validDrafts.entries()) {
-      const assertion = assertionFromDraft(draft, observations.find((observation) => observation.id === draft.sourceObservationId)!, report, scope, evidenceRefs, now, assertionIds[index]!);
+    for (const assertion of assertions) {
       validateKnowledgeAssertion(assertion, genericSystemAnalysisProfile);
       const existing = await transaction.knowledgeAssertion.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: assertion.id } } });
       if (existing?.status === "ACCEPTED") throw new Error("SEMANTIC_CANDIDATE_REWRITE_ACCEPTED");
@@ -101,7 +105,7 @@ export async function generateKnowledgeCandidates(input: GenerateKnowledgeCandid
         update: assertionRowUpdate(assertion)
       });
     }
-    const created = await transaction.knowledgeReviewBundle.create({ data: { ...scope, id: reviewBundleId, designChangeSessionId: report.designChangeSessionId, status, riskTier: "T1", assertionIds, identityCandidateIds: [], evidenceRefs, coverage: jsonValue(coverage), blockingIssues: issues, digest, createdBy: writableActor().actorId } });
+    const created = await transaction.knowledgeReviewBundle.create({ data: { ...scope, id: reviewBundleId, designChangeSessionId: report.designChangeSessionId, status, riskTier, assertionIds, identityCandidateIds: [], evidenceRefs, coverage: jsonValue(coverage), blockingIssues: issues, digest, createdBy: writableActor().actorId } });
     await transaction.designChangeSession.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: report.designChangeSessionId } }, data: { status: status === "READY" ? "WAITING_FOR_REVIEW" : "CONFLICTED" } });
     await transaction.federationOutbox.upsert({ where: { applicationServiceId_scopePath_idempotencyKey: { ...scope, idempotencyKey: `semantic-candidates:${report.reportDigest}` } }, create: { ...scope, eventType: "KNOWLEDGE_SEMANTIC_CANDIDATES_GENERATED", payload: jsonValue({ scanReportId: report.id, reportDigest: report.reportDigest, provider: response.provider, assertionIds, blockingIssues: issues }), idempotencyKey: `semantic-candidates:${report.reportDigest}`, status: "PENDING", designChangeSessionId: report.designChangeSessionId }, update: {} });
     return created;
@@ -112,13 +116,23 @@ export async function generateKnowledgeCandidates(input: GenerateKnowledgeCandid
 
 function assertionFromDraft(draft: SemanticCandidateDraft, observation: ScanObservation, report: any, scope: ArchitectureScopeRef, evidenceRefs: string[], now: Date, id: string): KnowledgeAssertion {
   const sourceObservationRef = `source-observation:${draft.sourceObservationId}`;
+  const value = normalizeCompatibilityValue(draft.value, { sourceObservationId: draft.sourceObservationId, sourcePath: observation.sourcePath, observationType: observation.observationType, reportDigest: report.reportDigest });
+  const riskInput: SemanticCandidateSubmission = {
+    ...draft,
+    normalizedDigest: observation.normalizedDigest,
+    value,
+    evidenceRefs: [...new Set([...evidenceRefs, sourceObservationRef])],
+    sourceObservationIds: [draft.sourceObservationId],
+    domainCluster: domainClusterFor(draft),
+    identityDecision: "UNMATCHED"
+  };
   return {
     id,
     semanticIdentity: draft.semanticIdentity,
     factType: draft.factType,
     layer: draft.layer,
     aspect: draft.aspect,
-    value: { ...draft.value, sourceObservationId: draft.sourceObservationId, sourcePath: observation.sourcePath, observationType: observation.observationType, reportDigest: report.reportDigest },
+    value,
     architectureScope: scope,
     status: "CANDIDATE",
     confidence: draft.confidence,
@@ -128,6 +142,8 @@ function assertionFromDraft(draft: SemanticCandidateDraft, observation: ScanObse
     evidenceRefs: [...new Set([...evidenceRefs, sourceObservationRef])],
     sourceObservationIds: [draft.sourceObservationId],
     extractorId: `ai:${report.scannerId}:${report.scannerVersion}`,
+    riskTier: classifyCandidateRisk(riskInput),
+    domainCluster: riskInput.domainCluster,
     revision: 1,
     createdAt: now.toISOString(),
     updatedAt: now.toISOString()
@@ -151,6 +167,9 @@ function assertionRow(assertion: KnowledgeAssertion) {
     evidenceRefs: jsonValue(assertion.evidenceRefs),
     sourceObservationIds: jsonValue(assertion.sourceObservationIds),
     extractorId: assertion.extractorId,
+    riskTier: assertion.riskTier ?? "T1",
+    domainCluster: assertion.domainCluster ?? null,
+    generatedByActorId: assertion.generatedByActorId ?? null,
     revision: assertion.revision,
     changeSetId: null,
     createdAt: new Date(assertion.createdAt),
@@ -179,6 +198,26 @@ function isSemanticCandidateDraft(value: SemanticCandidateDraft, observationIds:
 function normalizeObservationType(value: string): ScanObservation["observationType"] {
   const types: ScanObservation["observationType"][] = ["source-file", "system-component", "api-contract", "event-contract", "data-model", "documentation"];
   return types.includes(value as ScanObservation["observationType"]) ? value as ScanObservation["observationType"] : "source-file";
+}
+
+function normalizeCompatibilityValue(value: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+  const summary = value.summary;
+  if (summary && typeof summary === "object" && !Array.isArray(summary)) {
+    const localizedSummary = summary as Record<string, unknown>;
+    if (typeof localizedSummary.en === "string" && typeof localizedSummary.zh === "string") {
+      return {
+        ...value,
+        canonicalContent: { summary: localizedSummary.en },
+        localizedContent: { zh: { summary: localizedSummary.zh } },
+        ...source
+      };
+    }
+  }
+  return { ...value, ...source };
+}
+
+function domainClusterFor(draft: SemanticCandidateDraft): string {
+  return draft.semanticIdentity.split(/[.:/]/u).find(Boolean) ?? draft.factType;
 }
 
 function jsonValue(value: unknown): Prisma.InputJsonValue {

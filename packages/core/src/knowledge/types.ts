@@ -53,10 +53,109 @@ export interface KnowledgeAssertion {
   evidenceRefs: string[];
   sourceObservationIds: string[];
   extractorId: string;
+  riskTier?: ReviewRiskTier;
+  domainCluster?: string;
+  generatedByActorId?: string;
   revision: number;
   changeSetId?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export type SemanticIdentityDecision = "UNMATCHED" | "UNAMBIGUOUS" | "AMBIGUOUS";
+
+export interface SemanticCandidateProvenance {
+  agent: string;
+  model?: string;
+  tool?: string;
+  runId?: string;
+}
+
+export interface SemanticCandidateSubmission {
+  semanticIdentity: string;
+  normalizedDigest: string;
+  factType: string;
+  layer: ArchitectureLayer;
+  aspect: ArchitectureAspect;
+  value: Record<string, unknown>;
+  confidence: number;
+  matchingEvidence: string[];
+  counterEvidence: string[];
+  unresolvedQuestions: string[];
+  evidenceRefs: string[];
+  sourceObservationIds: string[];
+  domainCluster: string;
+  identityDecision: SemanticIdentityDecision;
+}
+
+export interface SemanticCandidateBatch {
+  sessionId: string;
+  sequence: number;
+  previousBatchDigest?: string;
+  complete: boolean;
+  provenance: SemanticCandidateProvenance;
+  candidates: SemanticCandidateSubmission[];
+}
+
+export interface SemanticCandidateBatchReceipt {
+  sessionId: string;
+  acceptedSequence: number;
+  acceptedBatchDigest: string;
+  assertionIds: string[];
+  idempotent: boolean;
+  complete: boolean;
+}
+
+const reviewRiskOrder: Record<ReviewRiskTier, number> = { T0: 0, T1: 1, T2: 2, T3: 3 };
+const criticalFactTypes = new Set(["security-policy", "authorization-policy", "privacy-policy", "compliance-policy"]);
+const structuralFactTypes = new Set(["api-contract", "event-contract", "data-model", "state-machine", "business-rule", "typed-relationship", "architecture-decision"]);
+
+export function classifyCandidateRisk(candidate: Pick<SemanticCandidateSubmission, "factType" | "value" | "confidence" | "evidenceRefs" | "sourceObservationIds" | "unresolvedQuestions" | "identityDecision">): ReviewRiskTier {
+  const factType = candidate.factType.trim().toLowerCase();
+  if (criticalFactTypes.has(factType) || /(security|authorization|authentication|privacy|compliance)/u.test(factType)) return "T3";
+  if (isBreakingCandidateValue(candidate.value)) return "T2";
+  if (structuralFactTypes.has(factType)) return "T1";
+  if (
+    factType === "documentation"
+    && candidate.confidence >= 0.95
+    && candidate.identityDecision === "UNAMBIGUOUS"
+    && candidate.unresolvedQuestions.length === 0
+    && candidate.evidenceRefs.length > 0
+    && candidate.sourceObservationIds.length > 0
+    && hasBilingualCandidateContent(candidate.value)
+  ) return "T0";
+  return "T1";
+}
+
+export function maximumReviewRisk(tiers: readonly ReviewRiskTier[]): ReviewRiskTier {
+  return tiers.reduce<ReviewRiskTier>((maximum, tier) => reviewRiskOrder[tier] > reviewRiskOrder[maximum] ? tier : maximum, "T0");
+}
+
+export function hasBilingualCandidateContent(value: Record<string, unknown>): boolean {
+  const summary = asRecord(value.summary);
+  if (nonEmptyContent(summary?.en) && nonEmptyContent(summary?.zh)) return true;
+  const canonical = asRecord(value.canonicalContent);
+  const localized = asRecord(value.localizedContent);
+  const chinese = asRecord(localized?.zh);
+  return hasTextLeaf(canonical) && hasTextLeaf(chinese);
+}
+
+export function isBreakingCandidateValue(value: Record<string, unknown>): boolean {
+  if (value.breaking === true || value.breakingChange === true) return true;
+  return asRecord(value.compatibility)?.breaking === true;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+}
+
+function nonEmptyContent(value: unknown): boolean {
+  return typeof value === "string" ? value.trim().length > 0 : hasTextLeaf(asRecord(value));
+}
+
+function hasTextLeaf(value: Record<string, unknown> | undefined): boolean {
+  if (!value) return false;
+  return Object.values(value).some((item) => typeof item === "string" ? item.trim().length > 0 : Array.isArray(item) ? item.some(nonEmptyContent) : hasTextLeaf(asRecord(item)));
 }
 
 export interface IdentityCandidate {

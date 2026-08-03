@@ -1,6 +1,7 @@
 import { assertBaselinePublishable, assertPromotionDecisionValid, changeSetDigest, evaluateReviewBundle, genericSystemAnalysisProfile, projectionManifestDigest, reviewBundleDigest, validateKnowledgeAssertion, type ArchitectureScopeRef, type BaselineManifest, type ChangeSet, type IdentityCandidate, type KnowledgeAssertion, type KnowledgePromotionDecision, type ProjectionManifest, type ReviewBundle, type ReviewCoverage, type ReviewRiskTier } from "@specforge/core";
 import { Prisma } from "@prisma/client";
 import { prisma, ensureMcpPersistenceSchema, readableScope, resolveWritableScope, writableActor } from "../persistence";
+import { assertCandidateApprovalPolicy } from "./risk-policy";
 
 export interface KnowledgeAssertionInput {
   assertion: KnowledgeAssertion;
@@ -94,6 +95,9 @@ export async function createKnowledgeAssertion(input: KnowledgeAssertionInput): 
       evidenceRefs: assertion.evidenceRefs,
       sourceObservationIds: assertion.sourceObservationIds,
       extractorId: assertion.extractorId,
+      riskTier: assertion.riskTier ?? "T1",
+      domainCluster: assertion.domainCluster ?? null,
+      generatedByActorId: assertion.generatedByActorId ?? null,
       revision: assertion.revision,
       changeSetId: assertion.changeSetId ?? null,
       ...scope,
@@ -114,6 +118,9 @@ export async function createKnowledgeAssertion(input: KnowledgeAssertionInput): 
       evidenceRefs: assertion.evidenceRefs,
       sourceObservationIds: assertion.sourceObservationIds,
       extractorId: assertion.extractorId,
+      riskTier: assertion.riskTier ?? "T1",
+      domainCluster: assertion.domainCluster ?? null,
+      generatedByActorId: assertion.generatedByActorId ?? null,
       revision: assertion.revision,
       changeSetId: assertion.changeSetId ?? null,
       updatedAt: new Date(assertion.updatedAt)
@@ -176,6 +183,11 @@ export async function decideKnowledgeReviewBundle(input: PromotionDecisionInput)
     if (!bundle) throw new Error("REVIEW_BUNDLE_NOT_FOUND");
     const bundleValue = reviewBundleFromRow(bundle);
     assertPromotionDecisionValid({ decision: input.decision, reason: input.reason, evidenceRefs: input.evidenceRefs, approvedAssertionIds: input.approvedAssertionIds, approvedIdentityCandidateIds: input.approvedIdentityCandidateIds }, bundleValue);
+    if (input.decision === "APPROVE") {
+      const bundleAssertions = await transaction.knowledgeAssertion.findMany({ where: { ...scope, id: { in: bundleValue.assertionIds } } });
+      if (bundleAssertions.length !== bundleValue.assertionIds.length) throw new Error("REVIEW_BUNDLE_FACT_SCOPE_MISMATCH");
+      assertCandidateApprovalPolicy(bundleValue, bundleAssertions.map(assertionFromRow), writableActor());
+    }
     const existing = await transaction.knowledgePromotionDecision.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } } });
     if (existing) return existing;
     const session = await transaction.designChangeSession.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: bundle.designChangeSessionId } } });
@@ -276,7 +288,7 @@ export async function listKnowledgeAssertions(applicationServiceId: string): Pro
 }
 
 function assertionFromRow(row: any): KnowledgeAssertion {
-  return { id: row.id, semanticIdentity: row.semanticIdentity, factType: row.factType, layer: row.layer, aspect: row.aspect, value: row.value as Record<string, unknown>, status: row.status, confidence: row.confidence, matchingEvidence: row.matchingEvidence as string[], counterEvidence: row.counterEvidence as string[], unresolvedQuestions: row.unresolvedQuestions as string[], evidenceRefs: row.evidenceRefs as string[], sourceObservationIds: row.sourceObservationIds as string[], extractorId: row.extractorId, revision: row.revision, changeSetId: row.changeSetId ?? undefined, architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+  return { id: row.id, semanticIdentity: row.semanticIdentity, factType: row.factType, layer: row.layer, aspect: row.aspect, value: row.value as Record<string, unknown>, status: row.status, confidence: row.confidence, matchingEvidence: row.matchingEvidence as string[], counterEvidence: row.counterEvidence as string[], unresolvedQuestions: row.unresolvedQuestions as string[], evidenceRefs: row.evidenceRefs as string[], sourceObservationIds: row.sourceObservationIds as string[], extractorId: row.extractorId, riskTier: row.riskTier ?? undefined, domainCluster: row.domainCluster ?? undefined, generatedByActorId: row.generatedByActorId ?? undefined, revision: row.revision, changeSetId: row.changeSetId ?? undefined, architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
 }
 
 function changeSetFromRow(row: any): ChangeSet {

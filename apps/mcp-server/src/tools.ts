@@ -12,6 +12,7 @@ import { finalizeKnowledgeScan, getScanCheckpoint, startKnowledgeScan } from "./
 import { submitScanBatch } from "./scanner/batch-persistence";
 import { generateKnowledgeCandidates } from "./knowledge/semantic-persistence";
 import { matchKnowledgeIdentities } from "./knowledge/identity-persistence";
+import { assembleKnowledgeReviewBundle, submitSemanticCandidateBatch } from "./knowledge/candidate-persistence";
 import {
   analyzeScopedProposalImpact,
   buildScopedAssetGraph,
@@ -109,6 +110,22 @@ const assetLocaleSchema = z.enum(["zh", "en"]);
 const architectureScopeSchema = z.object({
   applicationServiceId: z.string().min(1),
   scopePath: z.string().min(1)
+});
+const semanticCandidateSchema = z.object({
+  semanticIdentity: z.string().min(1),
+  normalizedDigest: z.string().min(1),
+  factType: z.string().min(1),
+  layer: z.enum(["BIZ", "SYS", "TECH"]),
+  aspect: z.enum(["structure", "behavior", "information", "contract", "constraint"]),
+  value: z.record(z.unknown()),
+  confidence: z.number().min(0).max(1),
+  matchingEvidence: z.array(z.string()),
+  counterEvidence: z.array(z.string()),
+  unresolvedQuestions: z.array(z.string()),
+  evidenceRefs: z.array(z.string()),
+  sourceObservationIds: z.array(z.string().min(1)).min(1),
+  domainCluster: z.string().min(1),
+  identityDecision: z.enum(["UNMATCHED", "UNAMBIGUOUS", "AMBIGUOUS"])
 });
 
 function assertMatchingApplicationService(input: { applicationServiceId: string; architectureScope: { applicationServiceId: string } }): void {
@@ -501,11 +518,37 @@ export function registerTools(server: McpServer): void {
 
   registerJsonTool(server, "generate_knowledge_candidates", {
     title: "Generate semantic knowledge candidates",
-    description: "Uses the configured AI Provider to analyze persisted scan observations and atomically create candidate assertions plus a scoped ReviewBundle. It never promotes facts or publishes a baseline.",
+    description: "Compatibility/test-only MockAI path for persisted legacy ScanReports. Production Agents must use submit_semantic_candidate_batch and assemble_knowledge_review_bundle. It never promotes facts or publishes a baseline.",
     inputSchema: { architectureScope: architectureScopeSchema, scanReportId: z.string().min(1), provider: z.string().min(1).optional() },
     permissions: ["knowledge:write"],
     readOnly: false
   }, async (input) => generateKnowledgeCandidates(input as unknown as Parameters<typeof generateKnowledgeCandidates>[0]));
+
+  registerJsonTool(server, "submit_semantic_candidate_batch", {
+    title: "Submit semantic candidate batch",
+    description: "Accepts a bounded provider-neutral Agent candidate batch for a persisted governed Scan Session. Scope and generator identity are derived server-side; identical retries are idempotent.",
+    inputSchema: {
+      architectureScope: architectureScopeSchema,
+      batch: z.object({
+        sessionId: z.string().min(1),
+        sequence: z.number().int().min(0),
+        previousBatchDigest: z.string().min(1).optional(),
+        complete: z.boolean(),
+        provenance: z.object({ agent: z.string().min(1), model: z.string().min(1).optional(), tool: z.string().min(1).optional(), runId: z.string().min(1).optional() }),
+        candidates: z.array(semanticCandidateSchema).min(1).max(100)
+      })
+    },
+    permissions: ["knowledge:write"],
+    readOnly: false
+  }, async (input) => submitSemanticCandidateBatch(input as unknown as Parameters<typeof submitSemanticCandidateBatch>[0]));
+
+  registerJsonTool(server, "assemble_knowledge_review_bundle", {
+    title: "Assemble semantic candidate ReviewBundle",
+    description: "Derives complete coverage, bilingual/evidence/identity blockers, and maximum T0-T3 risk from persisted exact-Scope Agent candidates; caller-supplied risk is not accepted.",
+    inputSchema: { architectureScope: architectureScopeSchema, sessionId: z.string().min(1) },
+    permissions: ["knowledge:write", "governance:run"],
+    readOnly: false
+  }, assembleKnowledgeReviewBundle);
 
   registerJsonTool(server, "match_knowledge_identities", {
     title: "Match knowledge identities",

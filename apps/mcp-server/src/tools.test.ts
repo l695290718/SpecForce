@@ -47,6 +47,11 @@ const scanner = vi.hoisted(() => ({
   matchKnowledgeIdentities: vi.fn().mockResolvedValue({ scanReportId: "scan-1", identityCandidateIds: ["identity-1"], reviewBundle: { id: "review-1", status: "READY" } })
 }));
 
+const semanticCandidates = vi.hoisted(() => ({
+  submitSemanticCandidateBatch: vi.fn().mockResolvedValue({ sessionId: "scan-session-1", acceptedSequence: 0, acceptedBatchDigest: "digest", assertionIds: ["assertion-1"], idempotent: false, complete: true }),
+  assembleKnowledgeReviewBundle: vi.fn().mockResolvedValue({ id: "review-1", status: "READY", riskTier: "T1" })
+}));
+
 const governedScanner = vi.hoisted(() => ({
   getScannerRelease: vi.fn().mockResolvedValue({ releaseId: "scanner-release-2.0.0" }),
   startKnowledgeScan: vi.fn().mockResolvedValue({ sessionId: "knowledge-scan-1" }),
@@ -61,6 +66,7 @@ vi.mock("./knowledge/persistence", () => knowledge);
 vi.mock("./scanner/persistence", () => scanner);
 vi.mock("./knowledge/semantic-persistence", () => ({ generateKnowledgeCandidates: scanner.generateKnowledgeCandidates }));
 vi.mock("./knowledge/identity-persistence", () => ({ matchKnowledgeIdentities: scanner.matchKnowledgeIdentities }));
+vi.mock("./knowledge/candidate-persistence", () => semanticCandidates);
 vi.mock("./scanner/release", () => ({ getScannerRelease: governedScanner.getScannerRelease }));
 vi.mock("./scanner/session", () => ({
   startKnowledgeScan: governedScanner.startKnowledgeScan,
@@ -276,6 +282,8 @@ describe("3A knowledge foundation tools", () => {
       "create_knowledge_assertion",
       "submit_scan_report",
       "generate_knowledge_candidates",
+      "submit_semantic_candidate_batch",
+      "assemble_knowledge_review_bundle",
       "match_knowledge_identities",
       "create_identity_candidate",
       "create_knowledge_review_bundle",
@@ -321,6 +329,8 @@ describe("3A knowledge foundation tools", () => {
     await tools.get("create_knowledge_assertion")!.handler({ architectureScope, assertion: { id: "assertion-1" } });
     await tools.get("submit_scan_report")!.handler({ architectureScope, id: "scan-1", connectorId: "scanner-1", designChangeSessionId: "session-1", report: { reportDigest: "digest" } });
     await tools.get("generate_knowledge_candidates")!.handler({ architectureScope, scanReportId: "scan-1", provider: "mock" });
+    await tools.get("submit_semantic_candidate_batch")!.handler({ architectureScope, batch: { sessionId: "scan-session-1", sequence: 0, complete: true, provenance: { agent: "claude-code" }, candidates: [{ semanticIdentity: "orders.api", normalizedDigest: "digest", factType: "api-contract", layer: "SYS", aspect: "contract", value: {}, confidence: 0.9, matchingEvidence: [], counterEvidence: [], unresolvedQuestions: [], evidenceRefs: ["evidence-1"], sourceObservationIds: ["source-1"], domainCluster: "orders", identityDecision: "UNAMBIGUOUS" }] } });
+    await tools.get("assemble_knowledge_review_bundle")!.handler({ architectureScope, sessionId: "scan-session-1" });
     await tools.get("match_knowledge_identities")!.handler({ architectureScope, scanReportId: "scan-1" });
     await tools.get("create_identity_candidate")!.handler({ architectureScope, candidate: { id: "identity-1" } });
     await tools.get("create_knowledge_review_bundle")!.handler({ architectureScope, id: "review-1", designChangeSessionId: "session-1", riskTier: "T1", assertionIds: ["assertion-1"], identityCandidateIds: [], evidenceRefs: ["evidence-1"], coverage: { totalSources: 1, processedSources: 1, supportedSources: 1, candidateCount: 1, complete: true }, blockingIssues: [] });
@@ -334,6 +344,8 @@ describe("3A knowledge foundation tools", () => {
     expect(knowledge.createKnowledgeAssertion).toHaveBeenCalledOnce();
     expect(scanner.submitScanReport).toHaveBeenCalledOnce();
     expect(scanner.generateKnowledgeCandidates).toHaveBeenCalledWith({ architectureScope, scanReportId: "scan-1", provider: "mock" });
+    expect(semanticCandidates.submitSemanticCandidateBatch).toHaveBeenCalledWith(expect.objectContaining({ architectureScope, batch: expect.objectContaining({ sessionId: "scan-session-1" }) }));
+    expect(semanticCandidates.assembleKnowledgeReviewBundle).toHaveBeenCalledWith({ architectureScope, sessionId: "scan-session-1" });
     expect(scanner.matchKnowledgeIdentities).toHaveBeenCalledWith({ architectureScope, scanReportId: "scan-1" });
     expect(knowledge.createIdentityCandidate).toHaveBeenCalledOnce();
     expect(knowledge.createKnowledgeReviewBundle).toHaveBeenCalledOnce();
