@@ -57,7 +57,7 @@ export async function startKnowledgeScan(input: StartKnowledgeScanInput): Promis
   const now = new Date();
   const expiresAt = normalizeExpiry(input.expiresAt, now);
   const contract = await loadScanContract();
-  const limits = normalizeLimits(input.budgets, contract.SCAN_LIMITS);
+  const limits = normalizeScanLimits(input.budgets, contract.SCAN_LIMITS);
   const repositoryPolicy = input.repositoryPolicy ?? { allowDirtyWorktree: false, ignorePatterns: [] };
   const nonce = createScanSessionNonce();
   const actorId = writableActor().actorId;
@@ -196,11 +196,12 @@ export function verifySessionNonceDigest(expected: string, actual: string): void
   if (!timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(actual, "hex"))) throw new Error("SCAN_NONCE_MISMATCH");
 }
 
-function normalizeLimits(requested: Partial<ScanLimits> | undefined, hardLimits: Readonly<ScanLimits>): ScanLimits {
+export function normalizeScanLimits(requested: Partial<ScanLimits> | undefined, hardLimits: Readonly<ScanLimits>): ScanLimits {
   const result = { ...hardLimits, ...requested };
   for (const [key, ceiling] of Object.entries(hardLimits) as Array<[keyof ScanLimits, number]>) {
     const value = result[key];
-    if (!Number.isInteger(value) || value < 1 || value > ceiling) throw new Error("SCAN_LIMITS_EXCEEDED");
+    const minimum = key === "maxExcerptBytes" ? 0 : 1;
+    if (!Number.isInteger(value) || value < minimum || value > ceiling) throw new Error("SCAN_LIMITS_EXCEEDED");
   }
   return result;
 }

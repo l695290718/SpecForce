@@ -66,7 +66,15 @@ describe("resumable batch persistence", () => {
   it("enforces per-batch and cumulative limits", () => {
     const accepted = batch();
     const integrity = computeBatchIntegrity(accepted);
-    expect(() => assertBatchBudgets({ maxObservationsPerBatch: 1, maxBatchBytes: integrity.canonicalBytes, maxObservationsPerSession: 2 }, 1, accepted, integrity)).not.toThrow();
-    expect(() => assertBatchBudgets({ maxObservationsPerBatch: 1, maxBatchBytes: integrity.canonicalBytes, maxObservationsPerSession: 1 }, 1, accepted, integrity)).toThrow("SCAN_SESSION_OBSERVATION_BUDGET_EXCEEDED");
+    expect(() => assertBatchBudgets({ maxObservationsPerBatch: 1, maxBatchBytes: integrity.canonicalBytes, maxExcerptBytes: 8_192, maxObservationsPerSession: 2 }, 1, accepted, integrity)).not.toThrow();
+    expect(() => assertBatchBudgets({ maxObservationsPerBatch: 1, maxBatchBytes: integrity.canonicalBytes, maxExcerptBytes: 8_192, maxObservationsPerSession: 1 }, 1, accepted, integrity)).toThrow("SCAN_SESSION_OBSERVATION_BUDGET_EXCEEDED");
+  });
+
+  it("enforces a zero excerpt disclosure budget", () => {
+    const accepted = batch();
+    accepted.observations[0]!.evidenceRefs[0] = { ...accepted.observations[0]!.evidenceRefs[0]!, kind: "SOURCE_EXCERPT", excerpt: "GET /orders" };
+    const integrity = computeBatchIntegrity(accepted);
+
+    expect(() => assertBatchBudgets({ maxObservationsPerBatch: 1, maxBatchBytes: integrity.canonicalBytes, maxExcerptBytes: 0, maxObservationsPerSession: 2 }, 0, accepted, integrity)).toThrow("SCAN_EVIDENCE_EXCERPT_BUDGET_EXCEEDED");
   });
 });

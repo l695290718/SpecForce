@@ -70,7 +70,7 @@ export function assertBatchSequence(checkpoint: BatchCheckpoint, batch: Pick<Kno
 }
 
 export function assertBatchBudgets(
-  budgets: Pick<ScanLimits, "maxObservationsPerBatch" | "maxBatchBytes" | "maxObservationsPerSession">,
+  budgets: Pick<ScanLimits, "maxObservationsPerBatch" | "maxBatchBytes" | "maxExcerptBytes" | "maxObservationsPerSession">,
   currentObservationCount: number,
   batch: Pick<KnowledgeScanBatch, "observations">,
   integrity: BatchIntegrity,
@@ -79,9 +79,13 @@ export function assertBatchBudgets(
   const observationCount = batch.observations.length;
   const maxPerBatch = Math.min(budgets.maxObservationsPerBatch, hardLimits.maxObservationsPerBatch);
   const maxBytes = Math.min(budgets.maxBatchBytes, hardLimits.maxBatchBytes);
+  const maxExcerptBytes = Math.min(budgets.maxExcerptBytes, hardLimits.maxExcerptBytes);
   const maxPerSession = Math.min(budgets.maxObservationsPerSession, hardLimits.maxObservationsPerSession);
   if (observationCount > maxPerBatch) throw new Error("SCAN_BATCH_OBSERVATION_BUDGET_EXCEEDED");
   if (integrity.canonicalBytes > maxBytes) throw new Error("SCAN_BATCH_BYTE_BUDGET_EXCEEDED");
+  if (batch.observations.some((observation) => observation.evidenceRefs.some((evidence) => evidence.excerpt !== undefined && Buffer.byteLength(evidence.excerpt, "utf8") > maxExcerptBytes))) {
+    throw new Error("SCAN_EVIDENCE_EXCERPT_BUDGET_EXCEEDED");
+  }
   if (currentObservationCount + observationCount > maxPerSession) throw new Error("SCAN_SESSION_OBSERVATION_BUDGET_EXCEEDED");
 }
 
@@ -233,7 +237,7 @@ function readBudgets(value: Prisma.JsonValue, hardLimits: Readonly<ScanLimits>):
   return {
     maxObservationsPerBatch: numericBudget(budgets.maxObservationsPerBatch, hardLimits.maxObservationsPerBatch),
     maxBatchBytes: numericBudget(budgets.maxBatchBytes, hardLimits.maxBatchBytes),
-    maxExcerptBytes: numericBudget(budgets.maxExcerptBytes, hardLimits.maxExcerptBytes),
+    maxExcerptBytes: numericBudget(budgets.maxExcerptBytes, hardLimits.maxExcerptBytes, true),
     maxSourceFileBytes: numericBudget(budgets.maxSourceFileBytes, hardLimits.maxSourceFileBytes),
     maxObservationsPerSession: numericBudget(budgets.maxObservationsPerSession, hardLimits.maxObservationsPerSession)
   };
@@ -250,8 +254,8 @@ async function loadScanContract(): Promise<{
   }>;
 }
 
-function numericBudget(value: unknown, fallback: number): number {
-  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : fallback;
+function numericBudget(value: unknown, fallback: number, allowZero = false): number {
+  return typeof value === "number" && Number.isInteger(value) && (value > 0 || (allowZero && value === 0)) ? value : fallback;
 }
 
 function assertUniqueObservationIds(observations: SourceObservationV2[]): void {
