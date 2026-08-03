@@ -31,7 +31,7 @@ func TestSharedSessionAndBatchFixtures(t *testing.T) {
 func TestCrossScopeBatchFixtureIsRejected(t *testing.T) {
 	root := filepath.Join("..", "..", "..", "..", "packages", "scan-contract", "fixtures")
 	var fixture struct {
-		ExpectedArchitectureScope ArchitectureScope `json:"expectedArchitectureScope"`
+		ExpectedArchitectureScope ArchitectureScope  `json:"expectedArchitectureScope"`
 		Batch                     KnowledgeScanBatch `json:"batch"`
 	}
 	readFixture(t, filepath.Join(root, "invalid-cross-scope-batch.json"), &fixture)
@@ -43,6 +43,16 @@ func TestCrossScopeBatchFixtureIsRejected(t *testing.T) {
 func TestProductionLimitsMatchContract(t *testing.T) {
 	if MaxObservationsPerBatch != 500 || MaxBatchBytes != 4_194_304 || MaxExcerptBytes != 8_192 || MaxSourceFileBytes != 10_485_760 || MaxObservationsPerSession != 100_000 {
 		t.Fatal("production limits drifted")
+	}
+}
+
+func TestSessionAllowsZeroExcerptBudget(t *testing.T) {
+	root := filepath.Join("..", "..", "..", "..", "packages", "scan-contract", "fixtures")
+	var session ScanSessionDescriptor
+	readFixture(t, filepath.Join(root, "valid-session.json"), &session)
+	session.Limits.MaxExcerptBytes = 0
+	if err := session.Validate(); err != nil {
+		t.Fatal(err)
 	}
 }
 
