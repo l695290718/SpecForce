@@ -47,12 +47,27 @@ const scanner = vi.hoisted(() => ({
   matchKnowledgeIdentities: vi.fn().mockResolvedValue({ scanReportId: "scan-1", identityCandidateIds: ["identity-1"], reviewBundle: { id: "review-1", status: "READY" } })
 }));
 
+const governedScanner = vi.hoisted(() => ({
+  getScannerRelease: vi.fn().mockResolvedValue({ releaseId: "scanner-release-2.0.0" }),
+  startKnowledgeScan: vi.fn().mockResolvedValue({ sessionId: "knowledge-scan-1" }),
+  getScanCheckpoint: vi.fn().mockResolvedValue({ acceptedSequence: -1 }),
+  submitScanBatch: vi.fn().mockResolvedValue({ acceptedSequence: 0, idempotent: false }),
+  finalizeKnowledgeScan: vi.fn().mockResolvedValue({ status: "READY_FOR_ANALYSIS" })
+}));
+
 vi.mock("./persistence", () => persistence);
 vi.mock("./scoped-derived", () => scopedDerived);
 vi.mock("./knowledge/persistence", () => knowledge);
 vi.mock("./scanner/persistence", () => scanner);
 vi.mock("./knowledge/semantic-persistence", () => ({ generateKnowledgeCandidates: scanner.generateKnowledgeCandidates }));
 vi.mock("./knowledge/identity-persistence", () => ({ matchKnowledgeIdentities: scanner.matchKnowledgeIdentities }));
+vi.mock("./scanner/release", () => ({ getScannerRelease: governedScanner.getScannerRelease }));
+vi.mock("./scanner/session", () => ({
+  startKnowledgeScan: governedScanner.startKnowledgeScan,
+  getScanCheckpoint: governedScanner.getScanCheckpoint,
+  finalizeKnowledgeScan: governedScanner.finalizeKnowledgeScan
+}));
+vi.mock("./scanner/batch-persistence", () => ({ submitScanBatch: governedScanner.submitScanBatch }));
 
 import { registerTools } from "./tools";
 
@@ -271,6 +286,33 @@ describe("3A knowledge foundation tools", () => {
       "create_projection_manifest",
       "list_knowledge_assertions"
     ]));
+  });
+
+  it("registers the governed release, session, checkpoint, batch, and finalization tools", () => {
+    const tools = captureTools();
+    expect([...tools.keys()]).toEqual(expect.arrayContaining([
+      "get_scanner_release",
+      "start_knowledge_scan",
+      "get_scan_checkpoint",
+      "submit_scan_batch",
+      "finalize_knowledge_scan"
+    ]));
+    expect((tools.get("start_knowledge_scan")!.config._meta as { permissions: string[] }).permissions).toEqual(["knowledge:write", "asset:read"]);
+    expect((tools.get("submit_scan_batch")!.config._meta as { permissions: string[] }).permissions).toEqual(["knowledge:write"]);
+  });
+
+  it("forwards client Scope only as a governed-session equality assertion", async () => {
+    const architectureScope = { applicationServiceId: "com.huawei.celon.desiner", scopePath: "designer" };
+    const tools = captureTools();
+    await tools.get("get_scanner_release")!.handler({ architectureScope, sessionId: "knowledge-scan-1" });
+    await tools.get("get_scan_checkpoint")!.handler({ architectureScope, sessionId: "knowledge-scan-1" });
+    await tools.get("submit_scan_batch")!.handler({ architectureScope, batch: { sessionId: "knowledge-scan-1" } });
+    await tools.get("finalize_knowledge_scan")!.handler({ architectureScope, sessionId: "knowledge-scan-1", finalization: { acceptedSequence: 0 } });
+
+    expect(governedScanner.getScannerRelease).toHaveBeenCalledWith({ architectureScope, sessionId: "knowledge-scan-1" });
+    expect(governedScanner.getScanCheckpoint).toHaveBeenCalledWith({ architectureScope, sessionId: "knowledge-scan-1" });
+    expect(governedScanner.submitScanBatch).toHaveBeenCalledWith({ architectureScope, batch: { sessionId: "knowledge-scan-1" } });
+    expect(governedScanner.finalizeKnowledgeScan).toHaveBeenCalledWith({ architectureScope, sessionId: "knowledge-scan-1", finalization: { acceptedSequence: 0 } });
   });
 
   it("routes the knowledge operations through the MCP write boundary", async () => {

@@ -7,6 +7,9 @@ import { allowAllPolicy, getDefaultActor } from "./auth";
 import { deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
 import { commitKnowledgeChangeSet, createIdentityCandidate, createKnowledgeAssertion, createKnowledgeReviewBundle, createProjectionManifest, createWorkingStream, decideKnowledgeReviewBundle, listKnowledgeAssertions, publishKnowledgeBaseline } from "./knowledge/persistence";
 import { submitScanReport } from "./scanner/persistence";
+import { getScannerRelease } from "./scanner/release";
+import { finalizeKnowledgeScan, getScanCheckpoint, startKnowledgeScan } from "./scanner/session";
+import { submitScanBatch } from "./scanner/batch-persistence";
 import { generateKnowledgeCandidates } from "./knowledge/semantic-persistence";
 import { matchKnowledgeIdentities } from "./knowledge/identity-persistence";
 import {
@@ -430,6 +433,63 @@ export function registerTools(server: McpServer): void {
     permissions: ["knowledge:write"],
     readOnly: false
   }, async (input) => createKnowledgeAssertion(input as unknown as Parameters<typeof createKnowledgeAssertion>[0]));
+
+  registerJsonTool(server, "start_knowledge_scan", {
+    title: "Start governed knowledge scan",
+    description: "Creates an exact-Scope Scan Session bound to the authorized actor, connector, signed Scanner Release, DesignChangeSession, repository snapshot, expiry, and budgets. The raw nonce is returned once and only its digest is persisted.",
+    inputSchema: {
+      architectureScope: architectureScopeSchema,
+      connectorId: z.string().min(1),
+      designChangeSessionId: z.string().min(1),
+      scannerReleaseId: z.string().min(1).optional(),
+      snapshotIdentity: z.record(z.unknown()),
+      repositoryPolicy: z.object({ allowDirtyWorktree: z.boolean(), ignorePatterns: z.array(z.string()) }).optional(),
+      evidencePolicy: z.record(z.unknown()).optional(),
+      parserPolicy: z.record(z.unknown()).optional(),
+      budgets: z.object({
+        maxObservationsPerBatch: z.number().int().positive().optional(),
+        maxBatchBytes: z.number().int().positive().optional(),
+        maxExcerptBytes: z.number().int().positive().optional(),
+        maxSourceFileBytes: z.number().int().positive().optional(),
+        maxObservationsPerSession: z.number().int().positive().optional()
+      }).optional(),
+      expiresAt: z.string().datetime().optional()
+    },
+    permissions: ["knowledge:write", "asset:read"],
+    readOnly: false
+  }, startKnowledgeScan);
+
+  registerJsonTool(server, "get_scanner_release", {
+    title: "Get authorized Scanner Release",
+    description: "Returns the signed Scanner Release selected by a persisted Scan Session after checking the caller's Scope equality assertion, actor binding, release status, expiry, and configured trust bundle.",
+    inputSchema: { architectureScope: architectureScopeSchema, sessionId: z.string().min(1) },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, getScannerRelease);
+
+  registerJsonTool(server, "get_scan_checkpoint", {
+    title: "Get scan checkpoint",
+    description: "Returns the persisted sequence, digest, count, and state for one opaque Scan Session. Scope is derived from the Session and the client value is an equality assertion only.",
+    inputSchema: { architectureScope: architectureScopeSchema, sessionId: z.string().min(1) },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, getScanCheckpoint);
+
+  registerJsonTool(server, "submit_scan_batch", {
+    title: "Submit resumable scan batch",
+    description: "Validates and atomically persists one hash-chained scan batch, its source-minimized observations, and the exact-Scope Session checkpoint. Identical retries are idempotent and conflicting sequence reuse is rejected.",
+    inputSchema: { architectureScope: architectureScopeSchema, batch: z.record(z.unknown()) },
+    permissions: ["knowledge:write"],
+    readOnly: false
+  }, async (input) => submitScanBatch(input as unknown as Parameters<typeof submitScanBatch>[0]));
+
+  registerJsonTool(server, "finalize_knowledge_scan", {
+    title: "Finalize governed knowledge scan",
+    description: "Verifies the final digest, repository snapshot, counts, coverage, signed release policy, actor binding, expiry, and exact Scope before moving a Scan Session to analysis or blocked review.",
+    inputSchema: { architectureScope: architectureScopeSchema, sessionId: z.string().min(1), finalization: z.record(z.unknown()) },
+    permissions: ["knowledge:write"],
+    readOnly: false
+  }, async (input) => finalizeKnowledgeScan(input as unknown as Parameters<typeof finalizeKnowledgeScan>[0]));
 
   registerJsonTool(server, "submit_scan_report", {
     title: "Submit local scan report",

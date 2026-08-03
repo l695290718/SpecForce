@@ -591,6 +591,9 @@ model KnowledgeAssertion {
   evidenceRefs          Json     @default("[]") @db.JsonB
   sourceObservationIds  Json     @default("[]") @db.JsonB
   extractorId           String
+  riskTier              String   @default("T1")
+  domainCluster         String?
+  generatedByActorId    String?
   revision              Int
   changeSetId           String?
   applicationServiceId  String
@@ -760,4 +763,97 @@ model KnowledgeScanReport {
   @@unique([applicationServiceId, scopePath, id], map: "KnowledgeScanReport_scope_id_key")
   @@unique([applicationServiceId, scopePath, reportDigest], map: "KnowledgeScanReport_scope_digest_key")
   @@index([applicationServiceId, scopePath, designChangeSessionId, status], map: "KnowledgeScanReport_scope_session_status_idx")
+}
+
+model ScannerRelease {
+  id               String    @id
+  version          String    @unique
+  contractVersion  String
+  artifactDigests  Json      @default("{}") @db.JsonB
+  manifest         Json      @db.JsonB
+  signature        String
+  keyId            String
+  status           String
+  publishedAt      DateTime
+  revokedAt        DateTime?
+  revocationReason String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  sessions KnowledgeScanSession[]
+
+  @@index([status, publishedAt], map: "ScannerRelease_status_published_idx")
+}
+
+model KnowledgeScanSession {
+  dbId                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                    String
+  applicationServiceId  String
+  scopePath             String
+  actorId               String
+  connectorId           String
+  designChangeSessionId String
+  scannerReleaseId      String
+  contractVersion       String
+  nonceDigest           String
+  snapshotIdentity      Json      @default("{}") @db.JsonB
+  repositoryPolicy      Json      @default("{}") @db.JsonB
+  evidencePolicy        Json      @default("{}") @db.JsonB
+  parserPolicy          Json      @default("{}") @db.JsonB
+  budgets               Json      @default("{}") @db.JsonB
+  status                String
+  acceptedSequence      Int       @default(-1)
+  acceptedBatchDigest   String?
+  observationCount      Int       @default(0)
+  finalizationManifest  Json?     @db.JsonB
+  finalizationDigest    String?
+  blockedReason         String?
+  expiresAt             DateTime
+  finalizedAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  scannerRelease ScannerRelease       @relation(fields: [scannerReleaseId], references: [id], onDelete: Restrict)
+  batches        KnowledgeScanBatch[]
+
+  @@unique([applicationServiceId, scopePath, id], map: "KnowledgeScanSession_scope_id_key")
+  @@index([id], map: "KnowledgeScanSession_id_idx")
+  @@index([applicationServiceId, scopePath, status, expiresAt], map: "KnowledgeScanSession_scope_status_expiry_idx")
+}
+
+model KnowledgeScanBatch {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId            String
+  applicationServiceId String
+  scopePath            String
+  sequence             Int
+  previousBatchDigest  String?
+  batchDigest          String
+  payloadDigest        String
+  observationCount     Int
+  canonicalBytes       Int
+  status               String
+  acceptanceReceipt    Json     @default("{}") @db.JsonB
+  acceptedAt           DateTime @default(now())
+
+  session KnowledgeScanSession @relation(fields: [applicationServiceId, scopePath, sessionId], references: [applicationServiceId, scopePath, id], onDelete: Restrict)
+
+  @@unique([applicationServiceId, scopePath, sessionId, sequence], map: "KnowledgeScanBatch_scope_session_sequence_key")
+  @@unique([applicationServiceId, scopePath, sessionId, batchDigest], map: "KnowledgeScanBatch_scope_session_digest_key")
+  @@index([sessionId], map: "KnowledgeScanBatch_session_id_idx")
+}
+
+model KnowledgePromotionReceipt {
+  dbId                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                      String
+  promotionDecisionId     String
+  sourceDigest            String
+  assetRevisionIds        Json     @default("[]") @db.JsonB
+  relationshipRevisionIds Json     @default("[]") @db.JsonB
+  applicationServiceId    String
+  scopePath               String
+  createdAt               DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, id], map: "KnowledgePromotionReceipt_scope_id_key")
+  @@unique([applicationServiceId, scopePath, promotionDecisionId, sourceDigest], map: "KnowledgePromotionReceipt_scope_decision_digest_key")
 }
