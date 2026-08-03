@@ -2,6 +2,7 @@ import { assertBaselinePublishable, assertPromotionDecisionValid, changeSetDiges
 import { Prisma } from "@prisma/client";
 import { prisma, ensureMcpPersistenceSchema, readableScope, resolveWritableScope, writableActor } from "../persistence";
 import { assertCandidateApprovalPolicy } from "./risk-policy";
+import { loadConvergedReconciliation } from "./promotion";
 
 export interface KnowledgeAssertionInput {
   assertion: KnowledgeAssertion;
@@ -59,7 +60,9 @@ export interface BaselineInput {
   architectureScope: ArchitectureScopeRef;
   sourceRevisionIds: string[];
   relationshipVersion: string;
-  reconciliationStatus: "CONVERGED" | "DRIFTED" | "BLOCKED";
+  reconciliationReceiptId?: string;
+  /** Kept optional at the type boundary for source compatibility; publication rejects its absence. */
+  reconciliationStatus?: "CONVERGED" | "DRIFTED" | "BLOCKED";
 }
 
 export interface ProjectionManifestInput {
@@ -257,14 +260,37 @@ export async function commitKnowledgeChangeSet(input: ChangeSetInput): Promise<C
 
 export async function publishKnowledgeBaseline(input: BaselineInput) {
   const scope = resolveWritableScope(writableActor(), input.architectureScope);
-  const manifest: BaselineManifest = { architectureScope: scope, baselineId: input.id, changeSetId: input.changeSetId, sourceRevisionIds: input.sourceRevisionIds, relationshipVersion: input.relationshipVersion, publishedAt: new Date().toISOString() };
-  assertBaselinePublishable({ status: "PUBLISHED", manifest }, input.reconciliationStatus);
   await ensureMcpPersistenceSchema();
+  if (!input.reconciliationReceiptId) throw new Error("BASELINE_RECONCILIATION_RECEIPT_REQUIRED");
+  const reconciliation = await loadConvergedReconciliation(scope, input.reconciliationReceiptId);
+  if (reconciliation.changeSetId !== input.changeSetId) throw new Error("BASELINE_RECONCILIATION_CHANGESET_MISMATCH");
+  if (!sameIds(reconciliation.assetRevisionIds, input.sourceRevisionIds)) throw new Error("BASELINE_RECONCILIATION_ASSET_MISMATCH");
+  if (reconciliation.relationshipVersion !== input.relationshipVersion) throw new Error("BASELINE_RECONCILIATION_RELATIONSHIP_VERSION_MISMATCH");
+  const manifest: BaselineManifest = {
+    architectureScope: scope,
+    baselineId: input.id,
+    changeSetId: input.changeSetId,
+    sourceRevisionIds: input.sourceRevisionIds,
+    relationshipVersion: input.relationshipVersion,
+    promotionReceiptId: reconciliation.promotionReceiptId,
+    reconciliationReceiptId: reconciliation.id,
+    scanSessionDigest: reconciliation.scanSessionDigest,
+    publishedAt: new Date().toISOString()
+  };
+  assertBaselinePublishable({ status: "PUBLISHED", manifest }, reconciliation.status);
   const row = await prisma.$transaction(async (transaction) => {
     const changeSet = await transaction.knowledgeChangeSet.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.changeSetId } } });
     if (!changeSet || changeSet.streamId !== input.streamId || changeSet.status !== "COMMITTED") throw new Error("CHANGESET_NOT_COMMITTED");
-    await transaction.knowledgeBaseline.updateMany({ where: { ...scope, streamId: input.streamId, status: "PUBLISHED" }, data: { status: "SUPERSEDED" } });
-    return transaction.knowledgeBaseline.upsert({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } }, create: { ...scope, id: input.id, streamId: input.streamId, changeSetId: input.changeSetId, status: "PUBLISHED", manifest: jsonValue(manifest), publishedAt: new Date(manifest.publishedAt) }, update: { streamId: input.streamId, changeSetId: input.changeSetId, status: "PUBLISHED", manifest: jsonValue(manifest), publishedAt: new Date(manifest.publishedAt) } });
+    await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1))", `knowledge-baseline:${scope.applicationServiceId}:${scope.scopePath}:${input.streamId}`);
+    const existing = await transaction.knowledgeBaseline.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } } });
+    if (existing) {
+      const existingManifest = existing.manifest as unknown as BaselineManifest;
+      if (existing.streamId !== input.streamId || existing.changeSetId !== input.changeSetId || existingManifest.reconciliationReceiptId !== manifest.reconciliationReceiptId) throw new Error("BASELINE_IMMUTABLE");
+      return existing;
+    }
+    const created = await transaction.knowledgeBaseline.create({ data: { ...scope, id: input.id, streamId: input.streamId, changeSetId: input.changeSetId, status: "PUBLISHED", manifest: jsonValue(manifest), publishedAt: new Date(manifest.publishedAt) } });
+    await transaction.knowledgeBaseline.updateMany({ where: { ...scope, streamId: input.streamId, status: "PUBLISHED", id: { not: input.id } }, data: { status: "SUPERSEDED" } });
+    return created;
   });
   return { id: row.id, streamId: row.streamId, changeSetId: row.changeSetId, status: row.status, manifest: row.manifest, architectureScope: scope, createdAt: row.createdAt.toISOString(), publishedAt: row.publishedAt?.toISOString() };
 }
@@ -309,4 +335,8 @@ async function appendGovernanceEvent(transaction: any, scope: ArchitectureScopeR
 
 function jsonValue(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
+}
+
+function sameIds(left: string[], right: string[]): boolean {
+  return JSON.stringify([...new Set(left)].sort()) === JSON.stringify([...new Set(right)].sort());
 }

@@ -7,6 +7,7 @@ import { PrismaRelationshipRepository, type RelationshipScope } from "./relation
 
 const globalForPrisma = globalThis as unknown as { specforgeMcpPrisma?: PrismaClient };
 const legacyContextPackFallbackSymbol = Symbol("legacyContextPackFallback");
+let persistenceSchemaPromise: Promise<void> | undefined;
 
 export const prisma = globalForPrisma.specforgeMcpPrisma ?? new PrismaClient();
 
@@ -103,6 +104,14 @@ export async function listPersistedArchitectureScopes() {
 }
 
 export async function ensureMcpPersistenceSchema() {
+  persistenceSchemaPromise ??= initializeMcpPersistenceSchema().catch((error) => {
+    persistenceSchemaPromise = undefined;
+    throw error;
+  });
+  return persistenceSchemaPromise;
+}
+
+async function initializeMcpPersistenceSchema() {
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "ArchitectureScope" (
       id TEXT PRIMARY KEY NOT NULL, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
@@ -475,6 +484,7 @@ export async function ensureMcpPersistenceSchema() {
       CONSTRAINT "KnowledgePromotionReceipt_scope_decision_digest_key" UNIQUE("applicationServiceId", "scopePath", "promotionDecisionId", "sourceDigest")
     )
   `);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "KnowledgePromotionReceipt_scope_decision_key" ON "KnowledgePromotionReceipt"("applicationServiceId", "scopePath", "promotionDecisionId")`);
   await upgradeLegacyPersistedIdentitySchema();
   for (const table of ["DesignAsset", "Proposal", "ContextPack", "AssetLink"]) {
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "${table}_applicationServiceId_idx" ON "${table}"("applicationServiceId")`);
@@ -953,6 +963,7 @@ export async function searchPersistedDesignAssets(input: { applicationServiceId:
 }
 
 export async function disconnectMcpPersistence() {
+  persistenceSchemaPromise = undefined;
   await prisma.$disconnect();
 }
 
@@ -1135,7 +1146,7 @@ type LegacyAssetLinkRow = {
   createdAt: Date;
 };
 
-function relationshipService(transaction: Prisma.TransactionClient, scope: RelationshipScope) {
+export function relationshipService(transaction: Prisma.TransactionClient, scope: RelationshipScope) {
   return new RelationshipCommandService(
     new PrismaRelationshipRepository(transaction),
     createTrustedRelationshipExecutionContext({
@@ -1146,7 +1157,7 @@ function relationshipService(transaction: Prisma.TransactionClient, scope: Relat
   );
 }
 
-function configuredRelationshipScope(scope: ArchitectureScopeRef): RelationshipScope {
+export function configuredRelationshipScope(scope: ArchitectureScopeRef): RelationshipScope {
   return { enterpriseId: process.env.SPECFORGE_ENTERPRISE_ID ?? "legacy-enterprise", applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath };
 }
 

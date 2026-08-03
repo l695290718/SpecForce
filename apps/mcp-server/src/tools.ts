@@ -13,6 +13,7 @@ import { submitScanBatch } from "./scanner/batch-persistence";
 import { generateKnowledgeCandidates } from "./knowledge/semantic-persistence";
 import { matchKnowledgeIdentities } from "./knowledge/identity-persistence";
 import { assembleKnowledgeReviewBundle, submitSemanticCandidateBatch } from "./knowledge/candidate-persistence";
+import { promoteKnowledgeCandidates, reconcileKnowledgeBaseline } from "./knowledge/promotion";
 import {
   analyzeScopedProposalImpact,
   buildScopedAssetGraph,
@@ -582,6 +583,22 @@ export function registerTools(server: McpServer): void {
     readOnly: false
   }, decideKnowledgeReviewBundle);
 
+  registerJsonTool(server, "promote_knowledge_candidates", {
+    title: "Promote reviewed knowledge candidates",
+    description: "Atomically materializes one approved ReviewBundle into immutable design revisions, typed relationships, evidence, outbox events, and a monotonic ChangeSet.",
+    inputSchema: { architectureScope: architectureScopeSchema, promotionDecisionId: z.string().min(1), streamId: z.string().min(1) },
+    permissions: ["knowledge:write", "governance:run"],
+    readOnly: false
+  }, promoteKnowledgeCandidates);
+
+  registerJsonTool(server, "reconcile_knowledge_baseline", {
+    title: "Reconcile promoted knowledge",
+    description: "Reconciles a promotion receipt against exact-Scope PostgreSQL state and durably records the governance receipt required for Baseline publication.",
+    inputSchema: { architectureScope: architectureScopeSchema, promotionReceiptId: z.string().min(1) },
+    permissions: ["knowledge:write", "governance:run"],
+    readOnly: false
+  }, reconcileKnowledgeBaseline);
+
   registerJsonTool(server, "create_working_stream", {
     title: "Create working stream",
     description: "Creates or reopens a mutable scoped Working Stream for atomic ChangeSets.",
@@ -601,7 +618,7 @@ export function registerTools(server: McpServer): void {
   registerJsonTool(server, "publish_knowledge_baseline", {
     title: "Publish knowledge baseline",
     description: "Publishes an immutable scoped Baseline only after a converged reconciliation result.",
-    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), streamId: z.string().min(1), changeSetId: z.string().min(1), sourceRevisionIds: z.array(z.string()).min(1), relationshipVersion: z.string().min(1), reconciliationStatus: z.enum(["CONVERGED", "DRIFTED", "BLOCKED"]) },
+    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), streamId: z.string().min(1), changeSetId: z.string().min(1), sourceRevisionIds: z.array(z.string()).min(1), relationshipVersion: z.string().min(1), reconciliationReceiptId: z.string().min(1) },
     permissions: ["knowledge:write"],
     readOnly: false
   }, publishKnowledgeBaseline);

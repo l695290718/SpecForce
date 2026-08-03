@@ -206,6 +206,9 @@ export interface BaselineManifest {
   changeSetId: string;
   sourceRevisionIds: string[];
   relationshipVersion: string;
+  promotionReceiptId?: string;
+  reconciliationReceiptId?: string;
+  scanSessionDigest?: string;
   publishedAt: string;
 }
 
@@ -270,4 +273,42 @@ export interface KnowledgePromotionDecision {
   reason: string;
   actorId: string;
   createdAt: string;
+}
+
+export interface KnowledgePromotionReceipt {
+  id: string;
+  architectureScope: ArchitectureScopeRef;
+  promotionDecisionId: string;
+  reviewBundleId: string;
+  scanSessionId: string;
+  scanSessionDigest: string;
+  sourceDigest: string;
+  streamId: string;
+  changeSetId: string;
+  changeSetSequence: number;
+  assetRevisionIds: string[];
+  relationshipRevisionIds: string[];
+  evidenceRefs: string[];
+  relationshipVersion: string;
+  idempotent: boolean;
+  createdAt: string;
+}
+
+export type KnowledgeReconciliationStatus = "CONVERGED" | "DRIFTED" | "BLOCKED";
+
+export interface KnowledgeReconciliationResult {
+  id: string;
+  architectureScope: ArchitectureScopeRef;
+  promotionReceiptId: string;
+  promotionSourceDigest: string;
+  scanSessionId: string;
+  scanSessionDigest: string;
+  changeSetId: string;
+  status: KnowledgeReconciliationStatus;
+  issues: string[];
+  assetRevisionIds: string[];
+  relationshipRevisionIds: string[];
+  evidenceRefs: string[];
+  relationshipVersion: string;
+  reconciledAt: string;
 }
