@@ -215,6 +215,23 @@ pnpm --filter @specforge/mcp-server smoke
 
 Open [http://localhost:3000](http://localhost:3000). The selected application service is carried in the `scope` query parameter and restored from the validated application-service cookie; the locale is restored independently from `specforge-locale`.
 
+## Legacy Baseline Discovery
+
+Phase 1 provides a signed, native Go scanner and an Agent-mediated MCP flow for turning an existing repository into an exact-Scope, reviewed Baseline v1. Scanner releases use an explicit Ed25519 trust root with no trust-on-first-use; local batches are resumable and hash-chained, while PostgreSQL remains authoritative for Sessions, observations, review decisions, ChangeSets, and Baselines.
+
+第一阶段提供签名的原生 Go 扫描器及 Agent 中介的 MCP 流程，将存量仓库转换为精确 Scope、经评审的 Baseline v1。扫描器使用显式 Ed25519 信任根，禁止首次使用自动信任；本地批次支持哈希链断点续传，PostgreSQL 对 Session、观察、评审决策、ChangeSet 和 Baseline 保持权威。
+
+```powershell
+# Stage-level verification; DATABASE_URL is required for PostgreSQL integration.
+pnpm legacy-baseline:verify
+
+# Build one native signed scanner artifact. The private key comes from a secret.
+./scripts/build-scanner-release.ps1 -Version 2.0.0 -SigningKeyId corp-scanner-2026-01 `
+  -ArtifactBaseUri https://artifacts.example.com/specforge/scanner
+```
+
+See [Legacy Baseline Discovery Operations](docs/operations/legacy-baseline-discovery.md) for trust installation, Session and Agent flow, resume, T0-T3 review, promotion, reconciliation, publication, revocation, rotation, cleanup, audit, and deferred production capabilities.
+
 ## Single-Host Docker Deployment
 
 Deploy the Web console and PostgreSQL on one Linux host with Docker Compose. PostgreSQL remains private to the Compose network; MCP stays a client-side stdio process and is not deployed as a network container.

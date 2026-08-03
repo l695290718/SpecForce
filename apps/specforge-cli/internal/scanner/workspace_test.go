@@ -12,6 +12,8 @@ func TestInventorySkipsPrivateRuntimePathsAndLargeFiles(t *testing.T) {
 	writeFixture(t, root, "src/orders.go", []byte("package orders"))
 	writeFixture(t, root, ".git/config", []byte("secret"))
 	writeFixture(t, root, ".specforge/scan-spool/batch.json", []byte("secret"))
+	writeFixture(t, root, ".specforge/design-context/session.json", []byte("private governance context"))
+	writeFixture(t, root, ".specforge.yaml", []byte("repository: governed"))
 	writeFixture(t, root, "large.bin", make([]byte, 33))
 
 	result, err := Inventory(root, 32)

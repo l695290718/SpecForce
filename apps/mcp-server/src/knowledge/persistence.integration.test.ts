@@ -55,7 +55,35 @@ describe.runIf(integrationEnabled)("3A knowledge PostgreSQL persistence", () => 
     const changeSet = await commitKnowledgeChangeSet({ id: `${prefix}-changeset`, streamId: stream.id, architectureScope, assetRevisionIds: [`${prefix}-assertion`], relationshipRevisionIds: [], evidenceRefs: [`${prefix}-evidence`], promotionDecisionId: decision.id });
     const retriedChangeSet = await commitKnowledgeChangeSet({ id: `${prefix}-changeset`, streamId: stream.id, architectureScope, assetRevisionIds: [`${prefix}-assertion`], relationshipRevisionIds: [], evidenceRefs: [`${prefix}-evidence`], promotionDecisionId: decision.id });
     expect(retriedChangeSet.sequence).toBe(changeSet.sequence);
-    const baseline = await publishKnowledgeBaseline({ id: `${prefix}-baseline`, streamId: stream.id, changeSetId: changeSet.id, architectureScope, sourceRevisionIds: [`${prefix}-assertion`], relationshipVersion: "1", reconciliationStatus: "CONVERGED" });
+    const reconciliationReceiptId = `${prefix}-reconciliation`;
+    await prisma.federationOutbox.create({
+      data: {
+        ...architectureScope,
+        eventType: "KNOWLEDGE_BASELINE_RECONCILED",
+        payload: {
+          result: {
+            id: reconciliationReceiptId,
+            architectureScope,
+            promotionReceiptId: `${prefix}-promotion`,
+            promotionSourceDigest: "a".repeat(64),
+            scanSessionId: `${prefix}-scan-session`,
+            scanSessionDigest: "b".repeat(64),
+            changeSetId: changeSet.id,
+            status: "CONVERGED",
+            issues: [],
+            assetRevisionIds: [`${prefix}-assertion`],
+            relationshipRevisionIds: [],
+            evidenceRefs: [`${prefix}-evidence`],
+            relationshipVersion: "1",
+            reconciledAt: now
+          }
+        },
+        idempotencyKey: reconciliationReceiptId,
+        status: "PENDING",
+        designChangeSessionId: session.id
+      }
+    });
+    const baseline = await publishKnowledgeBaseline({ id: `${prefix}-baseline`, streamId: stream.id, changeSetId: changeSet.id, architectureScope, sourceRevisionIds: [`${prefix}-assertion`], relationshipVersion: "1", reconciliationReceiptId });
     const projection = await createProjectionManifest({ id: `${prefix}-projection`, baselineId: baseline.id, architectureScope, projectionType: "SYS_KL", projectionSchemaVersion: "1", sourceRevisionIds: [`${prefix}-assertion`], relationshipVersion: "1", query: { layer: "SYS" } });
     expect((await listKnowledgeAssertions(architectureScope.applicationServiceId)).some((item) => item.id === `${prefix}-assertion`)).toBe(true);
     expect(projection.digest).toMatch(/^[a-f0-9]{64}$/);
@@ -65,6 +93,7 @@ describe.runIf(integrationEnabled)("3A knowledge PostgreSQL persistence", () => 
 async function deleteFixtures(): Promise<void> {
   await prisma.projectionManifest.deleteMany({ where: { ...architectureScope, id: { startsWith: prefix } } });
   await prisma.knowledgeBaseline.deleteMany({ where: { ...architectureScope, id: { startsWith: prefix } } });
+  await prisma.federationOutbox.deleteMany({ where: { ...architectureScope, OR: [{ idempotencyKey: { startsWith: prefix } }, { designChangeSessionId: { startsWith: prefix } }] } });
   await prisma.knowledgePromotionDecision.deleteMany({ where: { ...architectureScope, id: { startsWith: prefix } } });
   await prisma.knowledgeReviewBundle.deleteMany({ where: { ...architectureScope, id: { startsWith: prefix } } });
   await prisma.designChangeSession.deleteMany({ where: { ...architectureScope, id: { startsWith: prefix } } });

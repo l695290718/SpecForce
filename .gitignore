@@ -12,5 +12,6 @@ coverage
 *.log
 artifacts/db-consolidation/
 .specforge/design-context/
+.specforge/cache/
 .worktrees
 worktrees

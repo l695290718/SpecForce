@@ -1,0 +1,106 @@
+name: Scanner release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: SemVer scanner version
+        required: true
+        type: string
+      minimum_scanner_version:
+        description: Minimum version accepted by the trust policy
+        required: true
+        type: string
+      signing_key_id:
+        description: Pre-provisioned Ed25519 public key identifier
+        required: true
+        type: string
+      artifact_base_uri:
+        description: Immutable release download base URI
+        required: true
+        type: string
+      expires_at:
+        description: UTC RFC3339 release expiry
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  native-build:
+    name: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-amd64
+            os: windows-2022
+          - platform: linux-amd64
+            os: ubuntu-24.04
+          - platform: linux-arm64
+            os: ubuntu-24.04-arm
+          - platform: darwin-amd64
+            os: macos-13
+          - platform: darwin-arm64
+            os: macos-14
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/specforge-cli/go.mod
+          cache-dependency-path: apps/specforge-cli/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build and sign native scanner
+        shell: pwsh
+        env:
+          SCANNER_RELEASE_PRIVATE_KEY: ${{ secrets.SCANNER_RELEASE_PRIVATE_KEY }}
+        run: >-
+          ./scripts/build-scanner-release.ps1
+          -Version '${{ inputs.version }}'
+          -MinimumScannerVersion '${{ inputs.minimum_scanner_version }}'
+          -SigningKeyId '${{ inputs.signing_key_id }}'
+          -ArtifactBaseUri '${{ inputs.artifact_base_uri }}'
+          -ExpiresAt '${{ inputs.expires_at }}'
+      - name: Upload native release
+        uses: actions/upload-artifact@v4
+        with:
+          name: scanner-${{ matrix.platform }}
+          path: dist/scanner/${{ inputs.version }}/${{ matrix.platform }}/
+          if-no-files-found: error
+          retention-days: 14
+
+  aggregate:
+    name: Aggregate signed native releases
+    needs: native-build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: scanner-*
+          path: scanner-release
+      - name: Verify release inventory
+        shell: pwsh
+        run: |
+          $manifests = Get-ChildItem scanner-release -Recurse -Filter manifest.json
+          if ($manifests.Count -ne 5) { throw "EXPECTED_FIVE_NATIVE_MANIFESTS: $($manifests.Count)" }
+          foreach ($manifestPath in $manifests) {
+            $manifest = Get-Content $manifestPath.FullName -Raw | ConvertFrom-Json
+            if ($manifest.contractVersion -ne '2.0' -or $manifest.algorithm -ne 'Ed25519' -or -not $manifest.signature) {
+              throw "INVALID_SIGNED_MANIFEST: $($manifestPath.FullName)"
+            }
+            $artifact = Join-Path $manifestPath.DirectoryName ([System.IO.Path]::GetFileName($manifest.artifact.uri))
+            if (-not (Test-Path $artifact)) { throw "ARTIFACT_MISSING: $artifact" }
+            $digest = (Get-FileHash $artifact -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($digest -ne $manifest.artifact.sha256) { throw "ARTIFACT_DIGEST_MISMATCH: $artifact" }
+          }
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: specforge-scanner-${{ inputs.version }}
+          path: scanner-release/
+          if-no-files-found: error
+          retention-days: 30

@@ -1,4 +1,6 @@
 services:
+  # The native scanner remains an operator-side binary. It reaches SpecForge only
+  # through an authorized Agent/MCP client and is intentionally not a Compose service.
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped

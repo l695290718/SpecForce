@@ -1,0 +1,81 @@
+{
+    "stage":  "legacy-baseline-release-operations",
+    "startedAt":  "2026-08-03T10:05:47.3700356Z",
+    "completedAt":  "2026-08-03T10:10:21.4278745Z",
+    "status":  "PASSED",
+    "failure":  null,
+    "databaseIntegrationSkipped":  false,
+    "productionBuildSkipped":  false,
+    "steps":  [
+                  {
+                      "name":  "scan-contract-drift",
+                      "command":  "pnpm scanner-contract:check",
+                      "status":  "PASSED",
+                      "exitCode":  0,
+                      "durationSeconds":  1.437
+                  },
+                  {
+                      "name":  "go-scanner-tests",
+                      "command":  "go test ./...",
+                      "status":  "PASSED",
+                      "exitCode":  0,
+                      "durationSeconds":  22.462
+                  },
+                  {
+                      "name":  "go-scanner-build",
+                      "command":  "go build -trimpath -o dist/specforge.exe .",
+                      "status":  "PASSED",
+                      "exitCode":  0,
+                      "durationSeconds":  21.635
+                  },
+                  {
+                      "name":  "core-focused-tests",
+                      "command":  "pnpm --filter @specforge/core test",
+                      "status":  "PASSED",
+                      "exitCode":  0,
+                      "durationSeconds":  6.078
+                  },
+                  {
+                      "name":  "mcp-scanner-and-knowledge-tests",
+                      "command":  "C:\\Users\\69529\\OneDrive\\文档\\SpecForge\\node_modules\\.bin\\vitest.cmd run --root apps/mcp-server src/scanner src/knowledge",
+                      "status":  "PASSED",
+                      "exitCode":  0,
+                      "durationSeconds":  4.667
+                  },
+                  {
+                      "name":  "postgresql-integration",
+                      "command":  "C:\\Users\\69529\\OneDrive\\文档\\SpecForge\\node_modules\\.bin\\vitest.cmd run --root apps/mcp-server src/scanner/batch-persistence.integration.test.ts src/knowledge/persistence.integration.test.ts src/knowledge/promotion.integration.test.ts",
+                      "status":  "PASSED",
+                      "exitCode":  0,
+                      "durationSeconds":  14.537
+                  },
+                  {
+                      "name":  "legacy-baseline-e2e",
+                      "command":  "C:\\Users\\69529\\OneDrive\\文档\\SpecForge\\node_modules\\.bin\\vitest.cmd run --root apps/mcp-server src/scanner/legacy-baseline.e2e.test.ts",
+                      "status":  "PASSED",
+                      "exitCode":  0,
+                      "durationSeconds":  17.416
+                  },
+                  {
+                      "name":  "legacy-baseline-scale",
+                      "command":  "C:\\Users\\69529\\OneDrive\\文档\\SpecForge\\node_modules\\.bin\\vitest.cmd run --root apps/mcp-server src/scanner/legacy-baseline.scale.test.ts",
+                      "status":  "PASSED",
+                      "exitCode":  0,
+                      "durationSeconds":  106.283
+                  },
+                  {
+                      "name":  "workspace-typecheck",
+                      "command":  "pnpm typecheck",
+                      "status":  "PASSED",
+                      "exitCode":  0,
+                      "durationSeconds":  20.245
+                  },
+                  {
+                      "name":  "production-build",
+                      "command":  "pnpm build",
+                      "status":  "PASSED",
+                      "exitCode":  0,
+                      "durationSeconds":  59.079
+                  }
+              ]
+}

@@ -1,6 +1,6 @@
 import { scopeById } from "@specforge/core";
 import type { KnowledgeScanBatch, ScannerReleaseManifest, SourceObservationV2 } from "@specforge/scan-contract";
-import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { createHash, generateKeyPairSync, randomUUID, sign } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createDesignChangeSession, registerConnector } from "../federation/persistence";
 import { disconnectMcpPersistence, prisma } from "../persistence";
@@ -13,7 +13,8 @@ const scope = scopeById("com.huawei.celon.desiner")!;
 const siblingScope = scopeById("com.huawei.celon.policyhub")!;
 const architectureScope = { applicationServiceId: scope.id, scopePath: scope.scopePath };
 const prefix = "test-governed-scan-v2";
-const releaseId = `${prefix}-release`;
+const releaseId = `${prefix}-release-${randomUUID()}`;
+const releaseVersion = `2.0.${Number.parseInt(randomUUID().slice(0, 8), 16)}`;
 const connectorId = `${prefix}-connector`;
 const designChangeSessionId = `${prefix}-design-change`;
 const snapshotDigest = "e".repeat(64);
@@ -132,7 +133,7 @@ function signedRelease(): { manifest: ScannerReleaseManifest; trustBundle: Recor
   const unsigned = {
     contractVersion: "2.0" as const,
     releaseId,
-    scannerVersion: "2.0.0-test",
+    scannerVersion: releaseVersion,
     platform: "windows-amd64",
     artifact: { uri: "file:///test/specforge.exe", sha256: "a".repeat(64), sizeBytes: 1024 },
     schemaVersions: ["2.0"],

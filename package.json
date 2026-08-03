@@ -22,6 +22,7 @@
     "scan:workspace": "tsx scripts/scan-workspace.ts",
     "scanner-contract:generate": "tsx scripts/generate-scan-contract.ts",
     "scanner-contract:check": "tsx scripts/generate-scan-contract.ts --check",
+    "legacy-baseline:verify": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-legacy-baseline.ps1",
     "design-context:close": "tsx scripts/design-context.ts close",
     "design-facts:federation:check": "tsx scripts/reconcile-federated-facts.ts",
     "graph-outbox:archive": "tsx scripts/archive-legacy-graph-outbox.ts",

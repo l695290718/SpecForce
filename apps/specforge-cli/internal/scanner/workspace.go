@@ -43,9 +43,12 @@ func Inventory(root string, maxSourceFileBytes int64) (InventoryResult, error) {
 			return nil
 		}
 		if entry.IsDir() {
-			if relative == ".git" || relative == ".specforge/scan-spool" || strings.HasPrefix(relative, ".specforge/scan-spool/") {
+			if relative == ".git" || relative == ".specforge" {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		if relative == ".specforge.yaml" {
 			return nil
 		}
 		if entry.Type()&os.ModeSymlink != 0 {
