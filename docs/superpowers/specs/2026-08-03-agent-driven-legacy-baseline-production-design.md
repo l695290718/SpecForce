@@ -2,7 +2,7 @@
 
 ## Status
 
-**Approved architectural direction A; written specification pending user review. No production-completion claim is made by this document.**
+**Approved for Phase 1 implementation planning on 2026-08-03. No production-completion claim is made by this document.**
 
 - Owning `architectureScope.applicationServiceId`: `com.huawei.celon.desiner`
 - Owning `architectureScope.scopePath`: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
@@ -284,7 +284,7 @@ Each slice updates its repository ADR, Proposal, Context Pack, contracts, relati
 
 ### 状态
 
-**已确认采用架构方向 A；本文档等待用户书面评审。本文档不声明生产实现已经完成。**
+**已于 2026-08-03 批准进入第一阶段实施规划；本文档不代表生产能力已经完成。**
 
 - 精确所属应用服务：`com.huawei.celon.desiner`
 - 精确 Scope 路径：`pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
