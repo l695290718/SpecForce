@@ -1,0 +1,3 @@
+service:
+  endpoint: http://localhost
+  api_key: do-not-leak-this-value

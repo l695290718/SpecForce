@@ -1,0 +1,10 @@
+model Order {
+  id         String @id
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+}
+
+model Customer {
+  id     String @id
+  orders Order[]
+}

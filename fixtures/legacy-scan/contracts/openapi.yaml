@@ -1,0 +1,11 @@
+openapi: 3.1.0
+info:
+  title: Order API
+  version: 1.0.0
+paths:
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      responses:
+        "200":
+          description: Found
