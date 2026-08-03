@@ -141,6 +141,11 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		}
 	case "verify-staged":
 		return verifyStaged(context.Background(), root, config, stdout, stderr)
+	case "scan":
+		if len(args) > 1 && args[1] == "status" {
+			return runScanStatus(root, args[2:], stdout)
+		}
+		return runLocalScan(context.Background(), root, config, args[1:], stdout)
 	case "status":
 		return doctor(context.Background(), root, config, stdout)
 	default:
@@ -149,7 +154,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 }
 
 func usageError() error {
-	return errors.New("usage: specforge login | hook install|uninstall|doctor | verify-staged | status")
+	return errors.New("usage: specforge login | hook install|uninstall|doctor | verify-staged | status | scan --release <file> --session <file> --trust <file> [--spool <dir>] [--artifact <file>] | scan status --session <file> [--spool <dir>]")
 }
 
 func repositoryRoot(ctx context.Context) (string, error) {
