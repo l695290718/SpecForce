@@ -14,6 +14,7 @@ import { generateKnowledgeCandidates } from "./knowledge/semantic-persistence";
 import { matchKnowledgeIdentities } from "./knowledge/identity-persistence";
 import { assembleKnowledgeReviewBundle, submitSemanticCandidateBatch } from "./knowledge/candidate-persistence";
 import { promoteKnowledgeCandidates, reconcileKnowledgeBaseline } from "./knowledge/promotion";
+import { deriveScopedKnowledgeProjection } from "./knowledge/projection";
 import {
   analyzeScopedProposalImpact,
   buildScopedAssetGraph,
@@ -630,6 +631,14 @@ export function registerTools(server: McpServer): void {
     permissions: ["knowledge:write"],
     readOnly: false
   }, createProjectionManifest);
+
+  registerJsonTool(server, "derive_3a_knowledge_projection", {
+    title: "Derive deterministic 3A knowledge projection",
+    description: "Reads one published Baseline and its accepted exact-Scope facts from PostgreSQL, then derives reproducible BIZ, SYS, TECH, alignment, drift, and pinned Context Pack output without creating authoritative facts.",
+    inputSchema: { architectureScope: architectureScopeSchema, baselineId: z.string().min(1), currentAssertionIds: z.array(z.string()).optional() },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, deriveScopedKnowledgeProjection);
 
   registerJsonTool(server, "list_knowledge_assertions", {
     title: "List knowledge assertions",

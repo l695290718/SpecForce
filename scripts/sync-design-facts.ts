@@ -521,7 +521,16 @@ function extractBoldLocalizedSections(markdown: string): Array<[string, string]>
 }
 
 function sectionValue(sections: Array<[string, string]>, aliases: string[], fallback: string, field: string): string {
-  const match = sections.find(([heading]) => aliases.includes(heading.trim().toLowerCase()));
+  const readableChineseAliases: Record<string, string[]> = {
+    context: ["背景"],
+    decision: ["决策"],
+    alternatives: ["备选方案"],
+    consequences: ["后果"],
+    constraints: ["约束"],
+    evidence: ["证据"]
+  };
+  const acceptedAliases = [...aliases, ...(readableChineseAliases[field] ?? [])].map((alias) => alias.toLowerCase());
+  const match = sections.find(([heading]) => acceptedAliases.includes(heading.trim().toLowerCase()));
   if (match?.[1].trim()) return match[1].trim();
   const fallbackText = localizedFallback(fallback);
   if (fallbackText) return fallbackText;

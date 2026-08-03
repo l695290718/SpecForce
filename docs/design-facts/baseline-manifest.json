@@ -764,6 +764,41 @@
                                        ]
                       },
                       {
+                          "id":  "adr-deterministic-3a-knowledge-projections",
+                          "repositoryAdr":  "docs/adr/0019-deterministic-3a-knowledge-projections.md",
+                          "mcpAdrId":  "adr-deterministic-3a-knowledge-projections",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-deterministic-3a-knowledge-projections",
+                          "contextPackId":  "context-pack-deterministic-3a-knowledge-projections",
+                          "relatedAssetIds":  [
+                                                  "data-specforge-assets",
+                                                  "data-specforge-asset-graph",
+                                                  "api-specforge-mcp-tools",
+                                                  "adr-unified-3a-knowledge-initialization"
+                                              ],
+                          "owner":  "SpecForge Architecture",
+                          "status":  "Deterministic Phase 2 projection increment implemented, locally verified, MCP synchronized, and read back",
+                          "reason":  "Deterministic BIZ, SYS, and TECH projections must remain rebuildable views over a published exact-Scope Baseline rather than a second authoring store.",
+                          "retryTrigger":  "Complete focused test execution in an environment that can load the Vitest configuration, then synchronize and read back the exact-Scope Proposal, Context Pack, Evidence, and typed links.",
+                          "evidence":  [
+                                           {
+                                               "command":  "pnpm --filter @specforge/core typecheck; pnpm --filter @specforge/mcp-server typecheck",
+                                               "result":  "Core projection and exact-Scope MCP derive operation typecheck successfully."
+                                           },
+                                           {
+                                               "command":  "Invoke-WebRequest -UseBasicParsing http://localhost:3000/",
+                                               "result":  "Development Web service returned HTTP 200."
+                                           },
+                                           {
+                                               "command":  "node .\\node_modules\\vitest\\vitest.mjs run --root . --exclude .worktrees/** --exclude .pnpm-store/** packages/core/src/__tests__/knowledge-projections.test.ts apps/mcp-server/src/tools.test.ts",
+                                               "result":  "Passed 2 files and 26 tests for deterministic projections and MCP tool registration."
+                                           }
+                                       ]
+                      },
+                      {
                           "id":  "adr-unified-3a-knowledge-initialization",
                           "repositoryAdr":  "docs/adr/0018-unified-3a-knowledge-initialization.md",
                           "mcpAdrId":  "adr-unified-3a-knowledge-initialization",

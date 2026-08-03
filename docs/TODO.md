@@ -28,7 +28,7 @@
 
 ### Implement unified 3A knowledge initialization
 
-**Status:** Phase 1 Baseline discovery runtime implemented, locally verified, MCP synchronized, and read back. Phases 2-5 remain pending.
+**Status:** Phase 1 Baseline discovery runtime implemented, locally verified, MCP synchronized, and read back. The deterministic Phase 2 3A projection increment is implemented, locally verified, MCP synchronized, and read back; Phases 3-5 remain pending.
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
@@ -39,6 +39,8 @@
 **Deferred:** Continuous inbound synchronization, live database/API-gateway/CMDB/runtime connectors, outbound proposals, external `APPLY`, automatic cross-Scope merging, production object storage, and complete billion-scale capacity certification.
 
 **Trigger:** Begin Phase 2 only after the Phase 1 MCP records and exact design-change session are converged, then review and approve a dedicated Phase 2 design and implementation plan.
+
+**Phase 2 implementation record:** `docs/adr/0019-deterministic-3a-knowledge-projections.md` and `docs/superpowers/plans/2026-08-03-deterministic-3a-projections.md`. The core projection contract and exact-Scope MCP derive operation now provide BIZ/SYS/TECH layers, explicit cross-layer alignment, Baseline drift, and a pinned Context Pack. Focused verification and MCP read-back passed; later connector, graph, CodeHub, and capacity phases remain pending.
 
 **Completion evidence:** Phase 1 requires signed-release verification, safe source-minimized extraction, exact checkpoint resume, bilingual semantic review, actor separation, atomic promotion, durable reconciliation, immutable Baseline publication, stable rescan IDs, sibling-Scope isolation, exact-Scope MCP synchronization, and read-back. Phase 2 retains the additional projection and pinned-context acceptance criteria.
 

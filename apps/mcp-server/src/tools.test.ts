@@ -57,6 +57,10 @@ const promotion = vi.hoisted(() => ({
   reconcileKnowledgeBaseline: vi.fn().mockResolvedValue({ id: "reconciliation-1", status: "CONVERGED" })
 }));
 
+const knowledgeProjection = vi.hoisted(() => ({
+  deriveScopedKnowledgeProjection: vi.fn().mockResolvedValue({ baselineId: "baseline-1", digest: "projection-digest" })
+}));
+
 const governedScanner = vi.hoisted(() => ({
   getScannerRelease: vi.fn().mockResolvedValue({ releaseId: "scanner-release-2.0.0" }),
   startKnowledgeScan: vi.fn().mockResolvedValue({ sessionId: "knowledge-scan-1" }),
@@ -73,6 +77,7 @@ vi.mock("./knowledge/semantic-persistence", () => ({ generateKnowledgeCandidates
 vi.mock("./knowledge/identity-persistence", () => ({ matchKnowledgeIdentities: scanner.matchKnowledgeIdentities }));
 vi.mock("./knowledge/candidate-persistence", () => semanticCandidates);
 vi.mock("./knowledge/promotion", () => promotion);
+vi.mock("./knowledge/projection", () => knowledgeProjection);
 vi.mock("./scanner/release", () => ({ getScannerRelease: governedScanner.getScannerRelease }));
 vi.mock("./scanner/session", () => ({
   startKnowledgeScan: governedScanner.startKnowledgeScan,
@@ -278,6 +283,26 @@ describe("scoped localized derived tools", () => {
 
     expect(result.isError).toBe(true);
     expect(persistence.upsertProposal).not.toHaveBeenCalled();
+  });
+});
+
+describe("deterministic 3A projection tool", () => {
+  it("registers as exact-Scope read-only derivation", async () => {
+    const tool = captureTools().get("derive_3a_knowledge_projection");
+    expect(tool).toBeDefined();
+    expect((tool!.config.annotations as { readOnlyHint?: boolean }).readOnlyHint).toBe(true);
+
+    const input = {
+      architectureScope: {
+        applicationServiceId: "com.huawei.celon.desiner",
+        scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+      },
+      baselineId: "baseline-1"
+    };
+    const result = await tool!.handler(input);
+
+    expect(result.isError).not.toBe(true);
+    expect(knowledgeProjection.deriveScopedKnowledgeProjection).toHaveBeenCalledWith(input);
   });
 });
 
