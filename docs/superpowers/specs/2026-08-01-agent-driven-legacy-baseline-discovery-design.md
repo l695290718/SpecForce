@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted design. Implementation has not started.
+**Superseded for production implementation by `2026-08-03-agent-driven-legacy-baseline-production-design.md`. Retained as the original approved discovery concept for traceability.**
 
 - Owning `architectureScope.applicationServiceId`: `com.huawei.celon.desiner`
 - Owning `architectureScope.scopePath`: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
@@ -195,7 +195,7 @@ Continuous CI observation, live database introspection, API gateway or CMDB conn
 
 ### 状态
 
-设计已接受，尚未开始实现。第一阶段仅交付由 Claude Code、OpenCode 等现有 Coding Agent 在项目目录中主动发起的存量基线扫描；持续 CI 同步、运行时连接器、出站提案和外部 `APPLY` 保持延期。
+本原始设计已被 `2026-08-03-agent-driven-legacy-baseline-production-design.md` 的生产实施设计取代，并保留用于追溯。新版设计继续采用 Claude Code、OpenCode 等现有 Coding Agent 在项目目录中主动发起存量基线扫描；持续 CI 同步、运行时连接器、出站提案和外部 `APPLY` 仍保持延期。
 
 ### 目标与边界
 
