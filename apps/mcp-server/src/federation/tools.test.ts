@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { contentDigest } from "@specforge/core";
+import { computeContinuousBatchIntegrity, contentDigest, CONTINUOUS_OBSERVATION_CONTRACT_VERSION } from "@specforge/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const federationPersistence = vi.hoisted(() => ({
@@ -9,6 +9,11 @@ const federationPersistence = vi.hoisted(() => ({
   createDesignChangeSession: vi.fn(),
   closeDesignChangeSession: vi.fn(),
   reconcilePersistedScope: vi.fn()
+}));
+
+const continuousPersistence = vi.hoisted(() => ({
+  submitContinuousObservationBatch: vi.fn(),
+  getContinuousObservationCursor: vi.fn()
 }));
 
 const persistence = vi.hoisted(() => ({
@@ -50,6 +55,7 @@ const scopedDerived = vi.hoisted(() => ({
 }));
 
 vi.mock("./persistence", () => federationPersistence);
+vi.mock("./continuous-persistence", () => continuousPersistence);
 vi.mock("../persistence", () => persistence);
 vi.mock("../scoped-derived", () => scopedDerived);
 
@@ -157,6 +163,8 @@ beforeEach(() => {
   federationPersistence.createDesignChangeSession.mockResolvedValue({ id: "session-1", architectureScope: designerScope });
   federationPersistence.closeDesignChangeSession.mockResolvedValue({ id: "session-1", status: "CONVERGED", architectureScope: designerScope });
   federationPersistence.reconcilePersistedScope.mockResolvedValue({ architectureScope: designerScope, root: "root-1", status: "CONVERGED", issues: [], factDigests: [] });
+  continuousPersistence.submitContinuousObservationBatch.mockResolvedValue({ status: "ACCEPTED", idempotent: false });
+  continuousPersistence.getContinuousObservationCursor.mockResolvedValue(null);
   persistence.listPersistedAssetLinks.mockResolvedValue([]);
   scopedDerived.loadScopedAssetCatalog.mockResolvedValue({
     proposals: [{ id: "proposal-1" }],
@@ -180,6 +188,8 @@ describe("federation MCP tools", () => {
     expect([...tools.keys()]).toEqual(expect.arrayContaining([
       "register_connector",
       "record_external_observation",
+      "submit_continuous_observation_batch",
+      "get_continuous_observation_cursor",
       "promote_candidate_fact",
       "create_design_change_session",
       "prepare_design_change",
@@ -316,6 +326,25 @@ describe("federation MCP tools", () => {
 
     expect(errorCode(await callTool("get_federated_sync_status", { architectureScope: designerScope }, parentOnly))).toBe("PERMISSION_DENIED");
     expect(errorCode(await callTool("register_connector", { ...connector, architectureScope: designerScope }, parentOnly))).toBe("PERMISSION_DENIED");
+  });
+
+  it("routes a hash-chained continuous observation batch through the scoped persistence boundary", async () => {
+    const input = {
+      contractVersion: CONTINUOUS_OBSERVATION_CONTRACT_VERSION,
+      architectureScope: designerScope,
+      connectorId: connector.id,
+      sourceNamespace: "github",
+      sequence: 0,
+      previousBatchDigest: null,
+      sourceCursor: "commit:1",
+      observedAt: "2026-08-03T10:00:00.000Z",
+      observations: [{ id: "api-1", externalAssetType: "api", externalId: "payments", payload: { method: "GET" }, sourceVersion: "commit-1" }],
+      coverage: { complete: true }
+    };
+    const integrity = computeContinuousBatchIntegrity(input);
+    const result = await callTool("submit_continuous_observation_batch", { ...input, ...integrity });
+    expect(result.isError).toBeUndefined();
+    expect(continuousPersistence.submitContinuousObservationBatch).toHaveBeenCalledWith({ architectureScope: designerScope, batch: { ...input, ...integrity } });
   });
 
   it("accepts promotion only through the candidate identifier and exact Scope", async () => {

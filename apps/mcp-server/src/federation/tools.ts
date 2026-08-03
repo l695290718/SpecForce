@@ -14,6 +14,7 @@ import {
   registerConnector,
   type PromoteCandidateInput
 } from "./persistence";
+import { getContinuousObservationCursor, submitContinuousObservationBatch } from "./continuous-persistence";
 import { issueChangeAttestation } from "./attestation";
 
 const architectureScopeSchema = z.object({
@@ -71,6 +72,16 @@ const stableErrorCodes = new Set([
   "CONNECTOR_NOT_FOUND",
   "CONNECTOR_NOT_ACTIVE",
   "CONNECTOR_CAPABILITY_MISSING",
+  "OBSERVATION_BATCH_CONTRACT_MISMATCH",
+  "OBSERVATION_BATCH_CONTRACT_UNSUPPORTED",
+  "OBSERVATION_BATCH_BUDGET_EXCEEDED",
+  "OBSERVATION_BATCH_CHAIN_MISMATCH",
+  "OBSERVATION_BATCH_DIGEST_MISMATCH",
+  "OBSERVATION_BATCH_DUPLICATE_IDENTITY",
+  "OBSERVATION_BATCH_INPUT_INVALID",
+  "OBSERVATION_BATCH_SEQUENCE_CONFLICT",
+  "OBSERVATION_BATCH_SEQUENCE_GAP",
+  "OBSERVATION_IDENTITY_CONFLICT",
   "DELIVERY_BLOCKED",
   "DESIGN_CHANGE_SESSION_SCOPE_MISMATCH",
   "DESIGN_CHANGE_SESSION_EVIDENCE_REQUIRED",
@@ -125,6 +136,16 @@ function safeClientMessage(code: string): string {
     DESIGN_CONTEXT_RECONCILIATION_BLOCKED: "The requested Scope has a blocked design reconciliation state.",
     CONNECTOR_NOT_ACTIVE: "The federation connector is not active.",
     CONNECTOR_CAPABILITY_MISSING: "The federation connector does not support observation.",
+    OBSERVATION_BATCH_CONTRACT_MISMATCH: "The observation stream contract does not match its persisted cursor.",
+    OBSERVATION_BATCH_CONTRACT_UNSUPPORTED: "The observation stream contract is not supported.",
+    OBSERVATION_BATCH_BUDGET_EXCEEDED: "The observation batch exceeds the bounded delivery budget.",
+    OBSERVATION_BATCH_CHAIN_MISMATCH: "The observation batch is not linked to the last accepted batch.",
+    OBSERVATION_BATCH_DIGEST_MISMATCH: "The observation batch digest does not match its content.",
+    OBSERVATION_BATCH_DUPLICATE_IDENTITY: "The observation batch contains duplicate external identities.",
+    OBSERVATION_BATCH_INPUT_INVALID: "The observation batch input is invalid.",
+    OBSERVATION_BATCH_SEQUENCE_CONFLICT: "The observation sequence was already accepted with different content.",
+    OBSERVATION_BATCH_SEQUENCE_GAP: "The observation batch sequence is not the next expected sequence.",
+    OBSERVATION_IDENTITY_CONFLICT: "The observation external identity already exists with a different batch.",
     FEDERATION_TOOL_ERROR: "The federation tool request could not be completed.",
     IDENTITY_CONFLICT: "The requested fact has an identity conflict.",
     LOCALIZATION_INCOMPLETE: "The requested fact has incomplete localization.",
@@ -631,6 +652,52 @@ export function registerFederationTools(server: McpServer): void {
       session
     };
   });
+
+  registerFederationJsonTool(server, "submit_continuous_observation_batch", {
+    title: "Submit continuous observation batch",
+    description: "Accepts one hash-chained, bounded, exact-Scope observation batch from an authorized connector and persists its cursor and delivery receipt.",
+    inputSchema: {
+      connectorId: z.string().min(1),
+      sourceNamespace: z.string().min(1),
+      contractVersion: z.literal("continuous-observation/v1"),
+      sequence: z.number().int().min(0),
+      previousBatchDigest: z.string().min(1).nullable(),
+      sourceCursor: z.string().min(1).nullable(),
+      observedAt: z.string().datetime(),
+      coverage: z.record(z.unknown()).default({}),
+      observations: z.array(z.object({
+        id: z.string().min(1),
+        externalAssetType: z.string().min(1),
+        externalId: z.string().min(1),
+        payload: z.record(z.unknown()),
+        sourceVersion: z.string().min(1),
+        observedAt: z.string().datetime().optional()
+      })).max(500),
+      payloadDigest: z.string().length(64),
+      batchDigest: z.string().length(64),
+      architectureScope: architectureScopeSchema
+    },
+    permissions: ["asset:write"],
+    readOnly: false
+  }, async (input, caller) => {
+    const architectureScope = assertWritableExactScope(input.architectureScope, caller);
+    return submitContinuousObservationBatch({
+      architectureScope,
+      batch: { ...input, architectureScope }
+    });
+  });
+
+  registerFederationJsonTool(server, "get_continuous_observation_cursor", {
+    title: "Get continuous observation cursor",
+    description: "Returns the last accepted continuous observation checkpoint for one exact architecture Scope.",
+    inputSchema: {
+      connectorId: z.string().min(1),
+      sourceNamespace: z.string().min(1),
+      architectureScope: architectureScopeSchema
+    },
+    permissions: ["asset:read"],
+    readOnly: true
+  }, async (input, caller) => getContinuousObservationCursor(assertReadableExactScope(input.architectureScope, caller), input.connectorId, input.sourceNamespace));
 
   registerFederationJsonTool(server, "close_design_change_session", {
     title: "Close design change session",

@@ -351,7 +351,7 @@ function federationEventKey(eventType: string, scope: ArchitectureScopeRef, subj
   return `${eventType}:${contentDigest({ architectureScope: scope, subjectId })}`;
 }
 
-async function createOutbox(client: Pick<FederationTransaction, "federationOutbox" | "designChangeSession"> | typeof prisma, input: AppendFederationOutboxInput): Promise<FederationOutboxRecord> {
+export async function createOutbox(client: Pick<FederationTransaction, "federationOutbox" | "designChangeSession"> | typeof prisma, input: AppendFederationOutboxInput): Promise<FederationOutboxRecord> {
   const scope = input.architectureScope;
   if (input.designChangeSessionId) {
     const session = await client.designChangeSession.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.designChangeSessionId } } });

@@ -179,6 +179,48 @@ model ConnectorInstance {
   @@index([applicationServiceId, scopePath, status], map: "ConnectorInstance_scope_status_idx")
 }
 
+model FederationObservationCursor {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  connectorId          String
+  sourceNamespace      String
+  contractVersion      String
+  acceptedSequence     Int      @default(-1)
+  acceptedBatchDigest  String?
+  sourceCursor         String?
+  status               String
+  lastObservedAt       DateTime?
+  lastError            String?
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, connectorId, sourceNamespace], map: "FederationObservationCursor_scope_connector_namespace_key")
+  @@index([applicationServiceId, scopePath, status], map: "FederationObservationCursor_scope_status_idx")
+}
+
+model FederationObservationBatch {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  connectorId          String
+  sourceNamespace      String
+  sequence             Int
+  previousBatchDigest  String?
+  batchDigest          String
+  payloadDigest        String
+  observationCount     Int
+  canonicalBytes       Int
+  status               String
+  acceptanceReceipt    Json     @default("{}") @db.JsonB
+  applicationServiceId String
+  scopePath            String
+  acceptedAt           DateTime @default(now())
+  createdAt            DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, connectorId, sourceNamespace, sequence], map: "FederationObservationBatch_scope_sequence_key")
+  @@unique([applicationServiceId, scopePath, connectorId, sourceNamespace, batchDigest], map: "FederationObservationBatch_scope_digest_key")
+  @@index([applicationServiceId, scopePath, connectorId, sourceNamespace, acceptedAt], map: "FederationObservationBatch_scope_connector_accepted_idx")
+}
+
 model SourceObservation {
   dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   id                   String

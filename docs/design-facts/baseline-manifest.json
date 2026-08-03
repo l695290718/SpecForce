@@ -799,6 +799,58 @@
                                        ]
                       },
                       {
+                          "id":  "adr-continuous-observation-governance",
+                          "repositoryAdr":  "docs/adr/0020-continuous-observation-governance.md",
+                          "mcpAdrId":  "adr-continuous-observation-governance",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-continuous-observation-governance",
+                          "contextPackId":  "context-pack-continuous-observation-governance",
+                          "relatedAssetIds":  [
+                                                  "data-specforge-assets",
+                                                  "api-specforge-mcp-tools",
+                                                  "data-specforge-asset-graph"
+                                              ],
+                          "owner":  "SpecForge Architecture and Agent Integration",
+                          "status":  "Phase 3 continuous-observation governance core implemented and locally verified; concrete live adapters remain deferred",
+                          "reason":  "Continuous observation needs durable exact-Scope sequencing and recovery before concrete external adapters can safely deliver observations.",
+                          "retryTrigger":  "After any concrete adapter or external APPLY design is approved, create a separate ADR, contract, evidence set, and exact-Scope synchronization record.",
+                          "evidence":  [
+                                           {
+                                               "command":  "pnpm db:generate; pnpm db:push",
+                                               "result":  "Prisma Client generated and specforge_canonical at localhost:15433 is in sync with the cursor and batch schema."
+                                           },
+                                           {
+                                               "command":  "pnpm --filter @specforge/core typecheck; pnpm --filter @specforge/mcp-server typecheck",
+                                               "result":  "Core continuous-observation contract and MCP persistence typecheck successfully."
+                                           },
+                                           {
+                                               "command":  "node .\\node_modules\\vitest\\vitest.mjs run --root . --exclude .worktrees/** --exclude .pnpm-store/** packages/core/src/__tests__/continuous-observation.test.ts apps/mcp-server/src/federation/tools.test.ts",
+                                               "result":  "Passed 2 files and 41 tests for batch integrity, sequence rules, duplicate identity rejection, and MCP registration."
+                                           },
+                                           {
+                                               "command":  "$env:DATABASE_URL=(Get-Content .env | Where-Object { $_ -match '^DATABASE_URL=' } | Select-Object -First 1).Substring(14).Trim('\\\"'); $env:SPECFORGE_CONTINUOUS_INTEGRATION='1'; node .\\node_modules\\vitest\\vitest.mjs run --root . --exclude .worktrees/** --exclude .pnpm-store/** apps/mcp-server/src/federation/continuous-persistence.integration.test.ts",
+                                               "result":  "Passed the real PostgreSQL transaction test for first acceptance, idempotent retry, cursor read-back, sequence-gap rejection, and cleanup."
+                                           },
+                                           {
+                                               "command":  "Invoke-WebRequest -UseBasicParsing http://localhost:3000/",
+                                               "result":  "Development Web service returned HTTP 200."
+                                           }
+                                       ],
+                          "localizedContent":  {
+                                                   "en":  {
+                                                              "decision":  "Persist hash-chained continuous observation batches and exact-Scope cursors in PostgreSQL before any candidate promotion."
+                                                          },
+                                                   "zh":  {
+                                                              "decision":  "在任何候选提升之前，通过 PostgreSQL 持久化哈希链持续观测批次和精确 Scope 游标。"
+                                                          }
+                                               },
+                          "managedAssets":  [],
+                          "managedRelationships":  []
+                      },
+                      {
                           "id":  "adr-unified-3a-knowledge-initialization",
                           "repositoryAdr":  "docs/adr/0018-unified-3a-knowledge-initialization.md",
                           "mcpAdrId":  "adr-unified-3a-knowledge-initialization",

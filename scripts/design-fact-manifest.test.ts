@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(16);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(16);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(16);
+  expect(manifest.decisions).toHaveLength(18);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(18);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(18);
   const proposalByContextPack = new Map<string, string>();
 
   for (const decision of manifest.decisions) {

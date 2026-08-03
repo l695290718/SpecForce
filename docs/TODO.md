@@ -28,19 +28,23 @@
 
 ### Implement unified 3A knowledge initialization
 
-**Status:** Phase 1 Baseline discovery runtime implemented, locally verified, MCP synchronized, and read back. The deterministic Phase 2 3A projection increment is implemented, locally verified, MCP synchronized, and read back; Phases 3-5 remain pending.
+**Status:** Phase 1 Baseline discovery runtime and Phase 2 deterministic 3A projections are implemented, locally verified, MCP synchronized, and read back. The Phase 3 continuous-observation governance-core increment is implemented and locally verified; concrete live adapters and Phases 4-5 remain pending.
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
 **Rationale:** Existing enterprise application services need a low-friction baseline path that reuses Claude Code, OpenCode, and compatible coding Agents. ADR-0015 defines the local-Agent discovery boundary. ADR-0018 extends it with a generic 3A ontology, multiple evidence-backed assertions per semantic identity, configurable organization and analysis profiles, atomic ChangeSets, immutable Baselines, and derived Knowledge Layers.
 
-**Delivery increments:** Phase 1 delivers signed native scanning, resumable MCP ingestion, semantic review, atomic promotion, reconciliation, and immutable Baseline publication. Phase 2 delivers deterministic 3A projections. Phase 3 expands continuous observation and live connectors. Phase 4 adds CodeHub/CI enforcement. Phase 5 covers enterprise profile migration, object storage, graph projection, and billion-scale certification.
+**Delivery increments:** Phase 1 delivers signed native scanning, resumable MCP ingestion, semantic review, atomic promotion, reconciliation, and immutable Baseline publication. Phase 2 delivers deterministic 3A projections. Phase 3 now delivers the provider-neutral continuous-observation receiving boundary, durable PostgreSQL cursors, hash-chained batch receipts, exact-Scope MCP authorization, and idempotent candidate observation persistence; concrete live connectors remain a follow-up. Phase 4 adds CodeHub/CI enforcement. Phase 5 covers enterprise profile migration, object storage, graph projection, and billion-scale certification.
 
-**Deferred:** Continuous inbound synchronization, live database/API-gateway/CMDB/runtime connectors, outbound proposals, external `APPLY`, automatic cross-Scope merging, production object storage, and complete billion-scale capacity certification.
+**Deferred:** Concrete live database/API-gateway/CMDB/runtime adapters, polling/webhook workers, automatic candidate promotion, outbound proposals, external `APPLY`, automatic cross-Scope merging, production object storage, and complete billion-scale capacity certification.
 
 **Trigger:** Begin Phase 2 only after the Phase 1 MCP records and exact design-change session are converged, then review and approve a dedicated Phase 2 design and implementation plan.
 
 **Phase 2 implementation record:** `docs/adr/0019-deterministic-3a-knowledge-projections.md` and `docs/superpowers/plans/2026-08-03-deterministic-3a-projections.md`. The core projection contract and exact-Scope MCP derive operation now provide BIZ/SYS/TECH layers, explicit cross-layer alignment, Baseline drift, and a pinned Context Pack. Focused verification and MCP read-back passed; later connector, graph, CodeHub, and capacity phases remain pending.
+
+**Phase 3 implementation record:** `docs/adr/0020-continuous-observation-governance.md` and `docs/superpowers/plans/2026-08-03-continuous-observation-governance.md`. The exact-Scope MCP receiving boundary now validates bounded hash-chained batches, persists durable PostgreSQL cursors and batch receipts, stores accepted observations as candidates, and emits the transactional federation outbox event. Concrete external adapters, live polling/webhooks, promotion automation, and external `APPLY` remain pending.
+
+**Phase 3 evidence:** `pnpm db:push` synchronized the cursor and batch schema to Docker PostgreSQL at `localhost:15433`; the focused core/MCP suites passed 41 tests; the gated real PostgreSQL transaction suite passed first acceptance, identical retry, cursor read-back, sequence-gap rejection, and cleanup; the Web service returned HTTP 200.
 
 **Completion evidence:** Phase 1 requires signed-release verification, safe source-minimized extraction, exact checkpoint resume, bilingual semantic review, actor separation, atomic promotion, durable reconciliation, immutable Baseline publication, stable rescan IDs, sibling-Scope isolation, exact-Scope MCP synchronization, and read-back. Phase 2 retains the additional projection and pinned-context acceptance criteria.
 
