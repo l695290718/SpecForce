@@ -4,6 +4,7 @@ import {
   deletePersistedDesignData,
   getPersistedAsset,
   prisma,
+  readableScope,
   renderPersistedAssetAsMarkdown,
   resolveWritableScope,
   searchPersistedDesignAssets,
@@ -217,6 +218,20 @@ describe("resolveWritableScope", () => {
 
     await withRequestPrincipal(principal, async () => {
       expect(writableActor()).toMatchObject({ actorId: "request-agent", subject: "request-agent", tenantId: "tenant-1" });
+    });
+  });
+
+  it("does not inherit a parent Scope grant for a normalized principal", async () => {
+    const principal = principalFromAuthInfo({
+      clientId: "parent-client",
+      tenantId: "tenant-1",
+      scopes: ["asset:read", "asset:write"],
+      extra: { actor: { actorType: "agent", actorId: "parent-agent", grants: [{ scopeId: "module-celon-designer", action: "read" }, { scopeId: "module-celon-designer", action: "write" }] } }
+    });
+
+    await withRequestPrincipal(principal, async () => {
+      expect(() => resolveWritableScope(writableActor(), writableScope)).toThrow("SCOPE_ACCESS_DENIED");
+      expect(() => readableScope(writableScope.applicationServiceId)).toThrow("SCOPE_ACCESS_DENIED");
     });
   });
 

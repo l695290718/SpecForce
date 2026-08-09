@@ -1,6 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { assertWritableApplicationService, assetLabel, defaultHuaweiActor, hasScopeAccess, huaweiArchitectureScopes, localizeAsset, normalizeAssetType, relationshipOntology, scopeById, seedHuaweiActor, validateAssetLocalization } from "@specforge/core";
-import type { ArchitectureScopeRef, Asset, AssetLocale, AssetType, ContextPack, Proposal, RelationshipCode, ScopedActor } from "@specforge/core";
+import { assertWritableApplicationService, assetLabel, authorizePrincipalScope, defaultHuaweiActor, hasScopeAccess, huaweiArchitectureScopes, localizeAsset, normalizeAssetType, relationshipOntology, scopeById, seedHuaweiActor, validateAssetLocalization } from "@specforge/core";
+import type { ArchitectureScopeRef, Asset, AssetLocale, AssetType, ContextPack, Proposal, RelationshipCode, ScopedActor, ScopedPrincipal } from "@specforge/core";
 import { createHash } from "node:crypto";
 import { createTrustedRelationshipExecutionContext, RelationshipCommandService, type DeleteLegacyRelationshipCommand, type UpsertRelationshipCommand } from "./relationships/command-service";
 import { PrismaRelationshipRepository, type RelationshipScope } from "./relationships/repository";
@@ -56,6 +56,7 @@ export function resolveWritableScope(actor: ScopedActor, scope: ArchitectureScop
   if (!scope) throw new Error("Architecture scope is required.");
   const applicationService = scopeById(scope.applicationServiceId);
   if (!applicationService || applicationService.scopePath !== scope.scopePath) throw new Error("Scope write is not authorized.");
+  if (isScopedPrincipal(actor)) return authorizePrincipalScope(actor, scope, "write");
   return assertWritableApplicationService(actor, applicationService);
 }
 
@@ -72,8 +73,14 @@ export function isSeedMode(): boolean {
 export function readableScope(applicationServiceId: string): ArchitectureScopeRef {
   const scope = scopeById(applicationServiceId);
   const actor = currentRequestPrincipal() ?? defaultHuaweiActor;
-  if (!scope || scope.level !== "applicationService" || !hasScopeAccess(actor, scope, "read")) throw new Error("Scope read is not authorized.");
+  if (!scope || scope.level !== "applicationService") throw new Error("Scope read is not authorized.");
+  if (isScopedPrincipal(actor)) return authorizePrincipalScope(actor, { applicationServiceId: scope.id, scopePath: scope.scopePath }, "read");
+  if (!hasScopeAccess(actor, scope, "read")) throw new Error("Scope read is not authorized.");
   return { applicationServiceId: scope.id, scopePath: scope.scopePath };
+}
+
+function isScopedPrincipal(actor: ScopedActor): actor is ScopedPrincipal {
+  return "subject" in actor && "tenantId" in actor && "permissions" in actor && "decisionRef" in actor;
 }
 
 export async function ensureArchitectureScopes() {
