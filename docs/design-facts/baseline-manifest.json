@@ -481,7 +481,7 @@
                                            },
                                            {
                                                "command":  "pnpm design-facts:sync; pnpm design-facts:check; pnpm design-context:close",
-                                               "result":  "MCP sync for adr-parallel-governance-workstreams completed; design-facts:check verified all 19 decisions with empty missing, mismatched, outOfScope, and blocked lists; exact Designer federation check returned blocking:false. Session close remains the final gate."
+                                               "result":  "MCP sync for adr-parallel-governance-workstreams completed; design-facts:check verified all 19 decisions with empty missing, mismatched, outOfScope, and blocked lists; exact Designer federation check returned blocking:false; design-change-session:81cc9275-ce22-417b-a467-57c5b07be6bb closed CONVERGED."
                                            }
                                        ]
                       },

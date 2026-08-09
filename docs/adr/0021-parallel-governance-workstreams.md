@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted; implementation, focused local verification, MCP synchronization, and read-back are complete. Design-change-session closure is the final gate.**
+**Accepted; implementation, focused local verification, MCP synchronization, read-back, and exact-Scope design-change-session closure are complete.**
 
 - Stable ID: `adr-parallel-governance-workstreams`
 - Owning application service: `com.huawei.celon.desiner`
@@ -66,13 +66,13 @@ Repository records distinguish implemented local governance contracts from defer
 - `SPECFORGE_DESIGN_FACT_IDS=adr-parallel-governance-workstreams pnpm design-facts:sync` persisted the ADR, Proposal, Context Pack, Evidence, and typed links in the exact Designer Scope.
 - `pnpm design-facts:check` verified all 19 ADR decisions with empty `missing`, `mismatched`, `outOfScope`, and `blocked` lists.
 - `$env:SPECFORGE_APPLICATION_SERVICE_ID='com.huawei.celon.desiner'; $env:SPECFORGE_SCOPE_PATH='pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner'; pnpm design-facts:federation:check` returned `blocking:false` with empty issue counts for the canonical full Scope path.
-- `pnpm design-context:close` is the final required command for `design-change-session:81cc9275-ce22-417b-a467-57c5b07be6bb`.
+- `pnpm design-context:close -- --session design-change-session:81cc9275-ce22-417b-a467-57c5b07be6bb --status CONVERGED --evidence "core-typecheck=PASS,mcp-typecheck=PASS,focused-tests=5-files-61-tests,go-tests=PASS,manifest-check=PASS,design-facts-check=19-verified,federation-check=blocking-false"` returned the same exact Scope with status `CONVERGED`.
 
 ## Chinese Localization
 
 ### 状态
 
-**已接受；代码实现、针对性本地验证、MCP 同步和回读已完成，设计变更会话关闭是最后一道门禁。**
+**已接受；代码实现、针对性本地验证、MCP 同步、回读和精确 Scope 设计变更会话关闭均已完成。**
 
 ### 背景
 
