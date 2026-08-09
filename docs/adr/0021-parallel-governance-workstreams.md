@@ -10,6 +10,7 @@
 - Design Change Session: `design-change-session:81cc9275-ce22-417b-a467-57c5b07be6bb`
 - Follow-up Design Change Session: `design-change-session:9f97d614-52e2-479c-9699-c8a3220853c2`
 - Exact-Scope follow-up: `design-change-session:c4b5a809-d486-4a91-a3fb-d3b47788b3ad`
+- Status-reconciliation follow-up: `design-change-session:e013fbc4-e852-48b5-9b46-cb2f4753aea8`
 
 ## Context
 
@@ -75,6 +76,9 @@ Repository records distinguish implemented local governance contracts from defer
 - Exact-Scope follow-up preflight `design-change-session:c4b5a809-d486-4a91-a3fb-d3b47788b3ad` read 165 assets before tightening normalized-principal persistence reads and writes to exact application-service grants.
 - `pnpm --filter @specforge/mcp-server typecheck; pnpm --filter @specforge/mcp-server exec vitest run src/auth.test.ts src/persistence.test.ts src/federation/tools.test.ts` passed 3 files and 75 tests, including parent-Scope denial.
 - `pnpm design-context:close -- --session design-change-session:c4b5a809-d486-4a91-a3fb-d3b47788b3ad --status CONVERGED --evidence "mcp-typecheck=PASS,exact-scope-tests=3-files-75-tests,design-facts-check=19-verified,federation-check=blocking-false"` returned the exact Designer Scope with status `CONVERGED`.
+- Status-reconciliation preflight `design-change-session:e013fbc4-e852-48b5-9b46-cb2f4753aea8` read 165 exact-Scope assets before correcting stale backlog, ADR, manifest, and implementation-plan status records.
+- `node .\node_modules\vitest\vitest.mjs run scripts/design-fact-manifest.test.ts` passed 13 discovered files and 55 tests, including the root manifest's 10 tests; three affected MCP decisions synchronized as `complete`, all 19 decisions read back without issues, and exact-Scope federation reconciliation returned `blocking:false`.
+- `pnpm design-context:close -- --session design-change-session:e013fbc4-e852-48b5-9b46-cb2f4753aea8 --status CONVERGED --evidence "manifest-tests=13-files-55-tests,selected-design-facts-sync=3-complete,design-facts-check=19-verified,federation-check=blocking-false,diff-check=PASS"` returned the exact Designer Scope with status `CONVERGED`.
 
 ## Chinese Localization
 

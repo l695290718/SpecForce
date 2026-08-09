@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted; the Phase 3 governance-core increment is implemented and locally verified.**
+**Accepted; the Phase 3 governance-core increment is implemented, locally verified, MCP synchronized, and read back in the exact owning Scope.**
 
 - Stable ID: `adr-continuous-observation-governance`
 - Owning application service: `com.huawei.celon.desiner`
@@ -67,13 +67,13 @@ The increment does not execute connectors, fetch external systems, promote candi
 - Matching Proposal: `proposal-continuous-observation-governance`
 - Matching Context Pack: `context-pack-continuous-observation-governance`
 - Required typed links: Proposal `IMPLEMENTS_DECISION` ADR; Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal; Evidence `VALIDATES` ADR; ADR `DECIDES` MCP tools and observation storage.
-- MCP status: pending the synchronized closure step for this implementation.
+- MCP status: synchronized and read back. The latest full reconciliation verified all 19 decisions with empty missing, mismatched, out-of-scope, and blocked lists; the exact Designer federation check returned `blocking:false`.
 
 ## Chinese Localization
 
 ### 状态
 
-已接受；第三阶段治理核心增量已实现并完成本地验证。
+已接受；第三阶段治理核心增量已实现、完成本地验证，并已在精确所属 Scope 中通过 MCP 同步和回读。
 
 ### 背景
 
@@ -113,6 +113,12 @@ The increment does not execute connectors, fetch external systems, promote candi
 - `pnpm db:generate` 成功生成新增游标和批次模型的 Prisma Client。
 - `pnpm db:push` 成功将 `specforge_canonical@localhost:15433` 同步到 Prisma Schema。
 - Core、MCP Server 类型检查通过；阶段三聚焦测试通过 2 个文件、41 项测试；Web 服务返回 HTTP 200。
+
+### MCP 记录
+
+- 匹配 MCP ADR ID：`adr-continuous-observation-governance`。
+- 精确所属 Scope：`com.huawei.celon.desiner` / `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`。
+- 最新完整对账已核验全部 19 项决策，缺失、不匹配、越界和阻塞列表均为空；精确 Designer Scope 联邦检查返回 `blocking:false`。
 
 ## References
 

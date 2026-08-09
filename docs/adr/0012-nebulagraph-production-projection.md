@@ -2,14 +2,14 @@
 
 ## Status
 
-**Accepted; repository implementation and live component health verification completed, end-to-end authoritative projection and MCP synchronization blocked.**
+**Accepted; repository implementation, live component health verification, and exact-Scope MCP synchronization/read-back are complete. End-to-end authoritative outbox projection evidence remains deferred.**
 
 - Stable ADR/MCP ID: `adr-nebulagraph-production-projection`
 - Owning `architectureScope.applicationServiceId`: `com.huawei.celon.desiner`
 - Owning `architectureScope.scopePath`: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - Repository implementation: Gateway contract, official NebulaGraph Go client adapter, PostgreSQL outbox projector, Nebula Gateway GraphStore adapter, explicit runtime selection, local Compose profile, and cross-adapter isolation tests are committed.
 - Operational verification: the local Compose profile has a healthy PostgreSQL, Nebula Meta, Storage, Graphd, Gateway, and Projector. Gateway v3 client authentication, typed idempotent projection, scoped traversal, and full edge mapping were exercised against NebulaGraph 3.8.0. The authoritative outbox and checkpoint tables are currently empty, so this is not end-to-end outbox evidence.
-- Design-fact synchronization: **MCP synchronization blocked.** The configured Docker PostgreSQL authority at `localhost:5433` is not reachable from the MCP stdio client. A responding PostgreSQL listener at `localhost:5432` is not the elected `5433` authority and was deliberately not used for writes.
+- Design-fact synchronization: **Complete.** The canonical Docker PostgreSQL authority is reached through `localhost:15433/specforge_canonical`; the matching ADR, Proposal, Context Pack, typed links, and Evidence have been synchronized and read back in the exact Designer Scope. This record does not claim the still-missing end-to-end outbox projection evidence.
 
 ## Context
 
@@ -97,20 +97,20 @@ Fresh repository-only checks on 2026-07-27:
 - `powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -ConfigurationOnly` — passed the Compose topology assertions; Docker emitted non-fatal access warnings for the user-level Docker config file.
 - `pnpm --filter @specforge/graph-store test` — did not complete in this isolated worktree because pnpm attempted restricted registry access for missing workspace dependency links. The direct local Vitest run above is the successful test evidence for this repository-only pass.
 
-## Completion Blockers
+## Historical Blockers and Remaining Projection Gate
 
-- **Authoritative outbox evidence blocked:** the live private PostgreSQL query returned zero `RelationshipOutbox` rows and zero `ProjectionCheckpoint` rows. Therefore no MCP-authored relationship has drained through the Projector, and checkpoint, restart, or duplicate-edge claims cannot be made. Owner: SpecForge Runtime. Retry trigger: make the elected PostgreSQL authority reachable to the scoped MCP client, author one exact-Designer-scope relationship through MCP, then retain the outbox, checkpoint, traversal, and Projector-restart results.
-- **MCP synchronization blocked:** `localhost:5433/specforge` is the elected Docker PostgreSQL authority but is unreachable from the host MCP stdio client. The private graph-profile database has no host port by design, and `localhost:5432` was not substituted. Owner: SpecForge Architecture. Retry trigger: restore the elected `5433` authority or provide an approved MCP runtime on the private Compose network, then run `pnpm design-facts:sync`, `pnpm design-facts:check`, and the exact-scope federation check and read back IDs, scope, English canonical fields, Chinese overlays, directional links, and evidence.
+- **Authoritative outbox evidence deferred:** the live private PostgreSQL query returned zero `RelationshipOutbox` rows and zero `ProjectionCheckpoint` rows. Therefore no MCP-authored relationship has drained through the Projector, and checkpoint, restart, or duplicate-edge claims cannot be made. Owner: SpecForge Runtime. Retry trigger: when graph projection work resumes, author one exact-Designer-scope relationship through the canonical PostgreSQL authority, then retain the outbox, checkpoint, traversal, and Projector-restart results.
+- **Historical MCP synchronization blocker, resolved:** the former `localhost:5433/specforge` path was replaced by the canonical `localhost:15433/specforge_canonical` authority tunnel. MCP synchronization, full read-back, and exact-Scope federation reconciliation now pass. This resolved blocker is retained only as incident history.
 
-The fresh 2026-07-28 synchronization attempt used `DATABASE_URL=postgresql://admin:admin@localhost:5433/specforge?schema=public pnpm design-facts:sync`. The MCP stdio client reached `create_adr` and failed with Prisma `P1001` because `localhost:5433` is unreachable. No ADR, Proposal, Context Pack, asset, link, Evidence, or receipt was persisted by that attempt.
+The 2026-07-28 synchronization attempt against `localhost:5433/specforge` failed with Prisma `P1001`. The later canonical PostgreSQL cutover and synchronization closure below supersede that historical failure.
 
 ## MCP Record
 
-- Expected MCP ADR ID: `adr-nebulagraph-production-projection`
+- MCP ADR ID: `adr-nebulagraph-production-projection`
 - Exact owning `architectureScope`: `applicationServiceId=com.huawei.celon.desiner`; `scopePath=pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - Required matching records: Proposal, Context Pack, Gateway API, Projector service, deployment topology, outbox/checkpoint data model, operational rules, typed links, and Evidence.
-- Persisted/read-back status: none in this repository-only task.
-- **MCP synchronization blocked** as described in `Completion Blockers`; the active failure is the unreachable elected `localhost:5433` authority, not a missing MCP contract.
+- Persisted/read-back status: complete in the exact Designer Scope through the canonical PostgreSQL authority.
+- Latest reconciliation: all 19 manifest decisions verified with empty issue lists; exact-Scope federation reconciliation returned `blocking:false`.
 
 ## Canonical PostgreSQL Cutover Amendment (2026-07-30)
 
@@ -161,7 +161,7 @@ Evidence:
 - The Gateway image built from the updated `go.mod` and `go.sum`; Docker resolved the v3 module dependencies during `go mod download`.
 - Against the local NebulaGraph 3.8.0 Compose network, the v3 client authenticated and executed `SHOW HOSTS`, and the rebuilt Gateway remained `healthy` without the Thrift type error.
 - The broader opt-in two-hop compatibility test still returned `NEBULA_QUERY_FAILED` during projection. Local diagnostics also found pre-existing cluster initialization state (`Host not enough!` before storaged registration). Therefore end-to-end projection completion remains blocked and is not claimed by this amendment.
-- MCP synchronization remains blocked because no SpecForge MCP write tool is exposed in this execution context. Retry trigger: expose the scoped MCP write surface, persist this amendment under `adr-nebulagraph-production-projection`, and read it back in the exact Designer scope.
+- The lack of an MCP write surface was a historical execution-context limitation. The later synchronization closure supersedes it; the protocol compatibility failure remains a separate projection-runtime concern.
 
 ## 协议兼容性补充（2026-07-28）
 
@@ -182,14 +182,14 @@ Gateway 现已升级到官方模块 `github.com/vesoft-inc/nebula-go/v3 v3.8.0`�
 
 ### 状态
 
-**决策已接受；仓库实现和非在线验证已完成，但生产闭环仍受阻。**
+**决策已接受；仓库实现、运行组件健康验证以及精确 Scope MCP 同步和回读均已完成；权威 Outbox 端到端投影证据仍延期。**
 
 - 稳定 ADR/MCP ID：`adr-nebulagraph-production-projection`
 - 所属 `architectureScope.applicationServiceId`：`com.huawei.celon.desiner`
 - 所属 `architectureScope.scopePath`：`pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - 仓库实现：Gateway 契约、NebulaGraph 官方 Go 客户端适配器、PostgreSQL Outbox Projector、Nebula Gateway GraphStore 适配器、显式运行时选择、本地 Compose 形态和跨适配器隔离测试均已提交。
 - 运行验证：Compose 配置断言已通过，但没有真实 NebulaGraph/PostgreSQL 投影冒烟或官方客户端兼容性运行证据。
-- 设计事实同步：**MCP synchronization blocked。** 本次 Task 7 明确仅允许仓库变更并禁止调用 MCP，因此没有写入或回读匹配的 ADR、Proposal、Context Pack、资产、类型关系或 Evidence。
+- 设计事实同步：**已完成。** 规范 Docker PostgreSQL 通过 `localhost:15433/specforge_canonical` 提供权威连接；匹配 ADR、Proposal、Context Pack、类型关系和 Evidence 已在精确 Designer Scope 中同步并回读。本状态不代表仍缺失的端到端 Outbox 投影证据已经完成。
 
 ### 背景
 
@@ -249,12 +249,12 @@ Gateway 健康响应包含 `status`、`graphSchemaReady` 和脱敏代码。Proje
 
 - **真实 Docker 兼容性受阻：** 当前没有正在运行的 NebulaGraph 3.8.0、官方客户端兼容测试、从 PostgreSQL Outbox 到 Nebula 的端到端投影、检查点推进、多跳遍历、Projector 重启或逻辑边去重证据。负责人：SpecForge Runtime。重试触发条件：准备可构建的 Gateway/Projector 镜像和可访问 PostgreSQL，启动本地图形态，执行并保留 live 验证结果。
 - **Projector 运维健康能力未完成：** 当前仓库尚未暴露积压、最老年龄、检查点、重试和死信健康端点。负责人：SpecForge Runtime。重试触发条件：在 live Compose 门禁前交付可执行 Projector 运行时及健康契约。
-- **MCP synchronization blocked：** 本任务被明确限制为仅仓库变更并禁止调用 MCP。没有 MCP 写入尝试、收据、Proposal、Context Pack、设计资产、类型关系、Evidence 或回读结果。负责人：SpecForge Architecture。重试触发条件：获得有 Scope 的 MCP 写入授权后，在精确 Designer Scope 持久化本 ADR 和匹配记录，运行 `pnpm design-facts:sync`、`pnpm design-facts:check` 和精确 Scope 联邦检查，再回读 ID、Scope、英文规范字段、中文覆盖、方向关系和证据。
+- **历史 MCP 同步阻塞已解决：** 原 `localhost:5433/specforge` 路径已由规范 `localhost:15433/specforge_canonical` 权威隧道替代。MCP 同步、完整回读和精确 Scope 联邦对账均已通过；该历史仅作为事件记录保留。
 
 ### MCP 记录
 
-- 预期 MCP ADR ID：`adr-nebulagraph-production-projection`
+- MCP ADR ID：`adr-nebulagraph-production-projection`
 - 精确所属 `architectureScope`：`applicationServiceId=com.huawei.celon.desiner`；`scopePath=pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - 必需匹配记录：Proposal、Context Pack、Gateway API、Projector 服务、部署拓扑、Outbox/检查点数据模型、运维规则、类型关系和 Evidence。
-- 本次仅仓库任务没有任何持久化或回读结果。
-- 同步状态为 **MCP synchronization blocked**，不声明同步成功。
+- 持久化与回读状态：已通过规范 PostgreSQL 权威库在精确 Designer Scope 中完成。
+- 最新对账：清单全部 19 项决策均已核验且问题列表为空；精确 Scope 联邦对账返回 `blocking:false`。

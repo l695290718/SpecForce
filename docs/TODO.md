@@ -42,7 +42,7 @@
 
 **Deferred:** Concrete live database/API-gateway/CMDB/runtime adapters, polling/webhook workers, automatic candidate promotion, outbound proposals, external `APPLY`, automatic cross-Scope merging, production object storage, and complete billion-scale capacity certification.
 
-**Trigger:** Begin Phase 2 only after the Phase 1 MCP records and exact design-change session are converged, then review and approve a dedicated Phase 2 design and implementation plan.
+**Next trigger:** Start a concrete live connector, CodeHub enforcement, or Phase 5 scale increment only after its dedicated ADR, implementation plan, exact-Scope preflight, and acceptance evidence are approved.
 
 **Phase 2 implementation record:** `docs/adr/0019-deterministic-3a-knowledge-projections.md` and `docs/superpowers/plans/2026-08-03-deterministic-3a-projections.md`. The core projection contract and exact-Scope MCP derive operation now provide BIZ/SYS/TECH layers, explicit cross-layer alignment, Baseline drift, and a pinned Context Pack. Focused verification and MCP read-back passed; later connector, graph, CodeHub, and capacity phases remain pending.
 
@@ -54,23 +54,23 @@
 
 **Phase 1 evidence:** `pnpm legacy-baseline:verify` exited `0`; `artifacts/legacy-baseline-verification.json` records all ten checks as `PASSED`, including contract drift, Go tests/build, 155 Core tests, MCP scanner/knowledge tests, PostgreSQL integration, real signed-binary E2E, 100,000-observation scale, typecheck, and production build. The local Windows build used `SPECFORGE_NEXT_STANDALONE=0` to avoid OneDrive/pnpm symlink creation; Docker/Linux keeps standalone output enabled.
 
-**Design-fact evidence:** Full MCP synchronization returned all 16 decisions as `complete`; MCP read-back returned all 16 as `verified` with empty issue lists; exact-Scope federation reconciliation returned `blocking:false` and no issues. ADR-0015, ADR-0018, the Phase 1 Proposal, Agent Context Pack, seven managed facts, Evidence, and directional typed links are present in the canonical authority.
+**Design-fact evidence:** The latest full MCP synchronization and read-back verified all 19 decisions with empty missing, mismatched, out-of-scope, and blocked lists; exact-Scope federation reconciliation returned `blocking:false` and no issues. Phase 1-3 ADRs, Proposals, Context Packs, managed facts, Evidence, and directional typed links are present in the canonical authority.
 
 **Design-fact synchronization retry hardening:** Deferred after a transient `MCP synchronization blocked` event when the Docker PostgreSQL tunnel at `localhost:15433` was temporarily unreachable. **Owner:** SpecForge Architecture. **Retry trigger:** reproduce or observe a tunnel outage, then add bounded retry, reachability diagnostics, and an operator-visible failure receipt without changing the exact-Scope or PostgreSQL authority rules. **Rationale:** A transient tunnel interruption must be diagnosable and recoverable without weakening the MCP-only write boundary.
 
-**Current blocked receipt (2026-08-09):** The approved parallel-workstream preflight was attempted with `pnpm design-context:preflight -- --intent "Implement the approved parallel workstreams: production ScopedPrincipal authorization foundation, provider-neutral CodeHub attestation verification contract, and design-fact backlog/documentation reconciliation." --affected "adr-design-context-preflight-gate,adr-local-git-hook-change-attestation,adr-application-service-scope-isolation" --evidence "approved-parallel-workstreams,existing-auth-and-attestation-contract-review,backlog-and-ADR-status-review"` in the exact Designer Scope. MCP startup succeeded, but `prepare_design_change` could not persist its audit record because `localhost:15433` refused the database connection; `Get-NetTCPConnection -LocalPort 15433 -State Listen` returned `NO_LISTENER_15433`, and Docker Engine was unavailable. **Owner:** SpecForge Runtime. **Retry trigger:** start the canonical Docker PostgreSQL authority, verify the 15433 listener and `DATABASE_URL=postgresql://specforge:...@localhost:15433/specforge_canonical`, then rerun the same preflight before any implementation. **Status:** `MCP synchronization blocked`.
+**Resolved incident receipt (2026-08-09):** The temporary `localhost:15433` outage was recovered by starting the canonical Docker PostgreSQL authority and tunnel. The parallel governance preflight and both exact-Scope follow-up sessions subsequently closed `CONVERGED`; `pnpm design-facts:check` verified all 19 decisions with empty issue lists, and exact-Scope federation reconciliation returned `blocking:false`. The bounded-retry and operator-diagnostic hardening item above remains deferred as resilience work, not as an active synchronization blocker.
 
-**当前阻断回执（2026-08-09）：** 已在精确 Designer Scope 尝试批准的三条并行任务预检。MCP 已启动，但 `prepare_design_change` 无法写入审计记录，因为 `localhost:15433` 不可达；端口检查返回 `NO_LISTENER_15433`，Docker Engine 也未运行。**负责人：** SpecForge Runtime。**重试触发：** 启动权威 Docker PostgreSQL，确认 15433 监听以及 `.env` 指向 `specforge_canonical` 后，使用同一条预检命令重试；在预检成功前不实施代码变更。**状态：** `MCP synchronization blocked`。
+**已解决事件回执（2026-08-09）：** 启动权威 Docker PostgreSQL 和本地隧道后，`localhost:15433` 临时不可达问题已经恢复。并行治理预检及两个精确 Scope 后续会话均已关闭为 `CONVERGED`；`pnpm design-facts:check` 已核验全部 19 项决策且问题列表为空，精确 Scope 联邦对账返回 `blocking:false`。上方有界重试和运维诊断加固仍作为韧性待办保留，不再视为当前同步阻塞。
 
 **中文本地化：**
 
-**状态：** 第一阶段 Baseline 发现运行时已实现、完成本地验证、通过 MCP 同步并完成回读。第二至第五阶段保持待办。
+**状态：** 第一阶段 Baseline 发现、第二阶段确定性 3A 投影和第三阶段持续观测治理核心均已实现并完成 MCP 同步和回读。具体实时连接器、CodeHub 门禁和第五阶段规模化能力保持待办。
 
 **负责人：** SpecForge 架构与 Agent 集成。
 
 **理由：** 企业存量应用需要复用 Claude Code、OpenCode 等现有 Coding Agent 的低门槛基线方案。ADR-0015 定义本地 Agent 发现边界；ADR-0018 进一步定义通用 3A 本体、同一语义身份的多证据断言、可配置组织与分析 Profile、原子 ChangeSet、不可变 Baseline 和派生知识层。
 
-**交付增量：** 第一阶段交付签名原生扫描、可恢复 MCP 摄取、语义评审、原子提升、对账和不可变 Baseline 发布。第二阶段交付确定性 3A 投影。第三阶段扩展持续观察和实时连接器。第四阶段增加 CodeHub/CI 门禁。第五阶段完成企业 Profile 迁移、对象存储、图投影和亿级认证。
+**交付增量：** 第一阶段交付签名原生扫描、可恢复 MCP 摄取、语义评审、原子提升、对账和不可变 Baseline 发布。第二阶段交付确定性 3A 投影。第三阶段已交付持续观测接收边界、持久游标、哈希链批次收据和候选观察持久化，具体实时连接器仍待后续交付。第四阶段增加 CodeHub/CI 门禁。第五阶段完成企业 Profile 迁移、对象存储、图投影和亿级认证。
 
 **延期范围：** 持续入站同步、实时数据库/API 网关/CMDB/运行时连接器、出站 Proposal、外部 `APPLY`、自动跨 Scope 合并、生产对象存储和完整亿级容量认证。
 
@@ -80,7 +80,7 @@
 
 **第一阶段证据：** `pnpm legacy-baseline:verify` 退出码为 `0`；`artifacts/legacy-baseline-verification.json` 对全部十项检查记录为 `PASSED`，包括契约漂移、Go 测试与构建、155 项 Core 测试、MCP 扫描器/知识测试、PostgreSQL 集成、真实签名二进制端到端、10 万条观察规模、类型检查和生产构建。本地 Windows 构建使用 `SPECFORGE_NEXT_STANDALONE=0` 规避 OneDrive/pnpm 符号链接创建限制；Docker/Linux 仍启用 standalone 输出。
 
-**设计事实证据：** 完整 MCP 同步返回全部 16 项决策为 `complete`；MCP 回读返回全部 16 项为 `verified` 且问题列表为空；精确 Scope 联邦对账返回 `blocking:false` 且无问题。ADR-0015、ADR-0018、第一阶段 Proposal、Agent Context Pack、七项托管事实、Evidence 和有向类型关系均已存在于规范权威库中。
+**设计事实证据：** 最新完整 MCP 同步和回读已核验全部 19 项决策，缺失、不匹配、越界和阻塞列表均为空；精确 Scope 联邦对账返回 `blocking:false` 且无问题。第一至第三阶段 ADR、Proposal、Context Pack、托管事实、Evidence 和有向类型关系均已存在于规范权威库中。
 
 **设计事实同步重试加固：** 因 Docker PostgreSQL 隧道 `localhost:15433` 暂时不可达而出现过一次 `MCP synchronization blocked`，现已通过重试恢复，后续延期加固。**负责人：** SpecForge Architecture。**重试触发条件：** 再次复现或观测隧道中断后，增加有界重试、可达性诊断和面向运维的失败收据，同时不得改变精确 Scope 或 PostgreSQL 权威规则。**理由：** 短暂隧道中断必须可诊断、可恢复，且不能弱化 MCP-only 写入边界。
 
@@ -177,7 +177,7 @@ The Web console and authoritative PostgreSQL database are packaged as separate D
 
 ### NebulaGraph production projection
 
-**Status:** Runtime components live and healthy; authoritative outbox projection and MCP closure blocked.
+**Status:** Runtime components live and healthy; MCP design facts are synchronized and read back; authoritative outbox projection evidence remains deferred.
 
 **Owner:** SpecForge Runtime for live projection and Projector health; SpecForge Architecture for MCP synchronization.
 
@@ -195,27 +195,27 @@ The repository now contains the typed Go Gateway and official NebulaGraph adapte
 
 **Remaining completion gates:**
 
-- make the elected PostgreSQL authority available to the scoped MCP client, author one exact-Designer-scope relationship, and prove its `RelationshipOutbox` row drains to NebulaGraph;
+- author one exact-Designer-scope relationship through the canonical PostgreSQL authority and prove its `RelationshipOutbox` row drains to NebulaGraph;
 - retain exact-scope checkpoint advancement, multi-hop traversal, Projector restart, and duplicate-edge evidence; and
-- persist and read back the matching ADR, Proposal, Context Pack, design assets, typed links, and Evidence through MCP in the exact Designer scope.
+- retain a fresh exact-Scope MCP read-back after the end-to-end projection evidence is added.
 
-**Authoritative outbox blocked:** a read-only query against the live graph-profile PostgreSQL returned zero `RelationshipOutbox` and zero `ProjectionCheckpoint` rows. Retry trigger: create the exact-scope relationship through MCP after the elected authority is reachable, then repeat the live procedure in `docs/operations/nebulagraph-projection.md`.
+**Authoritative outbox evidence deferred:** a read-only query against the live graph-profile PostgreSQL returned zero `RelationshipOutbox` and zero `ProjectionCheckpoint` rows. Retry trigger: when graph projection work resumes, create the exact-scope relationship through MCP and repeat the live procedure in `docs/operations/nebulagraph-projection.md`.
 
-**MCP synchronization blocked:** the elected Docker PostgreSQL authority at `localhost:5433/specforge` is unreachable from the MCP stdio client. The graph-profile database remains private by design and `localhost:5432` was deliberately not substituted. Retry trigger: restore `5433` or run an approved scoped MCP client on the private Compose network, then run `pnpm design-facts:sync`, `pnpm design-facts:check`, and the exact-scope federation check with scoped read-back.
+**MCP synchronization closed:** the canonical Docker PostgreSQL authority is now reached through `localhost:15433/specforge_canonical`. The matching ADR, Proposal, Context Pack, design assets, typed links, and Evidence have been synchronized and read back in the exact Designer Scope. This closure does not supply the still-missing authoritative outbox projection evidence.
 
 **中文本地化：**
 
-**状态：** 仓库实现和非在线检查已完成；生产闭环仍受阻。
+**状态：** 仓库实现和运行组件健康检查已完成；MCP 设计事实已同步并回读；权威 Outbox 端到端投影证据仍延期。
 
 仓库已经包含有类型的 Go Gateway 与 NebulaGraph 官方客户端适配器、带租约和幂等语义的 PostgreSQL Outbox Projector、Gateway GraphStore、显式 `nebula`/`postgres` 运行时选择、单节点 Compose 配置、运维指南，以及跨适配器和兄弟 Scope 隔离测试。PostgreSQL 始终保持权威，NebulaGraph 只作为派生投影。
 
 2026-07-27 的仓库证据包括：检查六个实现提交；聚焦 Vitest 通过 5 个文件和 33 个测试；三个相关 TypeScript 类型检查通过；Gateway `go test ./...` 通过但真实 Nebula 兼容测试因未启用而跳过；Compose 配置断言通过。
 
-剩余门禁包括：在真实 NebulaGraph 3.8.0 上运行官方客户端兼容测试；验证 Outbox 到 Nebula 的端到端投影、幂等写入、精确 Scope 检查点、多跳遍历和重启去重；交付 Projector 运维健康端点；并在精确 Designer Scope 通过 MCP 写入和回读 ADR、Proposal、Context Pack、设计资产、类型关系与 Evidence。本次仅仓库任务禁止调用 MCP，因此必须保持 **MCP synchronization blocked**，不得声明整体完成。
+剩余门禁包括：验证 Outbox 到 Nebula 的端到端投影、幂等写入、精确 Scope 检查点、多跳遍历和重启去重，并保留完成后的精确 Scope MCP 回读。ADR、Proposal、Context Pack、设计资产、类型关系与 Evidence 已完成 MCP 同步；这不会替代仍缺失的投影运行证据。
 
 **2026-07-28 更新：** 本地私有 Compose 图运行时中的 PostgreSQL、Nebula Meta、Storage、Graphd、Gateway 和 Projector 均已健康。Gateway 已使用官方 v3 客户端，并完成 schema 初始化、稳定短顶点 ID 和完整边映射；Projector 已提供精确 Scope 的 backlog、checkpoint、retry 与 dead-letter 健康字段。
 
-当前不能关闭本待办：对图运行时私有 PostgreSQL 的只读查询返回零条 `RelationshipOutbox` 和零条 `ProjectionCheckpoint`，因此尚无 MCP 编写关系经 Outbox 到 NebulaGraph 的证据。已选定的权威库 `localhost:5433/specforge` 对主机 MCP stdio 客户端不可达；虽然 `localhost:5432` 可响应，但它不是已选权威库，未被替代使用。重试条件：恢复 `5433`，或在私有 Compose 网络中运行获准的 Scope MCP 客户端；随后创建一条精确 Designer Scope 关系，并完成 Outbox、checkpoint、遍历、Projector 重启和 MCP 回读验证。
+当前不能关闭投影运行待办：对图运行时的只读查询返回零条 `RelationshipOutbox` 和零条 `ProjectionCheckpoint`，因此尚无 MCP 编写关系经 Outbox 到 NebulaGraph 的证据。重试条件：恢复图投影工作后，通过当前权威 PostgreSQL 在精确 Designer Scope 创建关系，并完成 Outbox、checkpoint、遍历、Projector 重启和 MCP 回读验证。
 
 ### PostgreSQL graph traversal final regression
 

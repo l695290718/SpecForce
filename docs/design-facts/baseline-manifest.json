@@ -481,7 +481,7 @@
                                            },
                                            {
                                                "command":  "pnpm design-facts:sync; pnpm design-facts:check; pnpm design-context:close",
-                                               "result":  "MCP sync for adr-parallel-governance-workstreams completed; design-facts:check verified all 19 decisions with empty missing, mismatched, outOfScope, and blocked lists; exact Designer federation check returned blocking:false; the original session and follow-up sessions 9f97d614-52e2-479c-9699-c8a3220853c2 and c4b5a809-d486-4a91-a3fb-d3b47788b3ad closed CONVERGED."
+                                               "result":  "MCP sync for adr-parallel-governance-workstreams completed; design-facts:check verified all 19 decisions with empty missing, mismatched, outOfScope, and blocked lists; exact Designer federation check returned blocking:false; the original session and follow-up sessions 9f97d614-52e2-479c-9699-c8a3220853c2, c4b5a809-d486-4a91-a3fb-d3b47788b3ad, and e013fbc4-e852-48b5-9b46-cb2f4753aea8 closed CONVERGED."
                                            }
                                        ]
                       },
@@ -760,15 +760,15 @@
                                                   "api-specforge-mcp-tools",
                                                   "quality-specforge-impact-ready"
                                               ],
-                          "status":  "MCP synchronization blocked",
+                          "status":  "MCP synchronized and read back; authoritative outbox projection evidence remains deferred",
                           "owner":  "SpecForge Runtime and SpecForge Architecture",
-                          "reason":  "The live graph profile is healthy, but its authoritative RelationshipOutbox and ProjectionCheckpoint tables are empty and the elected localhost:5433 PostgreSQL authority is unreachable from the MCP stdio client. localhost:5432 was intentionally not substituted.",
-                          "retryTrigger":  "Restore the elected localhost:5433 authority or run the scoped MCP client on the private Compose network; author one exact-Designer-scope relationship, then run design-facts:sync, design-facts:check, the federation check, and scoped read-back.",
+                          "reason":  "The live graph profile is healthy and MCP design facts are synchronized through the canonical localhost:15433 PostgreSQL authority, but RelationshipOutbox and ProjectionCheckpoint evidence for an end-to-end authoritative projection is still absent.",
+                          "retryTrigger":  "When graph projection delivery resumes, author one exact-Designer-scope relationship, retain outbox, checkpoint, traversal, and Projector restart evidence, then repeat MCP synchronization and exact-Scope read-back.",
                           "localizedContent":  {
                                                    "en":  {
                                                               "decision":  "PostgreSQL remains authoritative; NebulaGraph is a derived exact-scope projection reached only through the typed Gateway and leased outbox Projector.",
                                                               "constraints":  [
-                                                                                  "Do not claim outbox projection, checkpoint advancement, restart idempotency, or MCP synchronization until the elected authority is reachable and the resulting records are read back in the exact Designer Scope."
+                                                                                  "Do not claim outbox projection, checkpoint advancement, or restart idempotency until those runtime results are retained; MCP synchronization is independently complete in the exact Designer Scope."
                                                                               ]
                                                           },
                             "zh":  {
@@ -783,7 +783,7 @@
                                                            "多节点生产规格、亿级边容量认证、Kubernetes 部署和企业密钥托管仍处于延期状态。"
                                                        ],
                                       "constraints":  [
-                                                                                  "在已选权威库可达且精确 Designer Scope 内的结果完成回读前，不得声明 Outbox 投影、检查点推进、重启幂等或 MCP 同步完成。"
+                                                                                  "在保留对应运行结果前，不得声明 Outbox 投影、检查点推进或重启幂等已经完成；MCP 同步已在精确 Designer Scope 中独立闭环。"
                                                                               ]
                                                           }
                                                },
@@ -798,7 +798,11 @@
                                            },
                                            {
                                                "command":  "DATABASE_URL=postgresql://admin:admin@localhost:5433/specforge?schema=public pnpm design-facts:sync",
-                                               "result":  "The MCP stdio client reached create_adr, then failed with Prisma P1001 because the elected localhost:5433 authority is unreachable; localhost:5432 was not substituted."
+                                               "result":  "Historical attempt failed with Prisma P1001; the later canonical PostgreSQL cutover superseded this path."
+                                           },
+                                           {
+                                               "command":  "pnpm design-facts:sync; pnpm design-facts:check; pnpm design-facts:federation:check",
+                                               "result":  "MCP synchronization and read-back completed through localhost:15433/specforge_canonical; all 19 decisions verified with empty issue lists and exact-Scope federation reconciliation returned blocking:false."
                                            }
                                        ]
                       },
@@ -853,7 +857,7 @@
                                                   "data-specforge-asset-graph"
                                               ],
                           "owner":  "SpecForge Architecture and Agent Integration",
-                          "status":  "Phase 3 continuous-observation governance core implemented and locally verified; concrete live adapters remain deferred",
+                          "status":  "Phase 3 continuous-observation governance core implemented, locally verified, MCP synchronized, and read back; concrete live adapters remain deferred",
                           "reason":  "Continuous observation needs durable exact-Scope sequencing and recovery before concrete external adapters can safely deliver observations.",
                           "retryTrigger":  "After any concrete adapter or external APPLY design is approved, create a separate ADR, contract, evidence set, and exact-Scope synchronization record.",
                           "evidence":  [
@@ -876,6 +880,10 @@
                                            {
                                                "command":  "Invoke-WebRequest -UseBasicParsing http://localhost:3000/",
                                                "result":  "Development Web service returned HTTP 200."
+                                           },
+                                           {
+                                               "command":  "pnpm design-facts:sync; pnpm design-facts:check; pnpm design-facts:federation:check",
+                                               "result":  "MCP synchronization and read-back completed; all 19 decisions verified with empty issue lists and exact-Scope federation reconciliation returned blocking:false."
                                            }
                                        ],
                           "localizedContent":  {
