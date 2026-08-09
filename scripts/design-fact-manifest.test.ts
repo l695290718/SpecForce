@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(18);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(18);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(18);
+  expect(manifest.decisions).toHaveLength(19);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(19);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(19);
   const proposalByContextPack = new Map<string, string>();
 
   for (const decision of manifest.decisions) {
@@ -70,6 +70,13 @@ it("includes the local Git Hook change-attestation decision", () => {
   expect(decision?.proposalId).toBe("proposal-local-git-hook-change-attestation");
   expect(decision?.contextPackId).toBe("context-pack-local-git-hook-change-attestation");
   expect(decision?.status).toContain("Local enforcement increment implemented");
+});
+
+it("includes the parallel governance workstreams decision", () => {
+  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-parallel-governance-workstreams");
+  expect(decision?.proposalId).toBe("proposal-parallel-governance-workstreams");
+  expect(decision?.contextPackId).toBe("context-pack-parallel-governance-workstreams");
+  expect(decision?.status).toContain("ScopedPrincipal");
 });
 
 it("includes the single-host Docker deployment decision in the baseline", () => {

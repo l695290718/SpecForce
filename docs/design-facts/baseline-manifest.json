@@ -447,6 +447,45 @@
                                        ]
                       },
                       {
+                          "id":  "adr-parallel-governance-workstreams",
+                          "repositoryAdr":  "docs/adr/0021-parallel-governance-workstreams.md",
+                          "mcpAdrId":  "adr-parallel-governance-workstreams",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-parallel-governance-workstreams",
+                          "contextPackId":  "context-pack-parallel-governance-workstreams",
+                          "relatedAssetIds":  [
+                                                  "api-specforge-mcp-tools",
+                                                  "data-specforge-assets",
+                                                  "adr-design-context-preflight-gate",
+                                                  "adr-local-git-hook-change-attestation"
+                                              ],
+                          "owner":  "SpecForge Architecture and Enterprise Integration",
+                          "status":  "ScopedPrincipal and provider-neutral CI verification implemented locally; external adapters deferred",
+                          "reason":  "The implementation separates normalized identity, exact Scope authorization, and signed CI evidence verification from enterprise provider and CodeHub adapters.",
+                          "retryTrigger":  "After MCP synchronization and read-back, implement a separately approved CodeHub adapter and enterprise identity integration with platform-specific evidence.",
+                          "evidence":  [
+                                           {
+                                               "command":  "pnpm --filter @specforge/core typecheck; pnpm --filter @specforge/core test",
+                                               "result":  "Core typecheck passed; 20 test files and 167 tests passed, including ScopedPrincipal exact-Scope authorization."
+                                           },
+                                           {
+                                               "command":  "pnpm --filter @specforge/mcp-server typecheck; pnpm --filter @specforge/mcp-server exec vitest run src/auth.test.ts src/federation/tools.test.ts src/federation/attestation-verification.test.ts",
+                                               "result":  "MCP typecheck passed; authentication, federation, and attestation verification tests passed."
+                                           },
+                                           {
+                                               "command":  "go test ./... (apps/specforge-cli)",
+                                               "result":  "Go CLI and internal package tests passed, including repository and multi-Scope evidence failures."
+                                           },
+                                           {
+                                               "command":  "pnpm design-facts:sync; pnpm design-facts:check; pnpm design-context:close",
+                                               "result":  "MCP sync for adr-parallel-governance-workstreams completed; design-facts:check verified all 19 decisions with empty missing, mismatched, outOfScope, and blocked lists; exact Designer federation check returned blocking:false. Session close remains the final gate."
+                                           }
+                                       ]
+                      },
+                      {
                           "id":  "adr-agent-driven-legacy-baseline-discovery",
                           "repositoryAdr":  "docs/adr/0015-agent-driven-legacy-baseline-discovery.md",
                           "mcpAdrId":  "adr-agent-driven-legacy-baseline-discovery",

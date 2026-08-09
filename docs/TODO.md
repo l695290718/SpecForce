@@ -4,15 +4,19 @@
 
 ### Enforce SpecForge attestations in CodeArts/CodeHub
 
-**Status:** Deferred by product decision; local Git Hook is the first increment.
+**Status:** Provider-neutral CI verification contract implemented locally; CodeArts/CodeHub protected-branch enforcement remains deferred.
 
 **Owner:** SpecForge Enterprise Integration and Repository Governance.
 
 **Rationale:** A local `pre-commit` gate improves normal developer and Agent behavior but Git permits `--no-verify` and Hooks are not installed automatically by clone. Repository-authoritative enforcement therefore requires CodeArts/CodeHub to independently recompute the committed tree, validate the SpecForge Change Attestation with a CI service identity, and make the result mandatory for protected-branch merge.
 
-**Trigger:** Start only after the standalone Go Hook CLI, remote MCP attestation contract, strict `CONVERGED` policy, signing-key lifecycle, and local developer workflow are implemented and reviewed.
+**Trigger:** Start the platform-specific adapter only after the standalone Go Hook CLI, provider-neutral remote MCP verification contract, strict `CONVERGED` policy, signing-key lifecycle, and local developer workflow are reviewed for the target CodeHub deployment.
 
 **Completion evidence:** A CodeHub merge request without a proof, with a bypassed Hook, stale tree, wrong repository or Scope, expired/revoked signature, incomplete multi-Scope coverage, or non-converged design must be rejected by a required protected-branch status check.
+
+**Local contract evidence (2026-08-09):** `verify_change_attestation` now validates signed repository evidence, exact multi-Scope coverage, session/reconciliation convergence, expiry, signature, trusted/revoked key policy, and deterministic failure codes. This does not register a CodeHub status check or block an external merge.
+
+**中文对齐（2026-08-09）：** 与平台无关的 CI 变更证明校验契约已在本地完成，能够校验签名仓库证据、精确多 Scope 覆盖、会话与对账收敛、有效期、密钥信任/撤销状态及确定性失败码。CodeHub 状态检查注册和外部合入阻断仍为待办。
 
 **中文本地化：**
 
@@ -253,7 +257,7 @@ Create a bilingual home page that explains SpecForge's system positioning, MCP-f
 
 ### Authorized multi-service comparison
 
-**Status:** Deferred.
+**Status:** Provider-neutral ScopedPrincipal foundation implemented locally; production identity provider and tenant administration remain deferred.
 
 Agents with explicit grants may eventually compare or aggregate multiple application services. This view must permission-filter every participating application service before it reads, joins, or presents any design asset or derived analysis.
 
@@ -262,5 +266,7 @@ Agents with explicit grants may eventually compare or aggregate multiple applica
 **Status:** Deferred.
 
 Replace the MVP mock actor grants with production identity, tenant policy, OAuth/RBAC enforcement, and auditable cross-service authorization decisions. This must preserve the existing fail-closed application-service scope boundary.
+
+**Local contract evidence (2026-08-09):** Core and MCP now normalize stable subject, tenant, auth source, permissions, and exact application-service grants through `ScopedPrincipal`; seed identity remains development-only. No enterprise IdP integration is claimed.
 
 **Completion evidence:** authenticated MCP and Web requests enforce tenant and application-service grants in integration tests, including denied cross-service reads and writes.
