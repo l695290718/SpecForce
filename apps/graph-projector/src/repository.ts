@@ -346,8 +346,8 @@ const CONTIGUOUS_VERSION_SQL = `
 
 const CHECKPOINT_SQL = `
   INSERT INTO "ProjectionCheckpoint" (
-    "enterpriseId", "applicationServiceId", "scopePath", "partitionId", "lastEventId", "projectionVersion", "projectedAt", status, error
-  ) VALUES ($1, $2, $3, $4, $5::uuid, $6::bigint, $7, 'HEALTHY', NULL)
+    "enterpriseId", "applicationServiceId", "scopePath", "partitionId", "lastEventId", "projectionVersion", "projectedAt", status, error, "updatedAt"
+  ) VALUES ($1, $2, $3, $4, $5::uuid, $6::bigint, $7, 'HEALTHY', NULL, $7)
   ON CONFLICT ("enterpriseId", "applicationServiceId", "scopePath", "partitionId") DO UPDATE
   SET "projectionVersion" = GREATEST("ProjectionCheckpoint"."projectionVersion", EXCLUDED."projectionVersion"),
       "lastEventId" = CASE
@@ -355,10 +355,11 @@ const CHECKPOINT_SQL = `
         ELSE "ProjectionCheckpoint"."lastEventId"
       END,
       "projectedAt" = CASE
-        WHEN EXCLUDED."projectionVersion" >= "ProjectionCheckpoint"."projectionVersion" THEN EXCLUDED."projectedAt"
-        ELSE "ProjectionCheckpoint"."projectedAt"
-      END,
-      status = 'HEALTHY',
+       WHEN EXCLUDED."projectionVersion" >= "ProjectionCheckpoint"."projectionVersion" THEN EXCLUDED."projectedAt"
+       ELSE "ProjectionCheckpoint"."projectedAt"
+       END,
+       "updatedAt" = EXCLUDED."updatedAt",
+       status = 'HEALTHY',
       error = NULL;
 `;
 

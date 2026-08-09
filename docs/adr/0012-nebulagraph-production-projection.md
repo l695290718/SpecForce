@@ -2,14 +2,14 @@
 
 ## Status
 
-**Accepted; repository implementation, live component health verification, and exact-Scope MCP synchronization/read-back are complete. End-to-end authoritative outbox projection evidence remains deferred.**
+**Accepted; repository implementation, live component health verification, end-to-end authoritative outbox projection, and exact-Scope MCP synchronization/read-back are complete for the local single-node compatibility topology. Multi-node production sizing and scale certification remain deferred.**
 
 - Stable ADR/MCP ID: `adr-nebulagraph-production-projection`
 - Owning `architectureScope.applicationServiceId`: `com.huawei.celon.desiner`
 - Owning `architectureScope.scopePath`: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - Repository implementation: Gateway contract, official NebulaGraph Go client adapter, PostgreSQL outbox projector, Nebula Gateway GraphStore adapter, explicit runtime selection, local Compose profile, and cross-adapter isolation tests are committed.
-- Operational verification: the local Compose profile has a healthy PostgreSQL, Nebula Meta, Storage, Graphd, Gateway, and Projector. Gateway v3 client authentication, typed idempotent projection, scoped traversal, and full edge mapping were exercised against NebulaGraph 3.8.0. The authoritative outbox and checkpoint tables are currently empty, so this is not end-to-end outbox evidence.
-- Design-fact synchronization: **Complete.** The canonical Docker PostgreSQL authority is reached through `localhost:15433/specforge_canonical`; the matching ADR, Proposal, Context Pack, typed links, and Evidence have been synchronized and read back in the exact Designer Scope. This record does not claim the still-missing end-to-end outbox projection evidence.
+- Operational verification: the local Compose profile has a healthy PostgreSQL, Nebula Meta, Storage, Graphd, Gateway, and Projector. Gateway v3 client authentication, typed idempotent projection, scoped traversal, full edge mapping, checkpoint advancement, and Projector restart were exercised against NebulaGraph 3.8.0.
+- Design-fact synchronization: **Complete.** The canonical Docker PostgreSQL authority is reached through `localhost:15433/specforge_canonical`; the matching ADR, Proposal, Context Pack, typed links, and Evidence have been synchronized and read back in the exact Designer Scope. The final local compatibility closure below records the end-to-end outbox evidence.
 
 ## Context
 
@@ -27,7 +27,7 @@ PostgreSQL remains authoritative. A relationship command commits current state, 
 
 A private Go Graph Gateway is the only component that uses the official NebulaGraph client or owns Nebula credentials. It accepts typed projection batches and traversal plans, rejects raw nGQL, validates exact scope, sanitizes failures, and exposes checkpoint and health contracts. Web, MCP, Agents, and the impact worker do not connect to NebulaGraph directly.
 
-The Graph Projector claims PostgreSQL outbox rows with a lease, sends an idempotent projection to the Gateway, and records delivery state in PostgreSQL. The local Compose overlay declares NebulaGraph 3.8.0, Gateway, and Projector services without publishing Nebula ports. Enterprise mode supplies external Nebula endpoints and credentials through environment-managed secrets.
+The Graph Projector claims PostgreSQL outbox rows with a lease, sends an idempotent projection to the Gateway, and records delivery state in PostgreSQL. Its checkpoint upsert explicitly maintains the required `updatedAt` field so raw PostgreSQL checkpoint writes remain valid against the authoritative schema. The local Compose overlay declares NebulaGraph 3.8.0, Gateway, and Projector services without publishing Nebula ports. Enterprise mode supplies external Nebula endpoints and credentials through environment-managed secrets.
 
 ### Delivery and checkpoint consistency
 
@@ -45,7 +45,7 @@ Every node, edge, projection, traversal, outbox row, and checkpoint carries the 
 
 ### Health and operations
 
-Gateway health reports `status`, `graphSchemaReady`, and a sanitized code. Projector backlog, oldest pending age, last checkpoint, retries, and dead letters remain required operational telemetry. The repository currently provides projector processing summaries and persistence fields, but it does not yet expose the planned Projector runtime health endpoint.
+Gateway health reports `status`, `graphSchemaReady`, and a sanitized code. Projector backlog, oldest pending age, last checkpoint, retries, and dead letters are exposed by the exact-Scope Projector health endpoint.
 
 Stopping Gateway or Projector must not block PostgreSQL/MCP relationship writes. Outbox rows accumulate and replay after recovery. Rollback switches explicitly to PostgreSQL traversal and preserves all relationship and outbox data.
 
@@ -76,7 +76,7 @@ Stopping Gateway or Projector must not block PostgreSQL/MCP relationship writes.
 - A checkpoint cannot advance until the corresponding projection is acknowledged.
 - Nebula failure must not cause implicit mixed-store reads.
 - The local single-node Compose profile is a compatibility topology, not a multi-node production cluster.
-- Full completion requires an MCP-authored relationship to drain from PostgreSQL outbox through the Projector, checkpoint advancement, Projector restart/idempotency evidence, and successful MCP synchronization/read-back.
+- Local compatibility completion requires an MCP-authored relationship to drain from PostgreSQL outbox through the Projector, checkpoint advancement, Projector restart/idempotency evidence, and successful MCP synchronization/read-back. Those gates are now satisfied. Multi-node production sizing, Kubernetes deployment, external secret integration, and billion-scale certification remain deferred.
 
 ## Repository Evidence
 
@@ -258,3 +258,22 @@ Gateway 健康响应包含 `status`、`graphSchemaReady` 和脱敏代码。Proje
 - 必需匹配记录：Proposal、Context Pack、Gateway API、Projector 服务、部署拓扑、Outbox/检查点数据模型、运维规则、类型关系和 Evidence。
 - 持久化与回读状态：已通过规范 PostgreSQL 权威库在精确 Designer Scope 中完成。
 - 最新对账：清单全部 19 项决策均已核验且问题列表为空；精确 Scope 联邦对账返回 `blocking:false`。
+
+## Final Local Compatibility Closure (2026-08-09)
+
+The final live gate passed against the canonical Docker PostgreSQL tunnel and the local NebulaGraph 3.8.0 profile:
+
+- `powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -ConfigurationOnly` passed the external/local topology and loopback-port assertions.
+- `pnpm --filter @specforge/graph-projector typecheck` passed; the Projector suite passed 5 files and 25 tests.
+- `go test ./...` from `apps/graph-gateway` passed all Gateway packages.
+- `go test ./...` from `apps/specforge-cli` passed the connector and CLI packages with a workspace-local `GOCACHE`.
+- `powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -Live` passed: the exact-Scope MCP fixture was accepted, the `RelationshipOutbox` row reached `COMPLETED`, the checkpoint reached graph version `13`, traversal returned 3 nodes and 2 edges across two hops, the Projector was restarted, and the replay returned one logical edge with `eventCount=1` and zero dead letters.
+- The raw PostgreSQL checkpoint upsert was corrected to maintain the required non-null `updatedAt` field; the repaired Projector image was rebuilt and used for the live gate.
+
+This closure proves the local single-node compatibility topology only. External Nebula clusters, multi-node production sizing, Kubernetes deployment, enterprise secret management, and billion-scale certification remain deferred.
+
+## 本地兼容拓扑最终闭环（2026-08-09）
+
+最终 live gate 已在规范 Docker PostgreSQL 隧道和本地 NebulaGraph 3.8.0 拓扑上通过：精确 Scope 的 MCP 验证夹具成功写入，`RelationshipOutbox` 进入 `COMPLETED`，检查点推进到图版本 `13`，两跳遍历返回 3 个节点和 2 条边，Projector 重启后重放仍只有 1 条逻辑边且 `eventCount=1`、死信为 0。期间发现并修复了 PostgreSQL 原始检查点写入遗漏非空 `updatedAt` 的缺陷。
+
+该证据只证明本地单节点兼容拓扑；外部 Nebula 集群、多节点生产容量、Kubernetes、企业密钥托管和十亿级规模认证仍保留为待办。

@@ -1,0 +1,10 @@
+# Loopback-only ports for the live projection verification gate.
+# Keep this overlay out of normal local and production topology.
+services:
+  graph-gateway:
+    ports:
+      - "127.0.0.1:18088:8088"
+
+  graph-projector:
+    ports:
+      - "127.0.0.1:18090:8090"

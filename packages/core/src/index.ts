@@ -26,3 +26,4 @@ export * from "./graph-store/types";
 export * from "./federation";
 export * from "./knowledge";
 export * from "./scanner";
+export * from "./connectors";

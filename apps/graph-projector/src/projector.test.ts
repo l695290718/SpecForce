@@ -27,6 +27,18 @@ describe("GraphProjector", () => {
     expect(repository.completed).toHaveLength(2);
   });
 
+  it("keeps the exact-scope checkpoint monotonic across a fresh projector instance", async () => {
+    const event = projection({ id: "outbox-restart", graphVersion: 9n });
+    const repository = new MemoryRepository([event]);
+
+    await new GraphProjector(repository, new RecordingGateway(), { workerId: "projector-before-restart", now: () => now }).processOnce();
+    repository.ready = [event];
+    await new GraphProjector(repository, new RecordingGateway(), { workerId: "projector-after-restart", now: () => now }).processOnce();
+
+    expect(repository.checkpoints.get(scopeKey(event))).toBe(9n);
+    expect(repository.completed.map((item) => item.graphVersion)).toEqual([9n, 9n]);
+  });
+
   it("reclaims an event after its delivery lease expires", async () => {
     const event = projection({ status: "DELIVERING", leaseOwner: "stale-worker", leaseExpiresAt: new Date("2026-07-25T23:59:59.000Z") });
     const repository = new MemoryRepository([event]);

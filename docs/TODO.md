@@ -32,13 +32,13 @@
 
 ### Implement unified 3A knowledge initialization
 
-**Status:** Phase 1 Baseline discovery runtime and Phase 2 deterministic 3A projections are implemented, locally verified, MCP synchronized, and read back. The Phase 3 continuous-observation governance-core increment is implemented and locally verified; concrete live adapters and Phases 4-5 remain pending.
+**Status:** Phase 1 Baseline discovery runtime, Phase 2 deterministic 3A projections, and the Phase 3 continuous-observation governance core plus provider-neutral local-repository connector are implemented, locally verified, MCP synchronized, and read back. External live adapters and Phases 4-5 remain pending.
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
 **Rationale:** Existing enterprise application services need a low-friction baseline path that reuses Claude Code, OpenCode, and compatible coding Agents. ADR-0015 defines the local-Agent discovery boundary. ADR-0018 extends it with a generic 3A ontology, multiple evidence-backed assertions per semantic identity, configurable organization and analysis profiles, atomic ChangeSets, immutable Baselines, and derived Knowledge Layers.
 
-**Delivery increments:** Phase 1 delivers signed native scanning, resumable MCP ingestion, semantic review, atomic promotion, reconciliation, and immutable Baseline publication. Phase 2 delivers deterministic 3A projections. Phase 3 now delivers the provider-neutral continuous-observation receiving boundary, durable PostgreSQL cursors, hash-chained batch receipts, exact-Scope MCP authorization, and idempotent candidate observation persistence; concrete live connectors remain a follow-up. Phase 4 adds CodeHub/CI enforcement. Phase 5 covers enterprise profile migration, object storage, graph projection, and billion-scale certification.
+**Delivery increments:** Phase 1 delivers signed native scanning, resumable MCP ingestion, semantic review, atomic promotion, reconciliation, and immutable Baseline publication. Phase 2 delivers deterministic 3A projections. Phase 3 now delivers the provider-neutral continuous-observation receiving boundary, durable PostgreSQL cursors, hash-chained batch receipts, exact-Scope MCP authorization, idempotent candidate observation persistence, a local repository source adapter, and a resumable connector runtime; concrete external adapters remain a follow-up. Phase 4 adds CodeHub/CI enforcement. Phase 5 covers enterprise profile migration, object storage, graph projection, and billion-scale certification.
 
 **Deferred:** Concrete live database/API-gateway/CMDB/runtime adapters, polling/webhook workers, automatic candidate promotion, outbound proposals, external `APPLY`, automatic cross-Scope merging, production object storage, and complete billion-scale capacity certification.
 
@@ -46,7 +46,7 @@
 
 **Phase 2 implementation record:** `docs/adr/0019-deterministic-3a-knowledge-projections.md` and `docs/superpowers/plans/2026-08-03-deterministic-3a-projections.md`. The core projection contract and exact-Scope MCP derive operation now provide BIZ/SYS/TECH layers, explicit cross-layer alignment, Baseline drift, and a pinned Context Pack. Focused verification and MCP read-back passed; later connector, graph, CodeHub, and capacity phases remain pending.
 
-**Phase 3 implementation record:** `docs/adr/0020-continuous-observation-governance.md` and `docs/superpowers/plans/2026-08-03-continuous-observation-governance.md`. The exact-Scope MCP receiving boundary now validates bounded hash-chained batches, persists durable PostgreSQL cursors and batch receipts, stores accepted observations as candidates, and emits the transactional federation outbox event. Concrete external adapters, live polling/webhooks, promotion automation, and external `APPLY` remain pending.
+**Phase 3 implementation record:** `docs/adr/0020-continuous-observation-governance.md` and `docs/superpowers/plans/2026-08-03-continuous-observation-governance.md`. The exact-Scope MCP receiving boundary now validates bounded hash-chained batches, persists durable PostgreSQL cursors and batch receipts, stores accepted observations as candidates, and emits the transactional federation outbox event. The local repository connector reuses the Phase 1 scanner/extractor and emits MCP-ready pages with deterministic snapshot cursors. Concrete database/API/CMDB/runtime adapters, live polling/webhooks, promotion automation, and external `APPLY` remain pending.
 
 **Phase 3 evidence:** `pnpm db:push` synchronized the cursor and batch schema to Docker PostgreSQL at `localhost:15433`; the focused core/MCP suites passed 41 tests; the gated real PostgreSQL transaction suite passed first acceptance, identical retry, cursor read-back, sequence-gap rejection, and cleanup; the Web service returned HTTP 200.
 
@@ -177,7 +177,7 @@ The Web console and authoritative PostgreSQL database are packaged as separate D
 
 ### NebulaGraph production projection
 
-**Status:** Runtime components live and healthy; MCP design facts are synchronized and read back; authoritative outbox projection evidence remains deferred.
+**Status:** Runtime components live and healthy; authoritative outbox projection, checkpoint, traversal, restart/idempotency, and MCP read-back evidence are complete for the local single-node compatibility topology. Enterprise multi-node sizing and scale certification remain deferred.
 
 **Owner:** SpecForge Runtime for live projection and Projector health; SpecForge Architecture for MCP synchronization.
 
@@ -191,17 +191,13 @@ The repository now contains the typed Go Gateway and official NebulaGraph adapte
 - Gateway `go test ./...` passed with the live compatibility case skipped because `SPECFORGE_NEBULA_COMPATIBILITY=1` was not set; and
 - `powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -ConfigurationOnly` passed the local/external Compose topology assertions.
 
-**Verified live state (2026-07-28):** the private Compose profile reports PostgreSQL, Nebula Meta, Storage, Graphd, Gateway, and Projector healthy. The Gateway uses the official v3 Nebula client, initializes the schema before health checks, projects stable bounded vertex IDs, and returns complete typed edges. The Projector exposes exact-scope health with backlog, checkpoint, retry, and dead-letter fields.
+**Verified live state (2026-08-09):** the private Compose profile reports PostgreSQL, Nebula Meta, Storage, Graphd, Gateway, and Projector healthy. The Gateway uses the official v3 Nebula client, initializes the schema before health checks, projects stable bounded vertex IDs, and returns complete typed edges. The Projector exposes exact-scope health with backlog, checkpoint, retry, and dead-letter fields.
 
-**Remaining completion gates:**
+**Completion evidence:** `powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -Live` passed the exact-Scope MCP fixture, `RelationshipOutbox` completion, checkpoint `13`, two-hop traversal with 3 nodes and 2 edges, Projector restart, idempotent replay with one logical edge and `eventCount=1`, and zero dead letters. The repaired checkpoint SQL explicitly writes the required non-null `updatedAt` field.
 
-- author one exact-Designer-scope relationship through the canonical PostgreSQL authority and prove its `RelationshipOutbox` row drains to NebulaGraph;
-- retain exact-scope checkpoint advancement, multi-hop traversal, Projector restart, and duplicate-edge evidence; and
-- retain a fresh exact-Scope MCP read-back after the end-to-end projection evidence is added.
+**MCP synchronization closed:** the canonical Docker PostgreSQL authority is reached through `localhost:15433/specforge_canonical`. The matching ADR, Proposal, Context Pack, design assets, typed links, and Evidence have been synchronized and read back in the exact Designer Scope.
 
-**Authoritative outbox evidence deferred:** a read-only query against the live graph-profile PostgreSQL returned zero `RelationshipOutbox` and zero `ProjectionCheckpoint` rows. Retry trigger: when graph projection work resumes, create the exact-scope relationship through MCP and repeat the live procedure in `docs/operations/nebulagraph-projection.md`.
-
-**MCP synchronization closed:** the canonical Docker PostgreSQL authority is now reached through `localhost:15433/specforge_canonical`. The matching ADR, Proposal, Context Pack, design assets, typed links, and Evidence have been synchronized and read back in the exact Designer Scope. This closure does not supply the still-missing authoritative outbox projection evidence.
+**Deferred:** external Nebula clusters, multi-node production sizing, Kubernetes deployment, enterprise secret management, and billion-scale certification. These require independent production evidence and do not block the local compatibility increment.
 
 **中文本地化：**
 

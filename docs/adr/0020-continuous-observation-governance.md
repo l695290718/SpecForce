@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted; the Phase 3 governance-core increment is implemented, locally verified, MCP synchronized, and read back in the exact owning Scope.**
+**Accepted; the Phase 3 governance core and provider-neutral local-repository connector increment are implemented, locally verified, MCP synchronized, and read back in the exact owning Scope.**
 
 - Stable ID: `adr-continuous-observation-governance`
 - Owning application service: `com.huawei.celon.desiner`
@@ -25,7 +25,13 @@ Add a provider-neutral `continuous-observation/v1` MCP contract. Each connector 
 
 `submit_continuous_observation_batch` validates the contract, exact Scope, active connector, `OBSERVE` capability, digest, sequence chain, duplicate identities, and budgets in one serializable PostgreSQL transaction. Accepted observations are persisted in the existing `SourceObservation` table as `CANDIDATE` records and an existing federation outbox event is appended in the same transaction. `get_continuous_observation_cursor` is a read-only exact-Scope checkpoint query.
 
-The increment does not execute connectors, fetch external systems, promote candidates, merge Scopes, issue outbound Proposals, or execute external `APPLY`. Those capabilities remain separate delivery increments.
+The governance core does not promote candidates, merge Scopes, issue outbound Proposals, or execute external `APPLY`. The first connector delivery increment is intentionally limited to a local repository source: it reuses the Phase 1 scanner/extractor, produces deterministic paged observations, resumes from a snapshot cursor, and submits only through the exact-Scope MCP receiving boundary. Database, API gateway, CMDB, runtime, polling, and webhook adapters remain separate delivery increments.
+
+### Provider-neutral connector runtime
+
+`@specforge/core` now owns the connector lifecycle and delivery runtime. It validates the exact Scope and the registered connector's `OBSERVE` capability, reads the durable PostgreSQL cursor through the MCP bridge, builds the hash-chained batch, submits it through the existing continuous-observation persistence boundary, and applies bounded exponential backoff for transient failures. Terminal Scope, connector, capability, and contract failures close the runtime without retrying.
+
+`apps/mcp-server` provides the persistence bridge and a local-repository source adapter. `apps/specforge-cli observe` reuses the signed native scanner and extractor to emit `READY_FOR_MCP_SUBMIT` batches for an operator or Agent to deliver through MCP. The adapter never writes PostgreSQL directly, never promotes a candidate, and never crosses the owning Scope.
 
 ## Alternatives
 
@@ -59,6 +65,16 @@ The increment does not execute connectors, fetch external systems, promote candi
 - `node .\\node_modules\\vitest\\vitest.mjs run --root . --exclude .worktrees/** --exclude .pnpm-store/** packages/core/src/__tests__/continuous-observation.test.ts apps/mcp-server/src/federation/tools.test.ts` passed 2 files and 41 tests.
 - `$env:DATABASE_URL=(Get-Content .env | Where-Object { $_ -match '^DATABASE_URL=' } | Select-Object -First 1).Substring(14).Trim('"'); $env:SPECFORGE_CONTINUOUS_INTEGRATION='1'; node .\\node_modules\\vitest\\vitest.mjs run --root . --exclude .worktrees/** --exclude .pnpm-store/** apps/mcp-server/src/federation/continuous-persistence.integration.test.ts` passed the real PostgreSQL transaction test for first acceptance, idempotent retry, cursor read-back, sequence-gap rejection, and cleanup.
 - `Invoke-WebRequest -UseBasicParsing http://localhost:3000/` returned HTTP 200.
+- `pnpm --filter @specforge/core typecheck` passed; the focused connector suite passed 1 file and 8 tests.
+- `pnpm --filter @specforge/mcp-server typecheck` passed; the focused MCP connector suites passed 2 files and 5 tests.
+- `$env:GOCACHE = '<workspace>/.tmp/go-build'; go test ./...` from `apps/specforge-cli` passed all CLI and connector packages.
+- `git diff --check` passed for the connector increment.
+
+## Connector Increment Evidence
+
+- `apps/specforge-cli observe --connector-id local-repository --scope-path <exact-scope>` emits deterministic `READY_FOR_MCP_SUBMIT` batches or `IDLE`; it does not bypass MCP.
+- The provider-neutral runtime tests cover durable cursor resume, idempotent receipts, sibling-Scope rejection, capability denial, bounded backoff, and lifecycle stop.
+- Concrete external database, API gateway, CMDB, runtime, polling, webhook, candidate-promotion, outbound Proposal, and external `APPLY` delivery remain deferred and require their own design facts and acceptance evidence.
 
 ## MCP Record
 
@@ -124,3 +140,9 @@ The increment does not execute connectors, fetch external systems, promote candi
 
 - `docs/superpowers/plans/2026-08-03-continuous-observation-governance.md`
 - `docs/adr/0018-unified-3a-knowledge-initialization.md`
+
+## Chinese Localization: Connector Increment
+
+本次增量已完成提供方无关的连接器运行时和本地仓库适配器。运行时会在精确 Scope 下读取 PostgreSQL 游标、校验 `OBSERVE` 能力、生成可恢复的哈希链批次，并且只通过 MCP 持久化边界提交。`specforge-cli observe` 复用既有扫描与提取能力，输出 `READY_FOR_MCP_SUBMIT` 或 `IDLE`，不会绕过 MCP 直接写库，也不会提升候选事实。
+
+数据库、API 网关、CMDB、运行时、轮询、Webhook、候选提升、出站 Proposal 和外部 `APPLY` 仍然是独立待办，必须分别设计、取证并完成 Scope 内同步后才能实现。

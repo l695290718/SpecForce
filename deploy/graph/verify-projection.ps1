@@ -1,8 +1,17 @@
 param(
-  [switch]$ConfigurationOnly
+  [switch]$ConfigurationOnly,
+  [switch]$Live
 )
 
 $ErrorActionPreference = "Stop"
+
+if ($ConfigurationOnly -and $Live) {
+  throw "Specify exactly one of -ConfigurationOnly or -Live."
+}
+
+if (-not $ConfigurationOnly -and -not $Live) {
+  $ConfigurationOnly = $true
+}
 
 function Assert-Condition([bool]$Condition, [string]$Message) {
   if (-not $Condition) {
@@ -21,6 +30,7 @@ function Get-Service($Configuration, [string]$Name) {
 $repositoryRoot = Resolve-Path (Join-Path $PSScriptRoot "..\\..")
 $baseCompose = Join-Path $repositoryRoot "deploy\\compose.yaml"
 $localCompose = Join-Path $repositoryRoot "deploy\\compose.graph-local.yaml"
+$verificationCompose = Join-Path $repositoryRoot "deploy\\compose.graph-verify.yaml"
 $gatewayDockerfile = Join-Path $repositoryRoot "deploy\\graph-gateway.Dockerfile"
 $projectorDockerfile = Join-Path $repositoryRoot "deploy\\graph-projector.Dockerfile"
 $gatewayDockerignore = Join-Path $repositoryRoot "deploy\\graph-gateway.Dockerfile.dockerignore"
@@ -32,6 +42,7 @@ $bootstrapQuery = Join-Path $repositoryRoot "deploy\\graph\\bootstrap-local.ngql
 
 Assert-Condition (Test-Path -LiteralPath $baseCompose) "Base Compose file is missing."
 Assert-Condition (Test-Path -LiteralPath $localCompose) "Local NebulaGraph Compose profile is missing."
+Assert-Condition (Test-Path -LiteralPath $verificationCompose) "Live verification Compose overlay is missing."
 Assert-Condition (Test-Path -LiteralPath $gatewayDockerfile) "Graph Gateway Dockerfile is missing."
 Assert-Condition (Test-Path -LiteralPath $projectorDockerfile) "Graph Projector Dockerfile is missing."
 Assert-Condition (Test-Path -LiteralPath $gatewayDockerignore) "Gateway Dockerfile-specific ignore file is missing."
@@ -77,8 +88,21 @@ SPECFORGE_GRAPH_HEALTH_SCOPE_PATH=pf-huawei/product-celon/subproduct-platform/mo
 '@ | Set-Content -LiteralPath $environmentFile -Encoding ascii
 
 try {
-  $external = docker compose --env-file $environmentFile -f $baseCompose config --format json | ConvertFrom-Json
-  $local = docker compose --env-file $environmentFile -f $localCompose config --format json | ConvertFrom-Json
+  # Compose gives inherited process variables precedence over --env-file. Keep the
+  # live canonical URL out of configuration assertions so they remain deterministic.
+  $liveDatabaseUrl = $env:DATABASE_URL
+  Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
+  try {
+    $external = docker compose --env-file $environmentFile -f $baseCompose config --format json | ConvertFrom-Json
+    $local = docker compose --env-file $environmentFile -f $localCompose config --format json | ConvertFrom-Json
+    $verification = docker compose --env-file $environmentFile -f $localCompose -f $verificationCompose config --format json | ConvertFrom-Json
+  } finally {
+    if ($null -eq $liveDatabaseUrl) {
+      Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
+    } else {
+      $env:DATABASE_URL = $liveDatabaseUrl
+    }
+  }
 
   Assert-Condition (-not (Has-Service $external "nebula-metad")) "External-cluster mode must not include Nebula meta service."
   Assert-Condition (-not (Has-Service $external "nebula-graphd")) "External-cluster mode must not include Nebula graph service."
@@ -115,9 +139,52 @@ try {
   Assert-Condition ($projector.environment.DATABASE_URL -match "deploy-postgres-1:5432/specforge_canonical") "Projector must use the canonical PostgreSQL connection."
   Assert-Condition ($local.networks.deploy_default.external -eq $true) "Local graph profile must join the external deploy_default network."
 
+  $verificationGateway = Get-Service $verification "graph-gateway"
+  $verificationProjector = Get-Service $verification "graph-projector"
+  Assert-Condition ($verificationGateway.ports.host_ip -eq "127.0.0.1" -and $verificationGateway.ports.published -eq 18088 -and $verificationGateway.ports.target -eq 8088) "Live verification Gateway port must bind only to loopback."
+  Assert-Condition ($verificationProjector.ports.host_ip -eq "127.0.0.1" -and $verificationProjector.ports.published -eq 18090 -and $verificationProjector.ports.target -eq 8090) "Live verification Projector port must bind only to loopback."
+
   Write-Host "NebulaGraph projection configuration assertions passed."
-  if (-not $ConfigurationOnly) {
-    Write-Host "Live verification is intentionally deferred until the runtime services from Task 4 are available."
+  if ($Live) {
+    if ([string]::IsNullOrWhiteSpace($env:DATABASE_URL)) {
+      $rootDotEnv = Join-Path $repositoryRoot ".env"
+      if (Test-Path -LiteralPath $rootDotEnv) {
+        $databaseLine = Get-Content -LiteralPath $rootDotEnv | Where-Object { $_ -match '^DATABASE_URL=' } | Select-Object -First 1
+        if ($null -ne $databaseLine) { $env:DATABASE_URL = ($databaseLine -replace '^DATABASE_URL=', '').Trim().Trim('"') }
+      }
+    }
+    if ([string]::IsNullOrWhiteSpace($env:DATABASE_URL)) {
+      throw "GRAPH_LIVE_DATABASE_REQUIRED: set DATABASE_URL to the canonical PostgreSQL authority before running -Live."
+    }
+    $gatewayUrl = $env:SPECFORGE_GRAPH_GATEWAY_URL
+    if ([string]::IsNullOrWhiteSpace($gatewayUrl)) { $gatewayUrl = "http://127.0.0.1:18088" }
+    $projectorUrl = $env:SPECFORGE_PROJECTOR_HEALTH_URL
+    if ([string]::IsNullOrWhiteSpace($projectorUrl)) { $projectorUrl = "http://127.0.0.1:18090" }
+    $env:SPECFORGE_GRAPH_GATEWAY_URL = $gatewayUrl
+    $env:SPECFORGE_PROJECTOR_HEALTH_URL = $projectorUrl
+    if ([string]::IsNullOrWhiteSpace($env:SPECFORGE_GRAPH_LIVE_RUN_ID)) {
+      $env:SPECFORGE_GRAPH_LIVE_RUN_ID = [guid]::NewGuid().ToString("N")
+    }
+
+    & node (Join-Path $repositoryRoot "node_modules\\tsx\\dist\\cli.mjs") (Join-Path $repositoryRoot "deploy\\graph\\live-projection-check.ts") --phase prepare
+    if ($LASTEXITCODE -ne 0) {
+      throw "NEBULA_LIVE_GATE_FAILED: prepare phase failed; retry after Gateway, Projector, and canonical PostgreSQL are reachable."
+    }
+
+    $projectorIds = @(docker ps --filter "label=com.docker.compose.service=graph-projector" --filter "status=running" --format "{{.ID}}")
+    if ($projectorIds.Count -ne 1) {
+      throw "PROJECTOR_RESTART_BLOCKED: expected exactly one running graph-projector container; start the local graph profile with deploy/compose.graph-verify.yaml and retry."
+    }
+    docker restart $projectorIds[0] | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+      throw "PROJECTOR_RESTART_BLOCKED: Docker could not restart the running graph-projector container; retry after Docker and the local graph profile are healthy."
+    }
+
+    & node (Join-Path $repositoryRoot "node_modules\\tsx\\dist\\cli.mjs") (Join-Path $repositoryRoot "deploy\\graph\\live-projection-check.ts") --phase verify
+    if ($LASTEXITCODE -ne 0) {
+      throw "NEBULA_LIVE_GATE_FAILED: verification after Projector restart failed; inspect the precise retry reason above."
+    }
+    Write-Host "NebulaGraph live outbox, checkpoint, traversal, restart, and idempotency assertions passed."
   }
 } finally {
   Remove-Item -LiteralPath $environmentFile -Force -ErrorAction SilentlyContinue

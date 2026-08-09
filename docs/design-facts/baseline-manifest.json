@@ -760,15 +760,15 @@
                                                   "api-specforge-mcp-tools",
                                                   "quality-specforge-impact-ready"
                                               ],
-                          "status":  "MCP synchronized and read back; authoritative outbox projection evidence remains deferred",
+                           "status":  "Local single-node authoritative outbox projection implemented, live verified, MCP synchronized, and read back; production scale remains deferred",
                           "owner":  "SpecForge Runtime and SpecForge Architecture",
-                          "reason":  "The live graph profile is healthy and MCP design facts are synchronized through the canonical localhost:15433 PostgreSQL authority, but RelationshipOutbox and ProjectionCheckpoint evidence for an end-to-end authoritative projection is still absent.",
-                          "retryTrigger":  "When graph projection delivery resumes, author one exact-Designer-scope relationship, retain outbox, checkpoint, traversal, and Projector restart evidence, then repeat MCP synchronization and exact-Scope read-back.",
+                           "reason":  "PostgreSQL remains authoritative while the local NebulaGraph profile is a derived projection; the live gate now proves exact-Scope outbox delivery, checkpoint advancement, traversal, restart recovery, and idempotent replay.",
+                           "retryTrigger":  "Before production rollout, provide separate external-cluster, multi-node sizing, Kubernetes, secret-management, and billion-scale evidence without changing PostgreSQL authority or exact-Scope rules.",
                           "localizedContent":  {
                                                    "en":  {
                                                               "decision":  "PostgreSQL remains authoritative; NebulaGraph is a derived exact-scope projection reached only through the typed Gateway and leased outbox Projector.",
-                                                              "constraints":  [
-                                                                                  "Do not claim outbox projection, checkpoint advancement, or restart idempotency until those runtime results are retained; MCP synchronization is independently complete in the exact Designer Scope."
+                                                               "constraints":  [
+                                                                                   "The local single-node compatibility gate has passed for outbox projection, checkpoint advancement, two-hop traversal, Projector restart, and idempotent replay; external-cluster and production-scale evidence remain deferred."
                                                                               ]
                                                           },
                             "zh":  {
@@ -782,8 +782,8 @@
                                                            "运行人员必须监控投影延迟，并在图运行时事件期间显式选择 PostgreSQL 回退。",
                                                            "多节点生产规格、亿级边容量认证、Kubernetes 部署和企业密钥托管仍处于延期状态。"
                                                        ],
-                                      "constraints":  [
-                                                                                  "在保留对应运行结果前，不得声明 Outbox 投影、检查点推进或重启幂等已经完成；MCP 同步已在精确 Designer Scope 中独立闭环。"
+                                       "constraints":  [
+                                                                                   "本地单节点兼容门禁已通过 Outbox 投影、检查点推进、两跳遍历、Projector 重启和幂等重放；外部集群与生产规模证据仍然延期。"
                                                                               ]
                                                           }
                                                },
@@ -792,14 +792,18 @@
                                                "command":  "docker compose --env-file deploy/.env --env-file deploy/graph/.env -f deploy/compose.yaml -f deploy/compose.graph-local.yaml ps",
                                                "result":  "PostgreSQL, Nebula Meta, Storage, Graphd, Gateway, and Projector reported healthy in the local graph profile."
                                            },
-                                           {
-                                               "command":  "docker exec specforge-graph-verify-postgres-1 psql -U specforge -d specforge -v ON_ERROR_STOP=1 \u003c read-only outbox/checkpoint query",
-                                               "result":  "RelationshipOutbox and ProjectionCheckpoint returned zero rows, so no authoritative outbox projection or checkpoint evidence exists."
-                                           },
-                                           {
-                                               "command":  "DATABASE_URL=postgresql://admin:admin@localhost:5433/specforge?schema=public pnpm design-facts:sync",
-                                               "result":  "Historical attempt failed with Prisma P1001; the later canonical PostgreSQL cutover superseded this path."
-                                           },
+                                            {
+                                                "command":  "powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -ConfigurationOnly",
+                                                "result":  "Local/external Compose topology, canonical PostgreSQL connection, exact Scope health configuration, and loopback verification ports passed."
+                                            },
+                                            {
+                                                "command":  "pnpm --filter @specforge/graph-projector typecheck; pnpm --filter @specforge/graph-projector test; go test ./...",
+                                                "result":  "Graph Projector typecheck passed; 5 files and 25 tests passed; Graph Gateway Go tests passed all packages."
+                                            },
+                                            {
+                                                "command":  "powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -Live",
+                                                "result":  "Exact-Scope MCP fixture was accepted; RelationshipOutbox reached COMPLETED; checkpoint reached graph version 13; two-hop traversal returned 3 nodes and 2 edges; Projector restart preserved one logical edge with eventCount=1; backlog, retries, and dead letters were zero."
+                                            },
                                            {
                                                "command":  "pnpm design-facts:sync; pnpm design-facts:check; pnpm design-facts:federation:check",
                                                "result":  "MCP synchronization and read-back completed through localhost:15433/specforge_canonical; all 19 decisions verified with empty issue lists and exact-Scope federation reconciliation returned blocking:false."
@@ -857,9 +861,9 @@
                                                   "data-specforge-asset-graph"
                                               ],
                           "owner":  "SpecForge Architecture and Agent Integration",
-                          "status":  "Phase 3 continuous-observation governance core implemented, locally verified, MCP synchronized, and read back; concrete live adapters remain deferred",
-                          "reason":  "Continuous observation needs durable exact-Scope sequencing and recovery before concrete external adapters can safely deliver observations.",
-                          "retryTrigger":  "After any concrete adapter or external APPLY design is approved, create a separate ADR, contract, evidence set, and exact-Scope synchronization record.",
+                          "status":  "Phase 3 governance core and provider-neutral local-repository connector implemented, locally verified, MCP synchronized, and read back; external adapters remain deferred",
+                          "reason":  "Continuous observation requires durable exact-Scope sequencing and recovery; the local repository increment now provides a deterministic MCP-ready source without making candidates authoritative.",
+                          "retryTrigger":  "After any external database, API gateway, CMDB, runtime, polling, webhook, promotion, or external APPLY design is approved, create a separate ADR, contract, evidence set, and exact-Scope synchronization record.",
                           "evidence":  [
                                            {
                                                "command":  "pnpm db:generate; pnpm db:push",
@@ -877,21 +881,33 @@
                                                "command":  "$env:DATABASE_URL=(Get-Content .env | Where-Object { $_ -match '^DATABASE_URL=' } | Select-Object -First 1).Substring(14).Trim('\\\"'); $env:SPECFORGE_CONTINUOUS_INTEGRATION='1'; node .\\node_modules\\vitest\\vitest.mjs run --root . --exclude .worktrees/** --exclude .pnpm-store/** apps/mcp-server/src/federation/continuous-persistence.integration.test.ts",
                                                "result":  "Passed the real PostgreSQL transaction test for first acceptance, idempotent retry, cursor read-back, sequence-gap rejection, and cleanup."
                                            },
-                                           {
-                                               "command":  "Invoke-WebRequest -UseBasicParsing http://localhost:3000/",
-                                               "result":  "Development Web service returned HTTP 200."
-                                           },
-                                           {
-                                               "command":  "pnpm design-facts:sync; pnpm design-facts:check; pnpm design-facts:federation:check",
-                                               "result":  "MCP synchronization and read-back completed; all 19 decisions verified with empty issue lists and exact-Scope federation reconciliation returned blocking:false."
+                                            {
+                                                "command":  "Invoke-WebRequest -UseBasicParsing http://localhost:3000/",
+                                                "result":  "Development Web service returned HTTP 200."
+                                            },
+                                            {
+                                                "command":  "pnpm --filter @specforge/core typecheck; node .\\node_modules\\vitest\\vitest.mjs run --root . --exclude .worktrees/** --exclude .pnpm-store/** packages/core/src/__tests__/connectors.test.ts",
+                                                "result":  "Core connector runtime typecheck passed; 1 file and 8 connector lifecycle, Scope, cursor, idempotency, and backoff tests passed."
+                                            },
+                                            {
+                                                "command":  "pnpm --filter @specforge/mcp-server typecheck; node .\\node_modules\\vitest\\vitest.mjs run --root . --exclude .worktrees/** --exclude .pnpm-store/** apps/mcp-server/src/connectors/runtime.test.ts apps/mcp-server/src/connectors/local-repository.test.ts",
+                                                "result":  "MCP connector bridge typecheck passed; 2 files and 5 exact-Scope runtime/local-repository tests passed."
+                                            },
+                                            {
+                                                "command":  "$env:GOCACHE='<workspace>/.tmp/go-build'; go test ./...",
+                                                "result":  "The specforge-cli test suite passed, including the local repository connector, resumable cursor fixture, batch contract, scanner, and extractor packages."
+                                            },
+                                            {
+                                                "command":  "pnpm design-facts:sync; pnpm design-facts:check; pnpm design-facts:federation:check",
+                                                "result":  "MCP synchronization and read-back completed; all 19 decisions verified with empty issue lists and exact-Scope federation reconciliation returned blocking:false."
                                            }
                                        ],
                           "localizedContent":  {
                                                    "en":  {
-                                                              "decision":  "Persist hash-chained continuous observation batches and exact-Scope cursors in PostgreSQL before any candidate promotion."
+                                                               "decision":  "Persist hash-chained continuous observation batches and exact-Scope cursors in PostgreSQL before any candidate promotion; deliver local repository observations through a provider-neutral resumable runtime and the MCP boundary."
                                                           },
                                                    "zh":  {
-                                                              "decision":  "在任何候选提升之前，通过 PostgreSQL 持久化哈希链持续观测批次和精确 Scope 游标。"
+                                                               "decision":  "在任何候选提升之前，通过 PostgreSQL 持久化哈希链持续观测批次和精确 Scope 游标；本地仓库观测通过提供方无关的可恢复运行时和 MCP 边界提交。"
                                                           }
                                                },
                           "managedAssets":  [],
