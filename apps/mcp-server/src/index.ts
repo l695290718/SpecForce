@@ -48,7 +48,13 @@ function buildAuthInfo() {
   if (configuredClaims) {
     try {
       const parsed = JSON.parse(configuredClaims) as Record<string, unknown>;
-      return { clientId: String(parsed.clientId ?? "specforge-cli"), scopes: Array.isArray(parsed.scopes) ? parsed.scopes as string[] : [], extra: parsed.extra ?? parsed };
+      return {
+        clientId: String(parsed.clientId ?? "specforge-cli"),
+        scopes: Array.isArray(parsed.scopes) ? parsed.scopes as string[] : [],
+        tenantId: typeof parsed.tenantId === "string" ? parsed.tenantId : process.env.SPECFORGE_MCP_TENANT_ID,
+        authSource: "static-bearer",
+        extra: parsed.extra ?? parsed
+      };
     } catch {
       throw new Error("SPECFORGE_MCP_TOKEN_CLAIMS must be valid JSON.");
     }
@@ -57,6 +63,8 @@ function buildAuthInfo() {
   return {
     clientId: "specforge-cli",
     scopes: ["asset:read", "asset:write", "governance:run", "graph:read"],
+    tenantId: process.env.SPECFORGE_MCP_TENANT_ID ?? "local-development",
+    authSource: "static-bearer",
     extra: {
       actorType: "agent",
       actorId: process.env.SPECFORGE_MCP_ACTOR_ID ?? "specforge-cli",

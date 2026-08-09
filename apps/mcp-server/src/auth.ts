@@ -1,4 +1,4 @@
-import type { Permission } from "@specforge/core";
+import { normalizePrincipalClaims, type Permission, type PrincipalAuthSource, type ScopedPrincipal } from "@specforge/core";
 
 export interface McpActor {
   actorType: "agent" | "user" | "system";
@@ -7,6 +7,14 @@ export interface McpActor {
 
 export interface AuthorizationPolicy {
   authorize(actor: McpActor, permissions: Permission[]): Promise<void>;
+}
+
+export interface McpAuthInfo {
+  clientId: string;
+  scopes?: string[];
+  extra?: Record<string, unknown>;
+  tenantId?: string;
+  authSource?: PrincipalAuthSource;
 }
 
 export const allowAllPolicy: AuthorizationPolicy = {
@@ -20,4 +28,30 @@ export function getDefaultActor(): McpActor {
     actorType: "agent",
     actorId: process.env.SPECFORGE_MCP_ACTOR_ID ?? "local-mcp-agent"
   };
+}
+
+export function principalFromAuthInfo(authInfo: McpAuthInfo | undefined): ScopedPrincipal {
+  if (!authInfo) throw new Error("AUTHENTICATION_REQUIRED");
+  const rawClaims = authInfo.extra;
+  const rawActor = isRecord(rawClaims?.actor) ? rawClaims.actor : rawClaims;
+  const tenantId = stringValue(rawActor?.tenantId) || stringValue(rawClaims?.tenantId) || stringValue(authInfo.tenantId) || (process.env.NODE_ENV === "production" ? "" : "local-development");
+  const authSource = stringValue(rawActor?.authSource) || stringValue(rawClaims?.authSource) || authInfo.authSource || (process.env.SPECFORGE_MCP_SEED === "1" ? "seed" : "static-bearer");
+  const permissions = authInfo.scopes ?? (Array.isArray(rawActor?.permissions) ? rawActor.permissions : []);
+  return normalizePrincipalClaims({
+    actorType: rawActor?.actorType,
+    subject: rawActor?.subject ?? rawActor?.actorId ?? rawClaims?.subject ?? authInfo.clientId,
+    tenantId,
+    authSource,
+    grants: rawActor?.grants,
+    permissions,
+    decisionRef: rawActor?.decisionRef ?? rawClaims?.decisionRef
+  }, { allowSeed: process.env.SPECFORGE_MCP_SEED === "1" });
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function isRecord(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

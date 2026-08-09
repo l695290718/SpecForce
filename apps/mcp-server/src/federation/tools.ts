@@ -1,4 +1,4 @@
-import { contentDigest, scopeById, type ArchitectureScopeRef, type ConnectorCapability, type Permission, type ScopedActor } from "@specforge/core";
+import { contentDigest, scopeById, type ArchitectureScopeRef, type ConnectorCapability, type Permission, type ScopedPrincipal } from "@specforge/core";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { randomUUID } from "node:crypto";
@@ -16,6 +16,7 @@ import {
 } from "./persistence";
 import { getContinuousObservationCursor, submitContinuousObservationBatch } from "./continuous-persistence";
 import { issueChangeAttestation } from "./attestation";
+import { principalFromAuthInfo, type McpAuthInfo } from "../auth";
 
 const architectureScopeSchema = z.object({
   applicationServiceId: z.string().min(1),
@@ -23,16 +24,10 @@ const architectureScopeSchema = z.object({
 });
 
 type FederationRequestExtra = {
-  authInfo?: {
-    clientId: string;
-    scopes?: string[];
-    extra?: Record<string, unknown>;
-  };
+  authInfo?: McpAuthInfo;
 };
 
-type FederationCaller = ScopedActor & {
-  permissions: Permission[];
-};
+type FederationCaller = ScopedPrincipal;
 
 type ToolHandler<T> = (input: T, caller: FederationCaller) => Promise<unknown>;
 
@@ -193,42 +188,38 @@ function requestActor(extra: FederationRequestExtra | undefined): FederationCall
   if (!claims && process.env.SPECFORGE_MCP_SEED === "1" && process.env.SPECFORGE_MCP_SEED_SCOPE) {
     const seedScope = scopeById(process.env.SPECFORGE_MCP_SEED_SCOPE);
     if (seedScope) {
-      return {
-        actorType: "agent",
-        actorId: "local-design-context",
-        grants: [
-          { scopeId: seedScope.id, action: "read" },
-          { scopeId: seedScope.id, action: "write" }
-        ],
-        permissions: ["asset:read", "asset:write", "governance:run", "graph:read"]
-      };
+      return principalFromAuthInfo({
+        clientId: "local-design-context",
+        authSource: "seed",
+        tenantId: "local-development",
+        scopes: ["asset:read", "asset:write", "governance:run", "graph:read"],
+        extra: {
+          actor: {
+            actorType: "agent",
+            actorId: "local-design-context",
+            grants: [
+              { scopeId: seedScope.id, action: "read" },
+              { scopeId: seedScope.id, action: "write" }
+            ]
+          }
+        }
+      });
     }
   }
-  const rawClaims = claims?.extra;
-  const rawActor = isRecord(rawClaims?.actor) ? rawClaims.actor : rawClaims;
-  const actorType = rawActor?.actorType;
-  const actorId = rawActor?.actorId ?? rawClaims?.subject ?? claims?.clientId;
-  const grants = rawActor?.grants;
-  if ((actorType !== "agent" && actorType !== "user" && actorType !== "system") || typeof actorId !== "string" || !Array.isArray(grants)) {
-    throw new FederationToolError("AUTHENTICATION_REQUIRED", "MCP authInfo.extra must contain a repository-compatible actor and scope grants.");
+  try {
+    return principalFromAuthInfo(claims);
+  } catch (error) {
+    throw new FederationToolError(error instanceof Error ? error.message : "AUTHENTICATION_REQUIRED", "MCP authInfo does not contain a valid normalized principal.");
   }
-  const normalizedGrants = grants.filter(isScopeGrant);
-  if (normalizedGrants.length !== grants.length) {
-    throw new FederationToolError("AUTHENTICATION_REQUIRED", "MCP authInfo.extra contains invalid scope grants.");
-  }
-  const permissions = (claims?.scopes ?? []).filter(isPermission);
-  return { actorType, actorId, grants: normalizedGrants, permissions: [...new Set(permissions)] };
 }
 
 function auditActor(extra: FederationRequestExtra | undefined): { actorType: FederationCaller["actorType"]; actorId: string } {
-  const claims = extra?.authInfo;
-  const rawClaims = claims?.extra;
-  const rawActor = isRecord(rawClaims?.actor) ? rawClaims.actor : rawClaims;
-  const actorType = rawActor?.actorType;
-  return {
-    actorType: actorType === "user" || actorType === "system" || actorType === "agent" ? actorType : "agent",
-    actorId: typeof rawActor?.actorId === "string" ? rawActor.actorId : claims?.clientId ?? "unauthenticated"
-  };
+  try {
+    const principal = requestActor(extra);
+    return { actorType: principal.actorType, actorId: principal.actorId };
+  } catch {
+    return { actorType: "agent", actorId: "unauthenticated" };
+  }
 }
 
 function authorizeCaller(caller: FederationCaller, permissions: Permission[], input: Record<string, unknown>): void {
@@ -392,23 +383,6 @@ function auditScopeFromSummary(value: string): ArchitectureScopeRef | undefined 
 
 function isArchitectureScope(value: unknown): value is ArchitectureScopeRef {
   return isRecord(value) && typeof value.applicationServiceId === "string" && typeof value.scopePath === "string";
-}
-
-function isScopeGrant(value: unknown): value is ScopedActor["grants"][number] {
-  return isRecord(value) && typeof value.scopeId === "string" && (value.action === "read" || value.action === "write");
-}
-
-function isPermission(value: unknown): value is Permission {
-  return typeof value === "string" && [
-    "asset:read",
-    "asset:write",
-    "proposal:read",
-    "proposal:write",
-    "context-pack:generate",
-    "governance:run",
-    "adr:write",
-    "graph:read"
-  ].includes(value);
 }
 
 function isRecord(value: unknown): value is Record<string, any> {
