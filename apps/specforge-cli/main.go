@@ -78,6 +78,7 @@ type Evidence struct {
 	ConfigDigest       string        `json:"configDigest"`
 	ScopeMappingDigest string        `json:"scopeMappingDigest"`
 	Manifest           []StagedEntry `json:"manifest"`
+	RequiredScopes     []Scope       `json:"requiredScopes,omitempty"`
 }
 
 type Attestation struct {
@@ -422,6 +423,7 @@ func verifyStaged(ctx context.Context, root string, config FileConfig, stdout, s
 		}
 		bindings = append(bindings, ScopeBinding{Scope: scope, SessionID: sessionID})
 	}
+	evidence.RequiredScopes = scopes
 	client, err := newMCPClient(config)
 	if err != nil {
 		return err
@@ -446,14 +448,34 @@ func verifyStaged(ctx context.Context, root string, config FileConfig, stdout, s
 
 func verifyAttestation(attestation Attestation, evidence Evidence) error {
 	var payload struct {
-		StagedTreeHash string `json:"stagedTreeHash"`
-		ExpiresAt      string `json:"expiresAt"`
+		RepositoryID       string         `json:"repositoryId"`
+		ParentCommit       string         `json:"parentCommit"`
+		StagedTreeHash     string         `json:"stagedTreeHash"`
+		FileManifestDigest string         `json:"fileManifestDigest"`
+		ScopeMappingDigest string         `json:"scopeMappingDigest"`
+		ExpiresAt          string         `json:"expiresAt"`
+		Scopes             []ScopeBinding `json:"scopes"`
 	}
 	if err := json.Unmarshal(attestation.Payload, &payload); err != nil {
 		return errors.New("ATTESTATION_PAYLOAD_INVALID")
 	}
 	if payload.StagedTreeHash != evidence.StagedTreeHash {
 		return errors.New("ATTESTATION_TREE_MISMATCH")
+	}
+	if payload.RepositoryID != evidence.RepositoryID {
+		return errors.New("ATTESTATION_REPOSITORY_MISMATCH")
+	}
+	if payload.ParentCommit != evidence.ParentCommit || payload.FileManifestDigest != evidence.ManifestDigest || payload.ScopeMappingDigest != evidence.ScopeMappingDigest {
+		return errors.New("ATTESTATION_EVIDENCE_MISMATCH")
+	}
+	seenScopes := map[string]bool{}
+	for _, binding := range payload.Scopes {
+		seenScopes[binding.Scope.ApplicationServiceID+"|"+binding.Scope.ScopePath] = true
+	}
+	for _, required := range evidence.RequiredScopes {
+		if !seenScopes[required.ApplicationServiceID+"|"+required.ScopePath] {
+			return errors.New("ATTESTATION_SCOPE_COVERAGE_INCOMPLETE")
+		}
 	}
 	expires, err := time.Parse(time.RFC3339, payload.ExpiresAt)
 	if err != nil || !expires.After(time.Now().UTC()) {

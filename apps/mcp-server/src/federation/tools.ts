@@ -16,6 +16,7 @@ import {
 } from "./persistence";
 import { getContinuousObservationCursor, submitContinuousObservationBatch } from "./continuous-persistence";
 import { issueChangeAttestation } from "./attestation";
+import { verifyPersistedChangeAttestation } from "./attestation-verification";
 import { principalFromAuthInfo, type McpAuthInfo } from "../auth";
 
 const architectureScopeSchema = z.object({
@@ -49,6 +50,21 @@ function errorResult(error: unknown): CallToolResult {
 const stableErrorCodes = new Set([
   "AUTHENTICATION_REQUIRED",
   "ATTESTATION_INPUT_INVALID",
+  "ATTESTATION_PAYLOAD_INVALID",
+  "ATTESTATION_REPOSITORY_MISMATCH",
+  "ATTESTATION_TREE_MISMATCH",
+  "ATTESTATION_PARENT_COMMIT_MISMATCH",
+  "ATTESTATION_MANIFEST_MISMATCH",
+  "ATTESTATION_SCOPE_MAPPING_MISMATCH",
+  "ATTESTATION_SCOPE_COVERAGE_INCOMPLETE",
+  "ATTESTATION_EXPIRED",
+  "ATTESTATION_KEY_INVALID",
+  "ATTESTATION_KEY_REVOKED",
+  "ATTESTATION_KEY_UNTRUSTED",
+  "ATTESTATION_SIGNATURE_INVALID",
+  "ATTESTATION_SESSION_NOT_FOUND",
+  "ATTESTATION_SESSION_NOT_CONVERGED",
+  "ATTESTATION_RECONCILIATION_NOT_CONVERGED",
   "ATTESTATION_SIGNING_KEY_INVALID",
   "ATTESTATION_SIGNING_KEY_UNAVAILABLE",
   "AUDIT_PERSISTENCE_FAILED",
@@ -111,6 +127,21 @@ function safeClientMessage(code: string): string {
   return {
     AUTHENTICATION_REQUIRED: "An authenticated MCP caller is required.",
     ATTESTATION_INPUT_INVALID: "The change attestation request is incomplete.",
+    ATTESTATION_PAYLOAD_INVALID: "The change attestation payload is invalid.",
+    ATTESTATION_REPOSITORY_MISMATCH: "The change attestation targets a different repository.",
+    ATTESTATION_TREE_MISMATCH: "The committed tree does not match the change attestation.",
+    ATTESTATION_PARENT_COMMIT_MISMATCH: "The parent commit does not match the change attestation.",
+    ATTESTATION_MANIFEST_MISMATCH: "The file manifest does not match the change attestation.",
+    ATTESTATION_SCOPE_MAPPING_MISMATCH: "The Scope mapping does not match the change attestation.",
+    ATTESTATION_SCOPE_COVERAGE_INCOMPLETE: "The change attestation does not cover every required Scope.",
+    ATTESTATION_EXPIRED: "The change attestation has expired.",
+    ATTESTATION_KEY_INVALID: "The change attestation public key is invalid.",
+    ATTESTATION_KEY_REVOKED: "The change attestation key has been revoked.",
+    ATTESTATION_KEY_UNTRUSTED: "The change attestation key is not trusted.",
+    ATTESTATION_SIGNATURE_INVALID: "The change attestation signature is invalid.",
+    ATTESTATION_SESSION_NOT_FOUND: "The attestation references a missing design change session.",
+    ATTESTATION_SESSION_NOT_CONVERGED: "The attestation references a design change session that is not converged.",
+    ATTESTATION_RECONCILIATION_NOT_CONVERGED: "The attestation Scope is not reconciled.",
     ATTESTATION_SIGNING_KEY_INVALID: "The attestation signing key is invalid.",
     ATTESTATION_SIGNING_KEY_UNAVAILABLE: "The attestation signing key is not configured.",
     AUDIT_PERSISTENCE_FAILED: "The federation audit record could not be persisted.",
@@ -725,6 +756,30 @@ export function registerFederationTools(server: McpServer): void {
     }
     const { architectureScope: _architectureScope, ...attestationInput } = input;
     return issueChangeAttestation({ ...attestationInput, scopes });
+  });
+
+  registerFederationJsonTool(server, "verify_change_attestation", {
+    title: "Verify change attestation",
+    description: "Recomputes CI repository evidence against a signed attestation without mutating design facts.",
+    inputSchema: {
+      attestation: z.object({ payload: z.record(z.unknown()), signature: z.string().min(1), publicKey: z.string().min(1) }),
+      evidence: z.object({
+        repositoryId: z.string().min(1),
+        parentCommit: z.string().min(1).optional(),
+        committedTreeHash: z.string().min(1),
+        fileManifestDigest: z.string().min(1).optional(),
+        scopeMappingDigest: z.string().min(1).optional(),
+        requiredScopes: z.array(architectureScopeSchema).min(1)
+      }),
+      architectureScope: architectureScopeSchema
+    },
+    permissions: ["asset:read", "governance:run"],
+    readOnly: true
+  }, async (input, caller) => {
+    const primaryScope = assertReadableExactScope(input.architectureScope, caller);
+    const requiredScopes = input.evidence.requiredScopes.map((scope) => assertReadableExactScope(scope, caller));
+    if (!requiredScopes.some((scope) => scope.applicationServiceId === primaryScope.applicationServiceId && scope.scopePath === primaryScope.scopePath)) throw new FederationToolError("SCOPE_MISMATCH");
+    return verifyPersistedChangeAttestation({ attestation: input.attestation, evidence: { ...input.evidence, requiredScopes } });
   });
 
   registerFederationJsonTool(server, "reconcile_federated_scope", {

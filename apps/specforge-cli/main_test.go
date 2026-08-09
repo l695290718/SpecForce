@@ -102,6 +102,48 @@ func TestAttestationSignatureVerification(t *testing.T) {
 	}
 }
 
+func TestAttestationRejectsRepositoryAndEvidenceMismatch(t *testing.T) {
+	publicKey, privateKey, _ := ed25519.GenerateKey(nil)
+	payloadValue := map[string]any{
+		"stagedTreeHash":     "tree",
+		"expiresAt":          "2999-01-01T00:00:00Z",
+		"attestationId":      "att-2",
+		"repositoryId":       "repo-a",
+		"parentCommit":       "parent-a",
+		"fileManifestDigest": "manifest-a",
+		"scopeMappingDigest": "mapping-a",
+		"scopes":             []any{map[string]any{"architectureScope": map[string]any{"applicationServiceId": "service-a", "scopePath": "root/service-a"}, "sessionId": "session-a"}},
+	}
+	payload, _ := json.Marshal(payloadValue)
+	canonical, _ := canonicalJSON(payloadValue)
+	attestation := Attestation{Payload: payload, Signature: base64.StdEncoding.EncodeToString(ed25519.Sign(privateKey, canonical)), PublicKey: base64.StdEncoding.EncodeToString(publicKey)}
+	evidence := Evidence{RepositoryID: "repo-b", ParentCommit: "parent-a", StagedTreeHash: "tree", ManifestDigest: "manifest-a", ScopeMappingDigest: "mapping-a", RequiredScopes: []Scope{{ApplicationServiceID: "service-a", ScopePath: "root/service-a"}}}
+	if err := verifyAttestation(attestation, evidence); err == nil || err.Error() != "ATTESTATION_REPOSITORY_MISMATCH" {
+		t.Fatalf("expected repository mismatch, got %v", err)
+	}
+}
+
+func TestAttestationRejectsIncompleteScopeCoverage(t *testing.T) {
+	publicKey, privateKey, _ := ed25519.GenerateKey(nil)
+	payloadValue := map[string]any{
+		"stagedTreeHash":     "tree",
+		"expiresAt":          "2999-01-01T00:00:00Z",
+		"attestationId":      "att-3",
+		"repositoryId":       "repo-a",
+		"parentCommit":       "parent-a",
+		"fileManifestDigest": "manifest-a",
+		"scopeMappingDigest": "mapping-a",
+		"scopes":             []any{map[string]any{"architectureScope": map[string]any{"applicationServiceId": "service-a", "scopePath": "root/service-a"}, "sessionId": "session-a"}},
+	}
+	payload, _ := json.Marshal(payloadValue)
+	canonical, _ := canonicalJSON(payloadValue)
+	attestation := Attestation{Payload: payload, Signature: base64.StdEncoding.EncodeToString(ed25519.Sign(privateKey, canonical)), PublicKey: base64.StdEncoding.EncodeToString(publicKey)}
+	evidence := Evidence{RepositoryID: "repo-a", ParentCommit: "parent-a", StagedTreeHash: "tree", ManifestDigest: "manifest-a", ScopeMappingDigest: "mapping-a", RequiredScopes: []Scope{{ApplicationServiceID: "service-a", ScopePath: "root/service-a"}, {ApplicationServiceID: "service-b", ScopePath: "root/service-b"}}}
+	if err := verifyAttestation(attestation, evidence); err == nil || err.Error() != "ATTESTATION_SCOPE_COVERAGE_INCOMPLETE" {
+		t.Fatalf("expected Scope coverage failure, got %v", err)
+	}
+}
+
 func TestHookInstallPreservesExistingHookAndIsIdempotent(t *testing.T) {
 	root := t.TempDir()
 	hooks := filepath.Join(root, ".git", "hooks")
