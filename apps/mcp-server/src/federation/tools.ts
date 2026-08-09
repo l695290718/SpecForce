@@ -17,7 +17,7 @@ import {
 import { getContinuousObservationCursor, submitContinuousObservationBatch } from "./continuous-persistence";
 import { issueChangeAttestation } from "./attestation";
 import { verifyPersistedChangeAttestation } from "./attestation-verification";
-import { principalFromAuthInfo, type McpAuthInfo } from "../auth";
+import { principalFromAuthInfo, withRequestPrincipal, type McpAuthInfo } from "../auth";
 
 const architectureScopeSchema = z.object({
   applicationServiceId: z.string().min(1),
@@ -460,7 +460,7 @@ function registerFederationJsonTool<T extends z.ZodRawShape>(
         auditId = await createFederationAudit({ actor: auditIdentity, action: name, ...target, toolInput: input, output: "pending", status: "failed" });
         const caller = requestActor(extra);
         authorizeCaller(caller, config.permissions, input as Record<string, unknown>);
-        const output = await handler(input as z.output<z.ZodObject<T>>, caller);
+        const output = await withRequestPrincipal(caller, () => handler(input as z.output<z.ZodObject<T>>, caller));
         try {
           await finalizeFederationAuditRecoverable(auditId, { actor: caller, action: name, ...target, toolInput: input, output, status: "success" });
         } catch (auditError) {

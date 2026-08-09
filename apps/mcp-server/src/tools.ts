@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Permission } from "@specforge/core";
 import { z } from "zod";
 import { auditToolCall } from "./audit";
-import { allowAllPolicy, getDefaultActor } from "./auth";
+import { allowAllPolicy, getDefaultActor, principalFromAuthInfo, withRequestPrincipal, type McpAuthInfo } from "./auth";
 import { deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
 import { commitKnowledgeChangeSet, createIdentityCandidate, createKnowledgeAssertion, createKnowledgeReviewBundle, createProjectionManifest, createWorkingStream, decideKnowledgeReviewBundle, listKnowledgeAssertions, publishKnowledgeBaseline } from "./knowledge/persistence";
 import { submitScanReport } from "./scanner/persistence";
@@ -26,6 +26,7 @@ import {
 } from "./scoped-derived";
 
 type ToolHandler<T> = (input: T) => Promise<unknown>;
+type ToolExtra = { authInfo?: McpAuthInfo };
 
 function textResult(value: unknown): CallToolResult {
   const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
@@ -86,23 +87,27 @@ function registerJsonTool<T extends z.ZodRawShape>(
       },
       _meta: { permissions: config.permissions, write: !config.readOnly }
     } as Parameters<McpServer["registerTool"]>[1],
-    async (input: unknown) => {
-      const actor = isSeedMode()
-        ? { actorType: "system" as const, actorId: "specforge-seed" }
-        : getDefaultActor();
-      const target = targetFor(name, input as Record<string, unknown>);
-      try {
-        if (config.seedOnly && !isSeedMode()) throw new Error("Seed cleanup is not enabled.");
-        await allowAllPolicy.authorize(actor, config.permissions);
-        const output = await handler(input as z.output<z.ZodObject<T>>);
-        auditToolCall({ actor, action: name, ...target, toolInput: input, output, status: "success" });
-        return textResult(output);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown tool error";
-        if (isSeedMode()) console.error(`[specforge-seed] ${name}: ${message}`);
-        auditToolCall({ actor, action: name, ...target, toolInput: input, output: "failed", status: "failed", errorMessage: message });
-        return errorResult(`SpecForge tool call failed: ${name}. Check input and asset identifiers.`);
-      }
+    async (input: unknown, extra?: ToolExtra) => {
+      const principal = !isSeedMode() && extra?.authInfo ? principalFromAuthInfo(extra.authInfo) : undefined;
+      const execute = async () => {
+        const actor = principal ?? (isSeedMode()
+          ? { actorType: "system" as const, actorId: "specforge-seed" }
+          : getDefaultActor());
+        const target = targetFor(name, input as Record<string, unknown>);
+        try {
+          if (config.seedOnly && !isSeedMode()) throw new Error("Seed cleanup is not enabled.");
+          await allowAllPolicy.authorize(actor, config.permissions);
+          const output = await handler(input as z.output<z.ZodObject<T>>);
+          auditToolCall({ actor, action: name, ...target, toolInput: input, output, status: "success" });
+          return textResult(output);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Unknown tool error";
+          if (isSeedMode()) console.error(`[specforge-seed] ${name}: ${message}`);
+          auditToolCall({ actor, action: name, ...target, toolInput: input, output: "failed", status: "failed", errorMessage: message });
+          return errorResult(`SpecForge tool call failed: ${name}. Check input and asset identifiers.`);
+        }
+      };
+      return principal ? withRequestPrincipal(principal, execute) : execute();
     }
   );
 }

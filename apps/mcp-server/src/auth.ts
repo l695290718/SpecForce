@@ -1,4 +1,5 @@
 import { normalizePrincipalClaims, type Permission, type PrincipalAuthSource, type ScopedPrincipal } from "@specforge/core";
+import { AsyncLocalStorage } from "node:async_hooks";
 
 export interface McpActor {
   actorType: "agent" | "user" | "system";
@@ -16,6 +17,8 @@ export interface McpAuthInfo {
   tenantId?: string;
   authSource?: PrincipalAuthSource;
 }
+
+const principalStorage = new AsyncLocalStorage<ScopedPrincipal>();
 
 export const allowAllPolicy: AuthorizationPolicy = {
   async authorize() {
@@ -46,6 +49,14 @@ export function principalFromAuthInfo(authInfo: McpAuthInfo | undefined): Scoped
     permissions,
     decisionRef: rawActor?.decisionRef ?? rawClaims?.decisionRef
   }, { allowSeed: process.env.SPECFORGE_MCP_SEED === "1" });
+}
+
+export function withRequestPrincipal<T>(principal: ScopedPrincipal, callback: () => Promise<T>): Promise<T> {
+  return principalStorage.run(principal, callback);
+}
+
+export function currentRequestPrincipal(): ScopedPrincipal | undefined {
+  return principalStorage.getStore();
 }
 
 function stringValue(value: unknown): string {

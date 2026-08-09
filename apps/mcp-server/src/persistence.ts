@@ -4,6 +4,7 @@ import type { ArchitectureScopeRef, Asset, AssetLocale, AssetType, ContextPack, 
 import { createHash } from "node:crypto";
 import { createTrustedRelationshipExecutionContext, RelationshipCommandService, type DeleteLegacyRelationshipCommand, type UpsertRelationshipCommand } from "./relationships/command-service";
 import { PrismaRelationshipRepository, type RelationshipScope } from "./relationships/repository";
+import { currentRequestPrincipal } from "./auth";
 
 const globalForPrisma = globalThis as unknown as { specforgeMcpPrisma?: PrismaClient };
 const legacyContextPackFallbackSymbol = Symbol("legacyContextPackFallback");
@@ -59,6 +60,8 @@ export function resolveWritableScope(actor: ScopedActor, scope: ArchitectureScop
 }
 
 export function writableActor(): ScopedActor {
+  const principal = currentRequestPrincipal();
+  if (principal) return principal;
   return process.env.SPECFORGE_MCP_SEED === "1" ? seedHuaweiActor : defaultHuaweiActor;
 }
 
@@ -68,7 +71,8 @@ export function isSeedMode(): boolean {
 
 export function readableScope(applicationServiceId: string): ArchitectureScopeRef {
   const scope = scopeById(applicationServiceId);
-  if (!scope || scope.level !== "applicationService" || !hasScopeAccess(defaultHuaweiActor, scope, "read")) throw new Error("Scope read is not authorized.");
+  const actor = currentRequestPrincipal() ?? defaultHuaweiActor;
+  if (!scope || scope.level !== "applicationService" || !hasScopeAccess(actor, scope, "read")) throw new Error("Scope read is not authorized.");
   return { applicationServiceId: scope.id, scopePath: scope.scopePath };
 }
 

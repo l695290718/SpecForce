@@ -10,8 +10,10 @@ import {
   upsertAssetLink,
   upsertContextPack,
   upsertDesignAsset,
-  upsertProposal
+  upsertProposal,
+  writableActor
 } from "./persistence";
+import { principalFromAuthInfo, withRequestPrincipal } from "./auth";
 
 const writableScope = {
   applicationServiceId: "com.huawei.celon.desiner",
@@ -203,6 +205,19 @@ describe("resolveWritableScope", () => {
 
   it("rejects a sibling application service without write permission", () => {
     expect(() => resolveWritableScope(defaultHuaweiActor, { applicationServiceId: "com.huawei.celon.runtime", scopePath: "client-supplied" })).toThrow("Scope write is not authorized.");
+  });
+
+  it("uses the normalized request principal instead of the default actor", async () => {
+    const principal = principalFromAuthInfo({
+      clientId: "request-client",
+      tenantId: "tenant-1",
+      scopes: ["asset:write"],
+      extra: { actor: { actorType: "agent", actorId: "request-agent", grants: [{ scopeId: writableScope.applicationServiceId, action: "write" }] } }
+    });
+
+    await withRequestPrincipal(principal, async () => {
+      expect(writableActor()).toMatchObject({ actorId: "request-agent", subject: "request-agent", tenantId: "tenant-1" });
+    });
   });
 
   it("keeps rendered zh source json canonical while leaving localized narratives in the markdown body", async () => {
