@@ -32,3 +32,13 @@ export interface ScopedActor {
   actorId: string;
   grants: ScopeGrant[];
 }
+
+export type PrincipalAuthSource = "seed" | "static-bearer" | "oidc" | "system";
+
+export interface ScopedPrincipal extends ScopedActor {
+  subject: string;
+  tenantId: string;
+  authSource: PrincipalAuthSource;
+  permissions: import("../types").Permission[];
+  decisionRef: string;
+}
