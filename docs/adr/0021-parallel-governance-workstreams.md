@@ -8,6 +8,7 @@
 - Owning application service: `com.huawei.celon.desiner`
 - Owning Scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - Design Change Session: `design-change-session:81cc9275-ce22-417b-a467-57c5b07be6bb`
+- Follow-up Design Change Session: `design-change-session:9f97d614-52e2-479c-9699-c8a3220853c2`
 
 ## Context
 
@@ -67,6 +68,9 @@ Repository records distinguish implemented local governance contracts from defer
 - `pnpm design-facts:check` verified all 19 ADR decisions with empty `missing`, `mismatched`, `outOfScope`, and `blocked` lists.
 - `$env:SPECFORGE_APPLICATION_SERVICE_ID='com.huawei.celon.desiner'; $env:SPECFORGE_SCOPE_PATH='pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner'; pnpm design-facts:federation:check` returned `blocking:false` with empty issue counts for the canonical full Scope path.
 - `pnpm design-context:close -- --session design-change-session:81cc9275-ce22-417b-a467-57c5b07be6bb --status CONVERGED --evidence "core-typecheck=PASS,mcp-typecheck=PASS,focused-tests=5-files-61-tests,go-tests=PASS,manifest-check=PASS,design-facts-check=19-verified,federation-check=blocking-false"` returned the same exact Scope with status `CONVERGED`.
+- Follow-up preflight `design-change-session:9f97d614-52e2-479c-9699-c8a3220853c2` read 165 scoped assets before propagating the principal through ordinary MCP tools and persistence.
+- `pnpm --filter @specforge/mcp-server typecheck; pnpm --filter @specforge/mcp-server exec vitest run src/auth.test.ts src/tools.test.ts src/persistence.test.ts src/federation/tools.test.ts` passed 4 files and 97 tests.
+- `pnpm design-context:close -- --session design-change-session:9f97d614-52e2-479c-9699-c8a3220853c2 --status CONVERGED --evidence "mcp-typecheck=PASS,principal-context-tests=4-files-97-tests,design-facts-check=19-verified,federation-check=blocking-false"` returned the exact Designer Scope with status `CONVERGED`.
 
 ## Chinese Localization
 
