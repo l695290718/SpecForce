@@ -9,6 +9,7 @@
 - Owning Scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - Design Change Session: `design-change-session:81cc9275-ce22-417b-a467-57c5b07be6bb`
 - Follow-up Design Change Session: `design-change-session:9f97d614-52e2-479c-9699-c8a3220853c2`
+- Exact-Scope follow-up: `design-change-session:c4b5a809-d486-4a91-a3fb-d3b47788b3ad`
 
 ## Context
 
@@ -71,6 +72,9 @@ Repository records distinguish implemented local governance contracts from defer
 - Follow-up preflight `design-change-session:9f97d614-52e2-479c-9699-c8a3220853c2` read 165 scoped assets before propagating the principal through ordinary MCP tools and persistence.
 - `pnpm --filter @specforge/mcp-server typecheck; pnpm --filter @specforge/mcp-server exec vitest run src/auth.test.ts src/tools.test.ts src/persistence.test.ts src/federation/tools.test.ts` passed 4 files and 97 tests.
 - `pnpm design-context:close -- --session design-change-session:9f97d614-52e2-479c-9699-c8a3220853c2 --status CONVERGED --evidence "mcp-typecheck=PASS,principal-context-tests=4-files-97-tests,design-facts-check=19-verified,federation-check=blocking-false"` returned the exact Designer Scope with status `CONVERGED`.
+- Exact-Scope follow-up preflight `design-change-session:c4b5a809-d486-4a91-a3fb-d3b47788b3ad` read 165 assets before tightening normalized-principal persistence reads and writes to exact application-service grants.
+- `pnpm --filter @specforge/mcp-server typecheck; pnpm --filter @specforge/mcp-server exec vitest run src/auth.test.ts src/persistence.test.ts src/federation/tools.test.ts` passed 3 files and 75 tests, including parent-Scope denial.
+- `pnpm design-context:close -- --session design-change-session:c4b5a809-d486-4a91-a3fb-d3b47788b3ad --status CONVERGED --evidence "mcp-typecheck=PASS,exact-scope-tests=3-files-75-tests,design-facts-check=19-verified,federation-check=blocking-false"` returned the exact Designer Scope with status `CONVERGED`.
 
 ## Chinese Localization
 
