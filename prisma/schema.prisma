@@ -735,12 +735,119 @@ model ProjectionManifest {
   query                   Json     @default("{}") @db.JsonB
   digest                  String
   generatedAt             DateTime
+  profileId               String?
+  profileVersion          String?
+  generationId            String?
+  inputDigest             String?
+  contentDigest           String?
+  nodeCount               Int?
+  edgeCount               Int?
+  publishedAt             DateTime?
   applicationServiceId    String
   scopePath               String
   createdAt               DateTime @default(now())
 
   @@unique([applicationServiceId, scopePath, id], map: "ProjectionManifest_scope_id_key")
   @@index([applicationServiceId, scopePath, baselineId, projectionType], map: "ProjectionManifest_scope_baseline_type_idx")
+}
+
+model ProjectionBuildJob {
+  dbId                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                      String
+  buildKey                String
+  generationId            String
+  baselineId              String
+  profileId               String
+  profileVersion          String
+  projectionSchemaVersion String
+  status                  String
+  attempt                 Int      @default(1)
+  leaseOwner              String?
+  leaseExpiresAt          DateTime?
+  checkpoint              Json     @default("{}") @db.JsonB
+  nodeCount               Int      @default(0)
+  edgeCount               Int      @default(0)
+  errorCode               String?
+  diagnosticRef           String?
+  availableAt             DateTime @default(now())
+  completedAt             DateTime?
+  applicationServiceId    String
+  scopePath               String
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "ProjectionBuildJob_scope_id_key")
+  @@unique([applicationServiceId, scopePath, buildKey, attempt], map: "ProjectionBuildJob_scope_build_attempt_key")
+  @@index([status, availableAt, leaseExpiresAt, createdAt], map: "ProjectionBuildJob_claim_idx")
+  @@index([applicationServiceId, scopePath, baselineId, profileId, profileVersion], map: "ProjectionBuildJob_scope_baseline_profile_idx")
+}
+
+model KnowledgeProjectionNode {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  generationId         String
+  baselineId           String
+  assertionId          String
+  semanticIdentity     String
+  layer                String
+  sortKey              String
+  acceptedAssetType    String?
+  acceptedAssetId      String?
+  contentDigest        String
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, generationId, assertionId], map: "KnowledgeProjectionNode_scope_generation_assertion_key")
+  @@index([applicationServiceId, scopePath, generationId, layer, sortKey, assertionId], map: "KnowledgeProjectionNode_search_idx")
+  @@index([applicationServiceId, scopePath, generationId, semanticIdentity], map: "KnowledgeProjectionNode_identity_idx")
+}
+
+model KnowledgeProjectionEdge {
+  dbId                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  generationId            String
+  baselineId              String
+  relationshipIdentity    String
+  relationshipAssertionId String?
+  relationshipEventId     String?
+  sourceAssertionId       String
+  targetAssertionId       String
+  sourceSemanticIdentity  String
+  targetSemanticIdentity  String
+  relationCode            String
+  confidence              Float
+  relationshipVersion     String
+  contentDigest           String
+  applicationServiceId    String
+  scopePath               String
+  createdAt               DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, generationId, relationshipIdentity], map: "KnowledgeProjectionEdge_scope_generation_identity_key")
+  @@index([applicationServiceId, scopePath, generationId, sourceAssertionId, relationCode, targetAssertionId], map: "KnowledgeProjectionEdge_source_idx")
+  @@index([applicationServiceId, scopePath, generationId, targetAssertionId, relationCode, sourceAssertionId], map: "KnowledgeProjectionEdge_target_idx")
+}
+
+model TraceContinuation {
+  dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  browseSessionId       String
+  tenantId              String
+  subject               String
+  baselineId            String
+  projectionManifestId  String
+  queryFingerprint      String
+  sequence              Int      @default(0)
+  stateDigest           String
+  frontier              Json     @default("[]") @db.JsonB
+  visitedIds            Json     @default("[]") @db.JsonB
+  expiresAt             DateTime
+  consumedAt            DateTime?
+  applicationServiceId  String
+  scopePath             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, browseSessionId], map: "TraceContinuation_scope_session_key")
+  @@index([expiresAt], map: "TraceContinuation_expiry_idx")
+  @@index([applicationServiceId, scopePath, subject, expiresAt], map: "TraceContinuation_scope_subject_expiry_idx")
 }
 
 model KnowledgeReviewBundle {

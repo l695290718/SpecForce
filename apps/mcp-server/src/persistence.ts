@@ -341,6 +341,115 @@ async function initializeMcpPersistenceSchema() {
       UNIQUE("applicationServiceId", "scopePath", id)
     )
   `);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ProjectionManifest"
+    ADD COLUMN IF NOT EXISTS "profileId" TEXT,
+    ADD COLUMN IF NOT EXISTS "profileVersion" TEXT,
+    ADD COLUMN IF NOT EXISTS "generationId" TEXT,
+    ADD COLUMN IF NOT EXISTS "inputDigest" TEXT,
+    ADD COLUMN IF NOT EXISTS "contentDigest" TEXT,
+    ADD COLUMN IF NOT EXISTS "nodeCount" INTEGER,
+    ADD COLUMN IF NOT EXISTS "edgeCount" INTEGER,
+    ADD COLUMN IF NOT EXISTS "publishedAt" TIMESTAMP`);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "ProjectionBuildJob" (
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
+      "buildKey" TEXT NOT NULL,
+      "generationId" TEXT NOT NULL,
+      "baselineId" TEXT NOT NULL,
+      "profileId" TEXT NOT NULL,
+      "profileVersion" TEXT NOT NULL,
+      "projectionSchemaVersion" TEXT NOT NULL,
+      status TEXT NOT NULL,
+      attempt INTEGER NOT NULL DEFAULT 1,
+      "leaseOwner" TEXT,
+      "leaseExpiresAt" TIMESTAMP,
+      checkpoint JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "nodeCount" INTEGER NOT NULL DEFAULT 0,
+      "edgeCount" INTEGER NOT NULL DEFAULT 0,
+      "errorCode" TEXT,
+      "diagnosticRef" TEXT,
+      "availableAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "completedAt" TIMESTAMP,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id),
+      UNIQUE("applicationServiceId", "scopePath", "buildKey", attempt)
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "KnowledgeProjectionNode" (
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      "generationId" TEXT NOT NULL,
+      "baselineId" TEXT NOT NULL,
+      "assertionId" TEXT NOT NULL,
+      "semanticIdentity" TEXT NOT NULL,
+      layer TEXT NOT NULL,
+      "sortKey" TEXT NOT NULL,
+      "acceptedAssetType" TEXT,
+      "acceptedAssetId" TEXT,
+      "contentDigest" TEXT NOT NULL,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", "generationId", "assertionId")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "KnowledgeProjectionEdge" (
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      "generationId" TEXT NOT NULL,
+      "baselineId" TEXT NOT NULL,
+      "relationshipIdentity" TEXT NOT NULL,
+      "relationshipAssertionId" TEXT,
+      "relationshipEventId" TEXT,
+      "sourceAssertionId" TEXT NOT NULL,
+      "targetAssertionId" TEXT NOT NULL,
+      "sourceSemanticIdentity" TEXT NOT NULL,
+      "targetSemanticIdentity" TEXT NOT NULL,
+      "relationCode" TEXT NOT NULL,
+      confidence DOUBLE PRECISION NOT NULL,
+      "relationshipVersion" TEXT NOT NULL,
+      "contentDigest" TEXT NOT NULL,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", "generationId", "relationshipIdentity")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "TraceContinuation" (
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      "browseSessionId" TEXT NOT NULL,
+      "tenantId" TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      "baselineId" TEXT NOT NULL,
+      "projectionManifestId" TEXT NOT NULL,
+      "queryFingerprint" TEXT NOT NULL,
+      sequence INTEGER NOT NULL DEFAULT 0,
+      "stateDigest" TEXT NOT NULL,
+      frontier JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "visitedIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "expiresAt" TIMESTAMP NOT NULL,
+      "consumedAt" TIMESTAMP,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", "browseSessionId")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "ProjectionBuildJob_one_active_build_key" ON "ProjectionBuildJob"("applicationServiceId", "scopePath", "buildKey") WHERE status IN ('QUEUED', 'BUILDING')`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ProjectionBuildJob_claim_idx" ON "ProjectionBuildJob"(status, "availableAt", "leaseExpiresAt", "createdAt")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ProjectionBuildJob_scope_baseline_profile_idx" ON "ProjectionBuildJob"("applicationServiceId", "scopePath", "baselineId", "profileId", "profileVersion")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "KnowledgeProjectionNode_search_idx" ON "KnowledgeProjectionNode"("applicationServiceId", "scopePath", "generationId", layer, "sortKey", "assertionId")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "KnowledgeProjectionNode_identity_idx" ON "KnowledgeProjectionNode"("applicationServiceId", "scopePath", "generationId", "semanticIdentity")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "KnowledgeProjectionEdge_source_idx" ON "KnowledgeProjectionEdge"("applicationServiceId", "scopePath", "generationId", "sourceAssertionId", "relationCode", "targetAssertionId")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "KnowledgeProjectionEdge_target_idx" ON "KnowledgeProjectionEdge"("applicationServiceId", "scopePath", "generationId", "targetAssertionId", "relationCode", "sourceAssertionId")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TraceContinuation_expiry_idx" ON "TraceContinuation"("expiresAt")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "TraceContinuation_scope_subject_expiry_idx" ON "TraceContinuation"("applicationServiceId", "scopePath", subject, "expiresAt")`);
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "KnowledgeReviewBundle" (
       "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
