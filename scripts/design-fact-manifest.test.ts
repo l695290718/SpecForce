@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(20);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(20);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(20);
+  expect(manifest.decisions).toHaveLength(21);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(21);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(21);
   const proposalByContextPack = new Map<string, string>();
 
   for (const decision of manifest.decisions) {
@@ -99,6 +99,23 @@ it("includes the implemented 3A architecture workspace and its typed design fact
     const localized = managed.asset.localizedContent as { en?: { name?: string; description?: string }; zh?: { name?: string; description?: string } };
     return localized.en?.name && localized.en.description && localized.zh?.name && localized.zh.description;
   })).toBe(true);
+});
+
+it("includes the approved scalable 3A exploration design without claiming implementation", () => {
+  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-scalable-3a-exploration");
+  expect(decision?.proposalId).toBe("proposal-scalable-3a-exploration");
+  expect(decision?.proposalStatus).toBe("approved");
+  expect(decision?.contextPackId).toBe("ctx-scalable-3a-exploration");
+  expect(decision?.status).toBe("Approved design; implementation has not started");
+  expect(decision?.relatedAssetIds).toEqual([
+    "api-specforge-3a-architecture-query",
+    "data-specforge-3a-projection-read-model",
+    "adr-3a-architecture-navigation-workspace"
+  ]);
+  expect(decision?.managedRelationships).toEqual(expect.arrayContaining([
+    expect.objectContaining({ sourceId: "proposal-scalable-3a-exploration", targetId: "api-specforge-3a-architecture-query", relationType: "IMPACTS" }),
+    expect.objectContaining({ sourceId: "proposal-scalable-3a-exploration", targetId: "data-specforge-3a-projection-read-model", relationType: "IMPACTS" })
+  ]));
 });
 
 it("includes the single-host Docker deployment decision in the baseline", () => {

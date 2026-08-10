@@ -1166,6 +1166,57 @@
                                                 "result":  "The exact Designer-Scope acceptance session closes as CONVERGED after canonical PostgreSQL e2e, restart recovery, query isolation, drift, browser acceptance, MCP read-back, and federation evidence; production identity and Nebula 3A remain deferred."
                                             }
                                        ]
+                      },
+                      {
+                          "id":  "adr-scalable-3a-exploration",
+                          "repositoryAdr":  "docs/adr/0023-scalable-3a-exploration.md",
+                          "mcpAdrId":  "adr-scalable-3a-exploration",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-scalable-3a-exploration",
+                          "proposalStatus":  "approved",
+                          "contextPackId":  "ctx-scalable-3a-exploration",
+                          "relatedAssetIds":  [
+                                                  "api-specforge-3a-architecture-query",
+                                                  "data-specforge-3a-projection-read-model",
+                                                  "adr-3a-architecture-navigation-workspace"
+                                              ],
+                          "managedRelationships":  [
+                                                       { "sourceType":  "proposal", "sourceId":  "proposal-scalable-3a-exploration", "targetType":  "api", "targetId":  "api-specforge-3a-architecture-query", "relationType":  "IMPACTS" },
+                                                       { "sourceType":  "proposal", "sourceId":  "proposal-scalable-3a-exploration", "targetType":  "dataModel", "targetId":  "data-specforge-3a-projection-read-model", "relationType":  "IMPACTS" }
+                                                   ],
+                          "owner":  "SpecForge Architecture and Runtime",
+                          "status":  "Approved design; implementation has not started",
+                          "reason":  "The current 3A page renders a combined 200-node catalog, stretches to the densest lane, eagerly loads inactive view data, and traverses a full in-memory edge list. Catalog browsing and relationship exploration require separate bounded interaction and query models.",
+                          "retryTrigger":  "After user review of the written Spec, create and approve the implementation plan. Update the existing query contract only after focused implementation evidence proves the additive behavior.",
+                          "evidence":  [
+                                           {
+                                               "command":  "User design review on 2026-08-10",
+                                               "result":  "Approved independent fixed-height paginated lanes and requested a complementary graph explorer informed by GitNexus."
+                                           },
+                                           {
+                                               "command":  "node node_modules\\.pnpm\\tsx@4.23.0\\node_modules\\tsx\\dist\\cli.mjs scripts\\design-context.ts preflight --intent scalable-3a-exploration",
+                                               "result":  "Opened design-change-session:bf43d490-47f0-4b3b-8fee-932d4b5ccf66 in the exact Designer Scope and read 194 scoped assets with design context digest 2fde34efc8bddce36686cf16de726ece4bec9c5e1d9399e8a688767ba390c5f7."
+                                           },
+                                           {
+                                               "command":  "Repository inspection of apps/web/app/architecture/3a/page.tsx, ArchitectureLanes, ThreeAWorkspace, and knowledge-query service",
+                                               "result":  "Confirmed limit 200, full client rendering, implicit first-node focus, eager trace/alignment/drift loading, signed layer search cursors, continuation support, and current full-edge in-memory traversal."
+                                           },
+                                           {
+                                               "command":  "Review GitNexus official repository and ARCHITECTURE.md on 2026-08-10",
+                                               "result":  "Confirmed focus-first context, impact and trace concepts plus a Sigma.js and Graphology WebGL renderer; retained those interaction principles while selecting the existing bounded React Flow renderer for SpecForge."
+                                           },
+                                           {
+                                               "command":  "Written-Spec structural review; git diff --check; focused design-fact tests",
+                                               "result":  "Confirmed 16 English and 16 Chinese Spec sections, all required ADR sections, zero placeholders, no implementation claim, clean diff, and 2 test files with 31 tests passed."
+                                           },
+                                           {
+                                               "command":  "Selected exact-Scope MCP design-fact synchronization and reconciliation",
+                                               "result":  "Synchronization returned complete for adr-scalable-3a-exploration; read-back verified it with empty missing, mismatched, outOfScope, and blocked lists."
+                                           }
+                                       ]
                       }
                   ]
 }
