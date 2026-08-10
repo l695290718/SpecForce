@@ -7,10 +7,10 @@
   "scripts": {
     "dev": "pnpm --filter @specforge/web dev",
     "mcp:dev": "pnpm --filter @specforge/mcp-server dev",
-    "build": "pnpm --filter @specforge/core build && pnpm --filter @specforge/mcp-server typecheck && pnpm --filter @specforge/web build",
+    "build": "pnpm --filter @specforge/core build && pnpm --filter @specforge/knowledge-query build && pnpm --filter @specforge/knowledge-projector build && pnpm --filter @specforge/mcp-server typecheck && pnpm --filter @specforge/web build",
     "lint": "pnpm --filter @specforge/web lint",
-    "typecheck": "pnpm --filter @specforge/core typecheck && pnpm --filter @specforge/mcp-server typecheck && pnpm --filter @specforge/web typecheck",
-    "test": "pnpm --filter @specforge/core test",
+    "typecheck": "pnpm --filter @specforge/core typecheck && pnpm --filter @specforge/knowledge-query typecheck && pnpm --filter @specforge/knowledge-projector typecheck && pnpm --filter @specforge/mcp-server typecheck && pnpm --filter @specforge/web typecheck",
+    "test": "pnpm --filter @specforge/core test && pnpm --filter @specforge/knowledge-query test && pnpm --filter @specforge/knowledge-projector test",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",

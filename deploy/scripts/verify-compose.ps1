@@ -28,8 +28,9 @@ function Get-ComposeConfiguration([string[]]$ComposeFiles, [string]$EnvFile = $e
 }
 
 $bundled = Get-ComposeConfiguration @($composeFile)
-if (-not $bundled.services.web.healthcheck -or -not $bundled.services.postgres.healthcheck) { throw "Both services require health checks." }
+if (-not $bundled.services.web.healthcheck -or -not $bundled.services.postgres.healthcheck -or -not $bundled.services.'knowledge-projector'.healthcheck) { throw "Web, PostgreSQL, and Knowledge Projector require health checks." }
 if ($bundled.services.postgres.ports) { throw "PostgreSQL must not publish a host port." }
+if ($bundled.services.'knowledge-projector'.ports) { throw "Knowledge Projector must not publish a host port in the default topology." }
 if (-not $bundled.volumes.specforge_pgdata) { throw "Missing specforge_pgdata volume." }
 
 $externalEnvironmentFile = Join-Path ([System.IO.Path]::GetTempPath()) "specforge-compose-external-$PID.env"
@@ -41,6 +42,7 @@ try {
   Remove-Item $externalEnvironmentFile -Force -ErrorAction SilentlyContinue
 }
 if ($external.services.postgres) { throw "External PostgreSQL mode must omit the bundled postgres service." }
+if (-not $external.services.'knowledge-projector'.environment.DATABASE_URL) { throw "External PostgreSQL mode must configure the Knowledge Projector DATABASE_URL." }
 
 if ($ConfigurationOnly) {
   Write-Output "Compose configuration verified."
