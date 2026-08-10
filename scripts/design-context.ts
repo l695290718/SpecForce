@@ -50,6 +50,8 @@ async function callMcpTool(name: string, arguments_: Record<string, unknown>): P
     args: ["--filter", "@specforge/mcp-server", "dev"],
     cwd: process.cwd(),
     env: {
+      ...process.env,
+      CI: process.env.CI ?? "true",
       SPECFORGE_MCP_SEED: "1",
       ...(requestedScope?.applicationServiceId ? { SPECFORGE_MCP_SEED_SCOPE: requestedScope.applicationServiceId } : {}),
       ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {})

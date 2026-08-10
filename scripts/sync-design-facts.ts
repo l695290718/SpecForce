@@ -716,6 +716,8 @@ async function main(): Promise<void> {
     args: ["--filter", "@specforge/mcp-server", "dev"],
     cwd: process.cwd(),
     env: {
+      ...process.env,
+      CI: process.env.CI ?? "true",
       SPECFORGE_MCP_SEED: "1",
       ...(process.env.DATABASE_URL ? { DATABASE_URL: process.env.DATABASE_URL } : {})
     }

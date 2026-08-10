@@ -79,10 +79,10 @@ it("includes the parallel governance workstreams decision", () => {
   expect(decision?.status).toContain("ScopedPrincipal");
 });
 
-it("includes the approved 3A architecture workspace and its typed design facts", () => {
+it("includes the implemented 3A architecture workspace and its typed design facts", () => {
   const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-3a-architecture-navigation-workspace");
   expect(decision?.proposalId).toBe("proposal-3a-architecture-navigation-workspace");
-  expect(decision?.proposalStatus).toBe("approved");
+  expect(decision?.proposalStatus).toBe("implemented");
   expect(decision?.contextPackId).toBe("ctx-3a-architecture-navigation-workspace");
   expect(decision?.managedAssets?.map((managed) => managed.asset.id)).toEqual([
     "api-specforge-3a-projection-build",

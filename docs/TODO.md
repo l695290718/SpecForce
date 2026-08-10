@@ -290,3 +290,33 @@ Replace the MVP mock actor grants with production identity, tenant policy, OAuth
 **触发条件：** PostgreSQL 3A 工作台验收通过，并且真实查询遥测证明需要图加速后才能启动。实现前必须创建独立 ADR 和精确 Scope 设计变更会话。
 
 **完成证据：** 必须定义 Knowledge Assertion 顶点、版本化关系边、Baseline 成员或 as-of 语义、Outbox 事件、检查点命名空间、重建与回滚行为、PostgreSQL/Nebula 结果一致性、多节点容量和生产规模认证，并通过 MCP 同步匹配的 ADR、Proposal、Context Pack、Evidence、待办状态和类型关系。
+
+## 3A Architecture Navigation Workspace
+
+**Status:** Complete locally and synchronized through MCP on 2026-08-10.
+
+**Owner:** SpecForge Architecture and Runtime.
+
+**Scope:** `com.huawei.celon.desiner` (`pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`).
+
+**Delivery:** The PostgreSQL-first read-only `/architecture/3a` workspace, v2 projection contracts and read model, leased asynchronous Knowledge Projector, bounded shared query service, exact-Scope MCP operations, provider-neutral Web principal boundary, bilingual lane/list/detail/alignment/drift views, and Docker deployment wiring are implemented. The matching ADR, implemented Proposal, Context Pack, managed assets, Evidence, and typed links were synchronized and read back through MCP.
+
+**Evidence:** Core, Query, Projector, MCP, and Web focused suites passed; all five package typechecks passed; the production build passed with `SPECFORGE_NEXT_STANDALONE=0`; Compose configuration passed. Normal Windows/OneDrive Prisma native-engine replacement and standalone symlink creation returned `EPERM`, so Docker/Linux is the production packaging path.
+
+**中文本地化：**
+
+**状态：** 2026-08-10 本地实现完成并已通过 MCP 同步与回读。
+
+**交付：** 已实现 PostgreSQL-first 的只读 `/architecture/3a` 工作台、3A v2 投影契约与读模型、带租约异步 Knowledge Projector、有界共享查询服务、精确 Scope MCP 操作、Provider-neutral Web Principal 边界、双语泳道/列表/详情/对齐/漂移视图和 Docker 部署配置。对应 ADR、已实现 Proposal、Context Pack、管理资产、Evidence 与有向类型关系均已通过 MCP 同步并回读。
+
+### Gated 3A PostgreSQL integration and visual acceptance
+
+**Status:** Deferred; external environment not configured.
+
+**Owner:** SpecForge Runtime and Release.
+
+**Trigger:** Configure the canonical PostgreSQL integration environment and Web visual harness, then run `SPECFORGE_3A_INTEGRATION=1` Projector e2e plus the desktop/mobile browser acceptance for the exact Designer Scope.
+
+**Rationale:** Local contracts, unit tests, typechecks, build, and Compose configuration are verified. External integration/e2e and browser screenshots were intentionally not claimed as passed in this environment.
+
+**中文本地化：** 外部 PostgreSQL 集成、Projector e2e 和桌面/移动端浏览器验收暂缓；触发条件是配置对应环境后运行精确 Designer Scope 的集成与视觉验收。负责人为 SpecForge Runtime 与 Release，原因是当前环境只具备本地契约、单元测试、类型检查、构建和 Compose 配置证据。

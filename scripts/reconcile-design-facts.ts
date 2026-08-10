@@ -178,7 +178,17 @@ async function main(): Promise<void> {
   const requireFromMcp = createRequire(resolve(process.cwd(), "apps/mcp-server/package.json"));
   const { Client } = requireFromMcp("@modelcontextprotocol/sdk/client/index.js");
   const { StdioClientTransport } = requireFromMcp("@modelcontextprotocol/sdk/client/stdio.js");
-  const transport = new StdioClientTransport({ command: "pnpm", args: ["--filter", "@specforge/mcp-server", "dev"], cwd: process.cwd(), env: { ...(process.env.DATABASE_URL ? { DATABASE_URL: process.env.DATABASE_URL } : {}) } });
+  const transport = new StdioClientTransport({
+    command: "pnpm",
+    args: ["--filter", "@specforge/mcp-server", "dev"],
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      CI: process.env.CI ?? "true",
+      SPECFORGE_MCP_SEED: "1",
+      ...(process.env.DATABASE_URL ? { DATABASE_URL: process.env.DATABASE_URL } : {})
+    }
+  });
   const client = new Client({ name: "specforge-design-fact-reconcile", version: "0.1.0" }, { capabilities: {} });
   await client.connect(transport);
   try {

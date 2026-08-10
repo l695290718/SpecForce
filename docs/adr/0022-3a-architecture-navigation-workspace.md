@@ -2,12 +2,12 @@
 
 ## Status
 
-**Accepted; the bilingual design is approved and implementation is pending.**
+**Implemented locally; the PostgreSQL-first 3A navigation increment is verified.**
 
 - Stable ID: `adr-3a-architecture-navigation-workspace`
 - Owning application service: `com.huawei.celon.desiner`
 - Owning scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
-- Design Change Session: `design-change-session:882fb4fb-cd55-4bba-a75c-d05c1d01b7bc`
+- Design Change Session: `design-change-session:b7540766-caf2-48f8-9a42-55922b3e815c`
 - Approved Spec: `docs/superpowers/specs/2026-08-10-3a-architecture-navigation-design.md`
 
 ## Context
@@ -69,6 +69,17 @@ The existing NebulaGraph design-asset projection is not reused for 3A traversal.
 - Exact-Scope `pnpm design-facts:federation:check` returned root `f04e3ad0981d2ce6a2e40032e359ab06b07dc4ed2255774b6515ba8cd87987dd`, empty issue counts, and `blocking:false`.
 - `pnpm design-context:close -- --session design-change-session:882fb4fb-cd55-4bba-a75c-d05c1d01b7bc --status CONVERGED --evidence "manifest-tests=2-files-30-tests,selected-design-facts-sync=complete,design-facts-check=1-verified,federation-check=blocking-false,plan-self-review=10-tasks-65-steps,diff-check=PASS"` closed the same exact-Scope design session as `CONVERGED`.
 
+## Implementation Evidence
+
+- The exact Designer Scope preflight opened `design-change-session:b7540766-caf2-48f8-9a42-55922b3e815c` with digest `e35fab2b0876261970e5cabe2420d0b3fcde250629d5067c19fdefafa28b5709` and relationship digest `8fc0eb687230e1fb5fa4a8fb90293215f09baed11210a968ba0b3abc0644b49e`.
+- `pnpm exec prisma generate --no-engine` passed. The normal `pnpm db:generate` attempt was blocked by a Windows/OneDrive `EPERM` while replacing the locked native Prisma query engine; this is an environment limitation, not a schema failure.
+- `$env:CI='true'; pnpm typecheck` passed all five package typechecks.
+- Focused tests passed: Core 2 files/6 tests; Knowledge Query 2 files/4 tests; Knowledge Projector 3 materializer tests; MCP tools/auth 2 files/29 tests; Web 3A 3 files/8 tests. Projector integration/e2e remained skipped because the external integration environment was not configured.
+- `$env:CI='true'; $env:SPECFORGE_NEXT_STANDALONE='0'; pnpm build` passed and generated `/architecture/3a`. The normal Windows standalone copy compiled successfully but could not create OneDrive symlinks (`EPERM`); Docker/Linux remains the production packaging path.
+- `powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -ConfigurationOnly` passed `Compose configuration verified.`
+- The design-fact manifest, MCP synchronization/read-back, and exact-Scope federation reconciliation were run after this record update; external PostgreSQL e2e, browser screenshots, production identity, and Nebula 3A projection remain explicitly deferred with owners and triggers in `docs/TODO.md`.
+- `pnpm design-context:close -- --session design-change-session:b7540766-caf2-48f8-9a42-55922b3e815c --status CONVERGED --evidence "prisma-generate-no-engine=PASS,full-typecheck=PASS,core-focused-tests=PASS,query-tests=PASS,projector-tests=PASS,mcp-tools-auth-tests=PASS,web-3a-tests=PASS,production-build-no-standalone=PASS,compose-check=PASS,design-facts-readback=PASS,federation-check=blocking-false,external-3a-integration=DEFERRED_ENV_NOT_CONFIGURED,web-visual-acceptance=DEFERRED_ENV_NOT_CONFIGURED"` closes the same exact-Scope implementation session as `CONVERGED` for the local increment while preserving deferred production evidence.
+
 ## MCP Record
 
 - Matching MCP ADR ID: `adr-3a-architecture-navigation-workspace`
@@ -77,13 +88,13 @@ The existing NebulaGraph design-asset projection is not reused for 3A traversal.
 - Required managed assets: `api-specforge-3a-projection-build`, `api-specforge-3a-architecture-query`, `data-specforge-3a-projection-read-model`, and `rule-specforge-3a-projection-publication`
 - Required related decisions: `adr-deterministic-3a-knowledge-projections`, `adr-unified-3a-knowledge-initialization`, `adr-application-service-scope-isolation`, and `adr-postgresql-authoritative-design-store`
 - Required links: Proposal `IMPLEMENTS_DECISION` ADR; Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal; Evidence `VALIDATES` ADR; ADR `DECIDES` managed assets; query API `READS` projection model; publication rule `GOVERNS` projection model; Proposal `IMPACTS` managed assets.
-- Synchronization state: the approved design records are MCP synchronized and read back in the exact owning Scope; the Proposal deliberately remains `approved` until implementation evidence exists.
+- Synchronization state: the implemented Proposal, ADR, Context Pack, managed assets, Evidence, and typed links are MCP synchronized and read back in the exact owning Scope. External integration, production identity, and Nebula 3A remain deferred capabilities.
 
 ## Chinese Localization
 
 ### 状态
 
-**已接受；双语设计已批准，代码实现尚未开始。**
+**本地实现已完成；PostgreSQL-first 3A 导航增量已验证。**
 
 ### 背景
 
@@ -141,6 +152,8 @@ Web 和 MCP 复用新的查询包。每个请求必须先解析标准化 `Scoped
 - 设计事实同步与 Manifest 聚焦测试通过 2 个文件和 30 项测试，覆盖已批准 Proposal 生命周期、四个双语 3A 管理资产及其有向类型关系。
 - 选定 3A 决策已经通过 MCP 写入 ADR、approved Proposal、Context Pack、三条 Evidence、四个管理资产和方向关系；回读不存在缺失、不匹配、越界或阻塞项，精确 Scope 联邦检查返回 `blocking:false`。
 - 原设计会话 `design-change-session:882fb4fb-cd55-4bba-a75c-d05c1d01b7bc` 已使用 Manifest、MCP 回读、联邦对账、实施计划和差异检查证据在同一精确 Scope 中关闭为 `CONVERGED`。
+- 新实现会话 `design-change-session:b7540766-caf2-48f8-9a42-55922b3e815c` 的 Core、Query、Projector、MCP、Web、构建和 Compose 聚焦证据已完成；外部 PostgreSQL 集成、浏览器截图、生产身份和 Nebula 3A 投影明确延期。
+- `pnpm exec prisma generate --no-engine`、五个包的类型检查、聚焦测试和 `SPECFORGE_NEXT_STANDALONE=0 pnpm build` 均通过；普通 Windows OneDrive standalone 复制因锁定查询引擎/符号链接返回 `EPERM`，已记录为环境限制。
 
 ### MCP 记录
 
@@ -148,4 +161,4 @@ Web 和 MCP 复用新的查询包。每个请求必须先解析标准化 `Scoped
 - 匹配 Proposal：`proposal-3a-architecture-navigation-workspace`
 - 匹配 Context Pack：`ctx-3a-architecture-navigation-workspace`
 - 必需管理资产：`api-specforge-3a-architecture-query`、`data-specforge-3a-projection-read-model`、`rule-specforge-3a-projection-publication`
-- 当前同步状态：已批准设计记录已经在精确所属 Scope 完成 MCP 同步与回读；在实现证据完成前，Proposal 有意保持 `approved`。
+- 当前同步状态：实现后的 Proposal、ADR、Context Pack、管理资产、Evidence 和有向类型关系已在精确所属 Scope 完成 MCP 同步与回读；外部集成、生产身份和 Nebula 3A 仍是延期能力。

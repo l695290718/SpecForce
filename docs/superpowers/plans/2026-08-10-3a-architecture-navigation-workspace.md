@@ -1,5 +1,14 @@
 # 3A Architecture Navigation Workspace Implementation Plan
 
+## Execution Status (2026-08-10)
+
+- [x] Tasks 0-8 implemented locally: v2 contracts, PostgreSQL read model, leased Projector, shared query service, MCP operations, Web principal boundary, bilingual read-only workspace, and Docker packaging.
+- [x] Focused Core, Query, Projector, MCP, and Web tests; five-package typecheck; production build with the Windows standalone workaround; and Compose configuration verification.
+- [x] Task 9 governance closure: the exact Designer Scope ADR, implemented Proposal, Context Pack, managed assets, Evidence, typed links, Manifest read-back, federation reconciliation, and the same preflight session are synchronized; session status is `CONVERGED`.
+- [ ] External PostgreSQL Projector e2e, browser desktop/mobile visual acceptance, production identity, and Knowledge-Assertion-aware Nebula 3A projection remain deferred with owner, trigger, and rationale in `docs/TODO.md`.
+
+The unchecked procedural boxes below describe the original execution recipe. The status above is the authoritative completion record for this implementation run; deferred checks are intentionally not represented as passed.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Deliver an exact-Scope, read-only 3A Web and MCP browser over immutable official Knowledge Baselines, backed by an asynchronously materialized PostgreSQL projection.
@@ -843,7 +852,7 @@ The gated test creates two immutable official Baselines in one temporary Stream,
 
 Run: `$env:SPECFORGE_3A_INTEGRATION='1'; pnpm --filter @specforge/knowledge-projector exec vitest run src/projection.e2e.test.ts`
 
-Expected: one test suite passes against `localhost:15433/specforge_canonical` and removes all prefixed fixtures.
+Expected when the external integration environment is configured: one test suite passes against `localhost:15433/specforge_canonical` and removes all prefixed fixtures. In this run the gated suite was skipped and recorded as `DEFERRED_ENV_NOT_CONFIGURED`.
 
 - [ ] **Step 4: Include new packages in root lifecycle scripts**
 
@@ -869,7 +878,7 @@ Expected: Web and Knowledge Projector images, internal PostgreSQL wiring, extern
 
 - [ ] **Step 7: Verify desktop and mobile rendering**
 
-Start the service at `http://localhost:3000/architecture/3a?scope=com.huawei.celon.desiner`. Capture 1440x900 and 390x844 screenshots. Confirm nonblank content, stable BIZ/SYS/TECH framing, no overlap, same node set in lane/list modes, usable drawer, visible partial-state controls, and reduced-motion behavior.
+Start the service at `http://localhost:3000/architecture/3a?scope=com.huawei.celon.desiner`. Capture 1440x900 and 390x844 screenshots. This acceptance remains deferred until the Web visual harness is configured; it was not claimed as passed in this run.
 
 - [ ] **Step 8: Document operations and rollback**
 
@@ -927,7 +936,7 @@ Expected: `blocking:false` and empty issue counts.
 - [ ] **Step 5: Close the implementation Design Change Session**
 
 ```powershell
-pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session $sessionId --status CONVERGED --evidence "core-and-query-tests=PASS,projection-worker-tests=PASS,mcp-and-web-tests=PASS,production-build=PASS,compose-check=PASS,3a-e2e=PASS,design-facts-readback=PASS,federation-check=blocking-false"
+pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session $sessionId --status CONVERGED --evidence "core-and-query-tests=PASS,projection-worker-tests=PASS,mcp-and-web-tests=PASS,production-build-no-standalone=PASS,compose-check=PASS,3a-e2e=DEFERRED_ENV_NOT_CONFIGURED,design-facts-readback=PASS,federation-check=blocking-false,web-visual-acceptance=DEFERRED_ENV_NOT_CONFIGURED"
 ```
 
 Expected: the same exact-Scope session closes as `CONVERGED`. A failed MCP write or check must close as `BLOCKED` with a sanitized reason and concrete retry trigger; implementation cannot be called complete.
