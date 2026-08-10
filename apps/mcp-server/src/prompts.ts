@@ -116,6 +116,32 @@ export function registerPrompts(server: McpServer): void {
   );
 
   server.registerPrompt(
+    "browse_3a_architecture",
+    {
+      title: "Browse 3A architecture",
+      description: "Navigate the published BIZ, SYS, and TECH architecture projection without reading mutable current-state facts.",
+      argsSchema: { applicationServiceId: z.string(), scopePath: z.string(), baselineId: z.string().optional(), locale: z.enum(["en", "zh"]).optional() }
+    },
+    ({ applicationServiceId, scopePath, baselineId, locale }) => promptResult(
+      "Browse a governed 3A architecture projection through SpecForge MCP.",
+      [
+        "Use the exact architectureScope for every call; do not infer or broaden Scope.",
+        `Architecture service: ${applicationServiceId}`,
+        `Scope path: ${scopePath}`,
+        `Locale: ${locale ?? "en"}`,
+        baselineId ? `Requested baseline: ${baselineId}` : "First list official published baselines.",
+        "Workflow:",
+        "1. Call list_3a_published_baselines and choose an official immutable baseline.",
+        "2. Call list_3a_projection_manifests and use a published 3a.v2 manifest.",
+        "3. Use search_3a_architecture_facts with bounded paging and an optional BIZ/SYS/TECH filter.",
+        "4. Use get_3a_architecture_fact for bilingual fact detail and evidence, then trace_3a_architecture_path for bounded impact paths.",
+        "5. Use get_3a_alignment for explicit cross-layer relationships and compare_3a_published_baselines for immutable drift.",
+        "Never pass currentAssertionIds to the new drift operation, and never treat a graph projection as authoritative."
+      ].join("\n")
+    )
+  );
+
+  server.registerPrompt(
     "implementation_preflight",
     {
       title: "Implementation preflight",

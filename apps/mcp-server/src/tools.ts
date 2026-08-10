@@ -15,6 +15,8 @@ import { matchKnowledgeIdentities } from "./knowledge/identity-persistence";
 import { assembleKnowledgeReviewBundle, submitSemanticCandidateBatch } from "./knowledge/candidate-persistence";
 import { promoteKnowledgeCandidates, reconcileKnowledgeBaseline } from "./knowledge/promotion";
 import { deriveScopedKnowledgeProjection } from "./knowledge/projection";
+import { getProjectionBuild, requestProjectionBuild } from "./knowledge/projection-build";
+import { compare3aPublishedBaselines, get3aAlignment, get3aArchitectureFact, list3aProjectionManifests, list3aPublishedBaselines, search3aArchitectureFacts, trace3aArchitecturePath } from "./knowledge/query-adapter";
 import {
   analyzeScopedProposalImpact,
   buildScopedAssetGraph,
@@ -637,9 +639,104 @@ export function registerTools(server: McpServer): void {
     readOnly: false
   }, createProjectionManifest);
 
+  registerJsonTool(server, "request_3a_projection_build", {
+    title: "Request 3A projection build",
+    description: "Creates or returns an idempotent exact-Scope asynchronous PostgreSQL 3A projection build.",
+    inputSchema: {
+      architectureScope: architectureScopeSchema,
+      baselineId: z.string().min(1),
+      profileId: z.string().min(1),
+      profileVersion: z.string().min(1),
+      projectionSchemaVersion: z.literal("3a.v2"),
+      query: z.record(z.unknown()).optional()
+    },
+    permissions: ["knowledge:write"],
+    readOnly: false
+  }, requestProjectionBuild);
+
+  registerJsonTool(server, "get_3a_projection_build", {
+    title: "Get 3A projection build",
+    description: "Returns sanitized asynchronous 3A projection build status, counts, publication, and diagnostic reference.",
+    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1) },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, getProjectionBuild);
+
+  registerJsonTool(server, "list_3a_published_baselines", {
+    title: "List 3A published baselines",
+    description: "Lists official immutable baselines available for 3A navigation in the exact authorized application-service Scope.",
+    inputSchema: { architectureScope: architectureScopeSchema },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, list3aPublishedBaselines);
+
+  registerJsonTool(server, "list_3a_projection_manifests", {
+    title: "List 3A projection manifests",
+    description: "Lists published versioned 3A projection manifests for one official baseline in the exact authorized Scope.",
+    inputSchema: { architectureScope: architectureScopeSchema, baselineId: z.string().min(1) },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, list3aProjectionManifests);
+
+  registerJsonTool(server, "search_3a_architecture_facts", {
+    title: "Search 3A architecture facts",
+    description: "Searches the published PostgreSQL 3A read model with bounded pagination and optional BIZ, SYS, or TECH filtering.",
+    inputSchema: {
+      architectureScope: architectureScopeSchema,
+      baselineId: z.string().min(1),
+      projectionManifestId: z.string().min(1),
+      query: z.string().max(200).optional(),
+      layer: z.enum(["BIZ", "SYS", "TECH"]).optional(),
+      limit: z.number().int().min(1).max(200).optional(),
+      cursor: z.string().min(1).optional()
+    },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, search3aArchitectureFacts);
+
+  registerJsonTool(server, "trace_3a_architecture_path", {
+    title: "Trace 3A architecture path",
+    description: "Traces bounded upstream, downstream, or bidirectional paths over the published 3A relationship projection with a signed continuation cursor.",
+    inputSchema: {
+      architectureScope: architectureScopeSchema,
+      baselineId: z.string().min(1),
+      projectionManifestId: z.string().min(1),
+      startAssertionId: z.string().min(1),
+      direction: z.enum(["upstream", "downstream", "both"]).optional(),
+      budget: z.object({ maxDepth: z.number().int().positive().optional(), maxNodes: z.number().int().positive().optional(), maxEdges: z.number().int().positive().optional(), maxPaths: z.number().int().positive().optional(), timeoutMs: z.number().int().positive().optional(), maxPayloadBytes: z.number().int().positive().optional() }).partial().optional(),
+      continuation: z.string().min(1).optional()
+    },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, trace3aArchitecturePath);
+
+  registerJsonTool(server, "get_3a_architecture_fact", {
+    title: "Get 3A architecture fact",
+    description: "Returns one published architecture fact with bilingual content, evidence, unresolved questions, and typed incoming/outgoing edges.",
+    inputSchema: { architectureScope: architectureScopeSchema, baselineId: z.string().min(1), projectionManifestId: z.string().min(1), assertionId: z.string().min(1) },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, get3aArchitectureFact);
+
+  registerJsonTool(server, "get_3a_alignment", {
+    title: "Get 3A alignment",
+    description: "Returns explicit cross-layer relationships from the published 3A projection and reports alignment warnings.",
+    inputSchema: { architectureScope: architectureScopeSchema, baselineId: z.string().min(1), projectionManifestId: z.string().min(1) },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, get3aAlignment);
+
+  registerJsonTool(server, "compare_3a_published_baselines", {
+    title: "Compare 3A published baselines",
+    description: "Compares two official published 3A baselines using immutable versioned nodes and edges; current assertion sets are not accepted.",
+    inputSchema: { architectureScope: architectureScopeSchema, baseBaselineId: z.string().min(1), targetBaselineId: z.string().min(1), baseProjectionManifestId: z.string().min(1), targetProjectionManifestId: z.string().min(1) },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, compare3aPublishedBaselines);
+
   registerJsonTool(server, "derive_3a_knowledge_projection", {
     title: "Derive deterministic 3A knowledge projection",
-    description: "Reads one published Baseline and its accepted exact-Scope facts from PostgreSQL, then derives reproducible BIZ, SYS, TECH, alignment, drift, and pinned Context Pack output without creating authoritative facts.",
+    description: "Legacy compatibility read. Reads one published Baseline and its accepted exact-Scope facts from PostgreSQL, then derives reproducible BIZ, SYS, TECH, alignment, drift, and pinned Context Pack output without creating authoritative facts. New clients must use versioned 3A projection build and query tools.",
     inputSchema: { architectureScope: architectureScopeSchema, baselineId: z.string().min(1), currentAssertionIds: z.array(z.string()).optional() },
     permissions: ["knowledge:read"],
     readOnly: true

@@ -306,6 +306,37 @@ describe("deterministic 3A projection tool", () => {
   });
 });
 
+describe("versioned 3A navigation MCP boundary", () => {
+  it("registers the build as write and every navigation operation as read-only", () => {
+    const tools = captureTools();
+    const writeTool = tools.get("request_3a_projection_build")!;
+    expect(writeTool).toBeDefined();
+    expect((writeTool.config.annotations as { readOnlyHint?: boolean }).readOnlyHint).toBe(false);
+    expect((writeTool.config._meta as { permissions: string[] }).permissions).toContain("knowledge:write");
+
+    for (const name of [
+      "get_3a_projection_build",
+      "list_3a_published_baselines",
+      "list_3a_projection_manifests",
+      "search_3a_architecture_facts",
+      "trace_3a_architecture_path",
+      "get_3a_architecture_fact",
+      "get_3a_alignment",
+      "compare_3a_published_baselines"
+    ]) {
+      const tool = tools.get(name);
+      expect(tool, `${name} should be registered`).toBeDefined();
+      expect((tool!.config.annotations as { readOnlyHint?: boolean }).readOnlyHint).toBe(true);
+      expect((tool!.config._meta as { permissions: string[] }).permissions).toContain("knowledge:read");
+    }
+  });
+
+  it("marks the current-set drift API as legacy compatibility", () => {
+    const tool = captureTools().get("derive_3a_knowledge_projection")!;
+    expect(tool.config.description).toContain("Legacy compatibility read");
+  });
+});
+
 describe("3A knowledge foundation tools", () => {
   it("registers the scoped assertion, ChangeSet, Baseline, and projection operations", () => {
     const tools = captureTools();

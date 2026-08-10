@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { genericSystemAnalysisProfile, optionalAnalysisProfiles, projectionBuildKey, isOfficialBaseline, type AnalysisProfile, type ArchitectureScopeRef, type ProjectionBuildJob, type ProjectionManifestV2, type ProjectionBuildStatus, THREE_A_PROJECTION_SCHEMA_VERSION } from "@specforge/core";
-import { ensureMcpPersistenceSchema, prisma, resolveWritableScope, writableActor } from "../persistence";
+import { ensureMcpPersistenceSchema, prisma, readableScope, resolveWritableScope, writableActor } from "../persistence";
 
 export interface ProjectionBuildRequest {
   architectureScope: ArchitectureScopeRef;
@@ -80,7 +80,8 @@ export async function requestProjectionBuild(input: ProjectionBuildRequest): Pro
 }
 
 export async function getProjectionBuild(input: { architectureScope: ArchitectureScopeRef; id: string }): Promise<ProjectionBuildStatusResult> {
-  const scope = resolveWritableScope(writableActor(), input.architectureScope);
+  const scope = readableScope(input.architectureScope.applicationServiceId);
+  if (scope.scopePath !== input.architectureScope.scopePath) throw new Error("Scope read is not authorized.");
   await ensureMcpPersistenceSchema();
   const job = await prisma.projectionBuildJob.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } } });
   if (job) {
