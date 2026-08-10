@@ -293,7 +293,7 @@ Replace the MVP mock actor grants with production identity, tenant policy, OAuth
 
 ## 3A Architecture Navigation Workspace
 
-**Status:** Complete locally and synchronized through MCP on 2026-08-10.
+**Status:** Implemented, accepted against canonical Docker PostgreSQL, and synchronized through MCP on 2026-08-10.
 
 **Owner:** SpecForge Architecture and Runtime.
 
@@ -301,22 +301,22 @@ Replace the MVP mock actor grants with production identity, tenant policy, OAuth
 
 **Delivery:** The PostgreSQL-first read-only `/architecture/3a` workspace, v2 projection contracts and read model, leased asynchronous Knowledge Projector, bounded shared query service, exact-Scope MCP operations, provider-neutral Web principal boundary, bilingual lane/list/detail/alignment/drift views, and Docker deployment wiring are implemented. The matching ADR, implemented Proposal, Context Pack, managed assets, Evidence, and typed links were synchronized and read back through MCP.
 
-**Evidence:** Core, Query, Projector, MCP, and Web focused suites passed; all five package typechecks passed; the production build passed with `SPECFORGE_NEXT_STANDALONE=0`; Compose configuration passed. Normal Windows/OneDrive Prisma native-engine replacement and standalone symlink creation returned `EPERM`, so Docker/Linux is the production packaging path.
+**Evidence:** Core, Query, Projector, MCP, and Web focused suites passed; all five package typechecks passed; the production build passed with `SPECFORGE_NEXT_STANDALONE=0`; Compose configuration passed. The canonical Docker PostgreSQL Projector e2e passed one test covering Baseline publication, lease restart recovery, bounded queries, cursor replay denial, tracing, alignment, drift, sibling-Scope denial, and cleanup. Browser Playwright acceptance passed at desktop `1280x720` and mobile `509x642`; the authorized Designer Scope rendered the bilingual workspace and the sibling PolicyHub Scope returned access denied. Normal Windows/OneDrive Prisma native-engine replacement and standalone symlink creation returned `EPERM`, so Docker/Linux is the production packaging path.
 
 **中文本地化：**
 
-**状态：** 2026-08-10 本地实现完成并已通过 MCP 同步与回读。
+**状态：** 2026-08-10 已实现、通过权威 Docker PostgreSQL 验收并完成 MCP 同步与回读。
 
 **交付：** 已实现 PostgreSQL-first 的只读 `/architecture/3a` 工作台、3A v2 投影契约与读模型、带租约异步 Knowledge Projector、有界共享查询服务、精确 Scope MCP 操作、Provider-neutral Web Principal 边界、双语泳道/列表/详情/对齐/漂移视图和 Docker 部署配置。对应 ADR、已实现 Proposal、Context Pack、管理资产、Evidence 与有向类型关系均已通过 MCP 同步并回读。
 
 ### Gated 3A PostgreSQL integration and visual acceptance
 
-**Status:** Deferred; external environment not configured.
+**Status:** Complete on 2026-08-10 for the canonical Docker PostgreSQL and local Web acceptance gate. Production identity, cross-application-service comparison, and Knowledge-Assertion-aware Nebula projection remain separate deferred capabilities.
 
 **Owner:** SpecForge Runtime and Release.
 
-**Trigger:** Configure the canonical PostgreSQL integration environment and Web visual harness, then run `SPECFORGE_3A_INTEGRATION=1` Projector e2e plus the desktop/mobile browser acceptance for the exact Designer Scope.
+**Evidence:** `$env:SPECFORGE_3A_INTEGRATION='1'; $env:DATABASE_URL='postgresql://specforge:local-deployment-verification-only@localhost:15433/specforge_canonical?schema=public'; vitest run src/projection.e2e.test.ts` passed one test. In-app browser Playwright rendered `/architecture/3a?scope=com.huawei.celon.desiner` at `1280x720` and `509x642`; `policyhub` returned `Scope access denied`.
 
-**Rationale:** Local contracts, unit tests, typechecks, build, and Compose configuration are verified. External integration/e2e and browser screenshots were intentionally not claimed as passed in this environment.
+**Rationale:** The local acceptance gate is complete. Production identity, cross-application-service views, and graph acceleration require separate design, authorization, scale, and production evidence and must not be implied by this local gate.
 
-**中文本地化：** 外部 PostgreSQL 集成、Projector e2e 和桌面/移动端浏览器验收暂缓；触发条件是配置对应环境后运行精确 Designer Scope 的集成与视觉验收。负责人为 SpecForge Runtime 与 Release，原因是当前环境只具备本地契约、单元测试、类型检查、构建和 Compose 配置证据。
+**中文本地化：** 2026-08-10 已完成权威 Docker PostgreSQL 集成、Projector e2e 及桌面/移动端浏览器验收；桌面视口为 `1280x720`，移动视口为 `509x642`，`policyhub` Scope 返回访问拒绝。生产身份、跨应用服务视图和面向 Knowledge Assertion 的 Nebula 投影仍作为独立待办保留。

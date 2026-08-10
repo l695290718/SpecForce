@@ -2,12 +2,12 @@
 
 ## Status
 
-**Implemented locally; the PostgreSQL-first 3A navigation increment is verified.**
+**Implemented and locally accepted; the PostgreSQL-first 3A navigation increment is verified against canonical Docker PostgreSQL.**
 
 - Stable ID: `adr-3a-architecture-navigation-workspace`
 - Owning application service: `com.huawei.celon.desiner`
 - Owning scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
-- Design Change Session: `design-change-session:b7540766-caf2-48f8-9a42-55922b3e815c`
+- Design Change Session: `design-change-session:fc5625ce-6495-46c7-8bf7-972c62f2a21a`
 - Approved Spec: `docs/superpowers/specs/2026-08-10-3a-architecture-navigation-design.md`
 
 ## Context
@@ -77,8 +77,11 @@ The existing NebulaGraph design-asset projection is not reused for 3A traversal.
 - Focused tests passed: Core 2 files/6 tests; Knowledge Query 2 files/4 tests; Knowledge Projector 3 materializer tests; MCP tools/auth 2 files/29 tests; Web 3A 3 files/8 tests. Projector integration/e2e remained skipped because the external integration environment was not configured.
 - `$env:CI='true'; $env:SPECFORGE_NEXT_STANDALONE='0'; pnpm build` passed and generated `/architecture/3a`. The normal Windows standalone copy compiled successfully but could not create OneDrive symlinks (`EPERM`); Docker/Linux remains the production packaging path.
 - `powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -ConfigurationOnly` passed `Compose configuration verified.`
-- The design-fact manifest, MCP synchronization/read-back, and exact-Scope federation reconciliation were run after this record update; external PostgreSQL e2e, browser screenshots, production identity, and Nebula 3A projection remain explicitly deferred with owners and triggers in `docs/TODO.md`.
-- `pnpm design-context:close -- --session design-change-session:b7540766-caf2-48f8-9a42-55922b3e815c --status CONVERGED --evidence "prisma-generate-no-engine=PASS,full-typecheck=PASS,core-focused-tests=PASS,query-tests=PASS,projector-tests=PASS,mcp-tools-auth-tests=PASS,web-3a-tests=PASS,production-build-no-standalone=PASS,compose-check=PASS,design-facts-readback=PASS,federation-check=blocking-false,external-3a-integration=DEFERRED_ENV_NOT_CONFIGURED,web-visual-acceptance=DEFERRED_ENV_NOT_CONFIGURED"` closes the same exact-Scope implementation session as `CONVERGED` for the local increment while preserving deferred production evidence.
+- Canonical integration command `$env:SPECFORGE_3A_INTEGRATION='1'; $env:DATABASE_URL='postgresql://specforge:local-deployment-verification-only@localhost:15433/specforge_canonical?schema=public'; vitest run src/projection.e2e.test.ts` passed one test: two Baselines, leased batch restart recovery, search pagination and cursor replay denial, two-hop trace, detail, alignment, node/edge drift, sibling-Scope denial, and fixture cleanup.
+- `corepack pnpm --filter @specforge/knowledge-query build; corepack pnpm --filter @specforge/knowledge-projector typecheck` passed; standard Prisma Client generation passed for the canonical PostgreSQL runtime.
+- In-app browser Playwright acceptance passed at `/architecture/3a?scope=com.huawei.celon.desiner`: desktop `1280x720` and mobile `509x642` rendered the bilingual read-only workspace and safe empty Projection state. The sibling `policyhub` Scope returned `Scope access denied`; no cross-Scope architecture facts were disclosed.
+- The design-fact manifest, MCP synchronization/read-back, and exact-Scope federation reconciliation were completed after this record update with empty issue lists and `blocking:false`; production identity, cross-application-service comparison, and Nebula 3A projection remain explicitly deferred with owners and triggers in `docs/TODO.md`.
+- `pnpm design-context:close -- --session design-change-session:fc5625ce-6495-46c7-8bf7-972c62f2a21a --status CONVERGED --evidence "canonical-3a-e2e=PASS,projector-restart-recovery=PASS,query-isolation=PASS,drift=PASS,web-visual-desktop-1280x720=PASS,web-visual-mobile-509x642=PASS,design-facts-readback=PASS,federation-check=blocking-false"` closes the same exact-Scope session as `CONVERGED` for this acceptance increment while preserving deferred production evidence.
 
 ## MCP Record
 
@@ -94,7 +97,7 @@ The existing NebulaGraph design-asset projection is not reused for 3A traversal.
 
 ### 状态
 
-**本地实现已完成；PostgreSQL-first 3A 导航增量已验证。**
+**已实现并完成本地验收；PostgreSQL-first 3A 导航增量已针对权威 Docker PostgreSQL 验证。**
 
 ### 背景
 
@@ -152,8 +155,10 @@ Web 和 MCP 复用新的查询包。每个请求必须先解析标准化 `Scoped
 - 设计事实同步与 Manifest 聚焦测试通过 2 个文件和 30 项测试，覆盖已批准 Proposal 生命周期、四个双语 3A 管理资产及其有向类型关系。
 - 选定 3A 决策已经通过 MCP 写入 ADR、approved Proposal、Context Pack、三条 Evidence、四个管理资产和方向关系；回读不存在缺失、不匹配、越界或阻塞项，精确 Scope 联邦检查返回 `blocking:false`。
 - 原设计会话 `design-change-session:882fb4fb-cd55-4bba-a75c-d05c1d01b7bc` 已使用 Manifest、MCP 回读、联邦对账、实施计划和差异检查证据在同一精确 Scope 中关闭为 `CONVERGED`。
-- 新实现会话 `design-change-session:b7540766-caf2-48f8-9a42-55922b3e815c` 的 Core、Query、Projector、MCP、Web、构建和 Compose 聚焦证据已完成；外部 PostgreSQL 集成、浏览器截图、生产身份和 Nebula 3A 投影明确延期。
+- 新实现会话 `design-change-session:b7540766-caf2-48f8-9a42-55922b3e815c` 的 Core、Query、Projector、MCP、Web、构建和 Compose 聚焦证据已完成；本轮验收会话为 `design-change-session:fc5625ce-6495-46c7-8bf7-972c62f2a21a`。
 - `pnpm exec prisma generate --no-engine`、五个包的类型检查、聚焦测试和 `SPECFORGE_NEXT_STANDALONE=0 pnpm build` 均通过；普通 Windows OneDrive standalone 复制因锁定查询引擎/符号链接返回 `EPERM`，已记录为环境限制。
+- 权威 Docker PostgreSQL 集成测试通过 1 个测试，覆盖两版正式 Baseline、租约批次恢复、查询分页与游标重放拒绝、双跳追踪、详情、对齐、节点/关系漂移、同级 Scope 拒绝和清理。
+- 浏览器验收通过：桌面 `1280x720`、移动 `509x642` 的 `/architecture/3a?scope=com.huawei.celon.desiner` 均正常渲染；`policyhub` 返回 Scope 拒绝且不泄露跨 Scope 架构事实。
 
 ### MCP 记录
 
@@ -161,4 +166,4 @@ Web 和 MCP 复用新的查询包。每个请求必须先解析标准化 `Scoped
 - 匹配 Proposal：`proposal-3a-architecture-navigation-workspace`
 - 匹配 Context Pack：`ctx-3a-architecture-navigation-workspace`
 - 必需管理资产：`api-specforge-3a-architecture-query`、`data-specforge-3a-projection-read-model`、`rule-specforge-3a-projection-publication`
-- 当前同步状态：实现后的 Proposal、ADR、Context Pack、管理资产、Evidence 和有向类型关系已在精确所属 Scope 完成 MCP 同步与回读；外部集成、生产身份和 Nebula 3A 仍是延期能力。
+- 当前同步状态：实现后的 Proposal、ADR、Context Pack、管理资产、Evidence 和有向类型关系已在精确所属 Scope 完成 MCP 同步与回读；PostgreSQL 集成与浏览器验收已完成，生产身份和 Nebula 3A 仍是延期能力。

@@ -68,6 +68,9 @@ importers:
       '@specforge/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@specforge/knowledge-query':
+        specifier: workspace:*
+        version: link:../../packages/knowledge-query
     devDependencies:
       vitest:
         specifier: ^2.1.8

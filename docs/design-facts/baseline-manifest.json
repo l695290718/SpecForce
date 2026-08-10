@@ -1117,9 +1117,9 @@
                                                        { "sourceType":  "proposal", "sourceId":  "proposal-3a-architecture-navigation-workspace", "targetType":  "businessRule", "targetId":  "rule-specforge-3a-projection-publication", "relationType":  "IMPACTS" }
                                                    ],
                           "owner":  "SpecForge Architecture and Runtime",
-                          "status":  "Implemented locally; PostgreSQL-first 3A navigation verified; external integration and production identity remain deferred",
+                           "status":  "Implemented and locally accepted against canonical PostgreSQL; production identity and Nebula 3A remain deferred",
                           "reason":  "The 3A browser must use official Baseline history, explicit Profile-bound immutable projection manifests, exact-Scope authorization, bounded resumable reads, and an asynchronous PostgreSQL build lifecycle rather than the semantically incompatible current asset graph.",
-                          "retryTrigger":  "Run the gated PostgreSQL integration and visual acceptance with the configured environment, then independently design production identity and Knowledge-Assertion-aware Nebula capabilities; do not treat skipped external integration as production certification.",
+                           "retryTrigger":  "Before production rollout, independently design production identity and Knowledge-Assertion-aware Nebula capabilities; do not treat local acceptance as production certification.",
                           "evidence":  [
                                            {
                                                "command":  "User design review on 2026-08-10",
@@ -1154,13 +1154,17 @@
                                                "result":  "Production build passed with the Windows standalone workaround and generated /architecture/3a; Compose configuration verification passed."
                                            },
                                            {
-                                               "command":  "Focused Core, Knowledge Query, Projector, MCP, and Web Vitest suites",
-                                               "result":  "Passed the focused local suites; external Projector integration/e2e and browser visual acceptance were not run because their environments were not configured and remain deferred."
-                                           },
-                                           {
-                                               "command":  "pnpm design-context:close -- --session design-change-session:b7540766-caf2-48f8-9a42-55922b3e815c --status CONVERGED",
-                                               "result":  "The same exact Designer-Scope implementation session was closed as CONVERGED for the locally verified increment; deferred external integration and production capabilities remain tracked."
-                                           }
+                                                "command":  "SPECFORGE_3A_INTEGRATION=1 DATABASE_URL=postgresql://specforge:local-deployment-verification-only@localhost:15433/specforge_canonical?schema=public vitest run src/projection.e2e.test.ts",
+                                                "result":  "Passed one canonical PostgreSQL integration test covering two official Baselines, lease restart recovery, bounded search and cursor replay denial, two-hop trace, detail, alignment, node/edge drift, sibling-Scope denial, and cleanup."
+                                            },
+                                            {
+                                                "command":  "In-app browser Playwright: /architecture/3a?scope=com.huawei.celon.desiner at 1280x720 and 509x642; policyhub Scope isolation check",
+                                                "result":  "Desktop and mobile views rendered the bilingual read-only workspace and safe empty Projection state; the sibling Scope returned Scope access denied without disclosing cross-Scope architecture facts."
+                                            },
+                                            {
+                                                "command":  "pnpm design-context:close -- --session design-change-session:fc5625ce-6495-46c7-8bf7-972c62f2a21a --status CONVERGED",
+                                                "result":  "The exact Designer-Scope acceptance session closes as CONVERGED after canonical PostgreSQL e2e, restart recovery, query isolation, drift, browser acceptance, MCP read-back, and federation evidence; production identity and Nebula 3A remain deferred."
+                                            }
                                        ]
                       }
                   ]

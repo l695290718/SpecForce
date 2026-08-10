@@ -31,6 +31,7 @@ export interface ProjectionSourceRelationship {
 
 export interface ProjectionSourceBatch {
   assertions: ProjectionSourceAssertion[];
+  relationshipAssertions?: ProjectionSourceAssertion[];
   relationships: ProjectionSourceRelationship[];
   sourceRevisionIds: string[];
   relationshipVersion: string;
@@ -127,9 +128,10 @@ export class PrismaProjectionBuildRepository implements ProjectionBuildRepositor
     const complete = rows.length <= limit;
     const selected = rows.slice(0, limit);
     const assertions = selected.map((row) => toSourceAssertion(row));
-    const relationships = checkpoint.assertionSortKey ? [] : await loadRelationships(this.prisma, job, relationshipVersion);
+    const relationships = checkpoint.assertionSortKey ? [] : await loadRelationships(this.prisma, job, relationshipVersion, baseline.changeSetId, sourceRevisionIds);
+    const relationshipAssertions = checkpoint.assertionSortKey ? [] : await loadRelationshipEndpoints(this.prisma, job, relationships, baseline.changeSetId, sourceRevisionIds);
     const next = assertions.at(-1)?.sortKey;
-    return { assertions, relationships, sourceRevisionIds, relationshipVersion, query: {}, checkpoint: { ...(next ? { assertionSortKey: next } : {}), relationshipVersion }, complete, };
+    return { assertions, relationshipAssertions, relationships, sourceRevisionIds, relationshipVersion, query: {}, checkpoint: { ...(next ? { assertionSortKey: next } : {}), relationshipVersion }, complete, };
   }
 
   async writeBatch(job: ProjectionBuildJob, owner: string, batch: MaterializedProjectionBatch): Promise<boolean> {
@@ -188,8 +190,8 @@ export function toSourceAssertion(row: { id: string; semanticIdentity: string; l
   return { id: row.id, semanticIdentity: row.semanticIdentity, layer: row.layer as "BIZ" | "SYS" | "TECH", sortKey, ...(acceptedAssetType ? { acceptedAssetType } : {}), ...(acceptedAssetId ? { acceptedAssetId } : {}), contentDigest: contentDigest({ id: row.id, semanticIdentity: row.semanticIdentity, layer: row.layer, factType: row.factType, value: row.value, confidence: row.confidence, evidenceRefs: row.evidenceRefs }) };
 }
 
-async function loadRelationships(prisma: PrismaClient, job: ProjectionBuildJob, relationshipVersion: string): Promise<ProjectionSourceRelationship[]> {
-  const assertions = await prisma.knowledgeAssertion.findMany({ where: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, status: "ACCEPTED", factType: { in: ["typed-relationship", "relationship"] } }, orderBy: [{ semanticIdentity: "asc" }, { revision: "asc" }] });
+async function loadRelationships(prisma: PrismaClient, job: ProjectionBuildJob, relationshipVersion: string, baselineChangeSetId: string, sourceRevisionIds: string[]): Promise<ProjectionSourceRelationship[]> {
+  const assertions = await prisma.knowledgeAssertion.findMany({ where: { ...scopeWhere(job), status: "ACCEPTED", factType: { in: ["typed-relationship", "relationship"] }, AND: [eligibleAssertionWhere(baselineChangeSetId, sourceRevisionIds)] }, orderBy: [{ semanticIdentity: "asc" }, { revision: "asc" }] });
   const result: ProjectionSourceRelationship[] = [];
   for (const assertion of assertions) {
     const value = assertion.value as Record<string, unknown>;
@@ -202,6 +204,16 @@ async function loadRelationships(prisma: PrismaClient, job: ProjectionBuildJob, 
   }
   return result;
 }
+
+async function loadRelationshipEndpoints(prisma: PrismaClient, job: ProjectionBuildJob, relationships: ProjectionSourceRelationship[], baselineChangeSetId: string, sourceRevisionIds: string[]): Promise<ProjectionSourceAssertion[]> {
+  const selectors = relationships.flatMap((relationship) => [relationship.source, relationship.target]).map((endpoint) => endpoint.assertionId ? { id: endpoint.assertionId } : endpoint.semanticIdentity ? { semanticIdentity: endpoint.semanticIdentity } : endpoint.assetType && endpoint.assetId ? { value: { path: ["acceptedAsset", "type"], equals: endpoint.assetType }, AND: [{ value: { path: ["acceptedAsset", "id"], equals: endpoint.assetId } }] } : undefined).filter((selector): selector is NonNullable<typeof selector> => Boolean(selector));
+  if (!selectors.length) return [];
+  const rows = await prisma.knowledgeAssertion.findMany({ where: { ...scopeWhere(job), status: "ACCEPTED", AND: [eligibleAssertionWhere(baselineChangeSetId, sourceRevisionIds), { OR: selectors }] } });
+  return rows.map(toSourceAssertion);
+}
+
+function scopeWhere(job: ProjectionBuildJob) { return { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath }; }
+function eligibleAssertionWhere(changeSetId: string, sourceRevisionIds: string[]) { return { OR: [{ changeSetId }, { id: { in: sourceRevisionIds } }] }; }
 
 function endpoint(value: unknown): ProjectionEndpoint | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;

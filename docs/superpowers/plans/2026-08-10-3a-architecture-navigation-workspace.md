@@ -4,8 +4,9 @@
 
 - [x] Tasks 0-8 implemented locally: v2 contracts, PostgreSQL read model, leased Projector, shared query service, MCP operations, Web principal boundary, bilingual read-only workspace, and Docker packaging.
 - [x] Focused Core, Query, Projector, MCP, and Web tests; five-package typecheck; production build with the Windows standalone workaround; and Compose configuration verification.
+- [x] Canonical Docker PostgreSQL Projector e2e and authorized/sibling-Scope browser acceptance passed: lease restart recovery, bounded queries, cursor isolation, drift, desktop `1280x720`, and mobile `509x642`.
 - [x] Task 9 governance closure: the exact Designer Scope ADR, implemented Proposal, Context Pack, managed assets, Evidence, typed links, Manifest read-back, federation reconciliation, and the same preflight session are synchronized; session status is `CONVERGED`.
-- [ ] External PostgreSQL Projector e2e, browser desktop/mobile visual acceptance, production identity, and Knowledge-Assertion-aware Nebula 3A projection remain deferred with owner, trigger, and rationale in `docs/TODO.md`.
+- [ ] Production identity, cross-application-service comparison, and Knowledge-Assertion-aware Nebula 3A projection remain deferred with owner, trigger, and rationale in `docs/TODO.md`.
 
 The unchecked procedural boxes below describe the original execution recipe. The status above is the authoritative completion record for this implementation run; deferred checks are intentionally not represented as passed.
 
@@ -846,13 +847,13 @@ CMD ["node", "dist/main.js"]
 
 The default service uses the private `postgres` service, port `8091`, `restart: unless-stopped`, and a health check against `/health` with the exact Designer Scope. The external overlay removes the PostgreSQL dependency and supplies the same external `DATABASE_URL` as Web. Neither mode starts NebulaGraph for 3A.
 
-- [ ] **Step 3: Add an exact-Scope E2E fixture**
+- [x] **Step 3: Add an exact-Scope E2E fixture**
 
 The gated test creates two immutable official Baselines in one temporary Stream, publishes one v2 Manifest per Baseline through the Worker, includes one node-only and one relationship-only change, and verifies search, two-direction traversal, detail, alignment, drift, cursor replay denial, sibling-Scope denial, Worker restart recovery, and cleanup.
 
 Run: `$env:SPECFORGE_3A_INTEGRATION='1'; pnpm --filter @specforge/knowledge-projector exec vitest run src/projection.e2e.test.ts`
 
-Expected when the external integration environment is configured: one test suite passes against `localhost:15433/specforge_canonical` and removes all prefixed fixtures. In this run the gated suite was skipped and recorded as `DEFERRED_ENV_NOT_CONFIGURED`.
+Expected: one test suite passes against `localhost:15433/specforge_canonical` and removes all prefixed fixtures. Actual: one test passed with Baseline publication, lease restart recovery, bounded queries, cursor replay denial, tracing, alignment, drift, sibling-Scope denial, and cleanup.
 
 - [ ] **Step 4: Include new packages in root lifecycle scripts**
 
@@ -876,9 +877,9 @@ Run: `powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1
 
 Expected: Web and Knowledge Projector images, internal PostgreSQL wiring, external PostgreSQL override, Worker health, and absence of a required Nebula 3A service all pass.
 
-- [ ] **Step 7: Verify desktop and mobile rendering**
+- [x] **Step 7: Verify desktop and mobile rendering**
 
-Start the service at `http://localhost:3000/architecture/3a?scope=com.huawei.celon.desiner`. Capture 1440x900 and 390x844 screenshots. This acceptance remains deferred until the Web visual harness is configured; it was not claimed as passed in this run.
+Start the service at `http://localhost:3000/architecture/3a?scope=com.huawei.celon.desiner`. In-app browser Playwright acceptance passed at desktop `1280x720` and mobile `509x642`; the authorized Designer Scope rendered the bilingual read-only workspace and the sibling PolicyHub Scope returned `Scope access denied`.
 
 - [ ] **Step 8: Document operations and rollback**
 
@@ -936,7 +937,7 @@ Expected: `blocking:false` and empty issue counts.
 - [ ] **Step 5: Close the implementation Design Change Session**
 
 ```powershell
-pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session $sessionId --status CONVERGED --evidence "core-and-query-tests=PASS,projection-worker-tests=PASS,mcp-and-web-tests=PASS,production-build-no-standalone=PASS,compose-check=PASS,3a-e2e=DEFERRED_ENV_NOT_CONFIGURED,design-facts-readback=PASS,federation-check=blocking-false,web-visual-acceptance=DEFERRED_ENV_NOT_CONFIGURED"
+pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session $sessionId --status CONVERGED --evidence "canonical-3a-e2e=PASS,projector-restart-recovery=PASS,query-isolation=PASS,drift=PASS,web-visual-desktop-1280x720=PASS,web-visual-mobile-509x642=PASS,design-facts-readback=PASS,federation-check=blocking-false"
 ```
 
 Expected: the same exact-Scope session closes as `CONVERGED`. A failed MCP write or check must close as `BLOCKED` with a sanitized reason and concrete retry trigger; implementation cannot be called complete.

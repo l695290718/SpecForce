@@ -57,7 +57,7 @@ export function materializeBatch(job: ProjectionBuildJob, batch: ProjectionSourc
   const nodes = batch.assertions.map((assertion) => nodeFromAssertion(job, assertion));
   const assertionsBySemanticIdentity = new Map<string, ProjectionSourceAssertion[]>();
   const assertionsByPromotedAsset = new Map<string, ProjectionSourceAssertion[]>();
-  for (const assertion of batch.assertions) {
+  for (const assertion of [...batch.assertions, ...(batch.relationshipAssertions ?? [])]) {
     add(assertionsBySemanticIdentity, assertion.semanticIdentity, assertion);
     if (assertion.acceptedAssetType && assertion.acceptedAssetId) add(assertionsByPromotedAsset, `${assertion.acceptedAssetType}:${assertion.acceptedAssetId}`, assertion);
   }
@@ -97,6 +97,7 @@ function publicationFrom(job: ProjectionBuildJob, batch: ProjectionSourceBatch, 
 
 function add(map: Map<string, ProjectionSourceAssertion[]>, key: string, value: ProjectionSourceAssertion): void {
   const current = map.get(key) ?? [];
+  if (current.some((item) => item.id === value.id)) return;
   current.push(value);
   map.set(key, current);
 }

@@ -21,7 +21,8 @@
   },
   "dependencies": {
     "@prisma/client": "^6.1.0",
-    "@specforge/core": "workspace:*"
+    "@specforge/core": "workspace:*",
+    "@specforge/knowledge-query": "workspace:*"
   },
   "devDependencies": {
     "vitest": "^2.1.8"
