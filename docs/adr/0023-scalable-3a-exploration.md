@@ -2,12 +2,12 @@
 
 ## Status
 
-**Approved design and implementation plan ready; implementation has not started.**
+**Implemented and locally accepted; production billion-scale capacity remains deferred.**
 
 - Stable ID: `adr-scalable-3a-exploration`
 - Owning application service: `com.huawei.celon.desiner`
 - Owning scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
-- Design Change Session: `design-change-session:bf43d490-47f0-4b3b-8fee-932d4b5ccf66`
+- Design Change Session: `design-change-session:d31c59f5-2630-4d4c-b351-83e0bcfc2c57`
 - Approved Spec: `docs/superpowers/specs/2026-08-10-scalable-3a-exploration-design.md`
 - Implementation Plan: `docs/superpowers/plans/2026-08-10-scalable-3a-exploration.md`
 - Parent ADR: `adr-3a-architecture-navigation-workspace`
@@ -73,6 +73,11 @@ The existing URL model adds `mode=graph`, preserves `mode=lanes` and `mode=list`
 - User written-Spec review on 2026-08-10 approved the bilingual Spec and authorized implementation-plan authoring.
 - The implementation plan self-review mapped all 16 Spec sections to 8 independently testable tasks, removed unfinished markers, and reconciled query, state, layout, and renderer type signatures.
 - `scripts/design-context.ts close --session design-change-session:bf43d490-47f0-4b3b-8fee-932d4b5ccf66 --status CONVERGED` closed the exact-Scope design session with written-Spec approval, plan self-review, 31 passing design-fact tests, MCP synchronization, and read-back evidence.
+- `node apps\\web\\node_modules\\vitest\\vitest.mjs run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" packages\\knowledge-query\\src\\service.test.ts packages\\knowledge-query\\src\\prisma-repository.test.ts apps\\web\\lib\\3a\\workspace-loader.test.ts apps\\web\\lib\\3a\\query-handler.test.ts apps\\web\\lib\\3a\\url-state.test.ts apps\\web\\components\\three-a\\catalog-state.test.ts apps\\web\\components\\three-a\\architecture-graph-state.test.ts apps\\web\\components\\three-a\\architecture-graph-layout.test.ts apps\\web\\components\\three-a\\three-a-workspace.test.tsx` passed 9 test files and 29 tests.
+- `node apps\\web\\node_modules\\typescript\\bin\\tsc -p apps\\web\\tsconfig.json --noEmit` exited 0 after regenerating Prisma Client v6.19.3 with `--no-engine`.
+- `$env:SPECFORGE_NEXT_STANDALONE='0'; node apps\\web\\node_modules\\next\\dist\\bin\\next build --no-lint --experimental-app-only` exited 0; the optimized build compiled, checked types, generated 20 static pages, and emitted `/architecture/3a` plus `/api/architecture/3a/query`. The default standalone copy path still hits the known Windows/OneDrive pnpm symlink `EPERM`.
+- In-app browser acceptance rendered the desktop bilingual read-only workspace and explicit-focus Graph prompt. At 390x844, body width was 375px, document scroll width was 375px, and three BIZ/SYS/TECH tabs were present with no horizontal overflow. The configured Projection had no selectable Baseline, so acceptance remained in the safe unavailable/empty state without fabricated facts.
+- `git diff --check` exited 0 for the implementation and governance changes.
 
 ## MCP Record
 
@@ -82,7 +87,7 @@ The existing URL model adds `mode=graph`, preserves `mode=lanes` and `mode=list`
 - Exact Scope: `com.huawei.celon.desiner` at `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - Related assets: `api-specforge-3a-architecture-query`, `data-specforge-3a-projection-read-model`, and `adr-3a-architecture-navigation-workspace`
 - Required links: Proposal `IMPLEMENTS_DECISION` ADR; Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal; ADR `DECIDES` query API and projection model; Proposal `IMPACTS` query API; Evidence `VALIDATES` ADR.
-- Synchronization state: ADR, approved Proposal, Context Pack, Evidence, and typed links are synchronized and read back in the exact owning Scope. The written Spec and implementation plan are approved, and the design session is closed as `CONVERGED`. Implementation requires a new exact-Scope preflight session.
+- Synchronization state: ADR, implemented Proposal, Context Pack, Evidence, typed links, and the additive query contract are synchronized and read back in the exact owning Scope. PostgreSQL remains authoritative for authored facts and relationship events; graph storage remains a derived projection. Local behavior is verified, while production billion-scale capacity remains deferred.
 
 ## 中文本地化覆盖
 
@@ -92,12 +97,12 @@ The existing URL model adds `mode=graph`, preserves `mode=lanes` and `mode=list`
 
 ### 状态
 
-**设计已批准且实施计划已就绪，尚未开始实施。**
+**已实施并完成本地验收；生产级十亿规模容量仍延期。**
 
 - 稳定 ID：`adr-scalable-3a-exploration`
 - 所属应用服务：`com.huawei.celon.desiner`
 - 所属 Scope 路径：`pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
-- 设计变更会话：`design-change-session:bf43d490-47f0-4b3b-8fee-932d4b5ccf66`
+- 设计变更会话：`design-change-session:d31c59f5-2630-4d4c-b351-83e0bcfc2c57`
 - 已批准 Spec：`docs/superpowers/specs/2026-08-10-scalable-3a-exploration-design.md`
 - 实施计划：`docs/superpowers/plans/2026-08-10-scalable-3a-exploration.md`
 - 父 ADR：`adr-3a-architecture-navigation-workspace`
@@ -163,6 +168,9 @@ The existing URL model adds `mode=graph`, preserves `mode=lanes` and `mode=list`
 - 2026-08-10 用户完成书面 Spec 审阅，批准双语 Spec 并授权编写实施计划。
 - 实施计划自审把全部 16 个 Spec 章节映射到 8 个可独立测试任务，移除未完成标记，并统一查询、状态、布局和渲染器类型签名。
 - `scripts/design-context.ts close --session design-change-session:bf43d490-47f0-4b3b-8fee-932d4b5ccf66 --status CONVERGED` 使用书面 Spec 批准、计划自审、31 项设计事实测试通过、MCP 同步和回读证据，关闭了精确 Scope 的设计会话。
+- `node apps\\web\\node_modules\\vitest\\vitest.mjs run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" ...` 通过 9 个测试文件和 29 项测试，覆盖有界分页、精确 Scope 查询、邻接遍历、目录状态、图谱状态、确定性布局和工作台渲染。
+- `node apps\\web\\node_modules\\typescript\\bin\\tsc -p apps\\web\\tsconfig.json --noEmit` 返回 0；`SPECFORGE_NEXT_STANDALONE=0` 的 Next 生产构建返回 0，生成 20 个静态页面以及 `/architecture/3a` 和 `/api/architecture/3a/query`。
+- In-app Browser 桌面与 390x844 移动验收通过：页面保持双语只读工作台，Graph 无焦点时显示受控引导；移动端页面宽度与文档滚动宽度均为 375px，并显示 BIZ/SYS/TECH 三个页签。当前 Projection 没有可选 Baseline，因此页面保持安全空态，没有伪造事实。
 
 ### MCP 记录
 
@@ -172,4 +180,4 @@ The existing URL model adds `mode=graph`, preserves `mode=lanes` and `mode=list`
 - 精确 Scope：`com.huawei.celon.desiner`，路径为 `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - 相关资产：`api-specforge-3a-architecture-query`、`data-specforge-3a-projection-read-model` 和 `adr-3a-architecture-navigation-workspace`
 - 必需关系：Proposal `IMPLEMENTS_DECISION` ADR；Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal；ADR `DECIDES` 查询 API 和投影模型；Proposal `IMPACTS` 查询 API；Evidence `VALIDATES` ADR。
-- 同步状态：ADR、已批准 Proposal、Context Pack、Evidence 和有类型关系已在精确所属 Scope 中同步并回读。书面 Spec 和实施计划均已批准，设计会话已按 `CONVERGED` 关闭。实现前必须打开新的精确 Scope 预检会话。
+- 同步状态：ADR、已实施 Proposal、Context Pack、Evidence、有类型关系和增量查询契约已在精确所属 Scope 中同步并回读。PostgreSQL 继续作为已编写事实和关系事件的权威存储，图数据库仅作为派生投影。本地行为已验证，生产十亿规模容量仍延期。

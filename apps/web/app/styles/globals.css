@@ -344,6 +344,12 @@ code {
     opacity: 1;
   }
 
+  [data-testid="architecture-graph-canvas"] * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
   .sf-overview-asset-node:hover,
   .sf-overview-asset-node:focus-visible,
   .sf-relationship-node:hover,

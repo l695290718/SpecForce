@@ -101,12 +101,12 @@ it("includes the implemented 3A architecture workspace and its typed design fact
   })).toBe(true);
 });
 
-it("includes the approved scalable 3A exploration design without claiming implementation", () => {
+it("includes the implemented scalable 3A exploration design and bounded query contract", () => {
   const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-scalable-3a-exploration");
   expect(decision?.proposalId).toBe("proposal-scalable-3a-exploration");
-  expect(decision?.proposalStatus).toBe("approved");
+  expect(decision?.proposalStatus).toBe("implemented");
   expect(decision?.contextPackId).toBe("ctx-scalable-3a-exploration");
-  expect(decision?.status).toBe("Approved design and implementation plan ready; implementation has not started");
+  expect(decision?.status).toContain("Implemented and locally accepted");
   expect(decision?.relatedAssetIds).toEqual([
     "api-specforge-3a-architecture-query",
     "data-specforge-3a-projection-read-model",
@@ -115,6 +115,20 @@ it("includes the approved scalable 3A exploration design without claiming implem
   expect(decision?.managedRelationships).toEqual(expect.arrayContaining([
     expect.objectContaining({ sourceId: "proposal-scalable-3a-exploration", targetId: "api-specforge-3a-architecture-query", relationType: "IMPACTS" }),
     expect.objectContaining({ sourceId: "proposal-scalable-3a-exploration", targetId: "data-specforge-3a-projection-read-model", relationType: "IMPACTS" })
+  ]));
+  const queryAsset = manifest.decisions
+    .find((item) => item.mcpAdrId === "adr-3a-architecture-navigation-workspace")
+    ?.managedAssets?.find((managed) => managed.asset.id === "api-specforge-3a-architecture-query")?.asset;
+  expect(queryAsset?.requestSchema).toEqual(expect.objectContaining({
+    search: expect.objectContaining({ layer: "BIZ|SYS|TECH", limit: "1..50, default 20", cursor: "opaque optional token" }),
+    trace: expect.objectContaining({ direction: "upstream|downstream|both", relationTypes: "string[] optional", layers: "BIZ|SYS|TECH[] optional", continuation: "opaque optional token" })
+  }));
+  expect(queryAsset?.localizedContent?.en.description).toContain("per-layer cursor pagination");
+  expect(queryAsset?.localizedContent?.zh.description).toContain("按层游标分页");
+  expect(decision?.evidence).toEqual(expect.arrayContaining([
+    expect.objectContaining({ command: expect.stringContaining("workspace-loader.test.ts") }),
+    expect.objectContaining({ command: expect.stringContaining("next build --no-lint --experimental-app-only") }),
+    expect.objectContaining({ command: expect.stringContaining("In-app browser acceptance") })
   ]));
 });
 

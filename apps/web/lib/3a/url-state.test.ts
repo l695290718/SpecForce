@@ -16,4 +16,9 @@ describe("3A URL state", () => {
     const state = { scope: "demo", baseline: "b-1", projection: "p-1", focus: "a-1", tab: "alignment" as const, mode: "list" as const, direction: "upstream" as const };
     expect(parseThreeAUrlState(new URLSearchParams(serializeThreeAUrlState(state)))).toEqual(state);
   });
+
+  it("round-trips graph mode without changing legacy list state", () => {
+    const state = { scope: "demo", baseline: "b-1", projection: "p-1", focus: "a-1", tab: "architecture" as const, mode: "graph" as const, direction: "downstream" as const };
+    expect(parseThreeAUrlState(new URLSearchParams(serializeThreeAUrlState(state)))).toEqual(state);
+  });
 });

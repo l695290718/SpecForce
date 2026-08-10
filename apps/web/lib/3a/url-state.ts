@@ -4,7 +4,7 @@ export interface ThreeAUrlState {
   projection?: string;
   focus?: string;
   tab: "architecture" | "alignment" | "drift";
-  mode: "lanes" | "list";
+  mode: "lanes" | "graph" | "list";
   direction: "upstream" | "downstream" | "both";
 }
 
@@ -13,7 +13,7 @@ const defaultState = { tab: "architecture", mode: "lanes", direction: "both" } a
 export function parseThreeAUrlState(params: URLSearchParams): ThreeAUrlState {
   const scope = nonEmpty(params.get("scope")) ?? "com.huawei.celon.desiner";
   const tab = enumValue(params.get("tab"), ["architecture", "alignment", "drift"] as const) ?? defaultState.tab;
-  const mode = enumValue(params.get("mode"), ["lanes", "list"] as const) ?? defaultState.mode;
+  const mode = enumValue(params.get("mode"), ["lanes", "graph", "list"] as const) ?? defaultState.mode;
   const direction = enumValue(params.get("direction"), ["upstream", "downstream", "both"] as const) ?? defaultState.direction;
   return {
     scope,

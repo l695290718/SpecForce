@@ -1031,13 +1031,13 @@
                                                     "asset":  {
                                                                   "id":  "api-specforge-3a-architecture-query",
                                                                   "name":  "3A Architecture Query Contract",
-                                                                  "description":  "Provides exact-Scope Baseline, search, traversal, detail, alignment, and node-and-edge drift reads over published 3A projection manifests.",
+                                                                  "description":  "Provides exact-Scope Baseline reads, per-layer cursor pagination, bounded search and adjacency traversal, detail, alignment, and node-and-edge drift reads over published 3A projection manifests.",
                                                                   "method":  "GET",
                                                                   "path":  "mcp://tools/3a_architecture_query",
                                                                   "domainId":  "domain-specforge-platform",
                                                                   "providerSystem":  "SpecForge Knowledge Query Service",
                                                                   "consumers":  ["SpecForge Web", "Authorized MCP Agent"],
-                                                                  "requestSchema":  { "architectureScope":  "ArchitectureScopeRef", "baselineId":  "string", "projectionManifestId":  "string", "operation":  "baseline|search|trace|detail|alignment|drift", "cursor":  "opaque optional token" },
+                                                                  "requestSchema":  { "architectureScope":  "ArchitectureScopeRef", "baselineId":  "string", "projectionManifestId":  "string", "operation":  "baseline|search|trace|detail|alignment|drift", "search":  { "layer":  "BIZ|SYS|TECH", "query":  "string optional", "limit":  "1..50, default 20", "cursor":  "opaque optional token" }, "trace":  { "startAssertionId":  "string", "direction":  "upstream|downstream|both", "relationTypes":  "string[] optional", "layers":  "BIZ|SYS|TECH[] optional", "continuation":  "opaque optional token", "budget":  "server bounded" } },
                                                                   "responseSchema":  { "scope":  "exact Scope", "baseline":  "official Baseline", "manifest":  "ProjectionManifestV2", "result":  "bounded deterministic DTO", "continuation":  "opaque optional token" },
                                                                   "errorCodes":  ["SCOPE_REQUIRED", "SCOPE_ACCESS_DENIED", "PUBLISHED_BASELINE_NOT_FOUND", "PROJECTION_MANIFEST_REQUIRED", "PROJECTION_BUILD_IN_PROGRESS", "PROJECTION_BUILD_FAILED", "FOCUS_NOT_IN_BASELINE", "CURSOR_INVALID", "RESULT_PARTIAL", "QUERY_SERVICE_UNAVAILABLE"],
                                                                   "authType":  "Exact application-service knowledge:read grant",
@@ -1050,8 +1050,8 @@
                                                                   "createdAt":  "2026-08-10T00:00:00.000Z",
                                                                   "updatedAt":  "2026-08-10T00:00:00.000Z",
                                                                   "localizedContent":  {
-                                                                                             "en":  { "name":  "3A Architecture Query Contract", "description":  "Provides exact-Scope Baseline, search, traversal, detail, alignment, and node-and-edge drift reads over published 3A projection manifests.", "authType":  "Exact application-service knowledge:read grant", "idempotency":  "Read-only; identical pinned requests return the same digest and ordering.", "rateLimit":  "Finite server policy for depth, nodes, edges, paths, timeout, and payload.", "timeout":  "2s default and 5s hard cap per traversal request.", "compatibilityPolicy":  "Additive DTO evolution within projection schema 3a.v2; incompatible changes require a new projection schema version." },
-                                                                                             "zh":  { "name":  "3A 架构查询契约", "description":  "基于已发布 3A 投影 Manifest 提供精确 Scope 的 Baseline、搜索、遍历、详情、对齐以及节点与关系漂移读取。", "authType":  "精确应用服务 knowledge:read 授权", "idempotency":  "只读；相同固定请求返回相同摘要和顺序。", "rateLimit":  "服务端对深度、节点、关系、路径、超时和载荷执行有限策略。", "timeout":  "遍历请求默认 2 秒，硬上限 5 秒。", "compatibilityPolicy":  "投影 Schema 3a.v2 内只允许兼容性 DTO 扩展；不兼容变更必须使用新投影 Schema 版本。" }
+                                                                                             "en":  { "name":  "3A Architecture Query Contract", "description":  "Provides exact-Scope Baseline reads, per-layer cursor pagination, bounded search and adjacency traversal, detail, alignment, and node-and-edge drift reads over published 3A projection manifests.", "authType":  "Exact application-service knowledge:read grant", "idempotency":  "Read-only; identical pinned requests return the same digest and ordering.", "rateLimit":  "Finite server policy for depth, nodes, edges, paths, timeout, and payload.", "timeout":  "2s default and 5s hard cap per traversal request.", "compatibilityPolicy":  "Additive DTO evolution within projection schema 3a.v2; incompatible changes require a new projection schema version." },
+                                                                                             "zh":  { "name":  "3A 架构查询契约", "description":  "基于已发布 3A 投影 Manifest 提供精确 Scope 的 Baseline 读取、按层游标分页、有限搜索与邻接遍历、详情、对齐以及节点与关系漂移读取。", "authType":  "精确应用服务 knowledge:read 授权", "idempotency":  "只读；相同固定请求返回相同摘要和顺序。", "rateLimit":  "服务端对深度、节点、关系、路径、超时和载荷执行有限策略。", "timeout":  "遍历请求默认 2 秒，硬上限 5 秒。", "compatibilityPolicy":  "投影 Schema 3a.v2 内只允许兼容性 DTO 扩展；不兼容变更必须使用新投影 Schema 版本。" }
                                                                                          }
                                                               }
                                                 },
@@ -1176,7 +1176,7 @@
                                         "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
                                     },
                           "proposalId":  "proposal-scalable-3a-exploration",
-                          "proposalStatus":  "approved",
+                          "proposalStatus":  "implemented",
                           "contextPackId":  "ctx-scalable-3a-exploration",
                           "relatedAssetIds":  [
                                                   "api-specforge-3a-architecture-query",
@@ -1188,9 +1188,9 @@
                                                        { "sourceType":  "proposal", "sourceId":  "proposal-scalable-3a-exploration", "targetType":  "dataModel", "targetId":  "data-specforge-3a-projection-read-model", "relationType":  "IMPACTS" }
                                                    ],
                           "owner":  "SpecForge Architecture and Runtime",
-                          "status":  "Approved design and implementation plan ready; implementation has not started",
-                          "reason":  "The current 3A page renders a combined 200-node catalog, stretches to the densest lane, eagerly loads inactive view data, and traverses a full in-memory edge list. Catalog browsing and relationship exploration require separate bounded interaction and query models.",
-                          "retryTrigger":  "Open a new exact-Scope implementation preflight session before editing code. Update the existing query contract only after focused implementation evidence proves the additive behavior.",
+                          "status":  "Implemented and locally accepted; production billion-scale capacity remains deferred",
+                          "reason":  "The 3A workspace now separates fixed-height independently paginated BIZ, SYS, and TECH catalog lanes from an explicit-focus bounded relationship graph, uses exact-Scope query contracts, and traverses indexed frontier adjacency without loading the full edge list.",
+                          "retryTrigger":  "Before production billion-scale rollout, run representative capacity tests and independently validate the PostgreSQL indexing and derived graph projection topology; local acceptance is not production certification.",
                           "evidence":  [
                                            {
                                                "command":  "User design review on 2026-08-10",
@@ -1220,10 +1220,30 @@
                                                "command":  "User written-Spec review and implementation-plan self-review on 2026-08-10",
                                                "result":  "User approved the bilingual Spec; the implementation plan maps all 16 Spec sections to 8 independently testable tasks with no unfinished markers or inconsistent query, state, layout, or renderer signatures."
                                            },
-                                           {
-                                               "command":  "scripts/design-context.ts close --session design-change-session:bf43d490-47f0-4b3b-8fee-932d4b5ccf66 --status CONVERGED",
-                                               "result":  "Closed the exact Designer-Scope design session with written-Spec approval, plan self-review, 31 passing design-fact tests, MCP synchronization, and read-back evidence."
-                                           }
+                                            {
+                                                "command":  "scripts/design-context.ts close --session design-change-session:bf43d490-47f0-4b3b-8fee-932d4b5ccf66 --status CONVERGED",
+                                                "result":  "Closed the exact Designer-Scope design session with written-Spec approval, plan self-review, 31 passing design-fact tests, MCP synchronization, and read-back evidence."
+                                            },
+                                            {
+                                                "command":  "node apps\\web\\node_modules\\vitest\\vitest.mjs run --root . --exclude \".worktrees/**\" --exclude \".pnpm-store/**\" packages\\knowledge-query\\src\\service.test.ts packages\\knowledge-query\\src\\prisma-repository.test.ts apps\\web\\lib\\3a\\workspace-loader.test.ts apps\\web\\lib\\3a\\query-handler.test.ts apps\\web\\lib\\3a\\url-state.test.ts apps\\web\\components\\three-a\\catalog-state.test.ts apps\\web\\components\\three-a\\architecture-graph-state.test.ts apps\\web\\components\\three-a\\architecture-graph-layout.test.ts apps\\web\\components\\three-a\\three-a-workspace.test.tsx",
+                                                "result":  "Passed 9 test files and 29 tests, including bounded search loading, exact-Scope query handling, adjacency traversal, catalog state, graph state, deterministic layout, and workspace rendering."
+                                            },
+                                            {
+                                                "command":  "node apps\\web\\node_modules\\typescript\\bin\\tsc -p apps\\web\\tsconfig.json --noEmit",
+                                                "result":  "Exited 0 with no TypeScript diagnostics after regenerating Prisma Client v6.19.3 with --no-engine."
+                                            },
+                                            {
+                                                "command":  "$env:SPECFORGE_NEXT_STANDALONE='0'; node apps\\web\\node_modules\\next\\dist\\bin\\next build --no-lint --experimental-app-only",
+                                                "result":  "Exited 0; optimized production build compiled, checked types, collected data, generated 20 static pages, and emitted /architecture/3a plus /api/architecture/3a/query."
+                                            },
+                                            {
+                                                "command":  "In-app browser acceptance at /architecture/3a?scope=com.huawei.celon.desiner in desktop and 390x844 mobile viewports",
+                                                "result":  "Desktop rendered the bilingual read-only 3A workspace and explicit-focus Graph prompt; mobile reported body width 375, document scroll width 375, and three BIZ/SYS/TECH tabs with no horizontal overflow. The configured Projection had no selectable Baseline, so the UI remained in the safe unavailable/empty state without fabricated facts."
+                                            },
+                                            {
+                                                "command":  "git diff --check",
+                                                "result":  "Exited 0 for the implementation and governance changes."
+                                            }
                                        ]
                       }
                   ]
