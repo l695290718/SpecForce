@@ -7,6 +7,7 @@
   "types": "src/index.ts",
   "scripts": {
     "dev": "tsx src/index.ts",
+    "bootstrap:3a": "tsx src/bootstrap-3a.ts",
     "seed": "tsx src/seed.ts",
     "smoke": "tsx src/smoke.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"

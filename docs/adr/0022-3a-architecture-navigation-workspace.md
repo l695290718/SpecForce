@@ -93,6 +93,28 @@ The existing NebulaGraph design-asset projection is not reused for 3A traversal.
 - Required links: Proposal `IMPLEMENTS_DECISION` ADR; Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal; Evidence `VALIDATES` ADR; ADR `DECIDES` managed assets; query API `READS` projection model; publication rule `GOVERNS` projection model; Proposal `IMPACTS` managed assets.
 - Synchronization state: the implemented Proposal, ADR, Context Pack, managed assets, Evidence, and typed links are MCP synchronized and read back in the exact owning Scope. External integration, production identity, and Nebula 3A remain deferred capabilities.
 
+## Addendum: Legacy Authored Catalog Bootstrap (2026-08-10)
+
+The empty 3A view was caused by a missing governed Knowledge Baseline, not by missing authored design assets. The exact Designer Scope already contained 194 bilingual authored records and 277 usable typed links, while Knowledge Assertions, Baselines, and published projection rows were empty.
+
+Add the MCP-only `bootstrap_3a_from_design_assets` command as an idempotent migration boundary. It reads the existing exact-Scope PostgreSQL catalog, preserves the English canonical payload and Chinese overlay, maps records to BIZ/SYS/TECH assertions, carries only typed links whose endpoints are inside the Scope, commits one Changeset, writes a converged reconciliation event, and publishes an immutable Baseline. It does not infer undocumented semantics and it does not write directly to projection tables.
+
+Acceptance evidence for `com.huawei.celon.desiner`:
+
+- `node node_modules\\.pnpm\\tsx@4.23.0\\node_modules\\tsx\\dist\\cli.mjs apps\\mcp-server\\src\\bootstrap-3a.ts` returned `assertionCount=194`, `relationshipCount=277`, `layerCounts={BIZ:28,SYS:39,TECH:127}`, `baseline=PUBLISHED`, and a queued `3a.v2` build.
+- `node node_modules\\.pnpm\\tsx@4.23.0\\node_modules\\tsx\\dist\\cli.mjs apps\\knowledge-projector\\src\\main.ts` processed the queued job; canonical PostgreSQL read-back reported `ProjectionBuildJob=READY`, `nodeCount=471`, `edgeCount=277`, and a published manifest.
+- `Invoke-WebRequest http://localhost:3000/architecture/3a?scope=com.huawei.celon.desiner` returned HTTP 200 with BIZ, SYS, TECH, Projection content, and no empty-projection state.
+- The sibling `com.huawei.celon.policyhub` response contained no Designer Baseline identifier, confirming Scope isolation.
+- MCP session `design-change-session:9d2b9760-f252-40a7-b882-a8dc503b6ab5` closed `CONVERGED` with the above evidence. Two failed, rolled-back retries were closed `BLOCKED` with explicit retry reasons; no partial authored data remained.
+
+### 三层架构存量资产回填补充（2026-08-10）
+
+三层架构页面为空的原因不是设计资产缺失，而是精确 Designer Scope 缺少受治理的 Knowledge Baseline。当前 Scope 原本已有 194 条双语设计事实和 277 条可用类型关系，但 Knowledge Assertion、Baseline 和已发布投影均为空。
+
+新增 MCP-only `bootstrap_3a_from_design_assets` 幂等迁移边界：读取当前精确 Scope 的 PostgreSQL 设计资产，保留英文规范字段和中文覆盖，将记录映射到 BIZ/SYS/TECH 断言，只保留端点同属当前 Scope 的类型关系，提交一个 Changeset，写入收敛对账事件并发布不可变 Baseline。该命令不推断代码中未维护的语义，也不直接写投影表。
+
+验收结果：BIZ 28、SYS 39、TECH 127，共 194 条断言；277 条关系；3a.v2 投影已发布，471 个节点、277 条边；Designer 页面 HTTP 200 且不再显示空投影；PolicyHub sibling Scope 不包含 Designer Baseline。成功会话已通过 MCP 关闭为 `CONVERGED`，两次事务回滚的失败尝试已按规则标记为 `BLOCKED` 并记录重试原因。
+
 ## Chinese Localization
 
 ### 状态

@@ -14,6 +14,7 @@ import { generateKnowledgeCandidates } from "./knowledge/semantic-persistence";
 import { matchKnowledgeIdentities } from "./knowledge/identity-persistence";
 import { assembleKnowledgeReviewBundle, submitSemanticCandidateBatch } from "./knowledge/candidate-persistence";
 import { promoteKnowledgeCandidates, reconcileKnowledgeBaseline } from "./knowledge/promotion";
+import { bootstrapThreeAFromDesignAssets } from "./knowledge/bootstrap";
 import { deriveScopedKnowledgeProjection } from "./knowledge/projection";
 import { getProjectionBuild, requestProjectionBuild } from "./knowledge/projection-build";
 import { compare3aPublishedBaselines, get3aAlignment, get3aArchitectureFact, list3aProjectionManifests, list3aPublishedBaselines, search3aArchitectureFacts, trace3aArchitecturePath } from "./knowledge/query-adapter";
@@ -459,6 +460,14 @@ export function registerTools(server: McpServer): void {
     permissions: ["knowledge:write"],
     readOnly: false
   }, async (input) => createKnowledgeAssertion(input as unknown as Parameters<typeof createKnowledgeAssertion>[0]));
+
+  registerJsonTool(server, "bootstrap_3a_from_design_assets", {
+    title: "Bootstrap 3A from authored design assets",
+    description: "Creates an idempotent exact-Scope bilingual BIZ/SYS/TECH Knowledge Baseline from already-authored PostgreSQL design assets and typed links. This migration preserves authored meaning and does not infer new semantics.",
+    inputSchema: { architectureScope: architectureScopeSchema, designChangeSessionId: z.string().min(1) },
+    permissions: ["asset:read", "knowledge:write", "governance:run"],
+    readOnly: false
+  }, async (input) => bootstrapThreeAFromDesignAssets(input));
 
   registerJsonTool(server, "start_knowledge_scan", {
     title: "Start governed knowledge scan",

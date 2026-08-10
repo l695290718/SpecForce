@@ -711,9 +711,11 @@ async function main(): Promise<void> {
   const requireFromMcpWorkspace = createRequire(resolve(process.cwd(), "apps/mcp-server/package.json"));
   const { Client } = requireFromMcpWorkspace("@modelcontextprotocol/sdk/client/index.js");
   const { StdioClientTransport } = requireFromMcpWorkspace("@modelcontextprotocol/sdk/client/stdio.js");
+  const mcpServerEntry = resolve(process.cwd(), "apps/mcp-server/src/index.ts");
+  const tsxCli = resolve(process.cwd(), "apps/mcp-server/node_modules/tsx/dist/cli.mjs");
   const transport = new StdioClientTransport({
-    command: "pnpm",
-    args: ["--filter", "@specforge/mcp-server", "dev"],
+    command: process.execPath,
+    args: [tsxCli, mcpServerEntry],
     cwd: process.cwd(),
     env: {
       ...process.env,

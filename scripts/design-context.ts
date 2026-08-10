@@ -45,9 +45,11 @@ async function callMcpTool(name: string, arguments_: Record<string, unknown>): P
   const requireFromMcpWorkspace = createRequire(resolve(process.cwd(), "apps/mcp-server/package.json"));
   const { Client } = requireFromMcpWorkspace("@modelcontextprotocol/sdk/client/index.js");
   const { StdioClientTransport } = requireFromMcpWorkspace("@modelcontextprotocol/sdk/client/stdio.js");
+  const mcpServerEntry = resolve(process.cwd(), "apps/mcp-server/src/index.ts");
+  const tsxCli = resolve(process.cwd(), "apps/mcp-server/node_modules/tsx/dist/cli.mjs");
   const transport = new StdioClientTransport({
-    command: "pnpm",
-    args: ["--filter", "@specforge/mcp-server", "dev"],
+    command: process.execPath,
+    args: [tsxCli, mcpServerEntry],
     cwd: process.cwd(),
     env: {
       ...process.env,
@@ -57,7 +59,8 @@ async function callMcpTool(name: string, arguments_: Record<string, unknown>): P
       ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {})
     }
   });
-  const client = new Client({ name: "specforge-design-context", version: "0.1.0" }, { capabilities: {} });
+  const requestTimeout = Number(process.env.SPECFORGE_MCP_REQUEST_TIMEOUT_MS ?? "300000");
+  const client = new Client({ name: "specforge-design-context", version: "0.1.0" }, { capabilities: {}, requestTimeout });
   await client.connect(transport);
   try {
     const result = await client.callTool({ name, arguments: arguments_ });
