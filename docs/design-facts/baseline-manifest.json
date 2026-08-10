@@ -1188,9 +1188,9 @@
                                                        { "sourceType":  "proposal", "sourceId":  "proposal-scalable-3a-exploration", "targetType":  "dataModel", "targetId":  "data-specforge-3a-projection-read-model", "relationType":  "IMPACTS" }
                                                    ],
                           "owner":  "SpecForge Architecture and Runtime",
-                          "status":  "Approved design; implementation has not started",
+                          "status":  "Approved design and implementation plan ready; implementation has not started",
                           "reason":  "The current 3A page renders a combined 200-node catalog, stretches to the densest lane, eagerly loads inactive view data, and traverses a full in-memory edge list. Catalog browsing and relationship exploration require separate bounded interaction and query models.",
-                          "retryTrigger":  "After user review of the written Spec, create and approve the implementation plan. Update the existing query contract only after focused implementation evidence proves the additive behavior.",
+                          "retryTrigger":  "Open a new exact-Scope implementation preflight session before editing code. Update the existing query contract only after focused implementation evidence proves the additive behavior.",
                           "evidence":  [
                                            {
                                                "command":  "User design review on 2026-08-10",
@@ -1215,6 +1215,14 @@
                                            {
                                                "command":  "Selected exact-Scope MCP design-fact synchronization and reconciliation",
                                                "result":  "Synchronization returned complete for adr-scalable-3a-exploration; read-back verified it with empty missing, mismatched, outOfScope, and blocked lists."
+                                           },
+                                           {
+                                               "command":  "User written-Spec review and implementation-plan self-review on 2026-08-10",
+                                               "result":  "User approved the bilingual Spec; the implementation plan maps all 16 Spec sections to 8 independently testable tasks with no unfinished markers or inconsistent query, state, layout, or renderer signatures."
+                                           },
+                                           {
+                                               "command":  "scripts/design-context.ts close --session design-change-session:bf43d490-47f0-4b3b-8fee-932d4b5ccf66 --status CONVERGED",
+                                               "result":  "Closed the exact Designer-Scope design session with written-Spec approval, plan self-review, 31 passing design-fact tests, MCP synchronization, and read-back evidence."
                                            }
                                        ]
                       }

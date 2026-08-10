@@ -106,7 +106,7 @@ it("includes the approved scalable 3A exploration design without claiming implem
   expect(decision?.proposalId).toBe("proposal-scalable-3a-exploration");
   expect(decision?.proposalStatus).toBe("approved");
   expect(decision?.contextPackId).toBe("ctx-scalable-3a-exploration");
-  expect(decision?.status).toBe("Approved design; implementation has not started");
+  expect(decision?.status).toBe("Approved design and implementation plan ready; implementation has not started");
   expect(decision?.relatedAssetIds).toEqual([
     "api-specforge-3a-architecture-query",
     "data-specforge-3a-projection-read-model",

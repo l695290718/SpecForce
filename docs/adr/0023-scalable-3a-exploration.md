@@ -2,13 +2,14 @@
 
 ## Status
 
-**Approved design; implementation has not started.**
+**Approved design and implementation plan ready; implementation has not started.**
 
 - Stable ID: `adr-scalable-3a-exploration`
 - Owning application service: `com.huawei.celon.desiner`
 - Owning scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - Design Change Session: `design-change-session:bf43d490-47f0-4b3b-8fee-932d4b5ccf66`
 - Approved Spec: `docs/superpowers/specs/2026-08-10-scalable-3a-exploration-design.md`
+- Implementation Plan: `docs/superpowers/plans/2026-08-10-scalable-3a-exploration.md`
 - Parent ADR: `adr-3a-architecture-navigation-workspace`
 
 ## Context
@@ -69,6 +70,9 @@ The existing URL model adds `mode=graph`, preserves `mode=lanes` and `mode=list`
 - `node node_modules\.pnpm\vitest@2.1.9_@types+node@22.20.1_supports-color@7.2.0\node_modules\vitest\vitest.mjs run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" scripts\design-fact-manifest.test.ts scripts\sync-design-facts.test.ts` passed 2 files and 31 tests.
 - Selected exact-Scope `scripts/sync-design-facts.ts` returned `complete` for `adr-scalable-3a-exploration`.
 - Selected exact-Scope `scripts/reconcile-design-facts.ts` verified `adr-scalable-3a-exploration` with empty `missing`, `mismatched`, `outOfScope`, and `blocked` lists.
+- User written-Spec review on 2026-08-10 approved the bilingual Spec and authorized implementation-plan authoring.
+- The implementation plan self-review mapped all 16 Spec sections to 8 independently testable tasks, removed unfinished markers, and reconciled query, state, layout, and renderer type signatures.
+- `scripts/design-context.ts close --session design-change-session:bf43d490-47f0-4b3b-8fee-932d4b5ccf66 --status CONVERGED` closed the exact-Scope design session with written-Spec approval, plan self-review, 31 passing design-fact tests, MCP synchronization, and read-back evidence.
 
 ## MCP Record
 
@@ -78,7 +82,7 @@ The existing URL model adds `mode=graph`, preserves `mode=lanes` and `mode=list`
 - Exact Scope: `com.huawei.celon.desiner` at `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - Related assets: `api-specforge-3a-architecture-query`, `data-specforge-3a-projection-read-model`, and `adr-3a-architecture-navigation-workspace`
 - Required links: Proposal `IMPLEMENTS_DECISION` ADR; Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal; ADR `DECIDES` query API and projection model; Proposal `IMPACTS` query API; Evidence `VALIDATES` ADR.
-- Synchronization state: ADR, approved Proposal, Context Pack, Evidence, and typed links are synchronized and read back in the exact owning Scope. The Design Change Session remains open pending user review of the written Spec.
+- Synchronization state: ADR, approved Proposal, Context Pack, Evidence, and typed links are synchronized and read back in the exact owning Scope. The written Spec and implementation plan are approved, and the design session is closed as `CONVERGED`. Implementation requires a new exact-Scope preflight session.
 
 ## 中文本地化覆盖
 
@@ -88,13 +92,14 @@ The existing URL model adds `mode=graph`, preserves `mode=lanes` and `mode=list`
 
 ### 状态
 
-**设计已批准，尚未开始实施。**
+**设计已批准且实施计划已就绪，尚未开始实施。**
 
 - 稳定 ID：`adr-scalable-3a-exploration`
 - 所属应用服务：`com.huawei.celon.desiner`
 - 所属 Scope 路径：`pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - 设计变更会话：`design-change-session:bf43d490-47f0-4b3b-8fee-932d4b5ccf66`
 - 已批准 Spec：`docs/superpowers/specs/2026-08-10-scalable-3a-exploration-design.md`
+- 实施计划：`docs/superpowers/plans/2026-08-10-scalable-3a-exploration.md`
 - 父 ADR：`adr-3a-architecture-navigation-workspace`
 
 ### 背景
@@ -155,6 +160,9 @@ The existing URL model adds `mode=graph`, preserves `mode=lanes` and `mode=list`
 - `node node_modules\.pnpm\vitest@2.1.9_@types+node@22.20.1_supports-color@7.2.0\node_modules\vitest\vitest.mjs run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" scripts\design-fact-manifest.test.ts scripts\sync-design-facts.test.ts` 通过 2 个文件和 31 项测试。
 - 针对精确 Scope 执行选定的 `scripts/sync-design-facts.ts`，为 `adr-scalable-3a-exploration` 返回 `complete`。
 - 针对精确 Scope 执行选定的 `scripts/reconcile-design-facts.ts`，`adr-scalable-3a-exploration` 验证通过，`missing`、`mismatched`、`outOfScope` 和 `blocked` 列表为空。
+- 2026-08-10 用户完成书面 Spec 审阅，批准双语 Spec 并授权编写实施计划。
+- 实施计划自审把全部 16 个 Spec 章节映射到 8 个可独立测试任务，移除未完成标记，并统一查询、状态、布局和渲染器类型签名。
+- `scripts/design-context.ts close --session design-change-session:bf43d490-47f0-4b3b-8fee-932d4b5ccf66 --status CONVERGED` 使用书面 Spec 批准、计划自审、31 项设计事实测试通过、MCP 同步和回读证据，关闭了精确 Scope 的设计会话。
 
 ### MCP 记录
 
@@ -164,4 +172,4 @@ The existing URL model adds `mode=graph`, preserves `mode=lanes` and `mode=list`
 - 精确 Scope：`com.huawei.celon.desiner`，路径为 `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - 相关资产：`api-specforge-3a-architecture-query`、`data-specforge-3a-projection-read-model` 和 `adr-3a-architecture-navigation-workspace`
 - 必需关系：Proposal `IMPLEMENTS_DECISION` ADR；Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal；ADR `DECIDES` 查询 API 和投影模型；Proposal `IMPACTS` 查询 API；Evidence `VALIDATES` ADR。
-- 同步状态：ADR、已批准 Proposal、Context Pack、Evidence 和有类型关系已在精确所属 Scope 中同步并回读。设计变更会话保持打开，等待用户审阅书面 Spec。
+- 同步状态：ADR、已批准 Proposal、Context Pack、Evidence 和有类型关系已在精确所属 Scope 中同步并回读。书面 Spec 和实施计划均已批准，设计会话已按 `CONVERGED` 关闭。实现前必须打开新的精确 Scope 预检会话。
