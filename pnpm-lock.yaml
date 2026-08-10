@@ -109,6 +109,9 @@ importers:
       '@specforge/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@specforge/knowledge-query':
+        specifier: workspace:*
+        version: link:../../packages/knowledge-query
       '@xyflow/react':
         specifier: ^12.4.4
         version: 12.11.2(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
