@@ -1,271 +1,619 @@
 # SpecForge 3A Architecture Navigation Workspace
 
-## Design status
+## English Canonical Design
 
-Collaboratively approved in conversation; written-spec review is pending before implementation planning.
+### 1. Status And Traceability
+
+This revision resolves the architecture-review findings. The product direction is approved; written-spec approval is still required before implementation planning.
 
 - Owning application service: `com.huawei.celon.desiner`
 - Owning scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - Design Change Session: `design-change-session:882fb4fb-cd55-4bba-a75c-d05c1d01b7bc`
-- Related ADRs: `adr-deterministic-3a-knowledge-projections`, `adr-architecture-overview-home`, `adr-mcp-first-architecture`, `adr-application-service-scope-isolation`
+- Proposed ADR ID: `adr-3a-architecture-navigation-workspace`
+- Proposed Proposal ID: `proposal-3a-architecture-navigation-workspace`
+- Proposed Context Pack ID: `ctx-3a-architecture-navigation-workspace`
+- Related decisions: `adr-deterministic-3a-knowledge-projections`, `adr-application-service-scope-isolation`, `adr-mcp-first-architecture`, `adr-postgresql-authoritative-design-store`
 
-## Context
+After written approval, the proposed ADR, Proposal, Context Pack, Evidence, backlog facts, and directional typed links must be persisted through MCP in this exact Scope. The current design session closes only after repository and MCP records reconcile. Implementation then opens a new exact-Scope session.
 
-SpecForge already has a deterministic 3A projection contract and MCP derive operation, but the Web console has no dedicated read-only 3A browser. Users currently see generic design-asset pages and a relationship graph, not a guided path from business intent to system realization and technical implementation.
+### 2. Problem And Product Decision
 
-The first browser increment must be useful for an enterprise application service without loading its complete fact graph. It must preserve the existing rules: PostgreSQL is authoritative for authored facts, graph stores are derived, the application service is the minimum write dimension, English is canonical, Chinese is a required human-facing overlay, and MCP remains the formal write boundary.
+SpecForge can derive deterministic BIZ, SYS, and TECH projections, cross-layer alignment, drift, and a pinned Context Pack. The Web console has no productized 3A browser. The generic asset graph cannot substitute for a Baseline-bound architecture view.
 
-## Goals
+The product decision is a read-only, business-first architecture navigation workspace at `/architecture/3a`. It shows one authorized application-service Scope and one published Baseline. It starts from a focused path rather than an entire graph, supports search from any layer, and permits bidirectional tracing.
 
-- Provide a read-only architecture navigation workspace at `/architecture/3a`.
-- Make business-to-system-to-technology tracing the primary user task.
-- Show only the selected exact Scope and a published Baseline by default.
-- Start with a bounded focus path and progressively expand it.
-- Allow search from any architecture layer and bidirectional tracing.
-- Expose explicit alignment, Baseline drift, Evidence, and linked design assets without inventing facts.
-- Keep the same query semantics available to Web and MCP clients.
-- Remain usable when a Scope contains millions or billions of relationships.
+The first delivery uses PostgreSQL only. The existing NebulaGraph projection contains design-asset identities, not Baseline-bound Knowledge Assertions, so it cannot provide semantically equivalent 3A traversal. A dedicated 3A graph projection and Nebula Reader are a separately governed increment.
 
-## Non-goals
+### 3. Goals
 
-- Editing, approving, rejecting, promoting, or publishing architecture facts in the Web UI.
-- Loading a whole application-service graph into the browser.
+- Trace business intent through system realization to technical implementation and back.
+- Read only facts belonging to an explicitly selected `PUBLISHED` Baseline.
+- Preserve exact tenant and application-service authorization for every node, edge, count, and continuation.
+- Use deterministic, bounded, resumable queries rather than whole-graph rendering.
+- Show explicit typed alignment, Baseline-to-Baseline drift, Evidence, and accepted identity mappings.
+- Reuse one query contract for Web and MCP read clients.
+- Keep all formal mutations behind MCP.
+
+### 4. Non-goals
+
+- Web editing, review, promotion, approval, or Baseline publication.
 - Cross-application-service comparison or aggregation.
-- Automatic semantic inference from names, labels, or visual proximity.
-- Candidate promotion, external `APPLY`, live source connectors, or new AI reasoning.
-- Replacing the existing generic relationship graph; the 3A workspace is a separate architecture view.
+- Inferred relationships based on names, layout, or model-generated similarity.
+- NebulaGraph-backed 3A traversal in the first delivery.
+- Whole-Scope or billion-edge browser rendering.
+- Production IdP delivery, external connectors, automatic promotion, outbound Proposal, external `APPLY`, or new AI generation.
+- A claim that billion-scale capacity has been certified. The design is bounded and horizontally extensible; certification remains separate evidence.
 
-## User model and primary flow
+### 5. Delivery Decomposition
 
-The primary user is an architect or engineer who wants to answer: "Which technical implementation realizes this business capability, and what business intent is affected by this technical fact?"
+#### Increment A: PostgreSQL 3A Browser
 
-1. The user opens `/architecture/3a?scope=<applicationServiceId>`.
-2. The server resolves the exact authorized application-service Scope.
-3. The page selects the latest `PUBLISHED` Baseline unless a valid published Baseline is present in the URL.
-4. The page opens the BIZ catalog as the initial focus source without loading every relationship.
-5. The user searches or selects a fact.
-6. The page renders a bounded path across BIZ, SYS, and TECH lanes.
-7. The user expands a branch, reverses traversal, or selects another node as the new focus.
-8. The detail drawer exposes bilingual content, typed relationships, Evidence, revisions, unresolved questions, and links to existing design assets.
-9. The user may switch to Alignment, Drift, or List mode. All state is represented in the URL so the result can be bookmarked and shared.
+This Spec and its future implementation plan cover:
 
-## Information architecture
+- explicit Profile binding in a v2 Projection Manifest;
+- resumable PostgreSQL materialization and atomic publication of Baseline-bound projection nodes and edges;
+- a shared, exact-Scope 3A query package;
+- PostgreSQL Baseline snapshot reads;
+- signed search cursors and server-held traversal continuations;
+- request-principal resolution with a seed-only development adapter;
+- Web navigation, lanes, list fallback, Alignment, Drift, detail, and failure states;
+- equivalent MCP read tools;
+- focused verification and MCP design-fact synchronization.
 
-### Route and navigation
+#### Increment B: 3A Graph Projection
 
-Add a top-level navigation item labelled `3A Architecture` / `3A 架构` after Workspace and before Design Assets. The route is `/architecture/3a` and carries the existing `scope` query parameter.
+This remains a backlog fact owned by SpecForge Runtime. Its trigger is successful acceptance and query telemetry from Increment A. It requires a separate ADR and must define Knowledge Assertion vertices, versioned relationship edges, Baseline membership or as-of semantics, Outbox events, checkpoint namespaces, rebuild behavior, and PostgreSQL/Nebula parity evidence. It is not part of the first implementation plan.
 
-The route accepts:
+### 6. Route And User Experience
 
-- `scope`: application-service identifier; required for data reads.
-- `baseline`: published Baseline identifier; defaults to the latest published Baseline.
-- `focus`: assertion or derived node identifier; optional.
-- `tab`: `architecture`, `alignment`, or `drift`; defaults to `architecture`.
-- `mode`: `lanes` or `list`; defaults to `lanes` on desktop and `list` on narrow screens.
-- `locale`: existing application locale state; it does not change canonical stored content.
+Add `3A Architecture` / `3A 架构` after Workspace and before Design Assets. The route is `/architecture/3a`.
 
-Invalid, missing, or unauthorized Scope values fail closed and do not reveal data counts, labels, or asset identifiers.
+The URL stores shareable architecture state:
 
-### Page regions
+- `scope`: required application-service ID;
+- `baseline`: published Baseline ID; default is selected deterministically by `publishedAt DESC, id ASC`;
+- `projection`: v2 Projection Manifest ID that fixes Profile and projection schema;
+- `focus`: Knowledge Assertion ID;
+- `tab`: `architecture`, `alignment`, or `drift`;
+- `mode`: `lanes` or `list`;
+- `direction`: `upstream`, `downstream`, or `both`.
 
-- `BaselineToolbar`: Scope, published Baseline, Profile/version, global search, tabs, and view mode.
-- `ArchitectureLanes`: three stable horizontal lanes labelled BIZ, SYS, and TECH.
-- `FocusPath`: selected node, path summary, expand controls, truncation status, and traversal history.
-- `ArchitectureDetailDrawer`: selected fact and its governance evidence.
-- `ProjectionStateBanner`: no Baseline, projection lag, unavailable reader, permission denial, and truncated results.
+Locale continues to use the existing cookie and local-storage mechanism. API reads may accept the existing optional `locale` parameter, but locale is not required in shareable architecture URLs and never changes canonical content.
 
-### Three-lane architecture view
+#### Default flow
 
-The default view uses three stable lanes:
+1. Resolve the request principal and exact Scope before any data-dependent query.
+2. Resolve the requested published Baseline or the deterministic latest published Baseline.
+3. Resolve a compatible v2 Projection Manifest for the configured default Profile, or use the explicit `projection` value.
+4. Open a paginated BIZ catalog without loading relationships.
+5. Search or select a fact from any layer.
+6. Render the selected fact and its first bounded cross-layer path in BIZ, SYS, and TECH lanes.
+7. Expand individual branches through continuation tokens or select another node as focus.
+8. Inspect facts, Evidence, typed links, accepted identity mappings, and projection metadata in a right-side drawer.
 
-- BIZ: capabilities, processes, actors, business objects, policies, rules, and terms.
-- SYS: modules, application services, domains, logical entities, state machines, APIs, events, and integrations.
-- TECH: repositories, dependencies, frameworks, middleware, physical schemas, deployment units, observability, and security controls.
+The page is read-only. It contains navigation links but no mutation controls.
 
-Nodes have a stable dimension and show the canonical English name, localized Chinese name when available, fact type, confidence marker, and evidence count. Edges show direction, typed relationship code, and confidence. The layout never infers a relationship from name similarity.
+### 7. Page Components
 
-The selected node remains visually anchored while branch expansion adds bounded results. A selected node can be promoted to the focus without changing the Baseline or writing any fact.
+- `ThreeAWorkspace`: owns URL state, selected Baseline, selected projection, tab, mode, focus, and history.
+- `BaselineToolbar`: shows Scope, Baseline, Profile/version, search, tabs, and view mode.
+- `ArchitectureLanes`: renders stable BIZ, SYS, and TECH lanes.
+- `ArchitectureNode`: renders canonical and localized names, fact type, confidence, and completeness indicators.
+- `ArchitectureEdge`: renders direction, relationship code, confidence, and truncation frontier.
+- `ArchitectureDetailDrawer`: renders read-only fact, Evidence, relationships, revisions, questions, and linked assets.
+- `AlignmentView`: groups explicit cross-layer alignment and unaligned facts.
+- `PublishedBaselineDriftView`: compares two published Baselines.
+- `ArchitecturePathList`: keyboard-friendly and mobile fallback for the same result.
+- `ProjectionStateBanner`: renders typed empty, lag, truncation, authorization, and availability states.
 
-### List fallback
+The lane view uses stable node dimensions and anchored focus placement. Mobile defaults to list mode. A large result may offer list mode but cannot silently omit nodes that were returned by the query.
 
-List mode renders the same nodes and edges as an ordered path inspector. It is the default for narrow screens and the explicit fallback when a result exceeds the visual layout budget. It provides keyboard-friendly expansion, stable pagination, and the same detail drawer content.
+### 8. Shared Module Boundaries
 
-## Read architecture
+No application may import another application's internal persistence code.
 
-### Shared query boundary
+#### `@specforge/core`
 
-Introduce a `ThreeAProjectionQueryService` as the shared semantic boundary for Web and MCP read operations. The service owns Scope validation, Baseline resolution, Profile binding, query budgets, cursor semantics, and DTO mapping. Web pages must not assemble 3A relationships directly from Prisma records.
+Owns pure domain contracts:
 
-The existing deterministic `deriveKnowledgeProjection` remains the complete projection algorithm. The browser query service is a bounded reader over the same contracts; it does not become a second authoring store and does not replace the derive operation.
+- `ProjectionManifestV2` with explicit `profileId`, `profileVersion`, and `projectionSchemaVersion`;
+- Baseline-bound `KnowledgeProjectionNode` and `KnowledgeProjectionEdge` contracts;
+- projection-generation lifecycle, canonical build-key, and publication invariants;
+- `PublishedBaselineDrift` with `baseBaselineId` and `targetBaselineId`;
+- validation, stable ordering, digest rules, and DTO value objects.
 
-### Query operations
+#### `@specforge/knowledge-query`
 
-The query boundary exposes these read operations:
+New package that owns:
 
-| Operation | Purpose | Required scope |
+- `ThreeAProjectionQueryService`;
+- repository and principal-policy interfaces;
+- query DTOs and typed errors;
+- search cursor signing and validation;
+- traversal continuation policy;
+- PostgreSQL repository adapter with an injected Prisma-compatible client.
+
+The package creates no global database client and performs no authored writes.
+
+#### Web adapter
+
+`apps/web` resolves the request principal, instantiates the shared service, maps URL state, and renders DTOs. Page components never call Prisma directly.
+
+#### MCP adapter
+
+`apps/mcp-server` exposes equivalent read tools over the same service and passes its normalized `ScopedPrincipal`. MCP remains the only formal write boundary.
+
+### 9. Manifest And Baseline Semantics
+
+The Baseline remains Profile-neutral. Profile identity belongs to the derived projection.
+
+`ProjectionManifestV2` requires:
+
+- exact `architectureScope`;
+- `baselineId`;
+- `profileId` and `profileVersion`;
+- `projectionSchemaVersion = 3a.v2`;
+- sorted `sourceRevisionIds`;
+- `relationshipVersion`;
+- canonical query definition;
+- canonical input digest, generation ID, lifecycle status, completion counts, content digest, and timestamps.
+
+The lifecycle is `BUILDING -> READY` or `BUILDING -> FAILED`. The canonical build key is the digest of exact Scope, Baseline, Profile ID/version, projection-schema version, sorted source revisions, relationship version, and normalized query definition. Runtime status, timestamps, and database-generated IDs are excluded from that digest.
+
+Schema migration adds nullable Profile columns to preserve existing rows. Legacy manifests are never guessed or silently backfilled. The 3A browser accepts only v2 manifests with explicit Profile binding. An existing Baseline without a compatible v2 manifest returns `PROJECTION_MANIFEST_REQUIRED`. A separately evidenced MCP derive operation creates the required v2 manifest.
+
+The v2 MCP derive operation selects Baseline assertions using the existing deterministic rule: accepted assertions explicitly listed by the Baseline or accepted assertions bound to the Baseline ChangeSet. It reconstructs typed relationships as of `BaselineManifest.relationshipVersion` from append-only `RelationshipEvent` snapshots; it must not use a newer mutable `AssetLink` state as a historical Baseline.
+
+The derive operation then resolves each explicit relationship endpoint to an assertion in the same Baseline using the typed relationship assertion, promoted asset `knowledgeRevision.sourceAssertionId`, and accepted identity decisions. Missing or ambiguous endpoint resolution fails with `PROJECTION_ENDPOINT_UNRESOLVED` or `PROJECTION_ENDPOINT_AMBIGUOUS`; it never fans out a guessed edge.
+
+The derive operation acquires a build lease for the canonical build key, creates a `BUILDING` generation, and writes the following derived read model in bounded batches:
+
+- `KnowledgeProjectionNode`: exact Scope, Manifest, Baseline, assertion ID, semantic identity, layer, stable sort key, optional accepted asset reference, and content digest;
+- `KnowledgeProjectionEdge`: exact Scope, Manifest, Baseline, relationship event/assertion reference, source assertion ID, target assertion ID, relation code, confidence, relationship version, and content digest.
+
+After all batches are written, a short PostgreSQL transaction validates endpoint closure, row counts, and the canonical content digest, then marks the generation `READY`. Readers never observe `BUILDING` or `FAILED` generations. A failed build is marked `FAILED` with a sanitized reason and retry reference; expired builds are removed by retention policy. A repeated derive request with the same build key returns the existing `READY` generation, resumes its own valid `BUILDING` generation, or fails on a conflicting digest. It never deletes or mutates a `READY` generation.
+
+These rows are derived, immutable after publication, and rebuildable from authoritative facts. The browser Reader queries only a pinned `READY` materialization and joins authoritative assertion, Evidence, and localization details by exact Scope. Web requests do not reconstruct historical relationship state on every interaction. This staged publication avoids a transaction whose duration grows with the Baseline while retaining atomic reader visibility.
+
+### 10. Query Contract
+
+| Operation | Result | Authorization |
 | --- | --- | --- |
-| `listPublishedBaselines` | List published Baselines and their projection metadata | exact Scope |
-| `searchArchitectureFacts` | Search BIZ, SYS, and TECH assertions with cursor pagination | exact Scope |
-| `traceArchitecturePath` | Expand a focus node in a direction under a bounded budget | exact Scope and Baseline |
-| `getArchitectureFactDetail` | Read fact, localization, Evidence, relationships, revisions, and asset references | exact Scope and Baseline |
-| `getArchitectureAlignment` | Read aligned and unaligned cross-layer assertions | exact Scope and Baseline |
-| `getBaselineDrift` | Compare two published Baselines | exact Scope and both Baselines |
+| `listPublishedBaselines` | deterministic Baseline summaries | tenant and exact Scope read grant |
+| `listProjectionManifests` | compatible `READY` v2 manifests for a Baseline | tenant, exact Scope, Baseline |
+| `searchArchitectureFacts` | ordered BIZ/SYS/TECH facts and search cursor | tenant, exact Scope, Baseline, projection |
+| `traceArchitecturePath` | bounded nodes, edges, frontier, continuation | tenant, exact Scope, Baseline, projection |
+| `getArchitectureFactDetail` | fact, localization, Evidence, relationships, and accepted asset mapping | tenant, exact Scope, Baseline, projection |
+| `getArchitectureAlignment` | explicit alignment and unaligned facts | tenant, exact Scope, Baseline, projection |
+| `comparePublishedBaselines` | `ADDED`, `REMOVED`, `CHANGED`, `UNCHANGED` | tenant, exact Scope, two published Baselines and two compatible projections |
 
-The Web route may call server-side query functions or internal route handlers. MCP may expose equivalent read tools. Both clients use the same service and DTOs.
+Every DTO returns `applicationServiceId`, `scopePath`, `baselineId`, `projectionManifestId`, `profileId`, `profileVersion`, `relationshipVersion`, and a deterministic result digest. The server validates both endpoints of every relationship before returning it.
 
-### Storage and projection selection
+Evidence references resolve only to same-Scope Evidence. Design-asset links resolve only through an `ACCEPTED` identity decision reached from the assertion's source observations. Missing or rejected identity mappings remain visible as completeness warnings and do not create links.
 
-- PostgreSQL remains authoritative for Baselines, accepted assertions, relationship revisions, Evidence, localization, and Projection Manifest metadata.
-- A PostgreSQL Reader is the explicit baseline implementation and supports bounded development and fallback deployments.
-- A NebulaGraph Reader is used only when the runtime explicitly selects it and its checkpoint satisfies the requested Baseline relationship version.
-- A graph checkpoint that is behind the request returns a typed projection-lag state. The service must not silently return stale graph data or silently switch readers after a graph error.
-- The reader returns a common DTO, including `truncated`, `nextCursor`, `completion`, and `projectionVersion` fields so the UI can explain partial results.
+### 11. Cursor And Query Budgets
 
-### Scope and authority rules
+There is no product-wide total-hop limit, but every request is finite.
 
-Every query carries both `applicationServiceId` and `scopePath`. The server compares both fields with the authorized principal and the selected Baseline. Every relationship endpoint validates both endpoints before returning an edge. No cross-Scope relationship or count is returned by the browser increment.
+Default request budget:
 
-MCP is the only write boundary for ADRs, Proposals, Context Packs, design facts, and typed links. The Web 3A workspace has no mutation handlers.
+- `maxDepth = 2`;
+- `maxNodes = 200`;
+- `maxEdges = 400`;
+- `maxPaths = 100`;
+- `timeoutMs = 2000`;
+- `maxPayloadBytes = 524288`.
 
-## Interaction and scale policy
+Server policy may lower these values. The first delivery hard-caps one request at depth 5, 1,000 nodes, 2,000 edges, 1,000 paths, 5 seconds, and 2 MiB. These are safety limits, not capacity certification.
 
-### Progressive expansion
+Search uses a signed, opaque, stateless cursor containing version, tenant, Scope digest, Baseline, projection, normalized filter digest, final sort key, expiry, and key ID.
 
-The browser does not enforce a fixed global hop limit. It uses per-request budgets:
+Traversal uses a signed token containing only `browseSessionId`, sequence, state digest, expiry, and key ID. The bounded frontier and visited-state live in an injected `TraceContinuationStore`, keyed by tenant, principal subject, exact Scope, Baseline, projection, and query fingerprint. The first deployment uses PostgreSQL with expiration; a shared cache may replace it later without changing the token contract.
 
-- node budget;
-- edge budget;
-- response-time budget;
-- payload budget;
-- continuation cursor.
+Writing an expiring traversal continuation is an operational cache write, not an authored design-fact mutation. It cannot update Baselines, assertions, relationships, Evidence, manifests, or design assets, and it is deleted by retention policy.
 
-The first request returns the focus node and directly related cross-layer paths. Each branch can be expanded independently. When a budget is reached, the response includes a deterministic truncation reason and cursor. Deep or broad impact analysis is delegated to the existing asynchronous impact-analysis capability and is not rendered as an unbounded browser graph.
+Continuation verification rejects signature failure, expiry, principal mismatch, Scope mismatch, Baseline or projection mismatch, stale sequence, state-digest mismatch, and query changes. A partial response returns explicit truncation reasons: `MAX_DEPTH`, `MAX_NODES`, `MAX_EDGES`, `MAX_PATHS`, `TIMEOUT`, or `MAX_PAYLOAD`.
 
-### Alignment
+### 12. Published Baseline Drift
 
-The Alignment tab groups explicit typed relationships by source layer, target layer, domain, and relationship code. It shows aligned assertion pairs, unaligned assertion IDs, confidence, and Evidence coverage. It must not present a guessed alignment score as an authored fact.
+The current `deriveKnowledgeProjection` drift output compares Baseline assertions with a supplied current accepted set. The browser requires a separate pure operation:
 
-### Drift
+`comparePublishedBaselines(baseBaseline, targetBaseline, baseManifest, targetManifest, baseNodes, baseEdges, targetNodes, targetEdges)`
 
-The Drift tab compares the selected published Baseline with its previous published Baseline by semantic identity. It shows `ADDED`, `REMOVED`, `CHANGED`, and `UNCHANGED`. Candidates, working streams, and unpublished facts are excluded from the official view.
+The result records both Baseline IDs, both Manifest IDs, exact Scope, `entityKind = NODE | EDGE`, a stable semantic key, before/after references and digests, layer or layer pair, and `ADDED`, `REMOVED`, `CHANGED`, or `UNCHANGED`. A node key is its semantic identity. An edge key is derived from source semantic identity, relation code, target semantic identity, and explicit relationship identity. Thus a relationship-only change is visible even when both endpoint assertions are unchanged. Both Baselines must be `PUBLISHED`, belong to the same stream and exact Scope, and their `READY` Manifests must use the same Profile ID and compatible Profile/projection-schema versions. Working-stream and candidate facts are excluded.
 
-### Detail drawer
+### 13. Authentication And Authorization
 
-The detail drawer shows:
+Introduce `WebPrincipalResolver` as a request-scoped interface returning the normalized `ScopedPrincipal` already used by MCP policy. It carries stable subject, tenant, auth source, permissions, and exact application-service grants.
 
-- canonical English content and Chinese localized overlay;
-- layer, aspect, fact type, domain cluster, confidence, and status;
-- incoming and outgoing typed relationships;
-- Evidence and source observation references;
-- revision, Baseline, Profile, and projection version;
-- unresolved questions and counter-evidence;
-- linked existing design assets where an explicit identity mapping exists.
+- `SPECFORGE_AUTH_MODE=seed` may use the existing development actor adapter.
+- Non-seed deployments without a configured resolver fail closed during startup or request handling.
+- The UI never trusts `scope`, `baseline`, `projection`, `focus`, or cursor claims from the browser.
+- Authorization occurs before counts, existence checks, cursor loads, or error details.
+- Raw tokens are never persisted in browse sessions, logs, errors, or DTOs.
 
-The drawer provides navigation links, not edit controls.
+Production OAuth/OIDC and tenant administration remain a separate backlog item. This increment delivers the provider boundary and verifies denial behavior; it does not claim enterprise IdP deployment.
 
-## Failure and empty states
+### 14. Alignment, Detail, And Localization
 
-- No published Baseline: show the Scope and explain that the official architecture view is unavailable until a Baseline is published.
-- Baseline exists but projection metadata is missing: show a blocking projection state with a retryable operational reference.
-- Graph projection lag: show required relationship version and current checkpoint; do not show stale graph results.
-- Result truncated: show budget category, returned count, continuation cursor, and expand action.
-- Missing localization or Evidence: show a completeness warning on the affected node; do not synthesize content.
-- Missing focus node: preserve the selected Baseline and return to the searchable catalog.
-- Unauthorized Scope: fail closed without data-dependent details.
-- Service or reader unavailable: show a sanitized error code and preserve the URL state for retry.
+Alignment uses only explicit relationship snapshots as of the Baseline relationship version. It groups by source layer, target layer, domain, and relationship code. It reports aligned pairs, unaligned assertion IDs, confidence, Evidence coverage, and missing accepted asset mappings. It never authors an alignment score.
 
-## Localization and accessibility
+The detail drawer shows canonical English content, complete Chinese overlay when required, layer, aspect, fact type, domain, confidence, status, incoming/outgoing relationships, Evidence, source observations, revision, Baseline, Profile, unresolved questions, counter-evidence, and accepted design-asset mappings.
 
-English is canonical. Human-facing labels and decision content require a complete Chinese overlay using existing localization rules. Technical identifiers, Scope IDs, digests, relationship codes, and projection versions remain unchanged by locale.
+English is canonical. Chinese is a complete human-facing overlay. Technical IDs, relationship codes, digests, versions, and Scope fields are not translated. Missing required localization produces `LOCALIZATION_INCOMPLETE`; the page may show the canonical text with a warning but cannot fabricate Chinese text.
 
-The lane view has keyboard focus order, visible focus treatment, semantic labels for nodes and edges, and a list-mode equivalent. Reduced-motion behavior follows the existing Web conventions. Text must not overlap nodes, drawers, controls, or responsive breakpoints.
+### 15. Failure And Empty States
 
-## Verification and acceptance
+| Code | Meaning | UI behavior |
+| --- | --- | --- |
+| `SCOPE_REQUIRED` | no exact application-service Scope | show scope selection without data counts |
+| `SCOPE_ACCESS_DENIED` | principal lacks exact read grant | fail closed with sanitized message |
+| `PUBLISHED_BASELINE_NOT_FOUND` | no published Baseline | show official-view unavailable state |
+| `PROJECTION_MANIFEST_REQUIRED` | no compatible v2 manifest | show derive/publish operational reference |
+| `PROJECTION_BUILD_IN_PROGRESS` | compatible generation exists but is not published | show retryable build status without partial data |
+| `PROJECTION_BUILD_FAILED` | latest compatible generation failed | show sanitized retry reference without partial data |
+| `FOCUS_NOT_IN_BASELINE` | focus does not belong to selected Baseline | return to searchable catalog |
+| `CURSOR_INVALID` | cursor signature, state, identity, or query mismatch | discard continuation and preserve focus |
+| `RESULT_PARTIAL` | a query budget was reached | show reasons, counts, and continuation action |
+| `LOCALIZATION_INCOMPLETE` | required Chinese overlay missing | show canonical content and warning |
+| `EVIDENCE_INCOMPLETE` | Evidence reference is absent or unavailable | show warning without synthesized evidence |
+| `QUERY_SERVICE_UNAVAILABLE` | repository or service unavailable | show sanitized retryable reference |
 
-### Core and query tests
+Unauthorized responses never vary based on whether a requested Baseline, projection, focus, or cursor exists.
 
-- same Baseline/Profile/Scope/input produces the same digest and DTO ordering;
-- unpublished or incomplete Baselines are rejected;
-- sibling-Scope assertions and relationships fail closed;
-- explicit typed relationships are the only source of cross-layer alignment;
-- cursor continuation is deterministic and does not duplicate nodes;
-- node, edge, payload, and time budgets return stable truncation metadata;
-- PostgreSQL and NebulaGraph Readers return equivalent scoped fixtures;
-- graph checkpoint lag fails closed;
-- Baseline drift compares only published Baselines;
-- Evidence, localization, and asset links are returned without mutation.
+### 16. Verification And Acceptance
 
-### Web tests
+#### Domain and query tests
 
-- navigation preserves Scope and reaches `/architecture/3a`;
-- Baseline, focus, tab, locale, and mode survive refresh;
-- BIZ default search, any-layer search, and bidirectional traversal work;
-- the detail drawer exposes the expected read-only content and no edit controls;
-- Alignment, Drift, empty, lag, truncation, permission, and reader-error states render;
-- desktop lane view and mobile/list fallback render without overlap or blank canvas;
-- keyboard navigation and reduced-motion behavior pass focused checks.
+- v2 Projection Manifests require explicit Profile identity and stable digest fields;
+- v2 derive uses bounded batches, resumable build identity, and an atomic `READY` publication transition;
+- readers cannot observe `BUILDING`, `FAILED`, or partially materialized generations;
+- duplicate build requests are idempotent and published generations are immutable;
+- unresolved or ambiguous relationship endpoints block materialization;
+- legacy unpinned manifests fail closed;
+- latest published Baseline selection is deterministic;
+- historical relationships are reconstructed at the Baseline relationship version;
+- unpublished, cross-stream, or cross-Scope Baselines are rejected;
+- Baseline-to-Baseline drift records both IDs, detects node and relationship changes, and excludes candidates;
+- search ordering and continuation are stable;
+- traversal continuation has no duplicates and rejects identity, Scope, version, sequence, and digest mismatch;
+- every budget produces explicit partial metadata;
+- Evidence and accepted identity mappings remain exact-Scope and read-only.
 
-### Operational checks
+#### Authorization tests
 
-- exact Scope Web smoke for `com.huawei.celon.desiner`;
-- MCP read operation and Web query use the same DTO fixtures;
-- design-fact synchronization and read-back verify the matching Proposal, ADR, Context Pack, Evidence, and typed links;
+- seed mode uses only the explicit development adapter;
+- non-seed mode without a resolver fails closed;
+- sibling-Scope and cross-tenant access reveal no counts or existence;
+- Web and MCP principals produce the same allow/deny result;
+- cursor replay by a different subject is rejected.
+
+#### Web tests
+
+- navigation preserves Scope and opens `/architecture/3a`;
+- URL refresh restores Baseline, projection, focus, tab, mode, and direction;
+- BIZ default catalog, any-layer search, and bidirectional tracing work;
+- lane and list modes render the same returned nodes and edges;
+- detail, Alignment, Drift, empty, partial, localization, authorization, and availability states render;
+- no mutation handler or edit control exists;
+- desktop, narrow desktop, and mobile render without overlap or blank canvas;
+- keyboard navigation, focus treatment, and reduced-motion behavior pass focused checks.
+
+#### Operational and governance checks
+
+- exact-Scope Web smoke uses `com.huawei.celon.desiner`;
+- MCP and Web read adapters pass the same contract fixtures;
+- production build and focused tests pass;
+- matching ADR, Proposal, Context Pack, Evidence, backlog facts, and typed links are written through MCP and read back;
+- design-fact reconciliation has no missing, mismatched, out-of-scope, or blocked facts;
 - exact-Scope federation reconciliation returns `blocking:false`;
-- no Web mutation path can write an authored asset.
+- the design and implementation sessions close with exact command evidence.
 
-## Delivery boundary
+## 中文完整覆盖
 
-This design covers the first productized 3A browser for one authorized application-service Scope and published Baselines. It does not claim that all enterprise semantic knowledge has been discovered or that the whole graph is renderable. External live connectors, automatic promotion, CodeHub enforcement, cross-Scope comparison, production object storage, and billion-scale certification remain separate work.
+### 1. 状态与追溯
 
-Implementation must use a new exact-Scope design session, update the matching repository ADR/Proposal/Context Pack and MCP records through the MCP write boundary, and close with command-level evidence before being marked complete.
-
-## 中文设计说明
-
-### 设计状态
-
-本设计已在协作讨论中确认，书面 Spec 仍需用户审阅；审阅通过后才能进入实施计划。
+本修订解决架构审查发现的问题。产品方向已经确认，但书面 Spec 仍需批准后才能进入实施计划。
 
 - 所属应用服务：`com.huawei.celon.desiner`
 - 所属 Scope：`pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - 设计变更会话：`design-change-session:882fb4fb-cd55-4bba-a75c-d05c1d01b7bc`
-- 关联 ADR：`adr-deterministic-3a-knowledge-projections`、`adr-architecture-overview-home`、`adr-mcp-first-architecture`、`adr-application-service-scope-isolation`
+- 拟新增 ADR ID：`adr-3a-architecture-navigation-workspace`
+- 拟新增 Proposal ID：`proposal-3a-architecture-navigation-workspace`
+- 拟新增 Context Pack ID：`ctx-3a-architecture-navigation-workspace`
+- 关联决策：`adr-deterministic-3a-knowledge-projections`、`adr-application-service-scope-isolation`、`adr-mcp-first-architecture`、`adr-postgresql-authoritative-design-store`
 
-### 背景与目标
+书面设计批准后，必须通过 MCP 在精确 Scope 中持久化对应 ADR、Proposal、Context Pack、Evidence、待办事实和有方向的类型关系。仓库记录与 MCP 记录对账通过后才能关闭当前设计会话；实施阶段必须创建新的精确 Scope 会话。
 
-SpecForge 已经具备确定性 3A 投影契约和 MCP 派生工具，但 Web 控制台没有独立的 3A 浏览页面。用户现在只能看到通用设计资产页和关系图谱，无法沿着“业务意图到系统实现再到技术实现”的路径浏览架构。
+### 2. 问题与产品决策
 
-本增量为单个企业应用服务提供只读的 3A 架构导航。它默认只读取已发布 Baseline，不加载完整关系图，不创建或修改事实。PostgreSQL 继续保存权威事实，图数据库只能作为派生投影；英文是规范内容，中文是面向人的必需覆盖；MCP 继续是正式写入边界。
+SpecForge 已能确定性派生 BIZ、SYS、TECH、跨层对齐、漂移和固定 Context Pack，但 Web 控制台没有产品化的 3A 浏览器。通用设计资产图不能替代绑定 Baseline 的架构视图。
 
-### 页面与用户流程
+产品决策是在 `/architecture/3a` 提供只读、业务优先的架构导航工作台。页面只展示一个已授权应用服务 Scope 和一个已发布 Baseline，从焦点路径开始而不是加载完整图，支持任意层搜索和双向追溯。
 
-新增一级菜单“3A 架构”，路由为 `/architecture/3a`，位于工作台之后、设计资产之前，并继承现有 `scope`。页面支持 Baseline、焦点、页签、视图模式和语言状态的 URL 恢复。
+第一增量只使用 PostgreSQL。现有 NebulaGraph 投影保存的是设计资产身份，不是绑定 Baseline 的 Knowledge Assertion，因此不能提供语义等价的 3A 遍历。专用 3A 图投影和 Nebula Reader 必须作为独立治理增量交付。
 
-默认“架构导航”使用三条固定泳道：
+### 3. 目标
 
-- `BIZ`：业务能力、流程、参与者、业务对象、政策、规则和术语；
-- `SYS`：模块、应用服务、领域、逻辑实体、状态机、API、事件和集成；
-- `TECH`：代码库、依赖、框架、中间件、物理 Schema、部署、可观测性和安全控制。
+- 从业务意图追踪到系统实现和技术实现，并支持反向追溯。
+- 只读取明确选择的 `PUBLISHED` Baseline 中的事实。
+- 对每个节点、关系、数量和继续查询执行精确租户与应用服务授权。
+- 使用确定性、有界、可恢复的查询，不渲染完整关系图。
+- 展示显式类型对齐、两个 Baseline 的漂移、Evidence 和已接受身份映射。
+- Web 与 MCP 读取客户端复用同一查询契约。
+- 所有正式修改继续通过 MCP。
 
-初始页面打开 BIZ 目录，选择节点后只加载有界路径。任何层都可以搜索，节点支持上下游双向追溯。右侧抽屉展示英文规范内容、中文覆盖、事实类型、Aspect、置信度、关系、Evidence、来源修订、未决问题和已明确映射的设计资产。页面没有编辑按钮。
+### 4. 非目标
 
-### 读取架构
+- 在 Web 中编辑、评审、提升、批准事实或发布 Baseline。
+- 跨应用服务比较或聚合。
+- 根据名称、布局或模型相似度推断关系。
+- 第一增量使用 NebulaGraph 执行 3A 遍历。
+- 在浏览器中渲染整个 Scope 或十亿条关系。
+- 本增量交付生产 IdP、外部连接器、自动提升、出站 Proposal、外部 `APPLY` 或新的 AI 生成。
+- 在没有容量证据时声称已经完成十亿级认证。本设计只保证有界和可横向扩展的结构，规模认证仍需独立证据。
 
-Web 和 MCP 共用 `ThreeAProjectionQueryService`，由它负责 Scope 校验、Baseline 解析、Profile 绑定、查询预算、游标和 DTO。Web 不直接拼接 Prisma 记录，浏览器也不直接执行写入。
+### 5. 交付拆分
 
-查询能力包括：列出已发布 Baseline、搜索任意层事实、按焦点展开路径、读取事实详情、读取跨层对齐和比较两个已发布 Baseline 的漂移。
+#### 增量 A：PostgreSQL 3A 浏览器
 
-PostgreSQL 是 Baseline、断言、关系、Evidence、本地化和 Projection Manifest 的权威存储。NebulaGraph 只有在显式选择且检查点满足所需关系版本时用于关系遍历。图检查点落后时显示“投影同步中”，不得静默读取旧图或隐式切换读取器。PostgreSQL 与 NebulaGraph 必须返回相同的 Scope、方向、节点、边和截断原因。
+本 Spec 及后续实施计划包含：
 
-### 规模与状态
+- 在 v2 Projection Manifest 中显式固定 Profile；
+- 在 PostgreSQL 中可恢复地物化并原子发布绑定 Baseline 的投影节点和关系；
+- 共享且精确 Scope 的 3A 查询包；
+- PostgreSQL Baseline 快照读取；
+- 签名搜索游标和服务端保存的遍历继续状态；
+- 请求 Principal 解析及仅限 seed 模式的开发适配器；
+- Web 导航、泳道、列表降级、对齐、漂移、详情和错误状态；
+- 等价 MCP 读取工具；
+- 聚焦验证和 MCP 设计事实同步。
 
-页面不设置固定的全局跳数上限，而是采用节点、边、响应时间、载荷和游标预算。首次返回焦点和直接跨层路径，分支可以独立继续展开；达到预算时返回确定性的截断原因和继续游标。深层或大范围分析转入已有异步影响分析能力。
+#### 增量 B：3A 图投影
 
-对齐页展示显式类型关系、已对齐路径、未对齐事实、低置信度关系和 Evidence 缺口，不生成猜测性的对齐事实。漂移页默认比较选中的已发布 Baseline 与前一个已发布 Baseline，展示新增、删除、变化和未变化。
+该能力作为 SpecForge Runtime 所有的独立待办。启动条件是增量 A 验收通过并获得真实查询遥测。它需要独立 ADR，并定义 Knowledge Assertion 顶点、版本化关系边、Baseline 成员或 as-of 语义、Outbox 事件、检查点命名空间、重建行为，以及 PostgreSQL/Nebula 一致性证据。它不进入第一阶段实施计划。
 
-页面必须明确处理：没有 Baseline、投影元数据缺失、图检查点落后、结果截断、本地化或 Evidence 缺失、焦点不存在、权限不足和读取服务不可用。权限错误失败关闭，不显示数据数量或名称。
+### 6. 路由与用户体验
 
-### 验收与边界
+在工作台之后、设计资产之前增加“3A 架构”一级菜单，路由为 `/architecture/3a`。
 
-验收覆盖精确 Scope、已发布 Baseline、任意层搜索、双向追溯、确定性游标、PG/Nebula 结果一致、投影延迟失败关闭、Baseline 漂移、双语内容、URL 恢复、只读行为、桌面泳道、移动端列表降级、键盘操作和错误状态。
+URL 保存可分享的架构状态：
 
-本设计不包含事实编辑、审批、Baseline 发布、跨应用服务聚合、全量全景图、候选提升、实时连接器、外部 `APPLY`、CodeHub 门禁、生产对象存储或亿级认证。实现前必须创建新的精确 Scope 设计会话，通过 MCP 更新匹配 ADR、Proposal、Context Pack、Evidence 和类型关系，并以命令级证据关闭会话。
+- `scope`：必填的应用服务 ID；
+- `baseline`：已发布 Baseline ID，默认按 `publishedAt DESC, id ASC` 确定性选择；
+- `projection`：固定 Profile 和投影 Schema 的 v2 Projection Manifest ID；
+- `focus`：Knowledge Assertion ID；
+- `tab`：`architecture`、`alignment` 或 `drift`；
+- `mode`：`lanes` 或 `list`；
+- `direction`：`upstream`、`downstream` 或 `both`。
+
+语言继续使用现有 Cookie 和 localStorage 机制。API 读取可以使用已有可选 `locale` 参数，但分享 URL 不要求包含语言，语言也不能修改规范内容。
+
+#### 默认流程
+
+1. 在任何依赖数据的查询前解析请求 Principal 和精确 Scope。
+2. 解析 URL 指定的已发布 Baseline，或确定性选择最新已发布 Baseline。
+3. 解析配置的默认 Profile 对应的 v2 Projection Manifest，或使用 URL 指定的 `projection`。
+4. 打开分页 BIZ 目录，不加载关系。
+5. 从任意层搜索或选择事实。
+6. 在 BIZ、SYS、TECH 泳道中渲染选中事实和第一段有界跨层路径。
+7. 使用继续令牌展开单个分支，或选择其他节点作为焦点。
+8. 在右侧抽屉中查看事实、Evidence、类型关系、已接受身份映射和投影元数据。
+
+页面只读，只提供导航链接，不提供修改控件。
+
+### 7. 页面组件
+
+- `ThreeAWorkspace`：管理 URL、Baseline、Projection、页签、模式、焦点和历史。
+- `BaselineToolbar`：显示 Scope、Baseline、Profile/version、搜索、页签和模式。
+- `ArchitectureLanes`：渲染稳定的 BIZ、SYS、TECH 泳道。
+- `ArchitectureNode`：渲染规范名称、本地化名称、事实类型、置信度和完整性标记。
+- `ArchitectureEdge`：渲染方向、关系代码、置信度和截断前沿。
+- `ArchitectureDetailDrawer`：只读展示事实、Evidence、关系、修订、问题和资产链接。
+- `AlignmentView`：展示显式跨层对齐和未对齐事实。
+- `PublishedBaselineDriftView`：比较两个已发布 Baseline。
+- `ArchitecturePathList`：键盘友好且适用于移动端的同结果列表模式。
+- `ProjectionStateBanner`：展示空状态、截断、授权和可用性错误。
+
+泳道使用稳定节点尺寸和固定焦点位置；移动端默认列表模式。大结果可以建议切换列表，但不能静默省略查询已经返回的节点。
+
+### 8. 共享模块边界
+
+任何应用都不得导入另一个应用的内部持久化代码。
+
+#### `@specforge/core`
+
+负责纯领域契约：
+
+- 显式包含 `profileId`、`profileVersion` 和 `projectionSchemaVersion` 的 `ProjectionManifestV2`；
+- 绑定 Baseline 的 `KnowledgeProjectionNode` 和 `KnowledgeProjectionEdge` 契约；
+- 投影生成生命周期、规范构建键和发布不变量；
+- 同时包含 `baseBaselineId` 和 `targetBaselineId` 的 `PublishedBaselineDrift`；
+- 校验、稳定排序、摘要规则和 DTO 值对象。
+
+#### `@specforge/knowledge-query`
+
+新增包，负责：
+
+- `ThreeAProjectionQueryService`；
+- Repository 和 Principal Policy 接口；
+- 查询 DTO 和类型化错误；
+- 搜索游标签名与验证；
+- 遍历继续策略；
+- 使用注入 Prisma 兼容客户端的 PostgreSQL Repository 适配器。
+
+该包不创建全局数据库客户端，也不执行任何正式写入。
+
+#### Web 适配器
+
+`apps/web` 解析请求 Principal、实例化共享服务、映射 URL 并渲染 DTO。页面组件不得直接调用 Prisma。
+
+#### MCP 适配器
+
+`apps/mcp-server` 基于同一服务提供等价读取工具，并传入已经规范化的 `ScopedPrincipal`。MCP 继续是唯一正式写入边界。
+
+### 9. Manifest 与 Baseline 语义
+
+Baseline 保持 Profile 无关，Profile 身份属于派生投影。
+
+`ProjectionManifestV2` 必须包含：
+
+- 精确 `architectureScope`；
+- `baselineId`；
+- `profileId` 和 `profileVersion`；
+- `projectionSchemaVersion = 3a.v2`；
+- 已排序的 `sourceRevisionIds`；
+- `relationshipVersion`；
+- 规范查询定义；
+- 规范输入摘要、生成 ID、生命周期状态、完成计数、内容摘要和时间戳。
+
+生命周期为 `BUILDING -> READY` 或 `BUILDING -> FAILED`。规范构建键由精确 Scope、Baseline、Profile ID/版本、投影 Schema 版本、排序后的来源修订、关系版本和规范化查询定义计算。运行状态、时间戳和数据库生成 ID 不进入该摘要。
+
+Schema 迁移新增可空 Profile 列以保留历史记录。禁止猜测或静默回填旧 Manifest。3A 浏览器只接受显式固定 Profile 的 v2 Manifest。已有 Baseline 没有兼容 v2 Manifest 时返回 `PROJECTION_MANIFEST_REQUIRED`，必须通过具有独立证据的 MCP 派生操作创建新 Manifest。
+
+v2 MCP 派生操作使用现有确定性规则选择 Baseline 断言：Baseline 明确列出的已接受断言，或绑定 Baseline ChangeSet 的已接受断言。类型关系必须根据追加式 `RelationshipEvent` 快照重建到 `BaselineManifest.relationshipVersion`，不能把更新的可变 `AssetLink` 当前状态当作历史 Baseline。
+
+派生操作根据类型关系断言、提升资产中的 `knowledgeRevision.sourceAssertionId` 和已接受身份决策，把每个显式关系端点解析到同一 Baseline 的断言。端点缺失或歧义时分别返回 `PROJECTION_ENDPOINT_UNRESOLVED` 或 `PROJECTION_ENDPOINT_AMBIGUOUS`，禁止通过猜测形成扇出关系。
+
+派生操作先按规范构建键获得构建租约，创建 `BUILDING` 代次，然后使用有限批次写入以下派生读取模型：
+
+- `KnowledgeProjectionNode`：精确 Scope、Manifest、Baseline、断言 ID、语义身份、层级、稳定排序键、可选已接受资产引用和内容摘要；
+- `KnowledgeProjectionEdge`：精确 Scope、Manifest、Baseline、关系事件/断言引用、来源断言 ID、目标断言 ID、关系代码、置信度、关系版本和内容摘要。
+
+全部批次写入后，由一个短 PostgreSQL 事务校验端点闭合、行数和规范内容摘要，再把代次标记为 `READY`。Reader 永远不能看到 `BUILDING` 或 `FAILED` 代次。失败构建标记为 `FAILED`，只保存脱敏原因和重试引用；过期构建由保留策略清理。相同构建键的重复派生请求只能返回已有 `READY` 代次、恢复属于自身且有效的 `BUILDING` 代次，或在摘要冲突时失败；不能删除或修改 `READY` 代次。
+
+这些记录发布后不可变，并且可以从权威事实重建。浏览 Reader 只查询固定的 `READY` 物化结果，并按精确 Scope 关联权威断言、Evidence 和本地化详情。Web 交互不需要每次重建历史关系状态。分阶段发布避免事务时长随 Baseline 增长，同时保持对 Reader 的原子可见性。
+
+### 10. 查询契约
+
+| 操作 | 结果 | 授权条件 |
+| --- | --- | --- |
+| `listPublishedBaselines` | 确定性 Baseline 摘要 | 租户与精确 Scope 读取授权 |
+| `listProjectionManifests` | Baseline 对应的兼容 `READY` v2 Manifest | 租户、精确 Scope、Baseline |
+| `searchArchitectureFacts` | 排序后的 BIZ/SYS/TECH 事实和搜索游标 | 租户、Scope、Baseline、Projection |
+| `traceArchitecturePath` | 有界节点、边、前沿和继续令牌 | 租户、Scope、Baseline、Projection |
+| `getArchitectureFactDetail` | 事实、本地化、Evidence、关系和已接受资产映射 | 租户、Scope、Baseline、Projection |
+| `getArchitectureAlignment` | 显式对齐和未对齐事实 | 租户、Scope、Baseline、Projection |
+| `comparePublishedBaselines` | `ADDED`、`REMOVED`、`CHANGED`、`UNCHANGED` | 租户、精确 Scope、两个已发布 Baseline 和两个兼容 Projection |
+
+每个 DTO 都返回 `applicationServiceId`、`scopePath`、`baselineId`、`projectionManifestId`、`profileId`、`profileVersion`、`relationshipVersion` 和确定性结果摘要。服务端在返回任何关系前校验两个端点。
+
+Evidence 引用只能解析同 Scope 的 Evidence。设计资产链接只能通过断言来源 Observation 对应的 `ACCEPTED` 身份决策解析。缺失或拒绝的身份映射只形成完整性告警，不能创建链接。
+
+### 11. 游标与查询预算
+
+产品没有总跳数上限，但每次请求必须有限。
+
+默认请求预算：
+
+- `maxDepth = 2`；
+- `maxNodes = 200`；
+- `maxEdges = 400`；
+- `maxPaths = 100`；
+- `timeoutMs = 2000`；
+- `maxPayloadBytes = 524288`。
+
+服务端策略可以调低预算。第一增量的单请求硬上限为深度 5、1,000 个节点、2,000 条边、1,000 条路径、5 秒和 2 MiB。这些是安全边界，不是容量认证。
+
+搜索使用签名、不透明、无状态游标，包含版本、租户、Scope 摘要、Baseline、Projection、规范过滤条件摘要、最后排序键、过期时间和密钥 ID。
+
+遍历使用只包含 `browseSessionId`、序号、状态摘要、过期时间和密钥 ID 的签名令牌。有界 frontier 和 visited 状态保存在注入的 `TraceContinuationStore` 中，并绑定租户、Principal subject、精确 Scope、Baseline、Projection 和查询指纹。第一部署使用带过期时间的 PostgreSQL，后续可以替换为共享缓存而不改变令牌契约。
+
+写入带过期时间的遍历继续状态属于运维缓存写入，不是正式设计事实修改。它不能更新 Baseline、断言、关系、Evidence、Manifest 或设计资产，并由保留策略自动删除。
+
+继续校验必须拒绝签名失败、过期、Principal 不匹配、Scope 不匹配、Baseline 或 Projection 不匹配、陈旧序号、状态摘要不匹配和查询变化。部分结果明确返回 `MAX_DEPTH`、`MAX_NODES`、`MAX_EDGES`、`MAX_PATHS`、`TIMEOUT` 或 `MAX_PAYLOAD`。
+
+### 12. 已发布 Baseline 漂移
+
+现有 `deriveKnowledgeProjection` 漂移比较 Baseline 断言和调用方传入的当前已接受集合。浏览器需要独立纯函数：
+
+`comparePublishedBaselines(baseBaseline, targetBaseline, baseManifest, targetManifest, baseNodes, baseEdges, targetNodes, targetEdges)`
+
+结果记录两个 Baseline ID、两个 Manifest ID、精确 Scope、`entityKind = NODE | EDGE`、稳定语义键、前后引用和摘要、层级或层级对，以及 `ADDED`、`REMOVED`、`CHANGED` 或 `UNCHANGED`。节点键是语义身份；关系键由来源语义身份、关系代码、目标语义身份和显式关系身份共同形成。因此，即使两个端点断言都未变化，关系自身变化仍然可见。两个 Baseline 都必须为 `PUBLISHED`，属于同一个 Stream 和精确 Scope；两个 `READY` Manifest 必须使用相同 Profile ID 以及兼容的 Profile 与投影 Schema 版本。工作流和候选事实不得进入正式漂移结果。
+
+### 13. 身份认证与授权
+
+新增请求级 `WebPrincipalResolver`，返回 MCP 策略已经使用的规范化 `ScopedPrincipal`，包含稳定 subject、tenant、auth source、permissions 和精确应用服务授权。
+
+- `SPECFORGE_AUTH_MODE=seed` 可以使用现有开发 Actor 适配器；
+- 非 seed 部署未配置 Resolver 时必须在启动或请求阶段失败关闭；
+- UI 不能信任浏览器提交的 `scope`、`baseline`、`projection`、`focus` 或游标声明；
+- 授权必须发生在数量、存在性、游标状态或错误详情查询之前；
+- 原始 Token 不能写入浏览会话、日志、错误或 DTO。
+
+生产 OAuth/OIDC 和租户管理继续作为独立待办。本增量只交付 Provider 边界并验证拒绝行为，不宣称已交付企业 IdP。
+
+### 14. 对齐、详情与本地化
+
+对齐只使用 Baseline 关系版本对应的显式关系快照，并按来源层、目标层、领域和关系代码分组。它展示已对齐对、未对齐断言、置信度、Evidence 覆盖和缺少的已接受资产映射，不生成新的对齐分数事实。
+
+详情抽屉展示英文规范内容、必需的完整中文覆盖、层级、Aspect、事实类型、领域、置信度、状态、出入关系、Evidence、来源 Observation、修订、Baseline、Profile、未决问题、反证和已接受设计资产映射。
+
+英文是规范内容，中文是完整的人类可读覆盖。技术 ID、关系代码、摘要、版本和 Scope 字段不翻译。缺失中文时返回 `LOCALIZATION_INCOMPLETE`；页面可以带告警展示英文规范内容，但不能生成中文文本。
+
+### 15. 失败与空状态
+
+| 代码 | 含义 | 页面行为 |
+| --- | --- | --- |
+| `SCOPE_REQUIRED` | 缺少精确应用服务 Scope | 显示 Scope 选择，不显示数据数量 |
+| `SCOPE_ACCESS_DENIED` | Principal 没有精确读取授权 | 失败关闭并显示脱敏消息 |
+| `PUBLISHED_BASELINE_NOT_FOUND` | 没有已发布 Baseline | 显示正式架构视图不可用 |
+| `PROJECTION_MANIFEST_REQUIRED` | 没有兼容 v2 Manifest | 显示派生/发布运维引用 |
+| `PROJECTION_BUILD_IN_PROGRESS` | 存在兼容代次但尚未发布 | 显示可重试构建状态且不返回部分数据 |
+| `PROJECTION_BUILD_FAILED` | 最新兼容代次构建失败 | 显示脱敏重试引用且不返回部分数据 |
+| `FOCUS_NOT_IN_BASELINE` | 焦点不属于 Baseline | 返回可搜索目录 |
+| `CURSOR_INVALID` | 游标签名、状态、身份或查询不匹配 | 丢弃继续状态并保留焦点 |
+| `RESULT_PARTIAL` | 查询达到预算 | 显示原因、数量和继续操作 |
+| `LOCALIZATION_INCOMPLETE` | 缺少必需中文覆盖 | 显示英文规范内容和告警 |
+| `EVIDENCE_INCOMPLETE` | Evidence 引用缺失或不可用 | 显示告警且不生成 Evidence |
+| `QUERY_SERVICE_UNAVAILABLE` | Repository 或服务不可用 | 显示可重试的脱敏引用 |
+
+未授权响应不能因为 Baseline、Projection、焦点或游标是否真实存在而产生可观察差异。
+
+### 16. 验证与验收
+
+#### 领域与查询测试
+
+- v2 Projection Manifest 必须包含显式 Profile 和稳定摘要字段；
+- v2 派生必须使用有限批次、可恢复构建身份和原子 `READY` 发布转换；
+- Reader 不能看到 `BUILDING`、`FAILED` 或部分物化的代次；
+- 重复构建请求必须幂等，已发布代次不可变；
+- 未解析或歧义关系端点必须阻止物化；
+- 旧的未固定 Manifest 必须失败关闭；
+- 最新已发布 Baseline 的选择必须确定；
+- 历史关系必须按 Baseline 关系版本重建；
+- 未发布、跨 Stream 或跨 Scope Baseline 必须拒绝；
+- Baseline 漂移必须记录两个 ID、发现节点和关系变化，并排除候选；
+- 搜索排序和继续必须稳定；
+- 遍历继续不能产生重复，并拒绝身份、Scope、版本、序号和摘要不匹配；
+- 每种预算都必须产生明确的部分结果元数据；
+- Evidence 和已接受身份映射必须精确 Scope 且只读。
+
+#### 授权测试
+
+- seed 模式只能使用显式开发适配器；
+- 非 seed 模式缺少 Resolver 时失败关闭；
+- 同级 Scope 和跨租户访问不能泄露数量或存在性；
+- Web 与 MCP Principal 必须产生相同授权结果；
+- 其他 subject 重放游标必须拒绝。
+
+#### Web 测试
+
+- 导航保留 Scope 并进入 `/architecture/3a`；
+- 刷新恢复 Baseline、Projection、焦点、页签、模式和方向；
+- BIZ 默认目录、任意层搜索和双向追溯可用；
+- 泳道和列表展示相同返回节点与关系；
+- 详情、对齐、漂移、空状态、部分结果、本地化、授权和不可用状态可见；
+- 不存在修改处理器或编辑控件；
+- 桌面、窄屏和移动端没有重叠或空白画布；
+- 键盘导航、焦点样式和减少动效行为通过验证。
+
+#### 运维与治理检查
+
+- 精确 Scope Web 冒烟使用 `com.huawei.celon.desiner`；
+- MCP 与 Web 读取适配器通过同一组契约夹具；
+- 生产构建和聚焦测试通过；
+- 通过 MCP 写入并回读匹配的 ADR、Proposal、Context Pack、Evidence、待办事实和类型关系；
+- 设计事实对账不存在缺失、不匹配、越界或阻塞项；
+- 精确 Scope 联邦对账返回 `blocking:false`；
+- 设计会话和实施会话都以精确命令证据关闭。
