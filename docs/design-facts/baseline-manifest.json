@@ -972,6 +972,180 @@
                              "result":  "Exited 0; contract, scanner, semantic review, PostgreSQL promotion/reconciliation, immutable Baseline, 100,000-observation scale, typecheck, and production build stages all passed."
                                            }
                                        ]
+                      },
+                      {
+                          "id":  "adr-3a-architecture-navigation-workspace",
+                          "repositoryAdr":  "docs/adr/0022-3a-architecture-navigation-workspace.md",
+                          "mcpAdrId":  "adr-3a-architecture-navigation-workspace",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-3a-architecture-navigation-workspace",
+                          "proposalStatus":  "approved",
+                          "contextPackId":  "ctx-3a-architecture-navigation-workspace",
+                          "relatedAssetIds":  [
+                                                  "api-specforge-3a-projection-build",
+                                                  "api-specforge-3a-architecture-query",
+                                                  "data-specforge-3a-projection-read-model",
+                                                  "rule-specforge-3a-projection-publication",
+                                                  "api-specforge-mcp-tools",
+                                                  "data-specforge-assets",
+                                                  "adr-deterministic-3a-knowledge-projections",
+                                                  "adr-unified-3a-knowledge-initialization",
+                                                  "adr-application-service-scope-isolation",
+                                                  "adr-postgresql-authoritative-design-store"
+                                              ],
+                          "managedAssets":  [
+                                                {
+                                                    "assetType":  "api",
+                                                    "asset":  {
+                                                                  "id":  "api-specforge-3a-projection-build",
+                                                                  "name":  "3A Projection Build Contract",
+                                                                  "description":  "Creates or returns an idempotent exact-Scope PostgreSQL projection-build job without executing long-running projection work in the MCP request.",
+                                                                  "method":  "POST",
+                                                                  "path":  "mcp://tools/request_3a_projection_build",
+                                                                  "domainId":  "domain-specforge-platform",
+                                                                  "providerSystem":  "SpecForge MCP Server",
+                                                                  "consumers":  ["Authorized coding Agent", "SpecForge architecture operations"],
+                                                                  "requestSchema":  { "architectureScope":  "ArchitectureScopeRef", "baselineId":  "string", "profileId":  "string", "profileVersion":  "string", "projectionSchemaVersion":  "3a.v2" },
+                                                                  "responseSchema":  { "job":  "ProjectionBuildJob summary", "manifest":  "ProjectionManifestV2 when already published" },
+                                                                  "errorCodes":  ["SCOPE_ACCESS_DENIED", "BASELINE_NOT_OFFICIALLY_PUBLISHED", "PROFILE_NOT_FOUND", "PROJECTION_BUILD_CONFLICT"],
+                                                                  "authType":  "Exact application-service knowledge:write grant",
+                                                                  "idempotency":  "Canonical build key returns the same active job or published Manifest; failed retries use a new attempt.",
+                                                                  "rateLimit":  "Governed build submissions only.",
+                                                                  "timeout":  "10s submission timeout; projection work is asynchronous.",
+                                                                  "compatibilityPolicy":  "Projection schema versions are explicit; legacy manifests are never guessed or backfilled.",
+                                                                  "openapiSpec":  "MCP tool schema: request_3a_projection_build",
+                                                                  "exposure":  "internal",
+                                                                  "createdAt":  "2026-08-10T00:00:00.000Z",
+                                                                  "updatedAt":  "2026-08-10T00:00:00.000Z",
+                                                                  "localizedContent":  {
+                                                                                             "en":  { "name":  "3A Projection Build Contract", "description":  "Creates or returns an idempotent exact-Scope PostgreSQL projection-build job without executing long-running projection work in the MCP request.", "authType":  "Exact application-service knowledge:write grant", "idempotency":  "Canonical build key returns the same active job or published Manifest; failed retries use a new attempt.", "rateLimit":  "Governed build submissions only.", "timeout":  "10s submission timeout; projection work is asynchronous.", "compatibilityPolicy":  "Projection schema versions are explicit; legacy manifests are never guessed or backfilled." },
+                                                                                             "zh":  { "name":  "3A 投影构建契约", "description":  "创建或返回精确 Scope 的幂等 PostgreSQL 投影构建任务，不在 MCP 请求中执行长时间投影工作。", "authType":  "精确应用服务 knowledge:write 授权", "idempotency":  "规范构建键返回同一活动任务或已发布 Manifest；失败重试使用新尝试。", "rateLimit":  "仅允许受治理的构建提交。", "timeout":  "提交超时 10 秒；投影工作异步执行。", "compatibilityPolicy":  "投影 Schema 版本必须显式保存；禁止猜测或回填旧 Manifest。" }
+                                                                                         }
+                                                              }
+                                                },
+                                                {
+                                                    "assetType":  "api",
+                                                    "asset":  {
+                                                                  "id":  "api-specforge-3a-architecture-query",
+                                                                  "name":  "3A Architecture Query Contract",
+                                                                  "description":  "Provides exact-Scope Baseline, search, traversal, detail, alignment, and node-and-edge drift reads over published 3A projection manifests.",
+                                                                  "method":  "GET",
+                                                                  "path":  "mcp://tools/3a_architecture_query",
+                                                                  "domainId":  "domain-specforge-platform",
+                                                                  "providerSystem":  "SpecForge Knowledge Query Service",
+                                                                  "consumers":  ["SpecForge Web", "Authorized MCP Agent"],
+                                                                  "requestSchema":  { "architectureScope":  "ArchitectureScopeRef", "baselineId":  "string", "projectionManifestId":  "string", "operation":  "baseline|search|trace|detail|alignment|drift", "cursor":  "opaque optional token" },
+                                                                  "responseSchema":  { "scope":  "exact Scope", "baseline":  "official Baseline", "manifest":  "ProjectionManifestV2", "result":  "bounded deterministic DTO", "continuation":  "opaque optional token" },
+                                                                  "errorCodes":  ["SCOPE_REQUIRED", "SCOPE_ACCESS_DENIED", "PUBLISHED_BASELINE_NOT_FOUND", "PROJECTION_MANIFEST_REQUIRED", "PROJECTION_BUILD_IN_PROGRESS", "PROJECTION_BUILD_FAILED", "FOCUS_NOT_IN_BASELINE", "CURSOR_INVALID", "RESULT_PARTIAL", "QUERY_SERVICE_UNAVAILABLE"],
+                                                                  "authType":  "Exact application-service knowledge:read grant",
+                                                                  "idempotency":  "Read-only; identical pinned requests return the same digest and ordering.",
+                                                                  "rateLimit":  "Finite server policy for depth, nodes, edges, paths, timeout, and payload.",
+                                                                  "timeout":  "2s default and 5s hard cap per traversal request.",
+                                                                  "compatibilityPolicy":  "Additive DTO evolution within projection schema 3a.v2; incompatible changes require a new projection schema version.",
+                                                                  "openapiSpec":  "MCP and Web query schemas: 3a.v2",
+                                                                  "exposure":  "internal",
+                                                                  "createdAt":  "2026-08-10T00:00:00.000Z",
+                                                                  "updatedAt":  "2026-08-10T00:00:00.000Z",
+                                                                  "localizedContent":  {
+                                                                                             "en":  { "name":  "3A Architecture Query Contract", "description":  "Provides exact-Scope Baseline, search, traversal, detail, alignment, and node-and-edge drift reads over published 3A projection manifests.", "authType":  "Exact application-service knowledge:read grant", "idempotency":  "Read-only; identical pinned requests return the same digest and ordering.", "rateLimit":  "Finite server policy for depth, nodes, edges, paths, timeout, and payload.", "timeout":  "2s default and 5s hard cap per traversal request.", "compatibilityPolicy":  "Additive DTO evolution within projection schema 3a.v2; incompatible changes require a new projection schema version." },
+                                                                                             "zh":  { "name":  "3A 架构查询契约", "description":  "基于已发布 3A 投影 Manifest 提供精确 Scope 的 Baseline、搜索、遍历、详情、对齐以及节点与关系漂移读取。", "authType":  "精确应用服务 knowledge:read 授权", "idempotency":  "只读；相同固定请求返回相同摘要和顺序。", "rateLimit":  "服务端对深度、节点、关系、路径、超时和载荷执行有限策略。", "timeout":  "遍历请求默认 2 秒，硬上限 5 秒。", "compatibilityPolicy":  "投影 Schema 3a.v2 内只允许兼容性 DTO 扩展；不兼容变更必须使用新投影 Schema 版本。" }
+                                                                                         }
+                                                              }
+                                                },
+                                                {
+                                                    "assetType":  "dataModel",
+                                                    "asset":  {
+                                                                  "id":  "data-specforge-3a-projection-read-model",
+                                                                  "name":  "3A Projection Read Model",
+                                                                  "description":  "Derived PostgreSQL model for leased projection builds, immutable published manifests, Baseline-bound nodes and edges, and expiring traversal continuations.",
+                                                                  "code":  "ThreeAProjectionReadModel",
+                                                                  "modelType":  "physical",
+                                                                  "domainId":  "domain-specforge-platform",
+                                                                  "tables":  ["ProjectionBuildJob", "ProjectionManifest", "KnowledgeProjectionNode", "KnowledgeProjectionEdge", "TraceContinuation"],
+                                                                  "entities":  ["Projection Build Job", "Published Projection Manifest", "Projection Node", "Projection Edge", "Trace Continuation"],
+                                                                  "fields":  [],
+                                                                  "relationships":  ["One official Baseline can have multiple Profile-bound published Manifests.", "One build job creates at most one immutable Manifest.", "One Manifest reaches one immutable generation of nodes and edges.", "A traversal continuation is bound to tenant, subject, exact Scope, Baseline, Manifest, and query fingerprint."],
+                                                                  "constraints":  ["PostgreSQL authored facts remain authoritative; this model is derived and rebuildable.", "Readers can reach rows only through a published Manifest.", "Build leases and checkpoints are mutable; published Manifests and reachable generations are immutable.", "All uniqueness and indexes include exact application-service Scope."],
+                                                                  "dataClassification":  "internal architecture metadata",
+                                                                  "lifecycle":  "Build jobs move through QUEUED, BUILDING, READY, or FAILED; a successful short transaction publishes an immutable Manifest; failed and expired operational rows follow retention policy.",
+                                                                  "lineage":  "MCP request_3a_projection_build, Knowledge Projector Worker, official KnowledgeBaseline, KnowledgeAssertion, RelationshipEvent, Evidence, and accepted IdentityCandidate records.",
+                                                                  "createdAt":  "2026-08-10T00:00:00.000Z",
+                                                                  "updatedAt":  "2026-08-10T00:00:00.000Z",
+                                                                  "localizedContent":  {
+                                                                                             "en":  { "name":  "3A Projection Read Model", "description":  "Derived PostgreSQL model for leased projection builds, immutable published manifests, Baseline-bound nodes and edges, and expiring traversal continuations.", "relationships":  ["One official Baseline can have multiple Profile-bound published Manifests.", "One build job creates at most one immutable Manifest.", "One Manifest reaches one immutable generation of nodes and edges.", "A traversal continuation is bound to tenant, subject, exact Scope, Baseline, Manifest, and query fingerprint."], "constraints":  ["PostgreSQL authored facts remain authoritative; this model is derived and rebuildable.", "Readers can reach rows only through a published Manifest.", "Build leases and checkpoints are mutable; published Manifests and reachable generations are immutable.", "All uniqueness and indexes include exact application-service Scope."], "lifecycle":  "Build jobs move through QUEUED, BUILDING, READY, or FAILED; a successful short transaction publishes an immutable Manifest; failed and expired operational rows follow retention policy.", "lineage":  "MCP request_3a_projection_build, Knowledge Projector Worker, official KnowledgeBaseline, KnowledgeAssertion, RelationshipEvent, Evidence, and accepted IdentityCandidate records.", "fields":  {} },
+                                                                                             "zh":  { "name":  "3A 投影读取模型", "description":  "用于租约投影构建、不可变已发布 Manifest、绑定 Baseline 的节点与关系以及带过期时间遍历继续状态的 PostgreSQL 派生模型。", "relationships":  ["一个正式 Baseline 可以拥有多个绑定 Profile 的已发布 Manifest。", "一个构建任务最多创建一个不可变 Manifest。", "一个 Manifest 指向一代不可变节点和关系。", "遍历继续状态绑定租户、subject、精确 Scope、Baseline、Manifest 和查询指纹。"], "constraints":  ["PostgreSQL 正式事实保持权威；该模型属于可重建派生数据。", "Reader 只能通过已发布 Manifest 到达数据。", "构建租约和检查点可变；已发布 Manifest 及其可达生成代次不可变。", "所有唯一约束和索引必须包含精确应用服务 Scope。"], "lifecycle":  "构建任务在 QUEUED、BUILDING、READY 或 FAILED 之间流转；成功的短事务发布不可变 Manifest；失败和过期运维记录按保留策略处理。", "lineage":  "来自 MCP request_3a_projection_build、Knowledge Projector Worker、正式 KnowledgeBaseline、KnowledgeAssertion、RelationshipEvent、Evidence 和已接受 IdentityCandidate。", "fields":  {} }
+                                                                                         }
+                                                              }
+                                                },
+                                                {
+                                                    "assetType":  "businessRule",
+                                                    "asset":  {
+                                                                  "id":  "rule-specforge-3a-projection-publication",
+                                                                  "name":  "3A Projection Publication Rule",
+                                                                  "description":  "Publishes a 3A projection only after an exact-Scope leased build proves endpoint closure, deterministic counts, compatible Profile/schema, and canonical content digest.",
+                                                                  "code":  "SPECFORGE_3A_PROJECTION_PUBLICATION",
+                                                                  "domainId":  "domain-specforge-platform",
+                                                                  "ruleType":  "validation",
+                                                                  "condition":  "A leased 3A projection build requests publication for an official Baseline.",
+                                                                  "action":  "Verify Scope, Baseline publication status, lease, checkpoint completion, unique endpoint resolution, row counts, Profile/schema compatibility, and content digest, then atomically create the immutable Manifest and mark the job READY.",
+                                                                  "exception":  "Any missing or ambiguous endpoint, stale lease, partial batch, digest mismatch, cross-Scope row, or nonofficial Baseline fails closed without publishing partial data.",
+                                                                  "examples":  ["A repeated request returns the existing published Manifest for the canonical build key.", "A relationship endpoint matching two assertions records PROJECTION_ENDPOINT_AMBIGUOUS and leaves the job failed."],
+                                                                  "relatedAssets":  [{ "type":  "dataModel", "id":  "data-specforge-3a-projection-read-model", "label":  "3A Projection Read Model" }, { "type":  "api", "id":  "api-specforge-3a-projection-build", "label":  "3A Projection Build Contract" }],
+                                                                  "severity":  "high",
+                                                                  "createdAt":  "2026-08-10T00:00:00.000Z",
+                                                                  "updatedAt":  "2026-08-10T00:00:00.000Z",
+                                                                  "localizedContent":  {
+                                                                                             "en":  { "name":  "3A Projection Publication Rule", "description":  "Publishes a 3A projection only after an exact-Scope leased build proves endpoint closure, deterministic counts, compatible Profile/schema, and canonical content digest.", "condition":  "A leased 3A projection build requests publication for an official Baseline.", "action":  "Verify Scope, Baseline publication status, lease, checkpoint completion, unique endpoint resolution, row counts, Profile/schema compatibility, and content digest, then atomically create the immutable Manifest and mark the job READY.", "exception":  "Any missing or ambiguous endpoint, stale lease, partial batch, digest mismatch, cross-Scope row, or nonofficial Baseline fails closed without publishing partial data.", "examples":  ["A repeated request returns the existing published Manifest for the canonical build key.", "A relationship endpoint matching two assertions records PROJECTION_ENDPOINT_AMBIGUOUS and leaves the job failed."] },
+                                                                                             "zh":  { "name":  "3A 投影发布规则", "description":  "只有精确 Scope 的租约构建证明端点闭合、确定性数量、兼容 Profile/Schema 和规范内容摘要后，才能发布 3A 投影。", "condition":  "带租约的 3A 投影构建请求为正式 Baseline 发布结果。", "action":  "校验 Scope、Baseline 发布状态、租约、检查点完成、端点唯一解析、行数、Profile/Schema 兼容性和内容摘要，然后原子创建不可变 Manifest 并把任务标记为 READY。", "exception":  "端点缺失或歧义、租约过期、批次不完整、摘要不匹配、跨 Scope 数据或非正式 Baseline 都必须失败关闭，不能发布部分数据。", "examples":  ["相同规范构建键的重复请求返回已有发布 Manifest。", "关系端点匹配两个断言时记录 PROJECTION_ENDPOINT_AMBIGUOUS，并保持任务失败。"] }
+                                                                                         }
+                                                              }
+                                                }
+                                            ],
+                          "managedRelationships":  [
+                                                       { "sourceType":  "api", "sourceId":  "api-specforge-mcp-tools", "targetType":  "api", "targetId":  "api-specforge-3a-projection-build", "relationType":  "CONTAINS" },
+                                                       { "sourceType":  "api", "sourceId":  "api-specforge-mcp-tools", "targetType":  "api", "targetId":  "api-specforge-3a-architecture-query", "relationType":  "CONTAINS" },
+                                                       { "sourceType":  "api", "sourceId":  "api-specforge-3a-projection-build", "targetType":  "dataModel", "targetId":  "data-specforge-3a-projection-read-model", "relationType":  "WRITES" },
+                                                       { "sourceType":  "api", "sourceId":  "api-specforge-3a-architecture-query", "targetType":  "dataModel", "targetId":  "data-specforge-3a-projection-read-model", "relationType":  "READS" },
+                                                       { "sourceType":  "businessRule", "sourceId":  "rule-specforge-3a-projection-publication", "targetType":  "api", "targetId":  "api-specforge-3a-projection-build", "relationType":  "GOVERNS" },
+                                                       { "sourceType":  "businessRule", "sourceId":  "rule-specforge-3a-projection-publication", "targetType":  "dataModel", "targetId":  "data-specforge-3a-projection-read-model", "relationType":  "GOVERNS" },
+                                                       { "sourceType":  "proposal", "sourceId":  "proposal-3a-architecture-navigation-workspace", "targetType":  "api", "targetId":  "api-specforge-3a-projection-build", "relationType":  "IMPACTS" },
+                                                       { "sourceType":  "proposal", "sourceId":  "proposal-3a-architecture-navigation-workspace", "targetType":  "api", "targetId":  "api-specforge-3a-architecture-query", "relationType":  "IMPACTS" },
+                                                       { "sourceType":  "proposal", "sourceId":  "proposal-3a-architecture-navigation-workspace", "targetType":  "dataModel", "targetId":  "data-specforge-3a-projection-read-model", "relationType":  "IMPACTS" },
+                                                       { "sourceType":  "proposal", "sourceId":  "proposal-3a-architecture-navigation-workspace", "targetType":  "businessRule", "targetId":  "rule-specforge-3a-projection-publication", "relationType":  "IMPACTS" }
+                                                   ],
+                          "owner":  "SpecForge Architecture and Runtime",
+                          "status":  "Bilingual design approved and implementation plan pending execution",
+                          "reason":  "The 3A browser must use official Baseline history, explicit Profile-bound immutable projection manifests, exact-Scope authorization, bounded resumable reads, and an asynchronous PostgreSQL build lifecycle rather than the semantically incompatible current asset graph.",
+                          "retryTrigger":  "Open a new exact-Scope implementation session after plan approval; implement and verify the PostgreSQL projection build, query, Web, MCP, and Worker increments before changing the Proposal status to implemented.",
+                          "evidence":  [
+                                           {
+                                               "command":  "User design review on 2026-08-10",
+                                               "result":  "Approved the rewritten bilingual 3A Architecture Navigation Workspace Spec."
+                                           },
+                                           {
+                                               "command":  "git diff --check; bilingual structural and contradiction scan",
+                                               "result":  "Passed with 16 English sections, 16 Chinese sections, zero placeholders, explicit authorization and finite budgets, node-and-edge drift, historical Baseline semantics, and no first-increment Nebula claim."
+                                           },
+                                           {
+                                               "command":  "node .\\node_modules\\vitest\\vitest.mjs run scripts/sync-design-facts.test.ts scripts/design-fact-manifest.test.ts",
+                                               "result":  "Passed 2 files and 30 tests with worktree and package-store exclusions, including approved Proposal lifecycle, four bilingual managed assets, unique IDs, and directional typed relationships."
+                                           },
+                                           {
+                                               "command":  "$env:SPECFORGE_DESIGN_FACT_IDS='adr-3a-architecture-navigation-workspace'; pnpm design-facts:sync; pnpm design-facts:check",
+                                               "result":  "MCP synchronization returned complete; selected read-back verified one decision with empty missing, mismatched, outOfScope, and blocked lists."
+                                           },
+                                           {
+                                               "command":  "$env:SPECFORGE_APPLICATION_SERVICE_ID='com.huawei.celon.desiner'; $env:SPECFORGE_SCOPE_PATH='pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner'; pnpm design-facts:federation:check",
+                                               "result":  "Returned root f04e3ad0981d2ce6a2e40032e359ab06b07dc4ed2255774b6515ba8cd87987dd, empty issue counts, and blocking=false."
+                                           },
+                                           {
+                                               "command":  "pnpm design-context:close -- --session design-change-session:882fb4fb-cd55-4bba-a75c-d05c1d01b7bc --status CONVERGED --evidence verified-design-evidence",
+                                               "result":  "Closed the same exact Designer-Scope session as CONVERGED with manifest-tests, MCP synchronization/read-back, federation, plan self-review, and diff-check references."
+                                           }
+                                       ]
                       }
                   ]
 }

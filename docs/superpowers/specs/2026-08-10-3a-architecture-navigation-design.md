@@ -4,30 +4,30 @@
 
 ### 1. Status And Traceability
 
-This revision resolves the architecture-review findings. The product direction is approved; written-spec approval is still required before implementation planning.
+This revision resolves the architecture-review findings. The bilingual written Spec is approved, the implementation plan is complete, and code implementation has not started.
 
 - Owning application service: `com.huawei.celon.desiner`
 - Owning scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - Design Change Session: `design-change-session:882fb4fb-cd55-4bba-a75c-d05c1d01b7bc`
-- Proposed ADR ID: `adr-3a-architecture-navigation-workspace`
-- Proposed Proposal ID: `proposal-3a-architecture-navigation-workspace`
-- Proposed Context Pack ID: `ctx-3a-architecture-navigation-workspace`
+- ADR ID: `adr-3a-architecture-navigation-workspace`
+- Proposal ID: `proposal-3a-architecture-navigation-workspace`
+- Context Pack ID: `ctx-3a-architecture-navigation-workspace`
 - Related decisions: `adr-deterministic-3a-knowledge-projections`, `adr-application-service-scope-isolation`, `adr-mcp-first-architecture`, `adr-postgresql-authoritative-design-store`
 
-After written approval, the proposed ADR, Proposal, Context Pack, Evidence, backlog facts, and directional typed links must be persisted through MCP in this exact Scope. The current design session closes only after repository and MCP records reconcile. Implementation then opens a new exact-Scope session.
+The ADR, approved Proposal, Context Pack, Evidence, backlog facts, and directional typed links are persisted and reconciled through MCP in this exact Scope. The design session is closed `CONVERGED`. Implementation must open a new exact-Scope session and cannot change the Proposal to `implemented` before focused evidence and reconciliation succeed.
 
 ### 2. Problem And Product Decision
 
 SpecForge can derive deterministic BIZ, SYS, and TECH projections, cross-layer alignment, drift, and a pinned Context Pack. The Web console has no productized 3A browser. The generic asset graph cannot substitute for a Baseline-bound architecture view.
 
-The product decision is a read-only, business-first architecture navigation workspace at `/architecture/3a`. It shows one authorized application-service Scope and one published Baseline. It starts from a focused path rather than an entire graph, supports search from any layer, and permits bidirectional tracing.
+The product decision is a read-only, business-first architecture navigation workspace at `/architecture/3a`. It shows one authorized application-service Scope and one official Baseline. It starts from a focused path rather than an entire graph, supports search from any layer, and permits bidirectional tracing.
 
 The first delivery uses PostgreSQL only. The existing NebulaGraph projection contains design-asset identities, not Baseline-bound Knowledge Assertions, so it cannot provide semantically equivalent 3A traversal. A dedicated 3A graph projection and Nebula Reader are a separately governed increment.
 
 ### 3. Goals
 
 - Trace business intent through system realization to technical implementation and back.
-- Read only facts belonging to an explicitly selected `PUBLISHED` Baseline.
+- Read only facts belonging to an active or historical officially published Baseline.
 - Preserve exact tenant and application-service authorization for every node, edge, count, and continuation.
 - Use deterministic, bounded, resumable queries rather than whole-graph rendering.
 - Show explicit typed alignment, Baseline-to-Baseline drift, Evidence, and accepted identity mappings.
@@ -51,7 +51,7 @@ The first delivery uses PostgreSQL only. The existing NebulaGraph projection con
 This Spec and its future implementation plan cover:
 
 - explicit Profile binding in a v2 Projection Manifest;
-- resumable PostgreSQL materialization and atomic publication of Baseline-bound projection nodes and edges;
+- an idempotent MCP build request, leased PostgreSQL build job, resumable materialization, and atomic publication of Baseline-bound projection nodes and edges;
 - a shared, exact-Scope 3A query package;
 - PostgreSQL Baseline snapshot reads;
 - signed search cursors and server-held traversal continuations;
@@ -141,11 +141,17 @@ The package creates no global database client and performs no authored writes.
 
 #### MCP adapter
 
-`apps/mcp-server` exposes equivalent read tools over the same service and passes its normalized `ScopedPrincipal`. MCP remains the only formal write boundary.
+`apps/mcp-server` exposes equivalent read tools over the same service and passes its normalized `ScopedPrincipal`. It also exposes `request_3a_projection_build`, an idempotent `knowledge:write` command that persists or returns a build job and then returns without executing the projection. MCP remains the only formal write boundary.
+
+#### Knowledge projector
+
+`apps/knowledge-projector` leases PostgreSQL projection-build jobs, resolves Baseline relationships, writes bounded node and edge batches, and performs the final publication transaction. It has no authored-fact mutation API and cannot change assertions, Baselines, Evidence, identity decisions, or relationship events.
 
 ### 9. Manifest And Baseline Semantics
 
-The Baseline remains Profile-neutral. Profile identity belongs to the derived projection.
+The Baseline remains Profile-neutral. Profile identity belongs to the derived projection. An officially published Baseline has `publishedAt` and status `PUBLISHED` or `SUPERSEDED`: `PUBLISHED` is the active stream head, while `SUPERSEDED` is an immutable historical publication. Working or blocked Baselines are never browser inputs.
+
+`ProjectionBuildJob` is the mutable operational record. It contains the canonical build key, exact Scope, Baseline, Profile, state `QUEUED | BUILDING | READY | FAILED`, attempt, lease owner/expiry, batch checkpoint, counters, sanitized failure code, retry reference, and timestamps.
 
 `ProjectionManifestV2` requires:
 
@@ -156,31 +162,31 @@ The Baseline remains Profile-neutral. Profile identity belongs to the derived pr
 - sorted `sourceRevisionIds`;
 - `relationshipVersion`;
 - canonical query definition;
-- canonical input digest, generation ID, lifecycle status, completion counts, content digest, and timestamps.
+- canonical input digest, generation ID, completed node/edge counts, content digest, and publication timestamp.
 
-The lifecycle is `BUILDING -> READY` or `BUILDING -> FAILED`. The canonical build key is the digest of exact Scope, Baseline, Profile ID/version, projection-schema version, sorted source revisions, relationship version, and normalized query definition. Runtime status, timestamps, and database-generated IDs are excluded from that digest.
+The canonical build key is the digest of exact Scope, Baseline, Profile ID/version, projection-schema version, sorted source revisions, relationship version, and normalized query definition. Runtime status, timestamps, attempts, leases, and database-generated IDs are excluded from that digest. A v2 Manifest is created only at successful publication and is immutable.
 
-Schema migration adds nullable Profile columns to preserve existing rows. Legacy manifests are never guessed or silently backfilled. The 3A browser accepts only v2 manifests with explicit Profile binding. An existing Baseline without a compatible v2 manifest returns `PROJECTION_MANIFEST_REQUIRED`. A separately evidenced MCP derive operation creates the required v2 manifest.
+Schema migration adds nullable Profile columns to preserve existing rows. Legacy manifests are never guessed or silently backfilled. The 3A browser accepts only v2 manifests with explicit Profile binding. An existing Baseline without a compatible v2 manifest returns `PROJECTION_MANIFEST_REQUIRED`. A separately evidenced MCP build request and Worker publication create the required v2 manifest.
 
-The v2 MCP derive operation selects Baseline assertions using the existing deterministic rule: accepted assertions explicitly listed by the Baseline or accepted assertions bound to the Baseline ChangeSet. It reconstructs typed relationships as of `BaselineManifest.relationshipVersion` from append-only `RelationshipEvent` snapshots; it must not use a newer mutable `AssetLink` state as a historical Baseline.
+The v2 Worker selects Baseline assertions using the existing deterministic rule: accepted assertions explicitly listed by the Baseline or accepted assertions bound to the Baseline ChangeSet. It reconstructs typed relationships as of `BaselineManifest.relationshipVersion` from append-only `RelationshipEvent` snapshots; it must not use a newer mutable `AssetLink` state as a historical Baseline.
 
-The derive operation then resolves each explicit relationship endpoint to an assertion in the same Baseline using the typed relationship assertion, promoted asset `knowledgeRevision.sourceAssertionId`, and accepted identity decisions. Missing or ambiguous endpoint resolution fails with `PROJECTION_ENDPOINT_UNRESOLVED` or `PROJECTION_ENDPOINT_AMBIGUOUS`; it never fans out a guessed edge.
+The Worker then resolves each explicit relationship endpoint to an assertion in the same Baseline using the typed relationship assertion, promoted asset `knowledgeRevision.sourceAssertionId`, and accepted identity decisions. Missing or ambiguous endpoint resolution fails with `PROJECTION_ENDPOINT_UNRESOLVED` or `PROJECTION_ENDPOINT_AMBIGUOUS`; it never fans out a guessed edge.
 
-The derive operation acquires a build lease for the canonical build key, creates a `BUILDING` generation, and writes the following derived read model in bounded batches:
+The MCP build command creates or returns a job by canonical build key. The Worker acquires a renewable lease, creates or resumes a generation, and writes the following derived read model in bounded batches:
 
 - `KnowledgeProjectionNode`: exact Scope, Manifest, Baseline, assertion ID, semantic identity, layer, stable sort key, optional accepted asset reference, and content digest;
-- `KnowledgeProjectionEdge`: exact Scope, Manifest, Baseline, relationship event/assertion reference, source assertion ID, target assertion ID, relation code, confidence, relationship version, and content digest.
+- `KnowledgeProjectionEdge`: exact Scope, Manifest, Baseline, relationship event/assertion reference, source and target assertion IDs, source and target semantic identities, relation code, confidence, relationship version, and content digest.
 
-After all batches are written, a short PostgreSQL transaction validates endpoint closure, row counts, and the canonical content digest, then marks the generation `READY`. Readers never observe `BUILDING` or `FAILED` generations. A failed build is marked `FAILED` with a sanitized reason and retry reference; expired builds are removed by retention policy. A repeated derive request with the same build key returns the existing `READY` generation, resumes its own valid `BUILDING` generation, or fails on a conflicting digest. It never deletes or mutates a `READY` generation.
+After all batches are written, a short PostgreSQL transaction validates endpoint closure, row counts, and the canonical content digest, creates the immutable v2 Manifest, and marks the job `READY`. Readers reach a generation only through its published Manifest and therefore never observe queued, building, failed, or partial rows. A failed job stores a sanitized code and retry reference; expired failed generations are removed by retention policy. A repeated build request with the same build key returns the existing published Manifest or active job. A retry after failure creates a new attempt without deleting or mutating a published generation.
 
-These rows are derived, immutable after publication, and rebuildable from authoritative facts. The browser Reader queries only a pinned `READY` materialization and joins authoritative assertion, Evidence, and localization details by exact Scope. Web requests do not reconstruct historical relationship state on every interaction. This staged publication avoids a transaction whose duration grows with the Baseline while retaining atomic reader visibility.
+These rows are derived, immutable after publication, and rebuildable from authoritative facts. The browser Reader queries only a materialization reachable through a pinned published Manifest and joins authoritative assertion, Evidence, and localization details by exact Scope. Web requests do not reconstruct historical relationship state on every interaction. This staged publication avoids a transaction whose duration grows with the Baseline while retaining atomic reader visibility.
 
 ### 10. Query Contract
 
 | Operation | Result | Authorization |
 | --- | --- | --- |
-| `listPublishedBaselines` | deterministic Baseline summaries | tenant and exact Scope read grant |
-| `listProjectionManifests` | compatible `READY` v2 manifests for a Baseline | tenant, exact Scope, Baseline |
+| `listPublishedBaselines` | deterministic active and historical published Baseline summaries | tenant and exact Scope read grant |
+| `listProjectionManifests` | compatible published v2 manifests for a Baseline | tenant, exact Scope, Baseline |
 | `searchArchitectureFacts` | ordered BIZ/SYS/TECH facts and search cursor | tenant, exact Scope, Baseline, projection |
 | `traceArchitecturePath` | bounded nodes, edges, frontier, continuation | tenant, exact Scope, Baseline, projection |
 | `getArchitectureFactDetail` | fact, localization, Evidence, relationships, and accepted asset mapping | tenant, exact Scope, Baseline, projection |
@@ -220,7 +226,7 @@ The current `deriveKnowledgeProjection` drift output compares Baseline assertion
 
 `comparePublishedBaselines(baseBaseline, targetBaseline, baseManifest, targetManifest, baseNodes, baseEdges, targetNodes, targetEdges)`
 
-The result records both Baseline IDs, both Manifest IDs, exact Scope, `entityKind = NODE | EDGE`, a stable semantic key, before/after references and digests, layer or layer pair, and `ADDED`, `REMOVED`, `CHANGED`, or `UNCHANGED`. A node key is its semantic identity. An edge key is derived from source semantic identity, relation code, target semantic identity, and explicit relationship identity. Thus a relationship-only change is visible even when both endpoint assertions are unchanged. Both Baselines must be `PUBLISHED`, belong to the same stream and exact Scope, and their `READY` Manifests must use the same Profile ID and compatible Profile/projection-schema versions. Working-stream and candidate facts are excluded.
+The result records both Baseline IDs, both Manifest IDs, exact Scope, `entityKind = NODE | EDGE`, a stable semantic key, before/after references and digests, layer or layer pair, and `ADDED`, `REMOVED`, `CHANGED`, or `UNCHANGED`. A node key is its semantic identity. An edge key is derived from source semantic identity, relation code, target semantic identity, and explicit relationship identity. Thus a relationship-only change is visible even when both endpoint assertions are unchanged. Both Baselines must be official immutable publications with `publishedAt` and status `PUBLISHED` or `SUPERSEDED`, belong to the same stream and exact Scope, and their published v2 Manifests must use the same Profile ID and compatible Profile/projection-schema versions. Working-stream, blocked Baselines, and candidate facts are excluded.
 
 ### 13. Authentication And Authorization
 
@@ -250,7 +256,7 @@ English is canonical. Chinese is a complete human-facing overlay. Technical IDs,
 | `SCOPE_ACCESS_DENIED` | principal lacks exact read grant | fail closed with sanitized message |
 | `PUBLISHED_BASELINE_NOT_FOUND` | no published Baseline | show official-view unavailable state |
 | `PROJECTION_MANIFEST_REQUIRED` | no compatible v2 manifest | show derive/publish operational reference |
-| `PROJECTION_BUILD_IN_PROGRESS` | compatible generation exists but is not published | show retryable build status without partial data |
+| `PROJECTION_BUILD_IN_PROGRESS` | compatible job exists but has no published Manifest | show retryable build status without partial data |
 | `PROJECTION_BUILD_FAILED` | latest compatible generation failed | show sanitized retry reference without partial data |
 | `FOCUS_NOT_IN_BASELINE` | focus does not belong to selected Baseline | return to searchable catalog |
 | `CURSOR_INVALID` | cursor signature, state, identity, or query mismatch | discard continuation and preserve focus |
@@ -266,14 +272,15 @@ Unauthorized responses never vary based on whether a requested Baseline, project
 #### Domain and query tests
 
 - v2 Projection Manifests require explicit Profile identity and stable digest fields;
-- v2 derive uses bounded batches, resumable build identity, and an atomic `READY` publication transition;
+- the MCP build request is idempotent and returns without running long projection work;
+- the Worker uses renewable leases, bounded batches, resumable checkpoints, and an atomic Manifest publication transition;
 - readers cannot observe `BUILDING`, `FAILED`, or partially materialized generations;
 - duplicate build requests are idempotent and published generations are immutable;
 - unresolved or ambiguous relationship endpoints block materialization;
 - legacy unpinned manifests fail closed;
 - latest published Baseline selection is deterministic;
 - historical relationships are reconstructed at the Baseline relationship version;
-- unpublished, cross-stream, or cross-Scope Baselines are rejected;
+- working/blocked, cross-stream, or cross-Scope Baselines are rejected while immutable `SUPERSEDED` publications remain available for history;
 - Baseline-to-Baseline drift records both IDs, detects node and relationship changes, and excludes candidates;
 - search ordering and continuation are stable;
 - traversal continuation has no duplicates and rejects identity, Scope, version, sequence, and digest mismatch;
@@ -313,30 +320,30 @@ Unauthorized responses never vary based on whether a requested Baseline, project
 
 ### 1. 状态与追溯
 
-本修订解决架构审查发现的问题。产品方向已经确认，但书面 Spec 仍需批准后才能进入实施计划。
+本修订解决架构审查发现的问题。双语书面 Spec 已批准，实施计划已完成，代码实现尚未开始。
 
 - 所属应用服务：`com.huawei.celon.desiner`
 - 所属 Scope：`pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - 设计变更会话：`design-change-session:882fb4fb-cd55-4bba-a75c-d05c1d01b7bc`
-- 拟新增 ADR ID：`adr-3a-architecture-navigation-workspace`
-- 拟新增 Proposal ID：`proposal-3a-architecture-navigation-workspace`
-- 拟新增 Context Pack ID：`ctx-3a-architecture-navigation-workspace`
+- ADR ID：`adr-3a-architecture-navigation-workspace`
+- Proposal ID：`proposal-3a-architecture-navigation-workspace`
+- Context Pack ID：`ctx-3a-architecture-navigation-workspace`
 - 关联决策：`adr-deterministic-3a-knowledge-projections`、`adr-application-service-scope-isolation`、`adr-mcp-first-architecture`、`adr-postgresql-authoritative-design-store`
 
-书面设计批准后，必须通过 MCP 在精确 Scope 中持久化对应 ADR、Proposal、Context Pack、Evidence、待办事实和有方向的类型关系。仓库记录与 MCP 记录对账通过后才能关闭当前设计会话；实施阶段必须创建新的精确 Scope 会话。
+ADR、approved Proposal、Context Pack、Evidence、待办事实和有方向的类型关系已经通过 MCP 在精确 Scope 中持久化并完成对账，设计会话已按 `CONVERGED` 关闭。实施阶段必须创建新的精确 Scope 会话，并且在聚焦证据和对账通过前不能把 Proposal 改为 `implemented`。
 
 ### 2. 问题与产品决策
 
 SpecForge 已能确定性派生 BIZ、SYS、TECH、跨层对齐、漂移和固定 Context Pack，但 Web 控制台没有产品化的 3A 浏览器。通用设计资产图不能替代绑定 Baseline 的架构视图。
 
-产品决策是在 `/architecture/3a` 提供只读、业务优先的架构导航工作台。页面只展示一个已授权应用服务 Scope 和一个已发布 Baseline，从焦点路径开始而不是加载完整图，支持任意层搜索和双向追溯。
+产品决策是在 `/architecture/3a` 提供只读、业务优先的架构导航工作台。页面只展示一个已授权应用服务 Scope 和一个正式 Baseline，从焦点路径开始而不是加载完整图，支持任意层搜索和双向追溯。
 
 第一增量只使用 PostgreSQL。现有 NebulaGraph 投影保存的是设计资产身份，不是绑定 Baseline 的 Knowledge Assertion，因此不能提供语义等价的 3A 遍历。专用 3A 图投影和 Nebula Reader 必须作为独立治理增量交付。
 
 ### 3. 目标
 
 - 从业务意图追踪到系统实现和技术实现，并支持反向追溯。
-- 只读取明确选择的 `PUBLISHED` Baseline 中的事实。
+- 只读取属于活动或历史正式发布 Baseline 的事实。
 - 对每个节点、关系、数量和继续查询执行精确租户与应用服务授权。
 - 使用确定性、有界、可恢复的查询，不渲染完整关系图。
 - 展示显式类型对齐、两个 Baseline 的漂移、Evidence 和已接受身份映射。
@@ -360,7 +367,7 @@ SpecForge 已能确定性派生 BIZ、SYS、TECH、跨层对齐、漂移和固�
 本 Spec 及后续实施计划包含：
 
 - 在 v2 Projection Manifest 中显式固定 Profile；
-- 在 PostgreSQL 中可恢复地物化并原子发布绑定 Baseline 的投影节点和关系；
+- 通过幂等 MCP 构建请求、PostgreSQL 租约任务、可恢复物化和原子发布生成绑定 Baseline 的投影节点与关系；
 - 共享且精确 Scope 的 3A 查询包；
 - PostgreSQL Baseline 快照读取；
 - 签名搜索游标和服务端保存的遍历继续状态；
@@ -450,11 +457,17 @@ URL 保存可分享的架构状态：
 
 #### MCP 适配器
 
-`apps/mcp-server` 基于同一服务提供等价读取工具，并传入已经规范化的 `ScopedPrincipal`。MCP 继续是唯一正式写入边界。
+`apps/mcp-server` 基于同一服务提供等价读取工具，并传入已经规范化的 `ScopedPrincipal`。它还提供 `request_3a_projection_build`：这是一个幂等的 `knowledge:write` 命令，只负责持久化或返回构建任务，不在请求内执行投影。MCP 继续是唯一正式写入边界。
+
+#### 知识投影 Worker
+
+`apps/knowledge-projector` 从 PostgreSQL 租用投影构建任务，解析 Baseline 关系，分批写入节点和关系，并执行最终发布事务。它没有正式事实修改 API，不能改变断言、Baseline、Evidence、身份决策或关系事件。
 
 ### 9. Manifest 与 Baseline 语义
 
-Baseline 保持 Profile 无关，Profile 身份属于派生投影。
+Baseline 保持 Profile 无关，Profile 身份属于派生投影。正式发布 Baseline 必须具有 `publishedAt`，状态为 `PUBLISHED` 或 `SUPERSEDED`：前者是活动 Stream 头，后者是不可变的历史发布。工作中或阻塞的 Baseline 不能作为浏览输入。
+
+`ProjectionBuildJob` 是可变运维记录，包含规范构建键、精确 Scope、Baseline、Profile、`QUEUED | BUILDING | READY | FAILED` 状态、尝试次数、租约持有者/期限、批次检查点、计数器、脱敏失败码、重试引用和时间戳。
 
 `ProjectionManifestV2` 必须包含：
 
@@ -465,31 +478,31 @@ Baseline 保持 Profile 无关，Profile 身份属于派生投影。
 - 已排序的 `sourceRevisionIds`；
 - `relationshipVersion`；
 - 规范查询定义；
-- 规范输入摘要、生成 ID、生命周期状态、完成计数、内容摘要和时间戳。
+- 规范输入摘要、生成 ID、完成节点/关系计数、内容摘要和发布时间。
 
-生命周期为 `BUILDING -> READY` 或 `BUILDING -> FAILED`。规范构建键由精确 Scope、Baseline、Profile ID/版本、投影 Schema 版本、排序后的来源修订、关系版本和规范化查询定义计算。运行状态、时间戳和数据库生成 ID 不进入该摘要。
+规范构建键由精确 Scope、Baseline、Profile ID/版本、投影 Schema 版本、排序后的来源修订、关系版本和规范化查询定义计算。运行状态、时间戳、尝试次数、租约和数据库生成 ID 不进入该摘要。v2 Manifest 只在成功发布时创建，创建后不可变。
 
-Schema 迁移新增可空 Profile 列以保留历史记录。禁止猜测或静默回填旧 Manifest。3A 浏览器只接受显式固定 Profile 的 v2 Manifest。已有 Baseline 没有兼容 v2 Manifest 时返回 `PROJECTION_MANIFEST_REQUIRED`，必须通过具有独立证据的 MCP 派生操作创建新 Manifest。
+Schema 迁移新增可空 Profile 列以保留历史记录。禁止猜测或静默回填旧 Manifest。3A 浏览器只接受显式固定 Profile 的 v2 Manifest。已有 Baseline 没有兼容 v2 Manifest 时返回 `PROJECTION_MANIFEST_REQUIRED`，必须通过具有独立证据的 MCP 构建请求和 Worker 发布创建新 Manifest。
 
-v2 MCP 派生操作使用现有确定性规则选择 Baseline 断言：Baseline 明确列出的已接受断言，或绑定 Baseline ChangeSet 的已接受断言。类型关系必须根据追加式 `RelationshipEvent` 快照重建到 `BaselineManifest.relationshipVersion`，不能把更新的可变 `AssetLink` 当前状态当作历史 Baseline。
+v2 Worker 使用现有确定性规则选择 Baseline 断言：Baseline 明确列出的已接受断言，或绑定 Baseline ChangeSet 的已接受断言。类型关系必须根据追加式 `RelationshipEvent` 快照重建到 `BaselineManifest.relationshipVersion`，不能把更新的可变 `AssetLink` 当前状态当作历史 Baseline。
 
-派生操作根据类型关系断言、提升资产中的 `knowledgeRevision.sourceAssertionId` 和已接受身份决策，把每个显式关系端点解析到同一 Baseline 的断言。端点缺失或歧义时分别返回 `PROJECTION_ENDPOINT_UNRESOLVED` 或 `PROJECTION_ENDPOINT_AMBIGUOUS`，禁止通过猜测形成扇出关系。
+Worker 根据类型关系断言、提升资产中的 `knowledgeRevision.sourceAssertionId` 和已接受身份决策，把每个显式关系端点解析到同一 Baseline 的断言。端点缺失或歧义时分别返回 `PROJECTION_ENDPOINT_UNRESOLVED` 或 `PROJECTION_ENDPOINT_AMBIGUOUS`，禁止通过猜测形成扇出关系。
 
-派生操作先按规范构建键获得构建租约，创建 `BUILDING` 代次，然后使用有限批次写入以下派生读取模型：
+MCP 构建命令按规范构建键创建或返回任务。Worker 获得可续期租约，创建或恢复生成代次，然后使用有限批次写入以下派生读取模型：
 
 - `KnowledgeProjectionNode`：精确 Scope、Manifest、Baseline、断言 ID、语义身份、层级、稳定排序键、可选已接受资产引用和内容摘要；
-- `KnowledgeProjectionEdge`：精确 Scope、Manifest、Baseline、关系事件/断言引用、来源断言 ID、目标断言 ID、关系代码、置信度、关系版本和内容摘要。
+- `KnowledgeProjectionEdge`：精确 Scope、Manifest、Baseline、关系事件/断言引用、来源与目标断言 ID、来源与目标语义身份、关系代码、置信度、关系版本和内容摘要。
 
-全部批次写入后，由一个短 PostgreSQL 事务校验端点闭合、行数和规范内容摘要，再把代次标记为 `READY`。Reader 永远不能看到 `BUILDING` 或 `FAILED` 代次。失败构建标记为 `FAILED`，只保存脱敏原因和重试引用；过期构建由保留策略清理。相同构建键的重复派生请求只能返回已有 `READY` 代次、恢复属于自身且有效的 `BUILDING` 代次，或在摘要冲突时失败；不能删除或修改 `READY` 代次。
+全部批次写入后，由一个短 PostgreSQL 事务校验端点闭合、行数和规范内容摘要，创建不可变 v2 Manifest，并把任务标记为 `READY`。Reader 只能通过已发布 Manifest 到达生成代次，因此永远看不到排队中、构建中、失败或部分写入的数据。失败任务只保存脱敏错误码和重试引用；过期失败代次由保留策略清理。相同构建键的重复构建请求返回已有发布 Manifest 或活动任务；失败后的重试创建新尝试，不能删除或修改已发布代次。
 
-这些记录发布后不可变，并且可以从权威事实重建。浏览 Reader 只查询固定的 `READY` 物化结果，并按精确 Scope 关联权威断言、Evidence 和本地化详情。Web 交互不需要每次重建历史关系状态。分阶段发布避免事务时长随 Baseline 增长，同时保持对 Reader 的原子可见性。
+这些记录发布后不可变，并且可以从权威事实重建。浏览 Reader 只查询可以通过固定已发布 Manifest 到达的物化结果，并按精确 Scope 关联权威断言、Evidence 和本地化详情。Web 交互不需要每次重建历史关系状态。分阶段发布避免事务时长随 Baseline 增长，同时保持对 Reader 的原子可见性。
 
 ### 10. 查询契约
 
 | 操作 | 结果 | 授权条件 |
 | --- | --- | --- |
-| `listPublishedBaselines` | 确定性 Baseline 摘要 | 租户与精确 Scope 读取授权 |
-| `listProjectionManifests` | Baseline 对应的兼容 `READY` v2 Manifest | 租户、精确 Scope、Baseline |
+| `listPublishedBaselines` | 确定性的活动与历史正式发布 Baseline 摘要 | 租户与精确 Scope 读取授权 |
+| `listProjectionManifests` | Baseline 对应的兼容已发布 v2 Manifest | 租户、精确 Scope、Baseline |
 | `searchArchitectureFacts` | 排序后的 BIZ/SYS/TECH 事实和搜索游标 | 租户、Scope、Baseline、Projection |
 | `traceArchitecturePath` | 有界节点、边、前沿和继续令牌 | 租户、Scope、Baseline、Projection |
 | `getArchitectureFactDetail` | 事实、本地化、Evidence、关系和已接受资产映射 | 租户、Scope、Baseline、Projection |
@@ -529,7 +542,7 @@ Evidence 引用只能解析同 Scope 的 Evidence。设计资产链接只能通�
 
 `comparePublishedBaselines(baseBaseline, targetBaseline, baseManifest, targetManifest, baseNodes, baseEdges, targetNodes, targetEdges)`
 
-结果记录两个 Baseline ID、两个 Manifest ID、精确 Scope、`entityKind = NODE | EDGE`、稳定语义键、前后引用和摘要、层级或层级对，以及 `ADDED`、`REMOVED`、`CHANGED` 或 `UNCHANGED`。节点键是语义身份；关系键由来源语义身份、关系代码、目标语义身份和显式关系身份共同形成。因此，即使两个端点断言都未变化，关系自身变化仍然可见。两个 Baseline 都必须为 `PUBLISHED`，属于同一个 Stream 和精确 Scope；两个 `READY` Manifest 必须使用相同 Profile ID 以及兼容的 Profile 与投影 Schema 版本。工作流和候选事实不得进入正式漂移结果。
+结果记录两个 Baseline ID、两个 Manifest ID、精确 Scope、`entityKind = NODE | EDGE`、稳定语义键、前后引用和摘要、层级或层级对，以及 `ADDED`、`REMOVED`、`CHANGED` 或 `UNCHANGED`。节点键是语义身份；关系键由来源语义身份、关系代码、目标语义身份和显式关系身份共同形成。因此，即使两个端点断言都未变化，关系自身变化仍然可见。两个 Baseline 都必须具有 `publishedAt`，状态为 `PUBLISHED` 或 `SUPERSEDED`，属于同一个 Stream 和精确 Scope；两个已发布 v2 Manifest 必须使用相同 Profile ID 以及兼容的 Profile 与投影 Schema 版本。工作流、阻塞 Baseline 和候选事实不得进入正式漂移结果。
 
 ### 13. 身份认证与授权
 
@@ -559,7 +572,7 @@ Evidence 引用只能解析同 Scope 的 Evidence。设计资产链接只能通�
 | `SCOPE_ACCESS_DENIED` | Principal 没有精确读取授权 | 失败关闭并显示脱敏消息 |
 | `PUBLISHED_BASELINE_NOT_FOUND` | 没有已发布 Baseline | 显示正式架构视图不可用 |
 | `PROJECTION_MANIFEST_REQUIRED` | 没有兼容 v2 Manifest | 显示派生/发布运维引用 |
-| `PROJECTION_BUILD_IN_PROGRESS` | 存在兼容代次但尚未发布 | 显示可重试构建状态且不返回部分数据 |
+| `PROJECTION_BUILD_IN_PROGRESS` | 存在兼容任务但尚无发布 Manifest | 显示可重试构建状态且不返回部分数据 |
 | `PROJECTION_BUILD_FAILED` | 最新兼容代次构建失败 | 显示脱敏重试引用且不返回部分数据 |
 | `FOCUS_NOT_IN_BASELINE` | 焦点不属于 Baseline | 返回可搜索目录 |
 | `CURSOR_INVALID` | 游标签名、状态、身份或查询不匹配 | 丢弃继续状态并保留焦点 |
@@ -575,14 +588,15 @@ Evidence 引用只能解析同 Scope 的 Evidence。设计资产链接只能通�
 #### 领域与查询测试
 
 - v2 Projection Manifest 必须包含显式 Profile 和稳定摘要字段；
-- v2 派生必须使用有限批次、可恢复构建身份和原子 `READY` 发布转换；
+- MCP 构建请求必须幂等，且不能在请求内执行长时间投影任务；
+- Worker 必须使用可续期租约、有限批次、可恢复检查点和原子 Manifest 发布转换；
 - Reader 不能看到 `BUILDING`、`FAILED` 或部分物化的代次；
 - 重复构建请求必须幂等，已发布代次不可变；
 - 未解析或歧义关系端点必须阻止物化；
 - 旧的未固定 Manifest 必须失败关闭；
 - 最新已发布 Baseline 的选择必须确定；
 - 历史关系必须按 Baseline 关系版本重建；
-- 未发布、跨 Stream 或跨 Scope Baseline 必须拒绝；
+- 工作中/阻塞、跨 Stream 或跨 Scope Baseline 必须拒绝；不可变的 `SUPERSEDED` 历史发布仍可读取；
 - Baseline 漂移必须记录两个 ID、发现节点和关系变化，并排除候选；
 - 搜索排序和继续必须稳定；
 - 遍历继续不能产生重复，并拒绝身份、Scope、版本、序号和摘要不匹配；

@@ -616,6 +616,20 @@ English canonical decision.
     }));
   });
 
+  it("preserves an approved design as approved instead of claiming implementation", async () => {
+    const callTool = vi.fn().mockResolvedValue({ ok: true });
+    await synchronizeDesignFacts({
+      callTool,
+      manifest: { decisions: [{ ...federatedDecision, proposalStatus: "approved" }] },
+      readAdr: async () => ({ title: "Federated Design-Fact Synchronization", english: federatedEnglishAdr, chinese: federatedChineseAdr }),
+      readExisting: async () => ({ id: federatedDecision.proposalId, status: "implemented" })
+    });
+
+    expect(callTool).toHaveBeenCalledWith("upsert_proposal", expect.objectContaining({
+      proposal: expect.objectContaining({ id: federatedDecision.proposalId, status: "approved" })
+    }));
+  });
+
   it("rejects unsupported localization overlays and canonical title overrides", async () => {
     const callTool = vi.fn().mockResolvedValue({ ok: true });
     await expect(synchronizeDesignFacts({

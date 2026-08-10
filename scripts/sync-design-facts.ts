@@ -14,6 +14,7 @@ export interface DesignFactManifestDecision {
   managedAssets?: ManagedDesignAsset[];
   managedRelationships?: ManagedDesignRelationship[];
   evidence: Array<{ command: string; result: string }>;
+  proposalStatus?: "draft" | "reviewing" | "approved" | "implemented" | "archived";
   status?: string;
   owner?: string;
   reason?: string;
@@ -164,7 +165,7 @@ function buildProposal(decision: DesignFactManifestDecision, parsed: ParsedAdr) 
     specChanges: [parsed.en.decision],
     risks: parsed.en.consequences,
     rolloutPlan: parsed.en.evidence.join(" "),
-    status: "implemented",
+    status: decision.proposalStatus ?? "implemented",
     createdAt: now,
     updatedAt: now,
     localizedContent: {
@@ -219,6 +220,7 @@ function backfillProposal(
     ...canonical,
     ...existing,
     id: canonical.id,
+    status: canonical.status,
     architectureScope: decision.scope,
     localizedContent: {
       en: completeLocalizedFields({
@@ -356,6 +358,9 @@ function assetRefFor(id: string) {
 function assertDecision(decision: DesignFactManifestDecision): void {
   if (!decision.scope?.applicationServiceId || !decision.scope.scopePath) {
     throw new Error(`DESIGN_FACT_SCOPE_MISSING: ${decision.id}`);
+  }
+  if (decision.proposalStatus && !["draft", "reviewing", "approved", "implemented", "archived"].includes(decision.proposalStatus)) {
+    throw new Error(`DESIGN_FACT_PROPOSAL_STATUS_INVALID: ${decision.id}`);
   }
   for (const relatedAssetId of decision.relatedAssetIds) assetTypeFor(relatedAssetId);
   const managedIds = new Set<string>();

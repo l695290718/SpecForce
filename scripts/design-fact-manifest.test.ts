@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(19);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(19);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(19);
+  expect(manifest.decisions).toHaveLength(20);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(20);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(20);
   const proposalByContextPack = new Map<string, string>();
 
   for (const decision of manifest.decisions) {
@@ -77,6 +77,28 @@ it("includes the parallel governance workstreams decision", () => {
   expect(decision?.proposalId).toBe("proposal-parallel-governance-workstreams");
   expect(decision?.contextPackId).toBe("context-pack-parallel-governance-workstreams");
   expect(decision?.status).toContain("ScopedPrincipal");
+});
+
+it("includes the approved 3A architecture workspace and its typed design facts", () => {
+  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-3a-architecture-navigation-workspace");
+  expect(decision?.proposalId).toBe("proposal-3a-architecture-navigation-workspace");
+  expect(decision?.proposalStatus).toBe("approved");
+  expect(decision?.contextPackId).toBe("ctx-3a-architecture-navigation-workspace");
+  expect(decision?.managedAssets?.map((managed) => managed.asset.id)).toEqual([
+    "api-specforge-3a-projection-build",
+    "api-specforge-3a-architecture-query",
+    "data-specforge-3a-projection-read-model",
+    "rule-specforge-3a-projection-publication"
+  ]);
+  expect(decision?.managedRelationships).toEqual(expect.arrayContaining([
+    expect.objectContaining({ sourceId: "api-specforge-3a-projection-build", targetId: "data-specforge-3a-projection-read-model", relationType: "WRITES" }),
+    expect.objectContaining({ sourceId: "api-specforge-3a-architecture-query", targetId: "data-specforge-3a-projection-read-model", relationType: "READS" }),
+    expect.objectContaining({ sourceId: "rule-specforge-3a-projection-publication", targetId: "api-specforge-3a-projection-build", relationType: "GOVERNS" })
+  ]));
+  expect(decision?.managedAssets?.every((managed) => {
+    const localized = managed.asset.localizedContent as { en?: { name?: string; description?: string }; zh?: { name?: string; description?: string } };
+    return localized.en?.name && localized.en.description && localized.zh?.name && localized.zh.description;
+  })).toBe(true);
 });
 
 it("includes the single-host Docker deployment decision in the baseline", () => {

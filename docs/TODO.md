@@ -266,3 +266,27 @@ Replace the MVP mock actor grants with production identity, tenant policy, OAuth
 **Local contract evidence (2026-08-09):** Core and MCP now normalize stable subject, tenant, auth source, permissions, and exact application-service grants through `ScopedPrincipal`; seed identity remains development-only. No enterprise IdP integration is claimed.
 
 **Completion evidence:** authenticated MCP and Web requests enforce tenant and application-service grants in integration tests, including denied cross-service reads and writes.
+
+### Knowledge-Assertion-aware Nebula 3A projection
+
+**Status:** Deferred; not part of the PostgreSQL-first 3A browser increment.
+
+**Owner:** SpecForge Runtime.
+
+**Rationale:** The current NebulaGraph projection stores design-asset identities and current typed relationships. It is not semantically equivalent to Baseline-bound Knowledge Assertions, Profile-pinned projection generations, or historical relationship snapshots, so routing the 3A browser through it would return incorrect architecture history.
+
+**Trigger:** Start only after the PostgreSQL 3A workspace passes acceptance and query telemetry demonstrates a traversal workload that needs graph acceleration. Open a separate ADR and exact-Scope Design Change Session before implementation.
+
+**Required completion evidence:** Define Knowledge Assertion vertices, versioned relationship edges, Baseline membership or as-of semantics, outbox events, checkpoint namespace, rebuild and rollback behavior, PostgreSQL/Nebula result parity, multi-node sizing, and production-scale certification. Synchronize the matching ADR, Proposal, Context Pack, Evidence, backlog state, and typed links through MCP.
+
+**中文本地化：**
+
+**状态：** 延期，不属于 PostgreSQL-first 3A 浏览器增量。
+
+**负责人：** SpecForge Runtime。
+
+**原因：** 当前 NebulaGraph 投影保存设计资产身份和当前类型关系，与绑定 Baseline 的 Knowledge Assertion、固定 Profile 的投影代次以及历史关系快照并不等价，直接复用会返回错误的架构历史。
+
+**触发条件：** PostgreSQL 3A 工作台验收通过，并且真实查询遥测证明需要图加速后才能启动。实现前必须创建独立 ADR 和精确 Scope 设计变更会话。
+
+**完成证据：** 必须定义 Knowledge Assertion 顶点、版本化关系边、Baseline 成员或 as-of 语义、Outbox 事件、检查点命名空间、重建与回滚行为、PostgreSQL/Nebula 结果一致性、多节点容量和生产规模认证，并通过 MCP 同步匹配的 ADR、Proposal、Context Pack、Evidence、待办状态和类型关系。
