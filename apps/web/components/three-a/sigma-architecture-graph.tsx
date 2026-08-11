@@ -112,12 +112,12 @@ export function createSigmaSettings(store: ArchitectureGraphStore, selectedRef: 
       const semantic = semanticStateRef.current;
       const selected = selectedRef.current === nodeId;
       const hovered = hoverRef.current === nodeId;
-      return { color: nodeColor(data), size: nodeSize({ ...data, stableId: nodeId }, semantic), label: visibleLabel({ ...data, stableId: nodeId }, semantic ?? 1, { selected, hovered }) ?? null, forceLabel: selected || hovered, highlighted: selected || hovered || data.highlighted === true, zIndex: selected ? 3 : hovered ? 2 : 1, hidden: false };
+      return { ...data, color: nodeColor(data), size: nodeSize({ ...data, stableId: nodeId }, semantic), label: visibleLabel({ ...data, stableId: nodeId }, semantic ?? 1, { selected, hovered }) ?? null, forceLabel: selected || hovered, highlighted: selected || hovered || data.highlighted === true, zIndex: selected ? 3 : hovered ? 2 : 1, hidden: false };
     },
     edgeReducer: (edgeId: string, data: GraphEdgeAttributes) => {
       const source = store.graph.source(edgeId);
       const target = store.graph.target(edgeId);
-      return { color: edgeColor(data, edgeOpacity({ source, target, attributes: data }, semanticStateRef.current)), size: Math.max(0.45, Math.min(3.2, data.weight * 0.75)), hidden: false, zIndex: data.highlighted ? 2 : 0 };
+      return { ...data, color: edgeColor(data, edgeOpacity({ source, target, attributes: data }, semanticStateRef.current)), size: Math.max(0.45, Math.min(3.2, data.weight * 0.75)), hidden: false, zIndex: data.highlighted ? 2 : 0 };
     }
   };
 }

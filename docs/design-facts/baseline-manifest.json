@@ -1302,6 +1302,10 @@
                                            {
                                                "command":  "In-app browser graph acceptance at the exact Designer Scope",
                                                "result":  "Loaded 60 bounded catalog nodes. Embedded browser WebGL is unavailable, so the Sigma semantic DOM fallback preserved the graph contents; derived analysis unavailable mode remains a bounded PostgreSQL catalog fallback."
+                                           },
+                                           {
+                                               "command":  "Browser reproduction and Sigma reducer regression suite",
+                                               "result":  "Reproduced the missing Graphology x/y position error, preserved source node and edge attributes in both Sigma reducers, passed 4 Sigma tests, 2 renderer tests, 4 workspace tests, and Web typecheck; follow-up session design-change-session:e2f19fdf-a96e-4ee5-98cd-56accd965680 closed as CONVERGED."
                                            }
                                        ]
                       }
