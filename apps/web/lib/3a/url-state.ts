@@ -7,11 +7,12 @@ export interface ThreeAUrlState {
   mode: "lanes" | "graph" | "list";
   direction: "upstream" | "downstream" | "both";
   graphView?: "overview" | "explore" | "impact";
+  graphLayout?: "force" | "tree" | "circles";
   layers?: Array<"BIZ" | "SYS" | "TECH">;
   relationTypes?: string[];
 }
 
-const defaultState = { tab: "architecture", mode: "lanes", direction: "both", graphView: "overview", layers: [], relationTypes: [] } as const;
+const defaultState = { tab: "architecture", mode: "lanes", direction: "both", graphView: "overview", graphLayout: "force", layers: [], relationTypes: [] } as const;
 
 export function parseThreeAUrlState(params: URLSearchParams): ThreeAUrlState {
   const scope = nonEmpty(params.get("scope")) ?? "com.huawei.celon.desiner";
@@ -19,6 +20,7 @@ export function parseThreeAUrlState(params: URLSearchParams): ThreeAUrlState {
   const mode = enumValue(params.get("mode"), ["lanes", "graph", "list"] as const) ?? defaultState.mode;
   const direction = enumValue(params.get("direction"), ["upstream", "downstream", "both"] as const) ?? defaultState.direction;
   const graphView = enumValue(params.get("graphView"), ["overview", "explore", "impact"] as const) ?? defaultState.graphView;
+  const graphLayout = enumValue(params.get("graphLayout"), ["force", "tree", "circles"] as const) ?? defaultState.graphLayout;
   return {
     scope,
     ...(nonEmpty(params.get("baseline")) ? { baseline: nonEmpty(params.get("baseline")) } : {}),
@@ -28,13 +30,14 @@ export function parseThreeAUrlState(params: URLSearchParams): ThreeAUrlState {
     mode,
     direction,
     graphView,
+    graphLayout,
     layers: listValue(params.get("layers"), ["BIZ", "SYS", "TECH"]) as Array<"BIZ" | "SYS" | "TECH">,
     relationTypes: listValue(params.get("relations"))
   };
 }
 
 export function serializeThreeAUrlState(state: ThreeAUrlState): string {
-  const params = new URLSearchParams({ scope: state.scope, tab: state.tab, mode: state.mode, direction: state.direction, graphView: state.graphView ?? "overview" });
+  const params = new URLSearchParams({ scope: state.scope, tab: state.tab, mode: state.mode, direction: state.direction, graphView: state.graphView ?? "overview", graphLayout: state.graphLayout ?? "force" });
   if (state.baseline) params.set("baseline", state.baseline);
   if (state.projection) params.set("projection", state.projection);
   if (state.focus) params.set("focus", state.focus);

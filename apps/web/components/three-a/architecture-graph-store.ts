@@ -295,7 +295,10 @@ export function highlightNeighborhood(
   focusId: string | undefined,
   depth = 1
 ): ReadonlySet<string> {
-  if (!focusId || !graph.hasNode(focusId)) return new Set();
+  if (!focusId || !graph.hasNode(focusId)) {
+    clearNeighborhoodHighlight(graph);
+    return new Set();
+  }
   const highlighted = new Set<string>([focusId]);
   let frontier = [focusId];
   for (let currentDepth = 0; currentDepth < depth; currentDepth += 1) {
@@ -317,6 +320,14 @@ export function highlightNeighborhood(
     graph.mergeEdgeAttributes(edgeId, { highlighted: highlightedEdge, dimmed: !highlightedEdge, opacity: highlightedEdge ? 1 : 0.12 });
   }
   return highlighted;
+}
+
+export function oneHopNeighborhood(
+  graph: MultiDirectedGraph<GraphNodeAttributes, GraphEdgeAttributes>,
+  focusId: string | undefined
+): ReadonlySet<string> {
+  if (!focusId || !graph.hasNode(focusId)) return new Set();
+  return new Set([focusId, ...graph.neighbors(focusId).sort()]);
 }
 
 export function visibleLabel(
@@ -366,6 +377,11 @@ export function edgeOpacity(
 export function isHighlighted(value: string | Pick<GraphNodeAttributes, "highlighted">, state?: ArchitectureGraphSemanticState): boolean {
   if (typeof value !== "string") return value.highlighted ?? false;
   return state?.selectedId === value || state?.hoveredId === value || state?.neighborhoodIds.has(value) || false;
+}
+
+function clearNeighborhoodHighlight(graph: MultiDirectedGraph<GraphNodeAttributes, GraphEdgeAttributes>): void {
+  for (const nodeId of graph.nodes()) graph.mergeNodeAttributes(nodeId, { highlighted: false, dimmed: false, opacity: 1 });
+  for (const edgeId of graph.edges()) graph.mergeEdgeAttributes(edgeId, { highlighted: false, dimmed: false, opacity: 1 });
 }
 
 function stableSummaryEndpoint(summaryId: string, nodes: readonly GraphSummaryNode[]): string | undefined {

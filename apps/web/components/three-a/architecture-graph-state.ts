@@ -62,7 +62,7 @@ export function reduceArchitectureGraphSemanticState(
         neighborhoodIds: new Set()
       };
     case "select":
-      return { ...state, selectedId: action.id };
+      return { ...state, selectedId: action.id, neighborhoodIds: new Set() };
     case "hover":
       return { ...state, hoveredId: action.id };
     case "neighborhood":

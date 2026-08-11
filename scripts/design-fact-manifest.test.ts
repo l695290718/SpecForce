@@ -137,7 +137,7 @@ it("includes the implemented scalable 3A exploration design and bounded query co
   expect(decision?.proposalId).toBe("proposal-webgl-3a-graph-exploration");
   expect(decision?.proposalStatus).toBe("implemented");
   expect(decision?.contextPackId).toBe("ctx-webgl-3a-graph-exploration");
-  expect(decision?.status).toBe("Implemented and locally verified; MCP synchronized and exact-Scope session closed");
+  expect(decision?.status).toBe("Implemented in source/build; fresh browser visual acceptance blocked by existing in-app tab snapshot");
   expect(decision?.scope).toEqual(expectedScope);
   expect(decision?.relatedAssetIds).toEqual([
     "api-specforge-3a-architecture-query",

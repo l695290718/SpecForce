@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implemented and locally verified; MCP synchronized and exact-Scope session closed.**
+**Implemented in source and build; fresh browser visual acceptance is blocked by the existing in-app tab snapshot.**
 
 - Stable ID: `adr-webgl-3a-graph-exploration`
 - Owning application service: `com.huawei.celon.desiner`
@@ -13,6 +13,7 @@
 - Follow-up Layered Layout Session: `design-change-session:162ef116-c479-4658-ab42-d77ad92594ab`
 - Follow-up Motion Session: `design-change-session:dd17470e-6417-40e1-93fe-e3c41f841a0d`
 - Follow-up Focus Persistence Session: `design-change-session:fcdf244a-6515-4332-b06c-6b2e4dfc96e4`
+- GitNexus-Aligned Implementation Session: `design-change-session:b4d9e57e-5a45-4b44-b581-dc94e2116752` (blocked only on fresh browser visual acceptance)
 - Follow-up Focus Persistence Spec: `docs/superpowers/specs/2026-08-11-3a-focus-persistence-fix.md`
 - Approved Spec: `docs/superpowers/specs/2026-08-11-webgl-3a-graph-exploration-design.md`
 - Follow-up Layout Spec: `docs/superpowers/specs/2026-08-11-3a-layered-graph-layout-design.md`
@@ -104,6 +105,18 @@ PostgreSQL remains authoritative for authored facts and relationship events. Gra
 - The edge fallback session `design-change-session:d442616a-078b-4dd0-ba82-6204409fbca3` is closed as `CONVERGED` after focused verification and exact-Scope synchronization read-back.
 - The layered layout session `design-change-session:162ef116-c479-4658-ab42-d77ad92594ab` and motion session `design-change-session:dd17470e-6417-40e1-93fe-e3c41f841a0d` are closed as `CONVERGED` after focused verification and exact-Scope synchronization read-back.
 - The focus persistence session `design-change-session:fcdf244a-6515-4332-b06c-6b2e4dfc96e4` is closed as `CONVERGED` after focused verification and exact-Scope synchronization read-back.
+- The GitNexus-aligned implementation session `design-change-session:b4d9e57e-5a45-4b44-b581-dc94e2116752` is closed as `BLOCKED` only because the existing in-app browser tab could not perform a real hard reload; the retry trigger is a fresh exact-Scope browser visual check of the new controls and interactions.
+- `pnpm design-facts:sync` returned `complete`; `SPECFORGE_DESIGN_FACT_IDS=adr-webgl-3a-graph-exploration pnpm design-facts:check` returned `missing=[]`, `mismatched=[]`, `outOfScope=[]`, and `blocked=[]` for repository/MCP design-fact reconciliation.
+
+## GitNexus-Aligned Implementation Increment (2026-08-11)
+
+- Exact-Scope implementation preflight opened `design-change-session:b4d9e57e-5a45-4b44-b581-dc94e2116752` for `com.huawei.celon.desiner`, read 246 scoped assets, and returned design-context digest `b66a5e280aea7b5d4f426fedda383ad5e45851cba8b0fa628f3e2fd9f38ae1fe` with relationship digest `ee520dc46aaad979521123b757b89e0747cc4c02360d8ef66bc6c766fb278f4f`.
+- The client now uses Sigma.js/Graphology with `@sigma/edge-curve`, ForceAtlas2, and Noverlap. A bounded Worker owns deterministic `force`, `tree`, and `circles` layouts with `seeded`, `running`, `settled`, `stopped`, and `failed` lifecycle states; reduced motion and WebGL/Worker failure retain the semantic fallback.
+- Graph interaction now has persistent selection, one-hop neighborhood emphasis, hover labels and halos, curved directed edges, zoom/camera/focus actions, start/stop/restart layout actions, clear selection, and localized Force/Tree/Circles view controls. Overview and Explore reuse the loaded bounded graph; Impact remains focus-query driven.
+- URL state persists `graphLayout` as `force`, `tree`, or `circles`; the implementation does not refetch the bounded graph when only layout mode changes. English remains canonical and the new human-facing graph controls and query tabs have complete Chinese overlays.
+- The focused regression suite passed 9 files and 57 tests, including ForceAtlas2/Noverlap output, distinct Tree/Circles layouts, Worker lifecycle, Sigma reducers and interaction, controls, workspace behavior, motion, store neighborhood behavior, and URL state. `pnpm --filter @specforge/web typecheck`, `pnpm --filter @specforge/knowledge-query typecheck`, and `git diff --check` passed.
+- `$env:SPECFORGE_NEXT_STANDALONE='0'; pnpm --filter @specforge/web build` exited 0 after compiling the application, checking types, generating 20 static pages, and emitting `/architecture/3a` and `/api/architecture/3a/query`. The route was served with HTTP 200 on the restarted local service; the generated browser chunks contain the `graphLayout` and `graphControls` integration markers.
+- The existing in-app browser tab remained on its pre-change client snapshot after route-history and keyboard refresh attempts; therefore this increment records source/build verification and the already-proven semantic fallback, but does not claim a fresh visual acceptance of the new controls in that tab. A fresh browser hard reload is the retry trigger for the remaining visual acceptance check.
 
 ## 中文本地化覆盖
 
@@ -113,12 +126,13 @@ WebGL 3A 图谱探索与影响分析
 
 ### 状态
 
-**已完成本地实施并同步 MCP，精确 Scope 会话已关闭。**
+**源码与构建已完成；最新浏览器视觉验收因现有 In-app Browser 标签页快照而阻塞。**
 
 - 稳定 ID：`adr-webgl-3a-graph-exploration`
 - 所属应用服务：`com.huawei.celon.desiner`
 - 所属 Scope 路径：`pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - 设计变更会话：`design-change-session:c024c443-93b5-4462-852f-c12c82c726d0`
+- GitNexus 风格实现会话：`design-change-session:b4d9e57e-5a45-4b44-b581-dc94e2116752`（仅因最新浏览器视觉验收阻塞）
 - 已批准 Spec：`docs/superpowers/specs/2026-08-11-webgl-3a-graph-exploration-design.md`
 - 父 ADR：`adr-scalable-3a-exploration`
 
@@ -183,6 +197,16 @@ PostgreSQL 继续作为已编写事实和关系事件的权威存储。图谱摘
 - 浏览器验收显示 151 个有界节点、234 条有界关系，显示 `PostgreSQL 有界回退` 数据源标签，存在 7 个 Canvas，且控制台无错误。
 - 边关系回退定向测试通过 5 个文件、28 项测试；knowledge-query 与 Web 类型检查均返回 0。
 
+### GitNexus 风格实现增量（2026-08-11）
+
+- 精确 Scope 实施预检打开 `design-change-session:b4d9e57e-5a45-4b44-b581-dc94e2116752`，所属应用服务为 `com.huawei.celon.desiner`，读取 246 条 Scope 内资产，并返回设计上下文摘要 `b66a5e280aea7b5d4f426fedda383ad5e45851cba8b0fa628f3e2fd9f38ae1fe` 与关系摘要 `ee520dc46aaad979521123b757b89e0747cc4c02360d8ef66bc6c766fb278f4f`。
+- 客户端现在使用 Sigma.js/Graphology、`@sigma/edge-curve`、ForceAtlas2 和 Noverlap；有界 Worker 提供确定性的 `force`、`tree`、`circles` 三种布局及 `seeded`、`running`、`settled`、`stopped`、`failed` 生命周期。减少动效、WebGL 不可用或 Worker 失败时保留语义回退。
+- 图谱交互现在支持持久选中、单跳邻域强调、悬停标签与光晕、弧形有向边、缩放/相机/聚焦操作、启动/停止/重启布局、清除选中，以及双语 Force/Tree/Circles 视图控件。Overview 与 Explore 复用已加载的有界图；Impact 仍由焦点查询驱动。
+- URL 状态持久化 `graphLayout=force|tree|circles`；只切换布局模式时不会重新请求有界图数据。英文仍为规范字段，新增图谱控件与查询页签已补齐中文覆盖。
+- 定向回归测试通过 9 个文件、57 项测试，覆盖 ForceAtlas2/Noverlap 输出、Tree/Circles 布局差异、Worker 生命周期、Sigma reducer 与交互、控件、工作台、动效、邻域状态和 URL 状态。`pnpm --filter @specforge/web typecheck`、`pnpm --filter @specforge/knowledge-query typecheck` 与 `git diff --check` 均通过。
+- `$env:SPECFORGE_NEXT_STANDALONE='0'; pnpm --filter @specforge/web build` 返回 0，完成应用编译、类型检查、20 个静态页面生成，并输出 `/architecture/3a` 与 `/api/architecture/3a/query`。重启后的本地服务路由返回 HTTP 200，生成的浏览器 chunk 含有 `graphLayout` 与 `graphControls` 集成标记。
+- 当前 In-app Browser 标签页在路由历史和键盘刷新尝试后仍保留变更前的客户端快照，因此本增量记录源码/构建验证与此前已验证的语义回退，不宣称该标签页已经完成新控件的最新视觉验收。新浏览器强制刷新是剩余视觉验收的重试触发条件。
+
 ### MCP 记录
 
 - 匹配 MCP ADR ID：`adr-webgl-3a-graph-exploration`
@@ -195,3 +219,5 @@ PostgreSQL 继续作为已编写事实和关系事件的权威存储。图谱摘
 - 本次分层布局会话：`design-change-session:162ef116-c479-4658-ab42-d77ad92594ab`；Worker 现将单位尺度 Overview 坐标视为种子，按 BIZ/SYS/TECH 分带布局并在迭代中加入有界排斥力；未选中节点默认隐藏长标签，以保留关系可读性。
 - 分层布局定向测试通过 4 个文件、20 项测试，Web 类型检查和 `git diff --check` 均通过；浏览器验收显示 151 个节点、234 条关系、7 个 Canvas 和三层清晰分布，刷新后无新增控制台错误。
 - 本次会话关闭命令以 `CONVERGED` 返回，证据包含精确 Scope、布局测试、类型检查、浏览器节点/边数量、分层视觉验收和控制台检查。
+- GitNexus 风格实现会话 `design-change-session:b4d9e57e-5a45-4b44-b581-dc94e2116752` 已关闭为 `BLOCKED`，唯一原因是现有 In-app Browser 标签页无法执行真正的强制刷新；重试触发条件是对精确 Scope 的新标签页执行视觉验收，检查新控件和交互。
+- `pnpm design-facts:sync` 返回 `complete`；`SPECFORGE_DESIGN_FACT_IDS=adr-webgl-3a-graph-exploration pnpm design-facts:check` 返回 `missing=[]`、`mismatched=[]`、`outOfScope=[]`、`blocked=[]`。

@@ -1267,7 +1267,7 @@
                                                        { "sourceType":  "proposal", "sourceId":  "proposal-webgl-3a-graph-exploration", "targetType":  "dataModel", "targetId":  "data-specforge-3a-projection-read-model", "relationType":  "IMPACTS" }
                                                    ],
                           "owner":  "SpecForge Architecture and Runtime",
-                          "status":  "Implemented and locally verified; MCP synchronized and exact-Scope session closed",
+                          "status":  "Implemented in source/build; fresh browser visual acceptance blocked by existing in-app tab snapshot",
                           "reason":  "The next Graph increment replaces the bounded React Flow relationship preview with a Sigma.js, Graphology, and WebGL workspace for cluster Overview, focused Explore, and explainable Impact analysis while retaining exact-Scope server budgets. The bounded Overview also loads typed relationships and uses an explicit PostgreSQL fallback when derived graph analysis is unavailable.",
                           "retryTrigger":  "Open a new exact-Scope design-change session for any future renderer, scale, provider, or impact-policy change.",
                           "evidence":  [
@@ -1398,6 +1398,38 @@
                                            {
                                                "command":  "pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session design-change-session:fcdf244a-6515-4332-b06c-6b2e4dfc96e4 --status CONVERGED --evidence focus-persistence-vitest-7-files-39-tests-PASS,pnpm-web-typecheck-PASS,pnpm-knowledge-query-typecheck-PASS,git-diff-check-PASS,browser-click-graph-remains-151-nodes-234-edges,browser-no-error-state",
                                                "result":  "Returned CONVERGED in the exact Designer Scope."
+                                           },
+                                           {
+                                               "command":  "pnpm design-facts:sync; $env:SPECFORGE_DESIGN_FACT_IDS='adr-webgl-3a-graph-exploration'; pnpm design-facts:check",
+                                               "result":  "Synchronization returned complete; reconciliation returned missing=[], mismatched=[], outOfScope=[], and blocked=[]."
+                                           },
+                                           {
+                                               "command":  "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Implement-GitNexus-aligned-3A-graph-interaction --affected adr-webgl-3a-graph-exploration,proposal-webgl-3a-graph-exploration,ctx-webgl-3a-graph-exploration,api-specforge-3a-architecture-query,data-specforge-3a-projection-read-model --evidence approved-gitnexus-aligned-graph-interaction-design,source-build-verification",
+                                               "result":  "Opened design-change-session:b4d9e57e-5a45-4b44-b581-dc94e2116752 in the exact Designer Scope, read 246 scoped assets, and returned design context digest b66a5e280aea7b5d4f426fedda383ad5e45851cba8b0fa628f3e2fd9f38ae1fe with relationship digest ee520dc46aaad979521123b757b89e0747cc4c02360d8ef66bc6c766fb278f4f."
+                                           },
+                                           {
+                                               "command":  "node .\\node_modules\\vitest\\vitest.mjs run apps/web/components/three-a/architecture-graph-layout-worker.test.ts apps/web/components/three-a/architecture-graph-layout-force.test.ts apps/web/components/three-a/architecture-graph-controls.test.tsx apps/web/components/three-a/sigma-architecture-graph.test.tsx apps/web/components/three-a/architecture-graph-store.test.ts apps/web/components/three-a/architecture-graph-state.test.ts apps/web/components/three-a/architecture-graph-workspace.test.ts apps/web/components/three-a/architecture-graph-motion.test.ts apps/web/lib/3a/url-state.test.ts",
+                                               "result":  "Passed 9 test files and 57 tests, including distinct Force/Tree/Circles layouts, Worker lifecycle, Sigma interaction, controls, workspace, motion, neighborhood state, and URL state."
+                                           },
+                                           {
+                                               "command":  "pnpm --filter @specforge/web typecheck; pnpm --filter @specforge/knowledge-query typecheck; git diff --check",
+                                               "result":  "Web and knowledge-query typechecks exited 0; git diff --check produced only expected Windows LF/CRLF normalization warnings."
+                                           },
+                                           {
+                                               "command":  "$env:SPECFORGE_NEXT_STANDALONE='0'; pnpm --filter @specforge/web build",
+                                               "result":  "Exited 0 after compiling, checking types, generating 20 static pages, and emitting /architecture/3a and /api/architecture/3a/query."
+                                           },
+                                           {
+                                               "command":  "curl.exe --max-time 15 -I http://localhost:3000/architecture/3a?scope=com.huawei.celon.desiner; inspect .next/static/chunks",
+                                               "result":  "Local route returned HTTP 200 and generated chunks contained graphLayout and graphControls integration markers."
+                                           },
+                                           {
+                                               "command":  "In-app browser route-history and keyboard refresh attempts at the exact Designer Scope",
+                                               "result":  "The existing tab retained its pre-change client snapshot; fresh visual acceptance of the new controls is pending a browser hard reload, with that reload recorded as the retry trigger."
+                                           },
+                                           {
+                                               "command":  "pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session design-change-session:b4d9e57e-5a45-4b44-b581-dc94e2116752 --status BLOCKED --reason browser-tab-pre-change-client-snapshot --retry-trigger fresh-exact-scope-browser-hard-reload-visual-check",
+                                               "result":  "Closed the exact-Scope session as BLOCKED only for the browser refresh limitation; source, tests, typechecks, build, and HTTP route evidence passed."
                                            },
                                            {
                                                "command":  "pnpm design-facts:sync; $env:SPECFORGE_DESIGN_FACT_IDS='adr-webgl-3a-graph-exploration'; pnpm design-facts:check",

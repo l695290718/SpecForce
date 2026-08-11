@@ -25,6 +25,7 @@ describe("architecture graph layout worker", () => {
     const shuffled = refineArchitectureGraphLayout({ ...request, nodes: [...request.nodes].reverse(), edges: [...request.edges].reverse() }, () => 0);
     const repeated = refineArchitectureGraphLayout(request, () => 0);
     expect(first.type).toBe("complete");
+    expect(first.lifecycle).toBe("settled");
     expect(shuffled).toEqual(first);
     expect(repeated).toEqual(first);
     expect(first.positions.map((position) => position.id)).toEqual(["a", "b", "c"]);
@@ -36,7 +37,23 @@ describe("architecture graph layout worker", () => {
     expect(timeout).toMatchObject({ type: "failed", reason: "TIMEOUT" });
     expect(timeout.positions).toEqual(deterministicLayout(request));
     expect(reduced.type).toBe("complete");
+    expect(reduced.lifecycle).toBe("stopped");
     expect(reduced.positions).toEqual(deterministicLayout(request));
+  });
+
+  it("accepts the force run mode and reports a stopped seeded fallback when disabled", () => {
+    const result = refineArchitectureGraphLayout({
+      type: "refine",
+      layout: "force",
+      nodes: [{ id: "fact:one", x: 0, y: 0, degree: 1 }],
+      edges: [],
+      seed: 7,
+      maxRuntimeMs: 0,
+      reducedMotion: true
+    }, () => 0);
+    expect(result).toMatchObject({ type: "complete", lifecycle: "stopped" });
+    expect(result.positions).toHaveLength(1);
+    expect(result.positions.every(({ x, y }) => Number.isFinite(x) && Number.isFinite(y))).toBe(true);
   });
 
   it("expands unit-scale overview seeds into separated architecture-layer bands", () => {
@@ -57,6 +74,21 @@ describe("architecture graph layout worker", () => {
     expect(byId.get("sys-0")!.y).toBeGreaterThan(-200);
     expect(byId.get("sys-0")!.y).toBeLessThan(200);
     expect(byId.get("tech-0")!.y).toBeGreaterThan(200);
+  });
+
+  it("keeps tree and circle modes visually distinct from the force seed", () => {
+    const nodes = [
+      { id: "biz-1", x: 0, y: 0, degree: 1, layer: "BIZ" as const },
+      { id: "biz-2", x: 0, y: 0, degree: 1, layer: "BIZ" as const },
+      { id: "sys-1", x: 0, y: 0, degree: 1, layer: "SYS" as const },
+      { id: "tech-1", x: 0, y: 0, degree: 1, layer: "TECH" as const }
+    ];
+    const tree = deterministicLayout({ ...request, layout: "tree", nodes });
+    const circles = deterministicLayout({ ...request, layout: "circles", nodes });
+    expect(new Set(tree.map(({ y }) => y)).size).toBe(3);
+    expect(circles.find(({ id }) => id === "biz-1")!.x ** 2 + circles.find(({ id }) => id === "biz-1")!.y ** 2).toBeGreaterThan(40_000);
+    expect(circles.find(({ id }) => id === "tech-1")!.x ** 2 + circles.find(({ id }) => id === "tech-1")!.y ** 2).toBeGreaterThan(300_000);
+    expect(tree).not.toEqual(circles);
   });
 
   it("keeps the refined overview from collapsing a connected cluster", () => {
