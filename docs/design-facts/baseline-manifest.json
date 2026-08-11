@@ -1268,7 +1268,7 @@
                                                    ],
                           "owner":  "SpecForge Architecture and Runtime",
                           "status":  "Implemented and locally verified; MCP synchronized and exact-Scope session closed",
-                          "reason":  "The next Graph increment replaces the bounded React Flow relationship preview with a Sigma.js, Graphology, and WebGL workspace for cluster Overview, focused Explore, and explainable Impact analysis while retaining exact-Scope server budgets.",
+                          "reason":  "The next Graph increment replaces the bounded React Flow relationship preview with a Sigma.js, Graphology, and WebGL workspace for cluster Overview, focused Explore, and explainable Impact analysis while retaining exact-Scope server budgets. The bounded Overview also loads typed relationships and uses an explicit PostgreSQL fallback when derived graph analysis is unavailable.",
                           "retryTrigger":  "Open a new exact-Scope design-change session for any future renderer, scale, provider, or impact-policy change.",
                           "evidence":  [
                                            {
@@ -1306,6 +1306,30 @@
                                            {
                                                "command":  "Browser reproduction and Sigma reducer regression suite",
                                                "result":  "Reproduced the missing Graphology x/y position error, preserved source node and edge attributes in both Sigma reducers, passed 4 Sigma tests, 2 renderer tests, 4 workspace tests, and Web typecheck; follow-up session design-change-session:e2f19fdf-a96e-4ee5-98cd-56accd965680 closed as CONVERGED."
+                                           },
+                                           {
+                                               "command":  "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Repair-the-3A-graph-overview-bounded-relationship-fallback --affected adr-webgl-3a-graph-exploration,proposal-webgl-3a-graph-exploration,ctx-webgl-3a-graph-exploration,api-specforge-3a-architecture-query,data-specforge-3a-projection-read-model,adr-3a-architecture-navigation-workspace --evidence approved-3a-graph-edge-fallback-design,current-browser-60-nodes-0-edges-observation",
+                                               "result":  "Opened design-change-session:d442616a-078b-4dd0-ba82-6204409fbca3 in the exact Designer Scope, read 222 scoped assets, and returned design context digest 2ba3e48ab9b52bb4541ca2c01243831497ebefd4df86bee85a136247578d7a09 with relationship digest 9db388a28ddc2140987260dfff2730101d10b06428ac99d2b333344c1be8dff1."
+                                           },
+                                           {
+                                               "command":  "node .\\node_modules\\vitest\\vitest.mjs run packages/knowledge-query/src/service.test.ts apps/web/lib/3a/workspace-loader.test.ts apps/web/components/three-a/architecture-graph-workspace.test.ts apps/web/components/three-a/architecture-graph-store.test.ts apps/web/components/three-a/sigma-architecture-graph.test.tsx",
+                                               "result":  "Passed 5 test files and 28 tests."
+                                           },
+                                           {
+                                               "command":  "pnpm --filter @specforge/knowledge-query typecheck; pnpm --filter @specforge/web typecheck",
+                                               "result":  "Both package typechecks exited 0."
+                                           },
+                                           {
+                                               "command":  "In-app browser graph acceptance at the exact Designer Scope after the edge fallback change",
+                                               "result":  "Rendered 151 bounded nodes and 234 bounded edges, displayed PostgreSQL bounded fallback, exposed 7 Canvas elements, and reported no console errors."
+                                           },
+                                           {
+                                               "command":  "pnpm design-context:close -- --session design-change-session:d442616a-078b-4dd0-ba82-6204409fbca3 --status CONVERGED --evidence node-vitest-focused-5-files-28-tests-PASS,pnpm-knowledge-query-typecheck-PASS,pnpm-web-typecheck-PASS,browser-graph-overview-151-nodes-234-edges,browser-canvas-count-7,browser-console-errors-0",
+                                               "result":  "Returned CONVERGED in the exact Designer Scope."
+                                           },
+                                           {
+                                               "command":  "pnpm design-facts:sync; $env:SPECFORGE_DESIGN_FACT_IDS='adr-webgl-3a-graph-exploration'; pnpm design-facts:check",
+                                               "result":  "Synchronization returned complete; reconciliation returned missing=[], mismatched=[], outOfScope=[], and blocked=[]."
                                            }
                                        ]
                       }

@@ -112,7 +112,7 @@ export interface ArchitectureGraphQueryProvider {
 }
 export interface ArchitectureFactDetailInput extends QueryPrincipalInput { baselineId: string; projectionManifestId: string; assertionId: string; }
 export interface ArchitectureFactDetail extends QueryResultEnvelope { node: KnowledgeProjectionNode; canonicalEnglish?: Record<string, unknown>; localizedChinese?: Record<string, unknown>; factType?: string; aspect?: string; confidence?: number; status?: string; evidenceRefs: string[]; sourceObservationIds: string[]; unresolvedQuestions: string[]; counterEvidence: string[]; incoming: KnowledgeProjectionEdge[]; outgoing: KnowledgeProjectionEdge[]; warnings: string[]; }
-export interface ArchitectureAlignmentInput extends QueryPrincipalInput { baselineId: string; projectionManifestId: string; }
+export interface ArchitectureAlignmentInput extends QueryPrincipalInput { baselineId: string; projectionManifestId: string; limit?: number; }
 export interface ArchitectureAlignmentResult extends QueryResultEnvelope { edges: KnowledgeProjectionEdge[]; warnings: string[]; }
 export interface ComparePublishedBaselinesInput extends QueryPrincipalInput { baseBaselineId: string; targetBaselineId: string; baseProjectionManifestId: string; targetProjectionManifestId: string; }
 export interface BaselineQueryInput extends QueryPrincipalInput { baselineId: string; }
@@ -127,7 +127,7 @@ export interface ThreeAQueryRepository {
   getFact(scope: ArchitectureScopeRef, manifest: ProjectionManifestV2, assertionId: string): Promise<ArchitectureFactSource | undefined>;
   getFactsByIds(scope: ArchitectureScopeRef, manifest: ProjectionManifestV2, assertionIds: string[]): Promise<ArchitectureFactSource[]>;
   listAdjacentEdges(scope: ArchitectureScopeRef, manifest: ProjectionManifestV2, input: AdjacentEdgeQuery): Promise<{ edges: KnowledgeProjectionEdge[]; hasMore: boolean }>;
-  listEdges(scope: ArchitectureScopeRef, manifest: ProjectionManifestV2, input?: { assertionId?: string }): Promise<KnowledgeProjectionEdge[]>;
+  listEdges(scope: ArchitectureScopeRef, manifest: ProjectionManifestV2, input?: { assertionId?: string; limit?: number }): Promise<KnowledgeProjectionEdge[]>;
 }
 
 export interface ContinuationState { browseSessionId: string; sequence: number; tenantId: string; subject: string; architectureScope: ArchitectureScopeRef; baselineId: string; projectionManifestId: string; queryFingerprint: string; frontier: string[]; visitedIds: string[]; stateDigest: string; expiresAt: string; }

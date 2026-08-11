@@ -27,6 +27,7 @@ export function ArchitectureGraphWorkspace({ state, identity, initialGraph, fall
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [dataSource, setDataSource] = useState<ArchitectureGraphDataSource>("postgres-fallback");
 
   useEffect(() => { if (typeof window === "undefined") return; const media = window.matchMedia("(prefers-reduced-motion: reduce)"); const sync = () => setReducedMotion(media.matches); sync(); media.addEventListener?.("change", sync); return () => media.removeEventListener?.("change", sync); }, []);
   useEffect(() => {
@@ -36,6 +37,7 @@ export function ArchitectureGraphWorkspace({ state, identity, initialGraph, fall
     if (hasFallbackSeed) {
       const fallback = fallbackOverview(identity, fallbackNodes, fallbackEdges);
       setOverview(fallback);
+      setDataSource("postgres-fallback");
       store.mergeOverview(fallback);
       setVersion((value) => value + 1);
     }
@@ -46,16 +48,12 @@ export function ArchitectureGraphWorkspace({ state, identity, initialGraph, fall
         } else if (graphView === "overview") {
           const result = await runOverviewArchitectureQuery({ operation: "overview", scope: identity.scope, baselineId: identity.baselineId, projectionManifestId: identity.projectionManifestId, layers, assetTypes: [], relationTypes, budget: { maxNodes: 250, maxEdges: 500, maxPaths: 100, timeoutMs: 3_000, maxPayloadBytes: 1_048_576 } }, controller.signal);
           if (!controller.signal.aborted) {
-            // A graph-analysis projection can be valid but empty while the projector is catching up.
-            // Keep the graph useful by showing the bounded published catalog in that state too.
-            if (!result.nodes.length && fallbackNodes.length) {
-              const fallback = fallbackOverview(identity, fallbackNodes, fallbackEdges);
-              setOverview(fallback);
-            } else {
-              if (hasFallbackSeed) store.clear();
-              setOverview(result);
-              store.mergeOverview(result);
-            }
+            const fallback = hasFallbackSeed ? fallbackOverview(identity, fallbackNodes, fallbackEdges) : undefined;
+            const selected = selectOverviewResult(result, fallback);
+            if (selected.source === "postgres-fallback") store.clear();
+            setOverview(selected.result);
+            setDataSource(selected.source);
+            store.mergeOverview(selected.result);
           }
         } else if (graphView === "impact" && state.focus) {
           const result = await runImpactArchitectureQuery({ operation: "impact", scope: identity.scope, baselineId: identity.baselineId, projectionManifestId: identity.projectionManifestId, focusAssertionId: state.focus, direction: state.direction, layers, relationTypes, budget: { maxNodes: 150, maxEdges: 300, maxPaths: 100, timeoutMs: 3_000, maxPayloadBytes: 1_048_576 } }, controller.signal);
@@ -66,7 +64,7 @@ export function ArchitectureGraphWorkspace({ state, identity, initialGraph, fall
         if (!controller.signal.aborted) {
           if (graphView === "overview" && fallbackNodes.length) {
             const fallback = fallbackOverview(identity, fallbackNodes, fallbackEdges);
-            setOverview(fallback); store.mergeOverview(fallback);
+            setOverview(fallback); setDataSource("postgres-fallback"); store.clear(); store.mergeOverview(fallback);
             setVersion((value) => value + 1);
           } else setError(cause instanceof Error ? cause.message : "UNAVAILABLE");
         }
@@ -82,11 +80,22 @@ export function ArchitectureGraphWorkspace({ state, identity, initialGraph, fall
   const viewHref = (nextView: NonNullable<ThreeAUrlState["graphView"]>) => `/architecture/3a?${serializeThreeAUrlState({ ...state, mode: "graph", graphView: nextView })}`;
   return <section className="space-y-3" data-testid="architecture-graph-workspace">
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-white p-3 shadow-panel"><div className="flex items-center gap-2 text-sm font-semibold text-ink"><Network className="text-accent" size={17} /><T k="threeA.graphWorkspace" /></div><ArchitectureGraphSearch nodes={snapshot.nodes} onSelect={focus} /><div className="flex items-center gap-1 rounded-md border border-border bg-chrome p-1">{(["overview", "explore", "impact"] as const).map((view) => <a className={`inline-flex h-7 items-center gap-1 rounded px-2 text-xs font-semibold ${graphView === view ? "bg-white text-ink shadow-sm" : "text-muted"}`} href={viewHref(view)} key={view}><Sparkles size={13} />{view}</a>)}</div></div>
-    <div className="flex flex-wrap gap-2 text-xs text-muted"><span><Search className="mr-1 inline-block" size={13} />{snapshot.nodes.length} <T k="threeA.loadedNodes" /></span>{overview ? <span>· {overview.edges.length} <T k="threeA.loadedEdges" /></span> : null}</div>
+    <div className="flex flex-wrap gap-2 text-xs text-muted"><span><Search className="mr-1 inline-block" size={13} />{snapshot.nodes.length} <T k="threeA.loadedNodes" /></span>{overview ? <><span>{overview.edges.length} <T k="threeA.loadedEdges" /></span><span className="rounded-full border border-border bg-chrome px-2 py-0.5 font-medium text-ink">{dataSource === "projection" ? <T k="threeA.graphSourceProjection" /> : <T k="threeA.graphSourceFallback" />}</span></> : null}</div>
     {error ? <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
     <ArchitectureGraphRenderer store={store} view={graphView} selectedId={state.focus ? `fact:${state.focus}` : undefined} reducedMotion={reducedMotion} onNodeSelect={focus} onEdgeSelect={() => undefined} onRendererFailure={(reason) => setError(reason)} />
     {graphView === "impact" ? <ArchitectureImpactPanel result={impact} loading={loading} error={error} /> : null}
   </section>;
+}
+
+export type ArchitectureGraphDataSource = "projection" | "postgres-fallback";
+
+export function selectOverviewResult(derived: OverviewArchitectureResult | undefined, fallback: OverviewArchitectureResult | undefined): { result: OverviewArchitectureResult; source: ArchitectureGraphDataSource } {
+  if (!derived || !derived.nodes.length || (derived.edges.length === 0 && Boolean(fallback?.edges.length))) {
+    if (fallback) return { result: fallback, source: "postgres-fallback" };
+  }
+  if (derived) return { result: derived, source: "projection" };
+  if (fallback) return { result: fallback, source: "postgres-fallback" };
+  throw new Error("GRAPH_OVERVIEW_EMPTY");
 }
 
 function fallbackOverview(identity: ThreeAQueryIdentity, nodes: readonly KnowledgeProjectionNode[], edges: readonly KnowledgeProjectionEdge[]): OverviewArchitectureResult {

@@ -36,6 +36,7 @@ export interface ThreeAWorkspaceData {
   manifests: ManifestOption[];
   initialCatalog?: LayerPages;
   initialGraph?: InitialGraphPage;
+  initialGraphEdges?: KnowledgeProjectionEdge[];
   alignmentEdges?: KnowledgeProjectionEdge[];
   drift?: PublishedBaselineDrift;
   errorCode?: string;
@@ -83,8 +84,11 @@ export async function loadThreeAWorkspaceData(
 
   if (state.mode === "graph") {
     if (!state.focus) {
-      const layers = await Promise.all((["BIZ", "SYS", "TECH"] as const).map(async (layer) => [layer, await service.searchArchitectureFacts({ ...queryIdentity, layer, limit: 20 })] as const));
-      return { ...base, initialCatalog: Object.fromEntries(layers) as LayerPages };
+      const [layers, alignment] = await Promise.all([
+        Promise.all((["BIZ", "SYS", "TECH"] as const).map(async (layer) => [layer, await service.searchArchitectureFacts({ ...queryIdentity, layer, limit: 84 })] as const)),
+        service.getArchitectureAlignment({ ...queryIdentity, limit: 500 })
+      ]);
+      return { ...base, initialCatalog: Object.fromEntries(layers) as LayerPages, initialGraphEdges: alignment.edges };
     }
     const [detail, trace] = await Promise.all([
       service.getArchitectureFactDetail({ ...queryIdentity, assertionId: state.focus }),

@@ -9,6 +9,7 @@
 - Owning scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - Design Change Session: `design-change-session:c024c443-93b5-4462-852f-c12c82c726d0`
 - Follow-up Renderer Fix Session: `design-change-session:e2f19fdf-a96e-4ee5-98cd-56accd965680`
+- Follow-up Edge Fallback Session: `design-change-session:d442616a-078b-4dd0-ba82-6204409fbca3`
 - Approved Spec: `docs/superpowers/specs/2026-08-11-webgl-3a-graph-exploration-design.md`
 - Parent ADR: `adr-scalable-3a-exploration`
 
@@ -67,6 +68,10 @@ PostgreSQL remains authoritative for authored facts and relationship events. Gra
 - In-app browser acceptance loaded 60 bounded catalog nodes for the exact Designer Scope. WebGL is unavailable in the embedded browser, so Sigma reports the semantic DOM fallback with the graph contents preserved instead of a blank canvas.
 - The graph API returns `503 GRAPH_ANALYSIS_UNAVAILABLE` when derived analysis is unavailable; the workspace immediately falls back to the exact-Scope PostgreSQL catalog and remains bounded.
 - Browser reproduction found Sigma reducers were dropping Graphology coordinates and caused `could not find a valid position (x, y)`. The node and edge reducers now preserve source attributes; the follow-up exact-Scope session `design-change-session:e2f19fdf-a96e-4ee5-98cd-56accd965680` closed as `CONVERGED` after 4 Sigma tests, 2 renderer tests, 4 workspace tests, Web typecheck, and a browser recheck with no new position error.
+- The bounded edge fallback follow-up opened `design-change-session:d442616a-078b-4dd0-ba82-6204409fbca3` in the exact Designer Scope and read 222 scoped assets. Graph mode now loads up to 84 facts per layer and 500 typed relationships through the PostgreSQL query service; browser acceptance rendered 151 nodes and 234 edges with the explicit `PostgreSQL bounded fallback` source label.
+- The focused follow-up suite passed 5 files and 28 tests, including bounded relationship forwarding, graph workspace fallback selection, loader edge loading, Graphology store behavior, and Sigma reducer behavior. Knowledge-query and Web typechecks both exited 0; the browser had 7 Canvas elements and no console errors.
+- `pnpm design-context:close -- --session design-change-session:d442616a-078b-4dd0-ba82-6204409fbca3 --status CONVERGED --evidence "node vitest focused 5 files 28 tests=PASS,pnpm knowledge-query typecheck=PASS,pnpm web typecheck=PASS,browser graph overview=151 nodes 234 edges,browser canvas count=7,browser console errors=0"` returned `CONVERGED` in the exact Designer Scope.
+- `pnpm design-facts:sync` returned `complete` for the matching ADR, Proposal, Context Pack, Evidence, and typed links; `SPECFORGE_DESIGN_FACT_IDS=adr-webgl-3a-graph-exploration pnpm design-facts:check` returned `missing=[]`, `mismatched=[]`, `outOfScope=[]`, and `blocked=[]`.
 
 ## MCP Record
 
@@ -76,6 +81,7 @@ PostgreSQL remains authoritative for authored facts and relationship events. Gra
 - Related assets: `api-specforge-3a-architecture-query`, `data-specforge-3a-projection-read-model`, and `adr-scalable-3a-exploration`
 - Required links: Proposal `IMPLEMENTS_DECISION` ADR; Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal; ADR `DECIDES` query API and projection model; Proposal `IMPACTS` query API and projection model; Evidence `VALIDATES` ADR.
 - Synchronization state: the matching ADR, Proposal, Context Pack, Evidence, and typed impact links were synchronized and read back in the exact owning Scope. The implementation session `design-change-session:c024c443-93b5-4462-852f-c12c82c726d0` and follow-up renderer fix session `design-change-session:e2f19fdf-a96e-4ee5-98cd-56accd965680` both closed as `CONVERGED`.
+- The edge fallback session `design-change-session:d442616a-078b-4dd0-ba82-6204409fbca3` is closed as `CONVERGED` after focused verification and exact-Scope synchronization read-back.
 
 ## 中文本地化覆盖
 
@@ -149,6 +155,12 @@ PostgreSQL 继续作为已编写事实和关系事件的权威存储。图谱摘
 - 派生分析不可用时图谱 API 返回 `503 GRAPH_ANALYSIS_UNAVAILABLE`，工作台立即回退到精确 Scope 的 PostgreSQL 目录，并继续受有界预算保护。
 - 浏览器复现确认 Sigma reducer 丢失 Graphology 坐标并触发 `could not find a valid position (x, y)`；节点和边 reducer 现已保留原始属性。后续精确 Scope 会话 `design-change-session:e2f19fdf-a96e-4ee5-98cd-56accd965680` 已在 4 项 Sigma 测试、2 项渲染器测试、4 项工作台测试、Web 类型检查和浏览器复核通过后以 `CONVERGED` 关闭。
 
+### 追加证据（2026-08-11）
+
+- 边关系回退增量在精确 Designer Scope 打开 `design-change-session:d442616a-078b-4dd0-ba82-6204409fbca3`，读取 222 条 Scope 内资产；图谱模式现在每层最多加载 84 个事实和 500 条类型化关系。
+- 浏览器验收显示 151 个有界节点、234 条有界关系，显示 `PostgreSQL 有界回退` 数据源标签，存在 7 个 Canvas，且控制台无错误。
+- 边关系回退定向测试通过 5 个文件、28 项测试；knowledge-query 与 Web 类型检查均返回 0。
+
 ### MCP 记录
 
 - 匹配 MCP ADR ID：`adr-webgl-3a-graph-exploration`
@@ -157,3 +169,4 @@ PostgreSQL 继续作为已编写事实和关系事件的权威存储。图谱摘
 - 相关资产：`api-specforge-3a-architecture-query`、`data-specforge-3a-projection-read-model` 和 `adr-scalable-3a-exploration`
 - 必需关系：Proposal `IMPLEMENTS_DECISION` ADR；Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal；ADR `DECIDES` 查询 API 和投影模型；Proposal `IMPACTS` 查询 API 和投影模型；Evidence `VALIDATES` ADR。
 - 同步状态：对应 ADR、Proposal、Context Pack、Evidence 和有类型影响关系已在精确所属 Scope 中同步并回读；原始实施会话 `design-change-session:c024c443-93b5-4462-852f-c12c82c726d0` 与渲染器修复会话 `design-change-session:e2f19fdf-a96e-4ee5-98cd-56accd965680` 均已使用验证证据以 `CONVERGED` 关闭。
+- 本次边关系回退会话：`design-change-session:d442616a-078b-4dd0-ba82-6204409fbca3`；完成针对性验证和同步回读后关闭为 `CONVERGED`。

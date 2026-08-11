@@ -25,7 +25,7 @@ function serviceMock() {
     searchArchitectureFacts: vi.fn().mockImplementation(async ({ layer }: { layer: "BIZ" | "SYS" | "TECH" }) => ({ ...scope, baselineId: baseline.id, projectionManifestId: manifest.id, profileId: "profile", profileVersion: "v1", relationshipVersion: "r1", resultDigest: "digest", nodes: [node(layer, `${layer.toLowerCase()}-1`)] })),
     getArchitectureFactDetail: vi.fn().mockResolvedValue({ ...scope, baselineId: baseline.id, projectionManifestId: manifest.id, profileId: "profile", profileVersion: "v1", relationshipVersion: "r1", resultDigest: "digest", node: node("BIZ", "biz-1"), evidenceRefs: [], sourceObservationIds: [], unresolvedQuestions: [], counterEvidence: [], incoming: [], outgoing: [], warnings: [] }),
     traceArchitecturePath: vi.fn().mockResolvedValue({ ...scope, baselineId: baseline.id, projectionManifestId: manifest.id, profileId: "profile", profileVersion: "v1", relationshipVersion: "r1", resultDigest: "digest", nodes: [node("BIZ", "biz-1")], edges: [] as KnowledgeProjectionEdge[], paths: [] }),
-    getArchitectureAlignment: vi.fn().mockResolvedValue({ ...scope, baselineId: baseline.id, projectionManifestId: manifest.id, profileId: "profile", profileVersion: "v1", relationshipVersion: "r1", resultDigest: "digest", edges: [], warnings: [] }),
+    getArchitectureAlignment: vi.fn().mockResolvedValue({ ...scope, baselineId: baseline.id, projectionManifestId: manifest.id, profileId: "profile", profileVersion: "v1", relationshipVersion: "r1", resultDigest: "digest", edges: [{ ...scope, generationId: "generation-1", baselineId: baseline.id, relationshipIdentity: "biz-1:REALIZED_BY:sys-1", sourceAssertionId: "biz-1", targetAssertionId: "sys-1", sourceSemanticIdentity: "biz-1", targetSemanticIdentity: "sys-1", relationCode: "REALIZED_BY", confidence: 1, relationshipVersion: "r1", contentDigest: "edge-1" }], warnings: [] }),
     comparePublishedBaselines: vi.fn()
   } as unknown as ThreeAProjectionQueryService;
   return service;
@@ -49,10 +49,15 @@ describe("loadThreeAWorkspaceData", () => {
     expect(result.initialCatalog).toBeDefined();
   });
 
-  it("loads no architecture facts for graph mode without focus", async () => {
+  it("loads bounded architecture facts and relationships for graph mode without focus", async () => {
     const service = serviceMock();
-    await loadThreeAWorkspaceData(service, request, state({ mode: "graph", focus: undefined }));
-    expect(service.searchArchitectureFacts).not.toHaveBeenCalled();
+    const result = await loadThreeAWorkspaceData(service, request, state({ mode: "graph", focus: undefined }));
+    expect(service.searchArchitectureFacts).toHaveBeenCalledTimes(3);
+    expect(service.searchArchitectureFacts).toHaveBeenCalledWith(expect.objectContaining({ layer: "BIZ", limit: 84 }));
+    expect(service.searchArchitectureFacts).toHaveBeenCalledWith(expect.objectContaining({ layer: "SYS", limit: 84 }));
+    expect(service.searchArchitectureFacts).toHaveBeenCalledWith(expect.objectContaining({ layer: "TECH", limit: 84 }));
+    expect(service.getArchitectureAlignment).toHaveBeenCalledWith(expect.objectContaining({ limit: 500 }));
+    expect(result.initialGraphEdges).toHaveLength(1);
     expect(service.traceArchitecturePath).not.toHaveBeenCalled();
   });
 

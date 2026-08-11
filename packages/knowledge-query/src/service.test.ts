@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { KnowledgeProjectionEdge, KnowledgeProjectionNode } from "@specforge/core";
 import { createThreeAProjectionQueryService } from "./service";
 import type { CursorKeyring } from "./cursor";
@@ -18,6 +18,8 @@ const graphRepository = {
   loadImpact: vi.fn().mockResolvedValue({ availability: "READY", analysis, edges: [], metrics: [], partialReasons: [] }),
   loadNodeMetrics: vi.fn(), loadClusterMembers: vi.fn()
 } as unknown as GraphAnalysisRepository;
+
+beforeEach(() => vi.clearAllMocks());
 
 function node(assertionId: string, layer: "BIZ" | "SYS" | "TECH", semanticIdentity: string): KnowledgeProjectionNode {
   return { ...scope, generationId: manifest.generationId, baselineId: manifest.baselineId, assertionId, layer, semanticIdentity, sortKey: `${layer}|${semanticIdentity}`, contentDigest: `digest-${assertionId}` };
@@ -46,6 +48,14 @@ function impactInput(overrides: Partial<ImpactArchitectureInput> = {}): ImpactAr
 describe("3A query service", () => {
   it("authorizes exact Scope before checking Baseline existence", async () => { const service = createThreeAProjectionQueryService(repository, store, keyring); const unauthorized = { ...principal, grants: [] }; await expect(service.listPublishedBaselines({ principal: unauthorized, architectureScope: scope })).rejects.toMatchObject({ code: "SCOPE_ACCESS_DENIED" }); expect(repository.listOfficialBaselines).not.toHaveBeenCalled(); });
   it("keeps an authorized empty catalog scoped and deterministic", async () => { const service = createThreeAProjectionQueryService(repository, store, keyring); await expect(service.searchArchitectureFacts({ principal, architectureScope: scope, baselineId: "baseline-1", projectionManifestId: "manifest-1" })).resolves.toMatchObject({ applicationServiceId: scope.applicationServiceId, nodes: [] }); });
+  it("forwards a bounded relationship page without changing the unlimited alignment contract", async () => {
+    const service = createThreeAProjectionQueryService(repository, store, keyring);
+    await service.getArchitectureAlignment({ principal, architectureScope: scope, baselineId: manifest.baselineId, projectionManifestId: manifest.id, limit: 500 });
+    expect(repository.listEdges).toHaveBeenCalledWith(scope, manifest, { limit: 500 });
+    repository.listEdges = vi.fn().mockResolvedValue([]);
+    await service.getArchitectureAlignment({ principal, architectureScope: scope, baselineId: manifest.baselineId, projectionManifestId: manifest.id });
+    expect(repository.listEdges).toHaveBeenCalledWith(scope, manifest);
+  });
 
   it("walks only bounded adjacency and binds filters to continuation state", async () => {
     const biz = node("biz-1", "BIZ", "orders.intent");
