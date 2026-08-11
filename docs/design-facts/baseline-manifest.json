@@ -1354,6 +1354,30 @@
                                            {
                                                "command":  "pnpm design-facts:sync; $env:SPECFORGE_DESIGN_FACT_IDS='adr-webgl-3a-graph-exploration'; pnpm design-facts:check",
                                                "result":  "Synchronization returned complete; reconciliation returned missing=[], mismatched=[], outOfScope=[], and blocked=[]."
+                                           },
+                                           {
+                                               "command":  "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Add-GitNexus-style-bounded-graph-motion --affected adr-webgl-3a-graph-exploration,proposal-webgl-3a-graph-exploration,ctx-webgl-3a-graph-exploration,data-specforge-3a-projection-read-model --evidence approved-gitnexus-style-graph-motion,current-3a-graph-static-layout-observation",
+                                               "result":  "Opened design-change-session:dd17470e-6417-40e1-93fe-e3c41f841a0d in the exact Designer Scope, read 234 scoped assets, and returned design context digest 92042bd9e208dc59fa42dd9b900e96ec9750ae2365a960b52f39cd1a70097f8b with relationship digest 50a7417ddab7cdb06307d06e1ddbd4f19f36232fa29dca04dfe1fb9cca6762e1."
+                                           },
+                                           {
+                                               "command":  "node .\\node_modules\\vitest\\vitest.mjs run packages/knowledge-query/src/service.test.ts apps/web/lib/3a/workspace-loader.test.ts apps/web/components/three-a/architecture-graph-workspace.test.ts apps/web/components/three-a/architecture-graph-store.test.ts apps/web/components/three-a/architecture-graph-layout-worker.test.ts apps/web/components/three-a/architecture-graph-motion.test.ts apps/web/components/three-a/sigma-architecture-graph.test.tsx",
+                                               "result":  "Passed 7 test files and 37 tests."
+                                           },
+                                           {
+                                               "command":  "pnpm --filter @specforge/web typecheck; pnpm --filter @specforge/knowledge-query typecheck; git diff --check",
+                                               "result":  "Web and knowledge-query typechecks exited 0; git diff --check exited 0."
+                                           },
+                                           {
+                                               "command":  "In-app browser graph motion acceptance at the exact Designer Scope after reload",
+                                               "result":  "Rendered 151 bounded nodes and 234 bounded edges with 7 Canvas elements; screenshots showed initial-to-settled node motion, three layer bands, and restored readable edges. The latest reload produced no new console errors and no error-state text after the Sigma resize race guard."
+                                           },
+                                           {
+                                               "command":  "pnpm design-context:close -- --session design-change-session:dd17470e-6417-40e1-93fe-e3c41f841a0d --status CONVERGED --evidence motion-vitest-7-files-37-tests-PASS,pnpm-web-typecheck-PASS,pnpm-knowledge-query-typecheck-PASS,git-diff-check-PASS,browser-motion-151-nodes-234-edges,browser-canvas-count-7,browser-new-console-errors-0,browser-resize-race-fixed",
+                                               "result":  "Returned CONVERGED in the exact Designer Scope."
+                                           },
+                                           {
+                                               "command":  "pnpm design-facts:sync; $env:SPECFORGE_DESIGN_FACT_IDS='adr-webgl-3a-graph-exploration'; pnpm design-facts:check",
+                                               "result":  "Synchronization returned complete; reconciliation returned missing=[], mismatched=[], outOfScope=[], and blocked=[]."
                                            }
                                        ]
                       }

@@ -11,8 +11,10 @@
 - Follow-up Renderer Fix Session: `design-change-session:e2f19fdf-a96e-4ee5-98cd-56accd965680`
 - Follow-up Edge Fallback Session: `design-change-session:d442616a-078b-4dd0-ba82-6204409fbca3`
 - Follow-up Layered Layout Session: `design-change-session:162ef116-c479-4658-ab42-d77ad92594ab`
+- Follow-up Motion Session: `design-change-session:dd17470e-6417-40e1-93fe-e3c41f841a0d`
 - Approved Spec: `docs/superpowers/specs/2026-08-11-webgl-3a-graph-exploration-design.md`
 - Follow-up Layout Spec: `docs/superpowers/specs/2026-08-11-3a-layered-graph-layout-design.md`
+- Follow-up Motion Spec: `docs/superpowers/specs/2026-08-11-3a-graph-motion-design.md`
 - Parent ADR: `adr-scalable-3a-exploration`
 
 ## Context
@@ -78,6 +80,12 @@ PostgreSQL remains authoritative for authored facts and relationship events. Gra
 - The layout regression suite passed 4 files and 20 tests, including unit-scale expansion, distinct layer bands, connected-cluster separation, Sigma label behavior, Graphology store behavior, and workspace fallback behavior. Web typecheck and `git diff --check` exited 0.
 - In-app browser acceptance after reload rendered 151 nodes and 234 edges with 7 Canvas elements, showed PostgreSQL bounded fallback, visibly separated the three layer bands with readable edges, and reported no new console errors.
 - `pnpm design-context:close -- --session design-change-session:162ef116-c479-4658-ab42-d77ad92594ab --status CONVERGED --evidence "focused-layout-vitest-4-files-20-tests-PASS,pnpm-web-typecheck-PASS,git-diff-check-PASS,browser-graph-overview-151-nodes-234-edges-3-layer-bands,browser-canvas-count-7,browser-new-console-errors-0"` returned `CONVERGED` in the exact Designer Scope.
+- The motion follow-up preflight opened `design-change-session:dd17470e-6417-40e1-93fe-e3c41f841a0d` in the exact Designer Scope, read 234 scoped assets, and returned design-context digest `92042bd9e208dc59fa42dd9b900e96ec9750ae2365a960b52f39cd1a70097f8b`; relationship digest: `50a7417ddab7cdb06307d06e1ddbd4f19f36232fa29dca04dfe1fb9cca6762e1`.
+- The motion implementation adds bounded `requestAnimationFrame` interpolation, finite camera easing, node pulse emphasis, connected-edge emphasis, reduced-motion handling, and a guarded Sigma resize callback without changing graph facts or Scope boundaries.
+- The motion-focused suite passed 7 files and 37 tests. Web and knowledge-query typechecks exited 0; `git diff --check` exited 0.
+- In-app browser acceptance after reload rendered 151 nodes and 234 edges with 7 Canvas elements. Screenshots captured the initial circular seed, the settled BIZ/SYS/TECH layout, and restored readable edges; the latest reload produced no new console errors and no error-state text.
+- `pnpm design-context:close -- --session design-change-session:dd17470e-6417-40e1-93fe-e3c41f841a0d --status CONVERGED --evidence "motion-vitest-7-files-37-tests-PASS,pnpm-web-typecheck-PASS,pnpm-knowledge-query-typecheck-PASS,git-diff-check-PASS,browser-motion-151-nodes-234-edges,browser-canvas-count-7,browser-new-console-errors-0,browser-resize-race-fixed"` returned `CONVERGED` in the exact Designer Scope.
+- `pnpm design-facts:sync` returned `complete`; `SPECFORGE_DESIGN_FACT_IDS=adr-webgl-3a-graph-exploration pnpm design-facts:check` returned `missing=[]`, `mismatched=[]`, `outOfScope=[]`, and `blocked=[]`.
 
 ## MCP Record
 
@@ -88,6 +96,7 @@ PostgreSQL remains authoritative for authored facts and relationship events. Gra
 - Required links: Proposal `IMPLEMENTS_DECISION` ADR; Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal; ADR `DECIDES` query API and projection model; Proposal `IMPACTS` query API and projection model; Evidence `VALIDATES` ADR.
 - Synchronization state: the matching ADR, Proposal, Context Pack, Evidence, and typed impact links were synchronized and read back in the exact owning Scope. The implementation session `design-change-session:c024c443-93b5-4462-852f-c12c82c726d0` and follow-up renderer fix session `design-change-session:e2f19fdf-a96e-4ee5-98cd-56accd965680` both closed as `CONVERGED`.
 - The edge fallback session `design-change-session:d442616a-078b-4dd0-ba82-6204409fbca3` is closed as `CONVERGED` after focused verification and exact-Scope synchronization read-back.
+- The layered layout session `design-change-session:162ef116-c479-4658-ab42-d77ad92594ab` and motion session `design-change-session:dd17470e-6417-40e1-93fe-e3c41f841a0d` are closed as `CONVERGED` after focused verification and exact-Scope synchronization read-back.
 
 ## 中文本地化覆盖
 
