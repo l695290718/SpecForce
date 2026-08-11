@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implementation in progress; Task 1 contract and migration increment implemented, remaining tasks pending.**
+**Implementation in progress; Tasks 1-2 contract, projection, and MCP read increments implemented, Tasks 3-6 pending.**
 
 - Stable ID: `adr-readable-3a-architecture-mapping`
 - Owning application service: `com.huawei.celon.desiner`
@@ -69,8 +69,11 @@ PostgreSQL remains authoritative for authored facts and relationship events. The
 - `pnpm design-context:close -- --session design-change-session:34a1a99a-6026-4060-a858-46654b1630f3 --status CONVERGED` closed the exact-Scope written-design session with bilingual Spec, manifest, test, diff, MCP synchronization, and read-back evidence.
 - Exact-Scope implementation session `design-change-session:41606f36-bbb9-4ae0-ba6c-7a651cbd5fbe` covered the Task 1 contract and migration increment.
 - `node .\\node_modules\\vitest\\vitest.mjs run packages/core/src/architecture-map/types.test.ts prisma/three-a-schema.test.ts` passed 2 files and 5 tests; `node node_modules/typescript/bin/tsc -p packages/core/tsconfig.json --noEmit` and `node node_modules/prisma/build/index.js validate` exited 0; `git diff --check` exited 0.
-- Task 1 created the exact-Scope architecture-unit projection models, bounded validators, and migration with PostgreSQL-safe constraint names. Tasks 2-6 remain unimplemented.
+- Task 1 created the exact-Scope architecture-unit projection models, bounded validators, and migration with PostgreSQL-safe constraint names; Task 2 now adds deterministic materialization, PostgreSQL persistence, and read-only MCP adapters. Tasks 3-6 remain unimplemented.
 - `pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session design-change-session:41606f36-bbb9-4ae0-ba6c-7a651cbd5fbe --status CONVERGED` closed the Task 1 implementation session with the recorded focused evidence.
+- Exact-Scope implementation session `design-change-session:470a576b-0660-4bd7-bf5a-dd92a6f3ee94` covered deterministic architecture-unit materialization, PostgreSQL projection persistence, and read-only MCP adapters.
+- `node .\\node_modules\\vitest\\vitest.mjs run --exclude ".worktrees/**" --exclude ".pnpm-store/**" apps/knowledge-projector/src/materializer.test.ts apps/knowledge-projector/src/architecture-unit-materializer.test.ts apps/knowledge-projector/src/architecture-unit-repository.test.ts apps/knowledge-projector/src/repository.test.ts apps/mcp-server/src/tools.test.ts` passed 5 test files and 54 tests; the knowledge-projector and MCP Server TypeScript checks, Prisma validation, and `git diff --check` exited 0.
+- Task 2 materializes only explicit, exact-Scope architecture-unit facts; PostgreSQL remains authoritative and MCP adapters are read-only. Tasks 3-6 remain pending.
 
 ## MCP Record
 
@@ -79,7 +82,7 @@ PostgreSQL remains authoritative for authored facts and relationship events. The
 - Matching Context Pack ID: `ctx-readable-3a-architecture-mapping`
 - Related assets: `api-specforge-3a-architecture-query`, `data-specforge-3a-projection-read-model`, and `adr-webgl-3a-graph-exploration`
 - Required links: Proposal `IMPLEMENTS_DECISION` ADR; Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal; ADR `DECIDES` the query API, projection read model, and relationship to the advanced WebGL decision; Proposal `IMPACTS` the query API and projection read model; Evidence `VALIDATES` ADR.
-- Synchronization state: the reviewing ADR, Proposal, Context Pack, Evidence, and typed links were synchronized and read back in the exact owning Scope. Task 1 is implemented and locally verified; the remaining projection, query, Web, and final acceptance increments are still pending.
+- Synchronization state: the reviewing ADR, Proposal, Context Pack, Evidence, and typed links were synchronized and read back in the exact owning Scope. Tasks 1-2 are implemented and locally verified; the remaining query, Web, and final acceptance increments are still pending.
 - Session state: `design-change-session:34a1a99a-6026-4060-a858-46654b1630f3` is `CONVERGED` for the written-design increment.
 
 ## 中文本地化覆盖
@@ -90,7 +93,7 @@ PostgreSQL remains authoritative for authored facts and relationship events. The
 
 ### 状态
 
-**实施进行中；Task 1 契约与迁移增量已实施，其余任务待完成。**
+**实施进行中；Task 1-2 契约、投影与 MCP 读取增量已实施，Task 3-6 待完成。**
 
 - 稳定 ID：`adr-readable-3a-architecture-mapping`
 - 所属应用服务：`com.huawei.celon.desiner`
@@ -156,8 +159,10 @@ PostgreSQL 继续作为已编写事实和关系事件的权威来源。后续实
 - `pnpm design-context:close -- --session design-change-session:34a1a99a-6026-4060-a858-46654b1630f3 --status CONVERGED` 使用双语 Spec、清单、测试、差异检查、MCP 同步和回读证据关闭了精确 Scope 的书面设计会话。
 - 精确 Scope 的实现会话 `design-change-session:41606f36-bbb9-4ae0-ba6c-7a651cbd5fbe` 覆盖了 Task 1 契约与迁移增量。
 - `node .\\node_modules\\vitest\\vitest.mjs run packages/core/src/architecture-map/types.test.ts prisma/three-a-schema.test.ts` 通过 2 个文件和 5 项测试；`node node_modules/typescript/bin/tsc -p packages/core/tsconfig.json --noEmit`、`node node_modules/prisma/build/index.js validate` 和 `git diff --check` 均通过。
-- Task 1 已创建精确 Scope 架构单元投影模型、有界校验器和 PostgreSQL 安全约束名的迁移；Task 2 至 Task 6 尚未实施。
+- Task 1 已创建精确 Scope 架构单元投影模型、有界校验器和 PostgreSQL 安全约束名的迁移；Task 2 已实现确定性架构单元物化、PostgreSQL 投影持久化和只读 MCP 适配器；Task 3 至 Task 6 尚未实施。
 - `pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session design-change-session:41606f36-bbb9-4ae0-ba6c-7a651cbd5fbe --status CONVERGED` 已使用上述针对性证据关闭 Task 1 实现会话。
+- 精确 Scope 的实现会话 `design-change-session:470a576b-0660-4bd7-bf5a-dd92a6f3ee94` 覆盖了确定性架构单元物化、PostgreSQL 投影持久化和只读 MCP 适配器。
+- 上述 5 个聚焦测试文件和 54 项测试通过；knowledge-projector 与 MCP Server TypeScript 检查、Prisma 校验和 `git diff --check` 均通过。
 
 ### MCP 记录
 
@@ -166,5 +171,5 @@ PostgreSQL 继续作为已编写事实和关系事件的权威来源。后续实
 - 对应 Context Pack ID：`ctx-readable-3a-architecture-mapping`
 - 相关资产：`api-specforge-3a-architecture-query`、`data-specforge-3a-projection-read-model`、`adr-webgl-3a-graph-exploration`
 - 必需关系：Proposal `IMPLEMENTS_DECISION` ADR；Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal；ADR `DECIDES` 查询 API、投影读取模型以及与高级 WebGL 决策的关系；Proposal `IMPACTS` 查询 API 和投影读取模型；Evidence `VALIDATES` ADR。
-- 同步状态：评审中的 ADR、Proposal、Context Pack、Evidence 和有类型关系已在精确所属 Scope 中同步并回读。Task 1 已实施并完成本地验证；其余投影、查询、Web 和最终验收增量仍待完成。
+- 同步状态：评审中的 ADR、Proposal、Context Pack、Evidence 和有类型关系已在精确所属 Scope 中同步并回读。Task 1-2 已实施并完成本地验证；其余查询、Web 和最终验收增量仍待完成。
 - 会话状态：`design-change-session:34a1a99a-6026-4060-a858-46654b1630f3` 已针对书面设计增量收敛为 `CONVERGED`。

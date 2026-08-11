@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { contentDigest, projectionBuildKey, type ArchitectureScopeRef, type KnowledgeProjectionEdge, type KnowledgeProjectionNode, type ProjectionBuildJob, type ProjectionManifestV2 } from "@specforge/core";
+import { contentDigest, projectionBuildKey, validateArchitectureMapBudget, type ArchitectureLayer, type ArchitectureMapBudget, type ArchitectureMapIdentity, type ArchitectureScopeRef, type ArchitectureUnitFilter, type ArchitectureUnitMappingProjection, type ArchitectureUnitMemberProjection, type ArchitectureUnitProjection, type ArchitectureUnitProjectionPage, type KnowledgeProjectionEdge, type KnowledgeProjectionNode, type ProjectionBuildJob, type ProjectionManifestV2 } from "@specforge/core";
+import type { ArchitectureUnitMaterialization } from "./architecture-unit-materializer.js";
 
 export interface ProjectionEndpoint {
   semanticIdentity?: string;
@@ -54,6 +55,33 @@ export interface ProjectionPublication {
   contentDigest: string;
   nodeCount: number;
   edgeCount: number;
+}
+
+export interface ArchitectureUnitRepositoryIdentity extends ArchitectureMapIdentity {}
+
+export interface ArchitectureUnitProjectionRepository {
+  writeArchitectureUnitBatch(job: ProjectionBuildJob, owner: string, materialization: ArchitectureUnitMaterialization): Promise<boolean>;
+  listArchitectureUnits(identity: ArchitectureUnitRepositoryIdentity, filter: ArchitectureUnitFilter, budget: ArchitectureMapBudget): Promise<ArchitectureUnitProjectionPage>;
+  listArchitectureUnitMembers(identity: ArchitectureUnitRepositoryIdentity, unitIdentity: string, limit: number): Promise<ArchitectureUnitMemberProjection[]>;
+  listArchitectureUnitMappings(identity: ArchitectureUnitRepositoryIdentity, unitIdentities: string[], limit: number): Promise<ArchitectureUnitMappingProjection[]>;
+}
+
+export interface ArchitectureUnitScopePredicate {
+  applicationServiceId: string;
+  scopePath: string;
+  generationId: string;
+  baselineId: string;
+  projectionManifestId: string;
+}
+
+export function architectureUnitScopePredicate(identity: ArchitectureUnitRepositoryIdentity): ArchitectureUnitScopePredicate {
+  return {
+    applicationServiceId: identity.applicationServiceId,
+    scopePath: identity.scopePath,
+    generationId: identity.generationId,
+    baselineId: identity.baselineId,
+    projectionManifestId: identity.projectionManifestId
+  };
 }
 
 export interface GraphAnalysisCluster {
@@ -172,7 +200,7 @@ type SqlBuildRow = {
   diagnosticRef: string | null;
 };
 
-export class PrismaProjectionBuildRepository implements ProjectionBuildRepository, GraphAnalysisPublicationRepository {
+export class PrismaProjectionBuildRepository implements ProjectionBuildRepository, GraphAnalysisPublicationRepository, ArchitectureUnitProjectionRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async claim(owner: string, now: Date, leaseExpiresAt: Date): Promise<ProjectionBuildJob | null> {
@@ -222,6 +250,79 @@ export class PrismaProjectionBuildRepository implements ProjectionBuildRepositor
       }
       return true;
     });
+  }
+
+  async writeArchitectureUnitBatch(job: ProjectionBuildJob, owner: string, materialization: ArchitectureUnitMaterialization): Promise<boolean> {
+    assertArchitectureMaterializationMatchesJob(job, materialization);
+    return this.prisma.$transaction(async (transaction) => {
+      const updated = await transaction.projectionBuildJob.updateMany({
+        where: {
+          applicationServiceId: job.applicationServiceId,
+          scopePath: job.scopePath,
+          id: job.id,
+          status: "BUILDING",
+          leaseOwner: owner,
+          leaseExpiresAt: { gt: new Date() }
+        },
+        data: {}
+      });
+      if (updated.count !== 1) return false;
+      await deleteArchitectureUnitRows(transaction, architectureUnitScopePredicate(architectureMaterializationIdentity(materialization)));
+      await createArchitectureUnitRows(transaction, materialization);
+      return true;
+    });
+  }
+
+  async listArchitectureUnits(identity: ArchitectureUnitRepositoryIdentity, filter: ArchitectureUnitFilter, budget: ArchitectureMapBudget): Promise<ArchitectureUnitProjectionPage> {
+    validateArchitectureMapBudget(budget);
+    const predicate = architectureUnitScopePredicate(identity);
+    const mappingUnitIdentities = filter.mappingFamilies?.length
+      ? await this.prisma.architectureUnitMappingProjection.findMany({ where: { ...predicate, mappingFamily: { in: filter.mappingFamilies } }, select: { sourceUnitIdentity: true, targetUnitIdentity: true } })
+      : [];
+    const mappedUnitIdentities = [...new Set(mappingUnitIdentities.flatMap((row) => [row.sourceUnitIdentity, row.targetUnitIdentity]))];
+    const layers: ArchitectureLayer[] = filter.layers?.length ? [...new Set(filter.layers)] : ["BIZ", "SYS", "TECH"];
+    const baseWhere = architectureUnitWhere(predicate, filter, mappedUnitIdentities);
+    const counts = await Promise.all((["BIZ", "SYS", "TECH"] as const).map(async (layer) => [layer, await this.prisma.architectureUnitProjection.count({ where: { ...baseWhere, layer } })] as const));
+    const totalByLayer = Object.fromEntries(counts) as Record<ArchitectureLayer, number>;
+    const rowsByLayer = await Promise.all(layers.map(async (layer) => this.prisma.architectureUnitProjection.findMany({
+      where: { ...baseWhere, layer },
+      orderBy: [{ parentUnitIdentity: "asc" }, { criticality: "desc" }, { canonicalName: "asc" }, { unitIdentity: "asc" }],
+      take: budget.maxUnitsPerLayer + 1
+    })));
+    const partialReasons = rowsByLayer.some((rows) => rows.length > budget.maxUnitsPerLayer) ? ["UNIT_BUDGET_EXCEEDED" as const, "CONTINUATION_REQUIRED" as const] : [];
+    const units = rowsByLayer.flatMap((rows) => rows.slice(0, budget.maxUnitsPerLayer).map(architectureUnitFromRow)).sort(compareArchitectureUnits);
+    const unclassifiedCount = await this.prisma.architectureUnitProjection.count({ where: { ...predicate, unclassifiedMemberCount: { gt: 0 } } });
+    const partial = partialReasons.length ? { code: "RESULT_PARTIAL" as const, reasons: partialReasons } : undefined;
+    return {
+      units,
+      totalByLayer,
+      unclassifiedCount,
+      ...(partial ? { partial, nextContinuation: contentDigest({ identity, filter, budget, returned: units.map((unit) => unit.unitIdentity) }) } : {})
+    };
+  }
+
+  async listArchitectureUnitMembers(identity: ArchitectureUnitRepositoryIdentity, unitIdentity: string, limit: number): Promise<ArchitectureUnitMemberProjection[]> {
+    assertUnitIdentityQuery(unitIdentity);
+    assertPositiveLimit(limit);
+    const rows = await this.prisma.architectureUnitMemberProjection.findMany({
+      where: { ...architectureUnitScopePredicate(identity), unitIdentity },
+      orderBy: [{ semanticIdentity: "asc" }, { assertionId: "asc" }],
+      take: limit
+    });
+    return rows.map(architectureUnitMemberFromRow);
+  }
+
+  async listArchitectureUnitMappings(identity: ArchitectureUnitRepositoryIdentity, unitIdentities: string[], limit: number): Promise<ArchitectureUnitMappingProjection[]> {
+    assertPositiveLimit(limit);
+    const identities = [...new Set(unitIdentities.filter((value) => value.trim()))];
+    if (identities.length === 0) return [];
+    if (identities.some((value) => !value.startsWith("unit:"))) throw new Error("ARCHITECTURE_UNIT_IDENTITY_INVALID");
+    const rows = await this.prisma.architectureUnitMappingProjection.findMany({
+      where: { ...architectureUnitScopePredicate(identity), sourceUnitIdentity: { in: identities }, targetUnitIdentity: { in: identities } },
+      orderBy: [{ sourceUnitIdentity: "asc" }, { targetUnitIdentity: "asc" }, { mappingFamily: "asc" }, { mappingIdentity: "asc" }],
+      take: limit
+    });
+    return rows.map(architectureUnitMappingFromRow);
   }
 
   async publish(job: ProjectionBuildJob, owner: string, result: ProjectionPublication): Promise<ProjectionManifestV2> {
@@ -363,6 +464,58 @@ function manifestFromRow(row: any): ProjectionManifestV2 { return { applicationS
 function jsonObject(value: Prisma.JsonValue): { assertionSortKey?: string; relationshipVersion?: string } { return typeof value === "object" && value !== null && !Array.isArray(value) ? value as { assertionSortKey?: string; relationshipVersion?: string } : {}; }
 function stringArray(value: unknown): string[] { return Array.isArray(value) && value.every((item) => typeof item === "string") ? value as string[] : []; }
 function stringValue(value: unknown): string | undefined { return typeof value === "string" && value.trim() ? value : undefined; }
+
+function architectureUnitWhere(predicate: ArchitectureUnitScopePredicate, filter: ArchitectureUnitFilter, mappedUnitIdentities: string[]): Record<string, unknown> {
+  const where: Record<string, unknown> = { ...predicate };
+  if (filter.kinds?.length) where.kind = { in: filter.kinds };
+  if (filter.minCriticality !== undefined) where.criticality = { gte: filter.minCriticality };
+  if (filter.minCompleteness !== undefined) where.completeness = { gte: filter.minCompleteness };
+  if (filter.includeUnclassified === false) where.unclassifiedMemberCount = 0;
+  if (filter.mappingFamilies?.length) where.unitIdentity = { in: mappedUnitIdentities };
+  if (filter.query?.trim()) {
+    where.OR = [
+      { unitIdentity: { contains: filter.query.trim(), mode: "insensitive" } },
+      { canonicalName: { contains: filter.query.trim(), mode: "insensitive" } }
+    ];
+  }
+  return where;
+}
+
+async function deleteArchitectureUnitRows(transaction: any, predicate: ArchitectureUnitScopePredicate): Promise<void> {
+  await transaction.architectureUnitMappingProjection.deleteMany({ where: predicate });
+  await transaction.architectureUnitMemberProjection.deleteMany({ where: predicate });
+  await transaction.architectureUnitProjection.deleteMany({ where: predicate });
+}
+
+async function createArchitectureUnitRows(transaction: any, materialization: ArchitectureUnitMaterialization): Promise<void> {
+  const predicate = architectureUnitScopePredicate(architectureMaterializationIdentity(materialization));
+  if (materialization.units.length) await transaction.architectureUnitProjection.createMany({ data: materialization.units.map((unit) => architectureUnitData(unit, predicate)) });
+  if (materialization.members.length) await transaction.architectureUnitMemberProjection.createMany({ data: materialization.members.map((member) => architectureUnitMemberData(member, predicate)) });
+  if (materialization.mappings.length) await transaction.architectureUnitMappingProjection.createMany({ data: materialization.mappings.map((mapping) => architectureUnitMappingData(mapping, predicate)) });
+}
+
+function assertArchitectureMaterializationMatchesJob(job: ProjectionBuildJob, materialization: ArchitectureUnitMaterialization): void {
+  const matches = materialization.architectureScope.applicationServiceId === job.applicationServiceId
+    && materialization.architectureScope.scopePath === job.scopePath
+    && materialization.generationId === job.generationId
+    && materialization.baselineId === job.baselineId
+    && materialization.projectionManifestId === `projection-manifest:${job.generationId}`;
+  if (!matches) throw new Error("ARCHITECTURE_UNIT_PROJECTION_SCOPE_MISMATCH");
+}
+
+function architectureMaterializationIdentity(materialization: ArchitectureUnitMaterialization): ArchitectureUnitRepositoryIdentity {
+  return { ...materialization.architectureScope, generationId: materialization.generationId, baselineId: materialization.baselineId, projectionManifestId: materialization.projectionManifestId };
+}
+
+function assertUnitIdentityQuery(value: string): void { if (!value.trim() || !value.startsWith("unit:")) throw new Error("ARCHITECTURE_UNIT_IDENTITY_INVALID"); }
+function assertPositiveLimit(value: number): void { if (!Number.isInteger(value) || value <= 0) throw new Error("ARCHITECTURE_UNIT_LIMIT_INVALID"); }
+function architectureUnitData(unit: ArchitectureUnitProjection, predicate: ArchitectureUnitScopePredicate) { return { ...predicate, unitIdentity: unit.unitIdentity, generationId: unit.generationId, baselineId: unit.baselineId, projectionManifestId: unit.projectionManifestId, layer: unit.layer, kind: unit.kind, parentUnitIdentity: unit.parentUnitIdentity ?? null, canonicalName: unit.canonicalName, localizedName: unit.localizedName ?? Prisma.JsonNull, aliases: unit.aliases as Prisma.InputJsonValue, memberCount: unit.memberCount, criticality: unit.criticality, completeness: unit.completeness, evidenceCount: unit.evidenceCount, unclassifiedMemberCount: unit.unclassifiedMemberCount, contentDigest: unit.contentDigest }; }
+function architectureUnitMemberData(member: ArchitectureUnitMemberProjection, predicate: ArchitectureUnitScopePredicate) { return { ...predicate, unitIdentity: member.unitIdentity, generationId: member.generationId, baselineId: member.baselineId, projectionManifestId: member.projectionManifestId, assertionId: member.assertionId, assetType: member.assetType ?? null, semanticIdentity: member.semanticIdentity, contentDigest: member.contentDigest }; }
+function architectureUnitMappingData(mapping: ArchitectureUnitMappingProjection, predicate: ArchitectureUnitScopePredicate) { return { ...predicate, mappingIdentity: mapping.mappingIdentity, generationId: mapping.generationId, baselineId: mapping.baselineId, projectionManifestId: mapping.projectionManifestId, sourceUnitIdentity: mapping.sourceUnitIdentity, targetUnitIdentity: mapping.targetUnitIdentity, sourceLayer: mapping.sourceLayer, targetLayer: mapping.targetLayer, mappingFamily: mapping.mappingFamily, relationshipCount: mapping.relationshipCount, evidenceCount: mapping.evidenceCount, confidence: mapping.confidence, contentDigest: mapping.contentDigest }; }
+function architectureUnitFromRow(row: any): ArchitectureUnitProjection { return { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath, generationId: row.generationId, baselineId: row.baselineId, projectionManifestId: row.projectionManifestId, unitIdentity: row.unitIdentity, layer: row.layer, kind: row.kind, ...(row.parentUnitIdentity ? { parentUnitIdentity: row.parentUnitIdentity } : {}), canonicalName: row.canonicalName, ...(typeof row.localizedName === "string" ? { localizedName: row.localizedName } : {}), aliases: Array.isArray(row.aliases) ? row.aliases.filter((item: unknown): item is string => typeof item === "string") : [], memberCount: row.memberCount, criticality: row.criticality, completeness: row.completeness, evidenceCount: row.evidenceCount, unclassifiedMemberCount: row.unclassifiedMemberCount, contentDigest: row.contentDigest }; }
+function architectureUnitMemberFromRow(row: any): ArchitectureUnitMemberProjection { return { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath, generationId: row.generationId, baselineId: row.baselineId, projectionManifestId: row.projectionManifestId, unitIdentity: row.unitIdentity, assertionId: row.assertionId, ...(row.assetType ? { assetType: row.assetType } : {}), semanticIdentity: row.semanticIdentity, contentDigest: row.contentDigest }; }
+function architectureUnitMappingFromRow(row: any): ArchitectureUnitMappingProjection { return { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath, generationId: row.generationId, baselineId: row.baselineId, projectionManifestId: row.projectionManifestId, mappingIdentity: row.mappingIdentity, sourceUnitIdentity: row.sourceUnitIdentity, targetUnitIdentity: row.targetUnitIdentity, sourceLayer: row.sourceLayer, targetLayer: row.targetLayer, mappingFamily: row.mappingFamily, relationshipCount: row.relationshipCount, evidenceCount: row.evidenceCount, confidence: row.confidence, contentDigest: row.contentDigest }; }
+function compareArchitectureUnits(left: ArchitectureUnitProjection, right: ArchitectureUnitProjection): number { return (left.parentUnitIdentity ?? "").localeCompare(right.parentUnitIdentity ?? "", "en") || right.criticality - left.criticality || left.canonicalName.localeCompare(right.canonicalName, "en") || left.unitIdentity.localeCompare(right.unitIdentity, "en"); }
 
 export function validateGraphAnalysisPublication(job: ProjectionBuildJob, manifest: ProjectionManifestV2, publication: GraphAnalysisPublication): void {
   assertManifestMatchesJob(job, manifest);

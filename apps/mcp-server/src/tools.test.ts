@@ -4,6 +4,60 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const persistence = vi.hoisted(() => ({
   isSeedMode: vi.fn(() => process.env.SPECFORGE_MCP_SEED === "1"),
+  readableScope: vi.fn((applicationServiceId: string) => ({ applicationServiceId, scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner" })),
+  prisma: {
+    projectionManifest: {
+      findFirst: vi.fn().mockResolvedValue({ id: "manifest-1", baselineId: "baseline-1", generationId: "generation-1", publishedAt: new Date() })
+    },
+    architectureUnitProjection: {
+      count: vi.fn().mockResolvedValue(1),
+      findFirst: vi.fn().mockResolvedValue({
+        applicationServiceId: "com.huawei.celon.desiner",
+        scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner",
+        generationId: "generation-1",
+        baselineId: "baseline-1",
+        projectionManifestId: "manifest-1",
+        unitIdentity: "unit:biz:policy",
+        layer: "BIZ",
+        kind: "CAPABILITY",
+        canonicalName: "Policy",
+        aliases: [],
+        memberCount: 1,
+        criticality: 0.8,
+        completeness: 1,
+        evidenceCount: 1,
+        unclassifiedMemberCount: 0,
+        contentDigest: "unit-digest"
+      }),
+      findMany: vi.fn().mockResolvedValue([{
+        applicationServiceId: "com.huawei.celon.desiner",
+        scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner",
+        generationId: "generation-1",
+        baselineId: "baseline-1",
+        projectionManifestId: "manifest-1",
+        unitIdentity: "unit:biz:policy",
+        layer: "BIZ",
+        kind: "CAPABILITY",
+        canonicalName: "Policy",
+        aliases: [],
+        memberCount: 1,
+        criticality: 0.8,
+        completeness: 1,
+        evidenceCount: 1,
+        unclassifiedMemberCount: 0,
+        contentDigest: "unit-digest"
+      }])
+    },
+    architectureUnitMappingProjection: {
+      findMany: vi.fn().mockResolvedValue([])
+    },
+    architectureUnitMemberProjection: {
+      findMany: vi.fn().mockResolvedValue([])
+    },
+    knowledgeProjectionEdge: {
+      findMany: vi.fn().mockResolvedValue([])
+    }
+  },
   deletePersistedDesignData: vi.fn().mockResolvedValue({ status: "deleted" }),
   getPersistedAsset: vi.fn(),
   listPersistedAssetLinks: vi.fn().mockResolvedValue([]),
@@ -319,6 +373,8 @@ describe("versioned 3A navigation MCP boundary", () => {
       "list_3a_published_baselines",
       "list_3a_projection_manifests",
       "search_3a_architecture_facts",
+      "search_3a_architecture_map",
+      "get_3a_architecture_unit_neighborhood",
       "trace_3a_architecture_path",
       "get_3a_architecture_fact",
       "get_3a_alignment",
@@ -331,9 +387,107 @@ describe("versioned 3A navigation MCP boundary", () => {
     }
   });
 
+  it("registers the architecture map as an exact-Scope read-only operation", async () => {
+    const tools = captureTools();
+    const tool = tools.get("search_3a_architecture_map")!;
+    expect(tool).toBeDefined();
+    expect((tool.config.annotations as { readOnlyHint?: boolean }).readOnlyHint).toBe(true);
+    expect((tool.config._meta as { permissions: string[] }).permissions).toEqual(["knowledge:read"]);
+    const architectureScope = { applicationServiceId: "com.huawei.celon.desiner", scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner" };
+    const input = { architectureScope, baselineId: "baseline-1", projectionManifestId: "manifest-1", filters: { layers: ["BIZ"] }, budget: { maxUnitsPerLayer: 3 } };
+    const result = await tool.handler(input);
+    expect(result.isError).not.toBe(true);
+    expect(persistence.readableScope).toHaveBeenCalledWith(architectureScope.applicationServiceId);
+    expect(persistence.prisma.projectionManifest.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        applicationServiceId: architectureScope.applicationServiceId,
+        scopePath: architectureScope.scopePath,
+        id: input.projectionManifestId,
+        baselineId: input.baselineId,
+        publishedAt: { not: null }
+      })
+    }));
+    const unitQueries = persistence.prisma.architectureUnitProjection.findMany.mock.calls;
+    expect(unitQueries.length).toBeGreaterThan(0);
+    expect(unitQueries[0]![0].where).toEqual(expect.objectContaining({
+      applicationServiceId: architectureScope.applicationServiceId,
+      scopePath: architectureScope.scopePath,
+      generationId: "generation-1",
+      baselineId: input.baselineId,
+      projectionManifestId: input.projectionManifestId,
+      layer: "BIZ"
+    }));
+    expect(persistence.prisma.architectureUnitMappingProjection.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        applicationServiceId: architectureScope.applicationServiceId,
+        scopePath: architectureScope.scopePath,
+        generationId: "generation-1",
+        baselineId: input.baselineId,
+        projectionManifestId: input.projectionManifestId
+      })
+    }));
+  });
+
   it("marks the current-set drift API as legacy compatibility", () => {
     const tool = captureTools().get("derive_3a_knowledge_projection")!;
     expect(tool.config.description).toContain("Legacy compatibility read");
+  });
+
+  it("registers and calls the architecture unit neighborhood as exact-Scope read-only", async () => {
+    const tools = captureTools();
+    const tool = tools.get("get_3a_architecture_unit_neighborhood")!;
+    expect(tool).toBeDefined();
+    expect((tool.config.annotations as { readOnlyHint?: boolean }).readOnlyHint).toBe(true);
+    expect((tool.config._meta as { permissions: string[] }).permissions).toEqual(["knowledge:read"]);
+    const input = {
+      identity: {
+        architectureScope: { applicationServiceId: "com.huawei.celon.desiner", scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner" },
+        generationId: "generation-1",
+        baselineId: "baseline-1",
+        projectionManifestId: "manifest-1"
+      },
+      unitIdentity: "unit:biz:policy",
+      direction: "both",
+      depth: 2,
+      budget: { maxMappings: 5 }
+    };
+    const result = await tool.handler(input);
+    expect(result.isError).not.toBe(true);
+    expect(persistence.prisma.architectureUnitProjection.findFirst).toHaveBeenCalledWith({ where: expect.objectContaining({
+      applicationServiceId: input.identity.architectureScope.applicationServiceId,
+      scopePath: input.identity.architectureScope.scopePath,
+      generationId: input.identity.generationId,
+      baselineId: input.identity.baselineId,
+      projectionManifestId: input.identity.projectionManifestId,
+      unitIdentity: input.unitIdentity
+    }) });
+    expect(persistence.prisma.architectureUnitMemberProjection.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        applicationServiceId: input.identity.architectureScope.applicationServiceId,
+        scopePath: input.identity.architectureScope.scopePath,
+        generationId: input.identity.generationId,
+        baselineId: input.identity.baselineId,
+        projectionManifestId: input.identity.projectionManifestId,
+        unitIdentity: input.unitIdentity
+      })
+    }));
+  });
+
+  it("rejects a neighborhood Scope mismatch before reading the manifest", async () => {
+    persistence.readableScope.mockImplementationOnce(() => ({ applicationServiceId: "com.huawei.celon.desiner", scopePath: "a-different-scope" }));
+    const result = await captureTools().get("get_3a_architecture_unit_neighborhood")!.handler({
+      identity: {
+        architectureScope: { applicationServiceId: "com.huawei.celon.desiner", scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner" },
+        generationId: "generation-1",
+        baselineId: "baseline-1",
+        projectionManifestId: "manifest-1"
+      },
+      unitIdentity: "unit:biz:policy",
+      direction: "both",
+      depth: 1
+    });
+    expect(result.isError).toBe(true);
+    expect(persistence.prisma.projectionManifest.findFirst).not.toHaveBeenCalled();
   });
 });
 

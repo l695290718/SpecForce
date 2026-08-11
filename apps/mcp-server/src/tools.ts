@@ -18,6 +18,7 @@ import { bootstrapThreeAFromDesignAssets } from "./knowledge/bootstrap";
 import { deriveScopedKnowledgeProjection } from "./knowledge/projection";
 import { getProjectionBuild, requestProjectionBuild } from "./knowledge/projection-build";
 import { compare3aPublishedBaselines, get3aAlignment, get3aArchitectureFact, list3aProjectionManifests, list3aPublishedBaselines, search3aArchitectureFacts, trace3aArchitecturePath } from "./knowledge/query-adapter";
+import { get3aArchitectureUnitNeighborhood, search3aArchitectureMap } from "./knowledge/architecture-map-adapter";
 import {
   analyzeScopedProposalImpact,
   buildScopedAssetGraph,
@@ -702,6 +703,59 @@ export function registerTools(server: McpServer): void {
     permissions: ["knowledge:read"],
     readOnly: true
   }, search3aArchitectureFacts);
+
+  registerJsonTool(server, "search_3a_architecture_map", {
+    title: "Search 3A architecture map",
+    description: "Reads bounded governed BIZ, SYS, and TECH architecture-unit projections from one exact published Scope, Baseline, and Projection Manifest. Empty derived projections are reported explicitly; no semantic facts are written.",
+    inputSchema: {
+      architectureScope: architectureScopeSchema,
+      baselineId: z.string().min(1),
+      projectionManifestId: z.string().min(1),
+      filters: z.object({
+        layers: z.array(z.enum(["BIZ", "SYS", "TECH"])).optional(),
+        kinds: z.array(z.enum(["CAPABILITY", "PROCESS", "BUSINESS_OBJECT", "APPLICATION", "SERVICE", "COMPONENT", "DATA_DOMAIN", "PLATFORM", "RUNTIME", "INFRASTRUCTURE", "TECHNOLOGY_SERVICE"])).optional(),
+        mappingFamilies: z.array(z.string().min(1)).optional(),
+        minCriticality: z.number().min(0).max(1).optional(),
+        minCompleteness: z.number().min(0).max(1).optional(),
+        includeUnclassified: z.boolean().optional(),
+        query: z.string().max(200).optional()
+      }).optional(),
+      budget: z.object({
+        maxUnitsPerLayer: z.number().int().positive().optional(),
+        maxMappings: z.number().int().positive().optional(),
+        timeoutMs: z.number().int().positive().optional(),
+        maxPayloadBytes: z.number().int().positive().optional()
+      }).partial().optional()
+    },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, search3aArchitectureMap);
+
+  registerJsonTool(server, "get_3a_architecture_unit_neighborhood", {
+    title: "Get 3A architecture unit neighborhood",
+    description: "Reads a bounded exact-generation neighborhood for one governed 3A architecture unit, including mapped units, members, same-layer dependencies, and derived evidence metadata.",
+    inputSchema: {
+      identity: z.object({
+        architectureScope: architectureScopeSchema,
+        generationId: z.string().min(1),
+        baselineId: z.string().min(1),
+        projectionManifestId: z.string().min(1)
+      }),
+      unitIdentity: z.string().min(1),
+      direction: z.enum(["upstream", "downstream", "both"]),
+      depth: z.number().int().min(1).max(5),
+      memberAssetTypes: z.array(z.string().min(1)).optional(),
+      mappingFamilies: z.array(z.string().min(1)).optional(),
+      budget: z.object({
+        maxUnitsPerLayer: z.number().int().positive().optional(),
+        maxMappings: z.number().int().positive().optional(),
+        timeoutMs: z.number().int().positive().optional(),
+        maxPayloadBytes: z.number().int().positive().optional()
+      }).partial().optional()
+    },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, get3aArchitectureUnitNeighborhood);
 
   registerJsonTool(server, "trace_3a_architecture_path", {
     title: "Trace 3A architecture path",

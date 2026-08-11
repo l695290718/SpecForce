@@ -60,10 +60,11 @@ async function callMcpTool(name: string, arguments_: Record<string, unknown>): P
     }
   });
   const requestTimeout = Number(process.env.SPECFORGE_MCP_REQUEST_TIMEOUT_MS ?? "300000");
-  const client = new Client({ name: "specforge-design-context", version: "0.1.0" }, { capabilities: {}, requestTimeout });
+  const client = new Client({ name: "specforge-design-context", version: "0.1.0" }, { capabilities: {} });
+  const requestOptions = { timeout: requestTimeout, maxTotalTimeout: requestTimeout };
   await client.connect(transport);
   try {
-    const result = await client.callTool({ name, arguments: arguments_ });
+    const result = await client.callTool({ name, arguments: arguments_ }, undefined, requestOptions);
     const message = Array.isArray(result.content)
       ? result.content.map((item) => "text" in item ? item.text : "").filter(Boolean).join("")
       : "";

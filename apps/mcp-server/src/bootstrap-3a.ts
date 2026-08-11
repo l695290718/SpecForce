@@ -26,7 +26,8 @@ async function main(): Promise<void> {
     env: { ...process.env, CI: process.env.CI ?? "true", SPECFORGE_MCP_SEED: "1", SPECFORGE_MCP_SEED_SCOPE: architectureScope.applicationServiceId },
     stderr: "inherit"
   });
-  const client = new Client({ name: "specforge-3a-bootstrap", version: "0.1.0" }, { capabilities: {}, requestTimeout: 300_000 });
+  const client = new Client({ name: "specforge-3a-bootstrap", version: "0.1.0" }, { capabilities: {} });
+  const requestOptions = { timeout: 300_000, maxTotalTimeout: 300_000 };
   console.error("[bootstrap-3a] connecting");
   await client.connect(transport);
   console.error("[bootstrap-3a] connected");
@@ -46,13 +47,13 @@ async function main(): Promise<void> {
         expectedEvidenceRefs: ["canonical-design-assets-present", "3a-baseline-empty", "3a-browser-empty-state"],
         architectureScope
       }
-    });
+    }, undefined, requestOptions);
     if (result && typeof result === "object" && "isError" in result && result.isError) throw new Error(textResult(result));
     const receipt = JSON.parse(textResult(result)).receipt as { sessionId: string };
     const migration = await client.callTool({
       name: "bootstrap_3a_from_design_assets",
       arguments: { architectureScope, designChangeSessionId: receipt.sessionId }
-    });
+    }, undefined, requestOptions);
     if (migration && typeof migration === "object" && "isError" in migration && migration.isError) throw new Error(textResult(migration));
     const migrationResult = JSON.parse(textResult(migration)) as { baselineId: string };
     const build = await client.callTool({
@@ -65,7 +66,7 @@ async function main(): Promise<void> {
         projectionSchemaVersion: "3a.v2",
         query: { layers: ["BIZ", "SYS", "TECH"] }
       }
-    });
+    }, undefined, requestOptions);
     if (build && typeof build === "object" && "isError" in build && build.isError) throw new Error(textResult(build));
     process.stdout.write(JSON.stringify({ preflight: JSON.parse(textResult(result)), migration: JSON.parse(textResult(migration)), build: JSON.parse(textResult(build)) }, null, 2));
   } finally {

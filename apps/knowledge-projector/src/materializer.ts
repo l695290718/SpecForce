@@ -1,5 +1,6 @@
 import { contentDigest, projectionBuildKey, type KnowledgeProjectionEdge, type KnowledgeProjectionNode, type ProjectionBuildJob } from "@specforge/core";
-import type { GraphAnalysisPublicationRepository, MaterializedProjectionBatch, ProjectionBuildRepository, ProjectionEndpoint, ProjectionSourceAssertion, ProjectionSourceBatch, ProjectionSourceRelationship, ProjectionPublication } from "./repository.js";
+import { materializeArchitectureUnits, type ArchitectureUnitMaterialization, type ArchitectureUnitMaterializationInput } from "./architecture-unit-materializer.js";
+import type { ArchitectureUnitProjectionRepository, GraphAnalysisPublicationRepository, MaterializedProjectionBatch, ProjectionBuildRepository, ProjectionEndpoint, ProjectionSourceAssertion, ProjectionSourceBatch, ProjectionSourceRelationship, ProjectionPublication } from "./repository.js";
 import { DEFAULT_GRAPH_ANALYSIS_VERSION, DeterministicGraphAnalysisMaterializer, type GraphAnalysisMaterializer } from "./graph-analysis-materializer.js";
 
 export const DEFAULT_PROJECTION_BATCH_SIZE = 500;
@@ -23,8 +24,14 @@ export interface ProjectionEndpointResolutionInput {
   assertionsByPromotedAsset: Map<string, ProjectionSourceAssertion[]>;
 }
 
+export interface ProjectionArchitectureUnitBatch extends ProjectionSourceBatch {
+  architectureUnitFacts?: ArchitectureUnitMaterializationInput;
+}
+
+export type ArchitectureUnitSourceLoader = (job: ProjectionBuildJob, batch: ProjectionSourceBatch) => Promise<ArchitectureUnitMaterializationInput | undefined>;
+
 export class ProjectionMaterializer {
-  constructor(private readonly repository: ProjectionBuildRepository, private readonly options: { owner?: string; now?: () => Date; batchSize?: number; leaseDurationMs?: number; analysisVersion?: string; graphAnalysisMaterializer?: GraphAnalysisMaterializer } = {}) {}
+  constructor(private readonly repository: ProjectionBuildRepository, private readonly options: { owner?: string; now?: () => Date; batchSize?: number; leaseDurationMs?: number; analysisVersion?: string; graphAnalysisMaterializer?: GraphAnalysisMaterializer; architectureUnitSource?: ArchitectureUnitSourceLoader } = {}) {}
 
   async processOnce(): Promise<ProjectionProcessResult> {
     const now = this.now();
@@ -39,8 +46,16 @@ export class ProjectionMaterializer {
     try {
       const batch = await this.repository.loadBatch(job, this.options.batchSize ?? DEFAULT_PROJECTION_BATCH_SIZE);
       const materialized = materializeBatch(job, batch);
+      const architectureRepository = isArchitectureUnitProjectionRepository(this.repository) ? this.repository : undefined;
+      const architectureUnits = batch.complete && architectureRepository
+        ? await this.materializeArchitectureUnits(job, batch)
+        : undefined;
       if (!await this.repository.writeBatch(job, owner, materialized)) throw new ProjectionBuildError("PROJECTION_BUILD_LEASE_LOST");
       if (!batch.complete) return { status: "BATCHED", resumed: Boolean(job.checkpoint.assertionSortKey) };
+      if (architectureUnits) {
+        if (!architectureRepository) throw new ProjectionBuildError("ARCHITECTURE_UNIT_REPOSITORY_UNAVAILABLE");
+        if (!await architectureRepository.writeArchitectureUnitBatch(job, owner, architectureUnits)) throw new ProjectionBuildError("PROJECTION_BUILD_LEASE_LOST");
+      }
       const publication = publicationFrom(job, batch, materialized);
       const manifest = await this.repository.publish(job, owner, publication);
       const derivedAnalysis = await this.publishDerivedAnalysis(job, manifest);
@@ -54,6 +69,15 @@ export class ProjectionMaterializer {
 
   private owner(): string { return this.options.owner ?? `knowledge-projector:${process.pid}`; }
   private now(): Date { return this.options.now?.() ?? new Date(); }
+
+  private async materializeArchitectureUnits(job: ProjectionBuildJob, batch: ProjectionSourceBatch): Promise<ArchitectureUnitMaterialization> {
+    const input = this.options.architectureUnitSource
+      ? await this.options.architectureUnitSource(job, batch)
+      : (batch as ProjectionArchitectureUnitBatch).architectureUnitFacts;
+    const materialization = materializeArchitectureUnits(input ?? emptyArchitectureUnitInput(job));
+    assertArchitectureUnitMaterializationMatchesJob(job, materialization);
+    return materialization;
+  }
 
   private async publishDerivedAnalysis(job: ProjectionBuildJob, manifest: import("@specforge/core").ProjectionManifestV2): Promise<"PUBLISHED" | "UNAVAILABLE"> {
     if (!isGraphAnalysisPublicationRepository(this.repository)) return "UNAVAILABLE";
@@ -88,6 +112,35 @@ function isGraphAnalysisPublicationRepository(repository: ProjectionBuildReposit
   return typeof candidate.loadPublishedProjection === "function"
     && typeof candidate.publishGraphAnalysis === "function"
     && typeof candidate.markGraphAnalysisUnavailable === "function";
+}
+
+function isArchitectureUnitProjectionRepository(repository: ProjectionBuildRepository): repository is ProjectionBuildRepository & ArchitectureUnitProjectionRepository {
+  return typeof (repository as Partial<ArchitectureUnitProjectionRepository>).writeArchitectureUnitBatch === "function";
+}
+
+function emptyArchitectureUnitInput(job: ProjectionBuildJob): ArchitectureUnitMaterializationInput {
+  return {
+    applicationServiceId: job.applicationServiceId,
+    scopePath: job.scopePath,
+    generationId: job.generationId,
+    baselineId: job.baselineId,
+    projectionManifestId: `projection-manifest:${job.generationId}`,
+    units: [],
+    members: [],
+    mappings: []
+  };
+}
+
+function assertArchitectureUnitMaterializationMatchesJob(job: ProjectionBuildJob, materialization: ArchitectureUnitMaterialization): void {
+  if (materialization.architectureScope.applicationServiceId !== job.applicationServiceId || materialization.architectureScope.scopePath !== job.scopePath) {
+    throw new ProjectionBuildError("ARCHITECTURE_UNIT_SCOPE_MISMATCH");
+  }
+  if (materialization.generationId !== job.generationId || materialization.baselineId !== job.baselineId) {
+    throw new ProjectionBuildError("ARCHITECTURE_UNIT_PROJECTION_IDENTITY_MISMATCH");
+  }
+  if (materialization.projectionManifestId !== `projection-manifest:${job.generationId}`) {
+    throw new ProjectionBuildError("ARCHITECTURE_UNIT_PROJECTION_MANIFEST_MISMATCH");
+  }
 }
 
 function graphAnalysisErrorCode(error: unknown): string {
