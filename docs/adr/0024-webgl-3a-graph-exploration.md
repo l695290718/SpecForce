@@ -12,6 +12,8 @@
 - Follow-up Edge Fallback Session: `design-change-session:d442616a-078b-4dd0-ba82-6204409fbca3`
 - Follow-up Layered Layout Session: `design-change-session:162ef116-c479-4658-ab42-d77ad92594ab`
 - Follow-up Motion Session: `design-change-session:dd17470e-6417-40e1-93fe-e3c41f841a0d`
+- Follow-up Focus Persistence Session: `design-change-session:fcdf244a-6515-4332-b06c-6b2e4dfc96e4`
+- Follow-up Focus Persistence Spec: `docs/superpowers/specs/2026-08-11-3a-focus-persistence-fix.md`
 - Approved Spec: `docs/superpowers/specs/2026-08-11-webgl-3a-graph-exploration-design.md`
 - Follow-up Layout Spec: `docs/superpowers/specs/2026-08-11-3a-layered-graph-layout-design.md`
 - Follow-up Motion Spec: `docs/superpowers/specs/2026-08-11-3a-graph-motion-design.md`
@@ -86,6 +88,10 @@ PostgreSQL remains authoritative for authored facts and relationship events. Gra
 - In-app browser acceptance after reload rendered 151 nodes and 234 edges with 7 Canvas elements. Screenshots captured the initial circular seed, the settled BIZ/SYS/TECH layout, and restored readable edges; the latest reload produced no new console errors and no error-state text.
 - `pnpm design-context:close -- --session design-change-session:dd17470e-6417-40e1-93fe-e3c41f841a0d --status CONVERGED --evidence "motion-vitest-7-files-37-tests-PASS,pnpm-web-typecheck-PASS,pnpm-knowledge-query-typecheck-PASS,git-diff-check-PASS,browser-motion-151-nodes-234-edges,browser-canvas-count-7,browser-new-console-errors-0,browser-resize-race-fixed"` returned `CONVERGED` in the exact Designer Scope.
 - `pnpm design-facts:sync` returned `complete`; `SPECFORGE_DESIGN_FACT_IDS=adr-webgl-3a-graph-exploration pnpm design-facts:check` returned `missing=[]`, `mismatched=[]`, `outOfScope=[]`, and `blocked=[]`.
+- The focus persistence follow-up preflight opened `design-change-session:fcdf244a-6515-4332-b06c-6b2e4dfc96e4` in the exact Designer Scope, read 240 scoped assets, and returned design-context digest `adc0e895a4f31bdfd29afb9ba3b5192939f5194448f800039b67af25ff9558a6`; relationship digest: `0eb741cb13694533e2fc0b67b9d4614028f48dab2a785c09ccd28a4755fe737c`.
+- Overview and Explore focus changes now select an existing bounded graph without clearing or reloading it; Impact focus changes remain reload-sensitive because the impact query is focus-defined.
+- The focus persistence regression suite passed 7 files and 39 tests. Web and knowledge-query typechecks passed; `git diff --check` passed.
+- In-app browser click persistence retained 151 loaded nodes and 234 loaded edges, kept the graph container present, and showed no error-state text after click attempts.
 
 ## MCP Record
 
@@ -97,6 +103,7 @@ PostgreSQL remains authoritative for authored facts and relationship events. Gra
 - Synchronization state: the matching ADR, Proposal, Context Pack, Evidence, and typed impact links were synchronized and read back in the exact owning Scope. The implementation session `design-change-session:c024c443-93b5-4462-852f-c12c82c726d0` and follow-up renderer fix session `design-change-session:e2f19fdf-a96e-4ee5-98cd-56accd965680` both closed as `CONVERGED`.
 - The edge fallback session `design-change-session:d442616a-078b-4dd0-ba82-6204409fbca3` is closed as `CONVERGED` after focused verification and exact-Scope synchronization read-back.
 - The layered layout session `design-change-session:162ef116-c479-4658-ab42-d77ad92594ab` and motion session `design-change-session:dd17470e-6417-40e1-93fe-e3c41f841a0d` are closed as `CONVERGED` after focused verification and exact-Scope synchronization read-back.
+- The focus persistence session `design-change-session:fcdf244a-6515-4332-b06c-6b2e4dfc96e4` is closed as `CONVERGED` after focused verification and exact-Scope synchronization read-back.
 
 ## 中文本地化覆盖
 

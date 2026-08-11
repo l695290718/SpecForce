@@ -17,6 +17,7 @@ import type { ThreeAQueryIdentity } from "./catalog-state";
 
 export function ArchitectureGraphWorkspace({ state, identity, initialGraph, fallbackNodes = [], fallbackEdges = [], onFocus }: { state: ThreeAUrlState; identity: ThreeAQueryIdentity; initialGraph?: InitialGraphPage; fallbackNodes?: readonly KnowledgeProjectionNode[]; fallbackEdges?: readonly KnowledgeProjectionEdge[]; onFocus(id: string): void }) {
   const graphView = state.graphView ?? "overview";
+  const focusLoadKey = graphFocusLoadKey(graphView, state.focus);
   const layers = state.layers ?? [];
   const relationTypes = state.relationTypes ?? [];
   const storeIdentity = useMemo<GraphStoreIdentity>(() => ({ applicationServiceId: identity.scope, scopePath: scopeById(identity.scope)?.scopePath ?? identity.scope, baselineId: identity.baselineId, projectionManifestId: identity.projectionManifestId }), [identity]);
@@ -73,7 +74,13 @@ export function ArchitectureGraphWorkspace({ state, identity, initialGraph, fall
     };
     void load();
     return () => controller.abort();
-  }, [fallbackEdges, fallbackNodes, graphView, identity, initialGraph, layers, relationTypes, state.direction, state.focus, store]);
+  }, [fallbackEdges, fallbackNodes, focusLoadKey, graphView, identity, initialGraph, layers, relationTypes, state.direction, store]);
+
+  useEffect(() => {
+    if (graphView === "impact") return;
+    store.select(state.focus ? `fact:${state.focus}` : undefined);
+    setVersion((value) => value + 1);
+  }, [graphView, state.focus, store]);
 
   const snapshot = useMemo(() => store.snapshot(), [store, version]);
   const focus = (id: string) => { const assertionId = id.startsWith("fact:") ? id.slice(5) : undefined; store.select(id); setVersion((value) => value + 1); if (assertionId) onFocus(assertionId); };
@@ -88,6 +95,10 @@ export function ArchitectureGraphWorkspace({ state, identity, initialGraph, fall
 }
 
 export type ArchitectureGraphDataSource = "projection" | "postgres-fallback";
+
+export function graphFocusLoadKey(view: "overview" | "explore" | "impact", focus?: string): string | undefined {
+  return view === "impact" ? focus : undefined;
+}
 
 export function selectOverviewResult(derived: OverviewArchitectureResult | undefined, fallback: OverviewArchitectureResult | undefined): { result: OverviewArchitectureResult; source: ArchitectureGraphDataSource } {
   if (!derived || !derived.nodes.length || (derived.edges.length === 0 && Boolean(fallback?.edges.length))) {

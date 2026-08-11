@@ -1378,6 +1378,30 @@
                                            {
                                                "command":  "pnpm design-facts:sync; $env:SPECFORGE_DESIGN_FACT_IDS='adr-webgl-3a-graph-exploration'; pnpm design-facts:check",
                                                "result":  "Synchronization returned complete; reconciliation returned missing=[], mismatched=[], outOfScope=[], and blocked=[]."
+                                           },
+                                           {
+                                               "command":  "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Fix-3A-graph-focus-persistence-after-node-click --affected adr-webgl-3a-graph-exploration,proposal-webgl-3a-graph-exploration,ctx-webgl-3a-graph-exploration,adr-3a-architecture-navigation-workspace --evidence reported-node-click-graph-disappears,current-focus-driven-reload-effect",
+                                               "result":  "Opened design-change-session:fcdf244a-6515-4332-b06c-6b2e4dfc96e4 in the exact Designer Scope, read 240 scoped assets, and returned design context digest adc0e895a4f31bdfd29afb9ba3b5192939f5194448f800039b67af25ff9558a6 with relationship digest 0eb741cb13694533e2fc0b67b9d4614028f48dab2a785c09ccd28a4755fe737c."
+                                           },
+                                           {
+                                               "command":  "node .\\node_modules\\vitest\\vitest.mjs run packages/knowledge-query/src/service.test.ts apps/web/lib/3a/workspace-loader.test.ts apps/web/components/three-a/architecture-graph-workspace.test.ts apps/web/components/three-a/architecture-graph-store.test.ts apps/web/components/three-a/architecture-graph-layout-worker.test.ts apps/web/components/three-a/architecture-graph-motion.test.ts apps/web/components/three-a/sigma-architecture-graph.test.tsx",
+                                               "result":  "Passed 7 test files and 39 tests; Overview and Explore focus changes remain local selection changes while Impact focus remains reload-sensitive."
+                                           },
+                                           {
+                                               "command":  "pnpm --filter @specforge/web typecheck; pnpm --filter @specforge/knowledge-query typecheck; git diff --check",
+                                               "result":  "Web and knowledge-query typechecks exited 0; git diff --check exited 0."
+                                           },
+                                           {
+                                               "command":  "In-app browser click persistence check at the exact Designer Scope",
+                                               "result":  "After click attempts, the graph retained 151 loaded nodes and 234 loaded edges, the graph container remained present, and no Something went wrong error state was shown."
+                                           },
+                                           {
+                                               "command":  "pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session design-change-session:fcdf244a-6515-4332-b06c-6b2e4dfc96e4 --status CONVERGED --evidence focus-persistence-vitest-7-files-39-tests-PASS,pnpm-web-typecheck-PASS,pnpm-knowledge-query-typecheck-PASS,git-diff-check-PASS,browser-click-graph-remains-151-nodes-234-edges,browser-no-error-state",
+                                               "result":  "Returned CONVERGED in the exact Designer Scope."
+                                           },
+                                           {
+                                               "command":  "pnpm design-facts:sync; $env:SPECFORGE_DESIGN_FACT_IDS='adr-webgl-3a-graph-exploration'; pnpm design-facts:check",
+                                               "result":  "Synchronization returned complete; reconciliation returned missing=[], mismatched=[], outOfScope=[], and blocked=[]."
                                            }
                                        ]
                       }
