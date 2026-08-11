@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(22);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(22);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(22);
+  expect(manifest.decisions).toHaveLength(23);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(23);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(23);
   const proposalByContextPack = new Map<string, string>();
 
   for (const decision of manifest.decisions) {
@@ -157,6 +157,24 @@ it("includes the single-host Docker deployment decision in the baseline", () => 
   expect(decision?.proposalId).toBe("proposal-single-host-docker-deployment");
   expect(decision?.contextPackId).toBe("context-pack-single-host-docker-deployment");
   expect(decision?.evidence).toHaveLength(3);
+});
+
+it("records the proposed readable 3A architecture map separately from advanced network exploration", () => {
+  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-readable-3a-architecture-mapping");
+  expect(decision?.proposalId).toBe("proposal-readable-3a-architecture-mapping");
+  expect(decision?.proposalStatus).toBe("reviewing");
+  expect(decision?.contextPackId).toBe("ctx-readable-3a-architecture-mapping");
+  expect(decision?.status).toBe("Written design complete; implementation not started");
+  expect(decision?.relatedAssetIds).toEqual([
+    "api-specforge-3a-architecture-query",
+    "data-specforge-3a-projection-read-model",
+    "adr-webgl-3a-graph-exploration"
+  ]);
+  expect(decision?.reason).toContain("semantic BIZ, SYS, and TECH units");
+  expect(decision?.managedRelationships).toEqual(expect.arrayContaining([
+    expect.objectContaining({ sourceId: "proposal-readable-3a-architecture-mapping", targetId: "api-specforge-3a-architecture-query", relationType: "IMPACTS" }),
+    expect.objectContaining({ sourceId: "proposal-readable-3a-architecture-mapping", targetId: "data-specforge-3a-projection-read-model", relationType: "IMPACTS" })
+  ]));
 });
 
 it("includes the scope-safe architecture overview decision with bilingual governance metadata", () => {

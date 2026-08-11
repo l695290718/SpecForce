@@ -1436,6 +1436,73 @@
                                                "result":  "Synchronization returned complete; reconciliation returned missing=[], mismatched=[], outOfScope=[], and blocked=[]."
                                            }
                                        ]
+                      },
+                      {
+                          "id": "adr-readable-3a-architecture-mapping",
+                          "repositoryAdr": "docs/adr/0025-readable-3a-architecture-mapping.md",
+                          "mcpAdrId": "adr-readable-3a-architecture-mapping",
+                          "scope": {
+                              "applicationServiceId": "com.huawei.celon.desiner",
+                              "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                          },
+                          "proposalId": "proposal-readable-3a-architecture-mapping",
+                          "proposalStatus": "reviewing",
+                          "contextPackId": "ctx-readable-3a-architecture-mapping",
+                          "relatedAssetIds": [
+                              "api-specforge-3a-architecture-query",
+                              "data-specforge-3a-projection-read-model",
+                              "adr-webgl-3a-graph-exploration"
+                          ],
+                          "managedRelationships": [
+                              {
+                                  "sourceType": "proposal",
+                                  "sourceId": "proposal-readable-3a-architecture-mapping",
+                                  "targetType": "api",
+                                  "targetId": "api-specforge-3a-architecture-query",
+                                  "relationType": "IMPACTS"
+                              },
+                              {
+                                  "sourceType": "proposal",
+                                  "sourceId": "proposal-readable-3a-architecture-mapping",
+                                  "targetType": "dataModel",
+                                  "targetId": "data-specforge-3a-projection-read-model",
+                                  "relationType": "IMPACTS"
+                              }
+                          ],
+                          "owner": "SpecForge Architecture and Product",
+                          "status": "Written design complete; implementation not started",
+                          "reason": "The default 3A representation must expose authored semantic BIZ, SYS, and TECH units and readable cross-layer mappings, while the existing WebGL network remains the bounded advanced exploration surface.",
+                          "retryTrigger": "User approves the written Spec and a separate exact-Scope implementation plan and design-change session are created.",
+                          "evidence": [
+                              {
+                                  "command": "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Design-readable-3A-architecture-mapping",
+                                  "result": "Opened design-change-session:34a1a99a-6026-4060-a858-46654b1630f3, read 254 exact-Scope assets, and returned design digest d8bb3389e8eb85559f46c8a111b7c3abcda61725aec3b39690be43c02fe139d1 with relationship digest dbb387eee30c0f19ba7dd8015d3e06dd971eab35464a4784ddfaef63b2d95055."
+                              },
+                              {
+                                  "command": "In-app browser inspection of the exact Designer Scope 3A graph",
+                                  "result": "Observed 151 nodes, 234 edges, and 7 canvases in a 454-by-576-pixel surface; the default network did not expose a readable BIZ-to-SYS-to-TECH chain."
+                              },
+                              {
+                                  "command": "User design review on 2026-08-11",
+                                  "result": "Selected semantic architecture units, bounded local drill-down with inspector and breadcrumb, and cross-layer-only overview mappings."
+                              },
+                              {
+                                  "command": "Written-Spec and ADR self-review; manifest JSON parse; git diff --check",
+                                  "result": "Confirmed bilingual canonical design, no placeholders, proposed status, exact-Scope isolation, PostgreSQL authority, Map/Network separation, valid JSON, and a clean documentation diff."
+                              },
+                              {
+                                  "command": "node .\\node_modules\\vitest\\vitest.mjs run --root . --exclude .worktrees/** --exclude .pnpm-store/** scripts\\design-fact-manifest.test.ts scripts\\sync-design-facts.test.ts",
+                                  "result": "Passed 2 test files and 33 tests."
+                              },
+                              {
+                                  "command": "SPECFORGE_DESIGN_FACT_IDS=adr-readable-3a-architecture-mapping pnpm design-facts:sync; pnpm design-facts:check",
+                                  "result": "Synchronization returned complete; reconciliation verified adr-readable-3a-architecture-mapping with missing=[], mismatched=[], outOfScope=[], and blocked=[]."
+                              },
+                              {
+                                  "command": "pnpm design-context:close -- --session design-change-session:34a1a99a-6026-4060-a858-46654b1630f3 --status CONVERGED",
+                                  "result": "Closed the exact-Scope written-design session as CONVERGED with bilingual Spec, manifest, test, diff, MCP synchronization, and read-back evidence."
+                              }
+                          ]
                       }
                   ]
 }
