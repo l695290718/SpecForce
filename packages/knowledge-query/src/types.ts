@@ -17,6 +17,99 @@ export interface TraceArchitecturePathInput extends QueryPrincipalInput { baseli
 export interface AdjacentEdgeQuery { frontierAssertionIds: string[]; direction: TraceDirection; relationTypes?: string[]; limit: number; }
 export interface ArchitecturePath { assertionIds: string[]; relationshipIdentities: string[]; }
 export interface TraceArchitecturePathResult extends QueryResultEnvelope { nodes: KnowledgeProjectionNode[]; edges: KnowledgeProjectionEdge[]; paths: ArchitecturePath[]; continuation?: string; partial?: { code: "RESULT_PARTIAL"; reasons: ThreeAPartialReason[] }; }
+
+export type GraphSummaryKind = "cluster" | "fact";
+export type ImpactBand = "DIRECT" | "LIKELY" | "EXTENDED" | "UNRESOLVED";
+
+export interface GraphSummaryNode extends ArchitectureScopeRef {
+  id: string;
+  kind: GraphSummaryKind;
+  label: string;
+  layer?: ArchitectureLayer;
+  clusterId?: string;
+  memberCount: number;
+  degree: number;
+  criticality: number;
+  positionSeed: { x: number; y: number };
+  assertionId?: string;
+}
+
+export interface GraphSummaryEdge extends ArchitectureScopeRef {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  relationCode: string;
+  confidence: number;
+  bridge: boolean;
+}
+
+export interface GraphAnalysisBudget {
+  maxNodes: number;
+  maxEdges: number;
+  maxPaths: number;
+  timeoutMs: number;
+  maxPayloadBytes: number;
+}
+
+export interface OverviewArchitectureInput extends QueryPrincipalInput {
+  baselineId: string;
+  projectionManifestId: string;
+  layers?: ArchitectureLayer[];
+  assetTypes?: string[];
+  relationTypes?: string[];
+  continuation?: string;
+  budget?: Partial<GraphAnalysisBudget>;
+}
+
+export interface OverviewArchitectureResult extends QueryResultEnvelope {
+  nodes: GraphSummaryNode[];
+  edges: GraphSummaryEdge[];
+  continuation?: string;
+  partial?: { code: "RESULT_PARTIAL"; reasons: ThreeAPartialReason[] };
+}
+
+export interface ImpactScoreFactors {
+  relationWeight: number;
+  confidence: number;
+  criticalityWeight: number;
+  depthDecay: number;
+}
+
+export interface ImpactArchitectureInput extends QueryPrincipalInput {
+  baselineId: string;
+  projectionManifestId: string;
+  focusAssertionId: string;
+  direction: TraceDirection;
+  layers?: ArchitectureLayer[];
+  relationTypes?: string[];
+  policyVersion?: string;
+  continuation?: string;
+  budget?: Partial<GraphAnalysisBudget>;
+}
+
+export interface ImpactArchitectureItem extends KnowledgeProjectionNode {
+  depth: number;
+  band: ImpactBand;
+  score: number;
+  factors: ImpactScoreFactors;
+}
+
+export interface ImpactArchitectureResult extends QueryResultEnvelope {
+  focusAssertionId: string;
+  policyVersion: string;
+  items: ImpactArchitectureItem[];
+  paths: ArchitecturePath[];
+  cutPointAssertionIds: string[];
+  countsByBand: Record<ImpactBand, number>;
+  continuation?: string;
+  partial?: { code: "RESULT_PARTIAL"; reasons: ThreeAPartialReason[] };
+}
+
+export interface ArchitectureGraphQueryProvider {
+  overview(input: OverviewArchitectureInput): Promise<OverviewArchitectureResult>;
+  neighborhood(input: TraceArchitecturePathInput): Promise<TraceArchitecturePathResult>;
+  impact(input: ImpactArchitectureInput): Promise<ImpactArchitectureResult>;
+}
 export interface ArchitectureFactDetailInput extends QueryPrincipalInput { baselineId: string; projectionManifestId: string; assertionId: string; }
 export interface ArchitectureFactDetail extends QueryResultEnvelope { node: KnowledgeProjectionNode; canonicalEnglish?: Record<string, unknown>; localizedChinese?: Record<string, unknown>; factType?: string; aspect?: string; confidence?: number; status?: string; evidenceRefs: string[]; sourceObservationIds: string[]; unresolvedQuestions: string[]; counterEvidence: string[]; incoming: KnowledgeProjectionEdge[]; outgoing: KnowledgeProjectionEdge[]; warnings: string[]; }
 export interface ArchitectureAlignmentInput extends QueryPrincipalInput { baselineId: string; projectionManifestId: string; }

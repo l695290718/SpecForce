@@ -16,14 +16,23 @@ function makeDependencies() {
     traceArchitecturePath: vi.fn().mockResolvedValue({ ...base, nodes: [], edges: [], paths: [] }),
     getArchitectureFactDetail: vi.fn().mockResolvedValue({ ...base, node: {}, evidenceRefs: [], sourceObservationIds: [], unresolvedQuestions: [], counterEvidence: [], incoming: [], outgoing: [], warnings: [] })
   } as unknown as ThreeAProjectionQueryService;
+  const graphProvider = {
+    overview: vi.fn().mockResolvedValue({ ...base, nodes: [], edges: [] }),
+    neighborhood: vi.fn().mockResolvedValue({ ...base, nodes: [], edges: [], paths: [] }),
+    impact: vi.fn().mockResolvedValue({ ...base, focusAssertionId: "focus-1", policyVersion: "impact-v1", items: [], paths: [], cutPointAssertionIds: [], countsByBand: { DIRECT: 0, LIKELY: 0, EXTENDED: 0, UNRESOLVED: 0 } })
+  };
+  const createService = vi.fn().mockReturnValue(service);
   return {
     service,
+    graphProvider,
+    createService,
     dependencies: {
       resolveRequest: vi.fn().mockImplementation(async (_request: Request, requestedScope: ArchitectureScopeRef) => {
         if (requestedScope.applicationServiceId !== scope.applicationServiceId) throw new Error("SCOPE_ACCESS_DENIED");
         return { architectureScope: scope, principal } satisfies ResolvedThreeARequest;
       }),
-      createService: () => service
+      createService,
+      createGraphProvider: () => graphProvider
     } satisfies ThreeAQueryHandlerDependencies
   };
 }
@@ -41,6 +50,52 @@ describe("handleThreeAQuery", () => {
     const response = await handleThreeAQuery(request({ operation: "trace", scope: scope.applicationServiceId, baselineId: "b1", projectionManifestId: "p1", startAssertionId: "sys-1", direction: "upstream", relationTypes: ["CALLS", "CALLS"], layers: ["BIZ", "SYS"] }), dependencies);
     expect(response.status).toBe(200);
     expect(service.traceArchitecturePath).toHaveBeenCalledWith(expect.objectContaining({ relationTypes: ["CALLS"], layers: ["BIZ", "SYS"] }));
+  });
+
+  it("routes overview through the exact-Scope graph provider with normalized filters and bounded budget", async () => {
+    const { graphProvider, createService, dependencies } = makeDependencies();
+    const response = await handleThreeAQuery(request({ operation: "overview", scope: scope.applicationServiceId, baselineId: "b1", projectionManifestId: "p1", layers: ["SYS", "BIZ", "SYS"], assetTypes: [" z ", "a", "z"], relationTypes: ["REL2", "REL1", "REL2"], budget: { maxNodes: 300 } }), dependencies);
+    expect(response.status).toBe(200);
+    expect(createService).not.toHaveBeenCalled();
+    expect(graphProvider.overview).toHaveBeenCalledWith(expect.objectContaining({
+      architectureScope: scope,
+      baselineId: "b1",
+      projectionManifestId: "p1",
+      layers: ["BIZ", "SYS"],
+      assetTypes: ["a", "z"],
+      relationTypes: ["REL1", "REL2"],
+      budget: { maxNodes: 300, maxEdges: 500, maxPaths: 100, timeoutMs: 3_000, maxPayloadBytes: 1_048_576 }
+    }));
+  });
+
+  it("routes impact with a versioned policy and rejects an over-cap budget", async () => {
+    const { graphProvider, dependencies } = makeDependencies();
+    const response = await handleThreeAQuery(request({ operation: "impact", scope: scope.applicationServiceId, baselineId: "b1", projectionManifestId: "p1", focusAssertionId: "biz-1", direction: "downstream", layers: ["TECH", "SYS", "TECH"], relationTypes: ["Z", "A", "Z"], policyVersion: " impact-v2 ", budget: { maxEdges: 600 } }), dependencies);
+    expect(response.status).toBe(200);
+    expect(graphProvider.impact).toHaveBeenCalledWith(expect.objectContaining({
+      architectureScope: scope,
+      focusAssertionId: "biz-1",
+      direction: "downstream",
+      layers: ["SYS", "TECH"],
+      relationTypes: ["A", "Z"],
+      policyVersion: "impact-v2",
+      budget: { maxNodes: 150, maxEdges: 600, maxPaths: 100, timeoutMs: 3_000, maxPayloadBytes: 1_048_576 }
+    }));
+
+    const rejected = await handleThreeAQuery(request({ operation: "impact", scope: scope.applicationServiceId, baselineId: "b1", projectionManifestId: "p1", focusAssertionId: "biz-1", direction: "both", budget: { maxEdges: 1_001 } }), dependencies);
+    expect(rejected.status).toBe(400);
+    await expect(rejected.json()).resolves.toEqual({ code: "QUERY_BUDGET_INVALID" });
+    expect(graphProvider.impact).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns a safe graph-analysis unavailable error when the provider is not configured", async () => {
+    const { dependencies } = makeDependencies();
+    const response = await handleThreeAQuery(request({ operation: "overview", scope: scope.applicationServiceId, baselineId: "b1", projectionManifestId: "p1" }), {
+      ...dependencies,
+      createGraphProvider: undefined
+    });
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ code: "GRAPH_ANALYSIS_UNAVAILABLE" });
   });
 
   it("returns a safe error for malformed input", async () => {

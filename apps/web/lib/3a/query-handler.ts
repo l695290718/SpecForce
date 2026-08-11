@@ -1,5 +1,5 @@
 import { scopeById, type ArchitectureScopeRef } from "@specforge/core";
-import { ThreeAQueryError, type ThreeAProjectionQueryService } from "@specforge/knowledge-query";
+import { ThreeAQueryError, type ArchitectureGraphQueryProvider, type GraphAnalysisBudget, type ThreeAProjectionQueryService } from "@specforge/knowledge-query";
 import { z } from "zod";
 import { resolveThreeARequest, type ResolvedThreeARequest } from "./principal";
 import { threeAWebQuerySchema, type ThreeAWebQuery } from "./query-protocol";
@@ -7,6 +7,7 @@ import { threeAWebQuerySchema, type ThreeAWebQuery } from "./query-protocol";
 export interface ThreeAQueryHandlerDependencies {
   resolveRequest: (request: Request, architectureScope: ArchitectureScopeRef) => Promise<ResolvedThreeARequest>;
   createService: () => ThreeAProjectionQueryService;
+  createGraphProvider?: () => ArchitectureGraphQueryProvider;
 }
 
 const statusByCode: Record<string, number> = {
@@ -18,7 +19,8 @@ const statusByCode: Record<string, number> = {
   INVALID_REQUEST: 400,
   PROJECTION_MANIFEST_REQUIRED: 404,
   BASELINE_NOT_FOUND: 404,
-  QUERY_BUDGET_INVALID: 400
+  QUERY_BUDGET_INVALID: 400,
+  GRAPH_ANALYSIS_UNAVAILABLE: 503
 };
 
 export async function handleThreeAQuery(request: Request, dependencies: ThreeAQueryHandlerDependencies): Promise<Response> {
@@ -31,8 +33,34 @@ export async function handleThreeAQuery(request: Request, dependencies: ThreeAQu
     if (resolved.architectureScope.applicationServiceId !== architectureScope.applicationServiceId || resolved.architectureScope.scopePath !== architectureScope.scopePath) {
       return jsonError("SCOPE_ACCESS_DENIED", 403);
     }
-    const service = dependencies.createService();
     const identity = { ...resolved, baselineId: parsed.baselineId, projectionManifestId: parsed.projectionManifestId };
+    if (parsed.operation === "overview") {
+      const provider = dependencies.createGraphProvider?.();
+      if (!provider) return jsonError("GRAPH_ANALYSIS_UNAVAILABLE", 503);
+      return Response.json(await provider.overview({
+        ...identity,
+        layers: unique(parsed.layers),
+        assetTypes: uniqueText(parsed.assetTypes),
+        relationTypes: uniqueText(parsed.relationTypes),
+        ...(parsed.continuation ? { continuation: parsed.continuation } : {}),
+        budget: normalizeGraphBudget(parsed.budget, defaultGraphBudget)
+      }));
+    }
+    if (parsed.operation === "impact") {
+      const provider = dependencies.createGraphProvider?.();
+      if (!provider) return jsonError("GRAPH_ANALYSIS_UNAVAILABLE", 503);
+      return Response.json(await provider.impact({
+        ...identity,
+        focusAssertionId: parsed.focusAssertionId,
+        direction: parsed.direction,
+        layers: unique(parsed.layers),
+        relationTypes: uniqueText(parsed.relationTypes),
+        ...(parsed.policyVersion?.trim() ? { policyVersion: parsed.policyVersion.trim() } : {}),
+        ...(parsed.continuation ? { continuation: parsed.continuation } : {}),
+        budget: normalizeGraphBudget(parsed.budget, defaultImpactGraphBudget)
+      }));
+    }
+    const service = dependencies.createService();
     if (parsed.operation === "search") {
       return Response.json(await service.searchArchitectureFacts({ ...identity, layer: parsed.layer, query: parsed.query, limit: parsed.limit, cursor: parsed.cursor }));
     }
@@ -69,6 +97,23 @@ export function defaultThreeAQueryHandlerDependencies(): ThreeAQueryHandlerDepen
 
 function unique<T extends string>(values: T[]): T[] {
   return [...new Set(values)].sort() as T[];
+}
+
+function uniqueText(values: string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort();
+}
+
+const defaultGraphBudget: GraphAnalysisBudget = { maxNodes: 250, maxEdges: 500, maxPaths: 100, timeoutMs: 3_000, maxPayloadBytes: 1_048_576 };
+const defaultImpactGraphBudget: GraphAnalysisBudget = { maxNodes: 150, maxEdges: 300, maxPaths: 100, timeoutMs: 3_000, maxPayloadBytes: 1_048_576 };
+const hardGraphBudget: GraphAnalysisBudget = { maxNodes: 500, maxEdges: 1_000, maxPaths: 100, timeoutMs: 3_000, maxPayloadBytes: 1_048_576 };
+
+function normalizeGraphBudget(input: Partial<GraphAnalysisBudget> | undefined, defaults: GraphAnalysisBudget): GraphAnalysisBudget {
+  const budget = { ...defaults, ...input };
+  for (const key of ["maxNodes", "maxEdges", "maxPaths", "timeoutMs", "maxPayloadBytes"] as const) {
+    const value = budget[key];
+    if (!Number.isSafeInteger(value) || value <= 0 || value > hardGraphBudget[key]) throw new ThreeAQueryError("QUERY_BUDGET_INVALID");
+  }
+  return budget;
 }
 
 function jsonError(code: string, status: number): Response {
