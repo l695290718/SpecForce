@@ -20,7 +20,11 @@ const statusByCode: Record<string, number> = {
   PROJECTION_MANIFEST_REQUIRED: 404,
   BASELINE_NOT_FOUND: 404,
   QUERY_BUDGET_INVALID: 400,
-  GRAPH_ANALYSIS_UNAVAILABLE: 503
+  GRAPH_ANALYSIS_UNAVAILABLE: 503,
+  ARCHITECTURE_UNIT_NOT_FOUND: 404,
+  NO_GOVERNED_ARCHITECTURE_UNITS: 200,
+  ARCHITECTURE_MAP_QUERY_INVALID: 400,
+  ARCHITECTURE_MAP_UNAVAILABLE: 503
 };
 
 export async function handleThreeAQuery(request: Request, dependencies: ThreeAQueryHandlerDependencies): Promise<Response> {
@@ -59,6 +63,12 @@ export async function handleThreeAQuery(request: Request, dependencies: ThreeAQu
         ...(parsed.continuation ? { continuation: parsed.continuation } : {}),
         budget: normalizeGraphAnalysisBudget(parsed.budget, defaultImpactGraphAnalysisBudget)
       }));
+    }
+    if (parsed.operation === "architectureMap") {
+      return Response.json(await dependencies.createService().architectureMap({ ...identity, generationId: parsed.generationId, filter: parsed.filter ?? {}, budget: parsed.budget, continuation: parsed.continuation }));
+    }
+    if (parsed.operation === "architectureUnitNeighborhood") {
+      return Response.json(await dependencies.createService().architectureUnitNeighborhood({ ...identity, generationId: parsed.generationId, unitIdentity: parsed.unitIdentity, direction: parsed.direction, depth: parsed.depth, memberAssetTypes: parsed.memberAssetTypes, mappingFamilies: parsed.mappingFamilies, continuation: parsed.continuation, budget: parsed.budget }));
     }
     const service = dependencies.createService();
     if (parsed.operation === "search") {

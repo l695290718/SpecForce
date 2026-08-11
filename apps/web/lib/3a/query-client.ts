@@ -1,4 +1,4 @@
-import type { ImpactArchitectureResult, OverviewArchitectureResult } from "@specforge/knowledge-query";
+import type { ArchitectureMapQueryResult, ArchitectureUnitNeighborhoodResult, ImpactArchitectureResult, OverviewArchitectureResult } from "@specforge/knowledge-query";
 import type { ThreeAWebQuery } from "./query-protocol";
 
 export class ThreeAClientError extends Error {
@@ -29,4 +29,15 @@ export function runOverviewArchitectureQuery(input: OverviewArchitectureWebQuery
 
 export function runImpactArchitectureQuery(input: ImpactArchitectureWebQuery, signal?: AbortSignal): Promise<ImpactArchitectureResult> {
   return runThreeAWebQuery<ImpactArchitectureResult>(input, signal);
+}
+
+export type ArchitectureMapWebQuery = Extract<ThreeAWebQuery, { operation: "architectureMap" }>;
+export type ArchitectureUnitNeighborhoodWebQuery = Extract<ThreeAWebQuery, { operation: "architectureUnitNeighborhood" }>;
+
+export function runArchitectureMapQuery(input: ArchitectureMapWebQuery, signal?: AbortSignal): Promise<ArchitectureMapQueryResult> {
+  return runThreeAWebQuery<ArchitectureMapQueryResult>(input, signal);
+}
+
+export function runArchitectureUnitNeighborhoodQuery(input: ArchitectureUnitNeighborhoodWebQuery, signal?: AbortSignal): Promise<ArchitectureUnitNeighborhoodResult> {
+  return runThreeAWebQuery<ArchitectureUnitNeighborhoodResult>(input, signal);
 }

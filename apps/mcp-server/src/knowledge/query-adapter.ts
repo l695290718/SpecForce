@@ -75,6 +75,14 @@ export async function compare3aPublishedBaselines(input: Record<string, unknown>
   return getThreeAQueryService().comparePublishedBaselines(queryInput(input.architectureScope, omitScope(input)) as never);
 }
 
+export async function query3aArchitectureMap(input: Record<string, unknown> & { architectureScope: ArchitectureScopeRef }) {
+  return getThreeAQueryService().architectureMap(queryInput(input.architectureScope, omitScope(input)) as never);
+}
+
+export async function query3aArchitectureUnitNeighborhood(input: Record<string, unknown> & { architectureScope: ArchitectureScopeRef }) {
+  return getThreeAQueryService().architectureUnitNeighborhood(queryInput(input.architectureScope, omitScope(input)) as never);
+}
+
 function omitScope<T extends Record<string, unknown>>(input: T): Omit<T, "architectureScope"> {
   const { architectureScope: _architectureScope, ...rest } = input;
   return rest;

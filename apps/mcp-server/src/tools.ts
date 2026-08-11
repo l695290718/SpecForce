@@ -17,7 +17,7 @@ import { promoteKnowledgeCandidates, reconcileKnowledgeBaseline } from "./knowle
 import { bootstrapThreeAFromDesignAssets } from "./knowledge/bootstrap";
 import { deriveScopedKnowledgeProjection } from "./knowledge/projection";
 import { getProjectionBuild, requestProjectionBuild } from "./knowledge/projection-build";
-import { compare3aPublishedBaselines, get3aAlignment, get3aArchitectureFact, list3aProjectionManifests, list3aPublishedBaselines, search3aArchitectureFacts, trace3aArchitecturePath } from "./knowledge/query-adapter";
+import { compare3aPublishedBaselines, get3aAlignment, get3aArchitectureFact, list3aProjectionManifests, list3aPublishedBaselines, query3aArchitectureMap, query3aArchitectureUnitNeighborhood, search3aArchitectureFacts, trace3aArchitecturePath } from "./knowledge/query-adapter";
 import { get3aArchitectureUnitNeighborhood, search3aArchitectureMap } from "./knowledge/architecture-map-adapter";
 import {
   analyzeScopedProposalImpact,
@@ -756,6 +756,42 @@ export function registerTools(server: McpServer): void {
     permissions: ["knowledge:read"],
     readOnly: true
   }, get3aArchitectureUnitNeighborhood);
+
+  registerJsonTool(server, "query_3a_architecture_map", {
+    title: "Query 3A architecture map",
+    description: "Runs the bounded, versioned architecture-map query service for an exact Scope, generation, baseline, and projection.",
+    inputSchema: {
+      architectureScope: architectureScopeSchema,
+      generationId: z.string().min(1),
+      baselineId: z.string().min(1),
+      projectionManifestId: z.string().min(1),
+      filter: z.record(z.unknown()).optional(),
+      budget: z.record(z.unknown()).optional(),
+      continuation: z.string().min(1).optional()
+    },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, query3aArchitectureMap);
+
+  registerJsonTool(server, "query_3a_architecture_unit_neighborhood", {
+    title: "Query 3A architecture unit neighborhood",
+    description: "Runs the bounded unit drill-down query with typed mappings, members, same-layer dependencies, and exact-generation evidence.",
+    inputSchema: {
+      architectureScope: architectureScopeSchema,
+      generationId: z.string().min(1),
+      baselineId: z.string().min(1),
+      projectionManifestId: z.string().min(1),
+      unitIdentity: z.string().startsWith("unit:"),
+      direction: z.enum(["upstream", "downstream", "both"]),
+      depth: z.number().int().min(1).max(3),
+      memberAssetTypes: z.array(z.string().min(1)).optional(),
+      mappingFamilies: z.array(z.string().min(1)).optional(),
+      budget: z.record(z.unknown()).optional(),
+      continuation: z.string().min(1).optional()
+    },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, query3aArchitectureUnitNeighborhood);
 
   registerJsonTool(server, "trace_3a_architecture_path", {
     title: "Trace 3A architecture path",
