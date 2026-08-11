@@ -826,6 +826,77 @@ model KnowledgeProjectionEdge {
   @@index([applicationServiceId, scopePath, generationId, targetAssertionId, relationCode, sourceAssertionId], map: "KnowledgeProjectionEdge_target_idx")
 }
 
+model ArchitectureUnitProjection {
+  dbId                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  generationId            String
+  baselineId              String
+  projectionManifestId    String
+  unitIdentity            String
+  layer                   String
+  kind                    String
+  parentUnitIdentity      String?
+  canonicalName           String
+  localizedName           Json?
+  aliases                 Json     @default("[]") @db.JsonB
+  memberCount             Int
+  criticality             Float
+  completeness            Float
+  evidenceCount           Int
+  unclassifiedMemberCount Int
+  contentDigest           String
+  applicationServiceId    String
+  scopePath               String
+  createdAt               DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, generationId, unitIdentity], map: "ArchitectureUnitProjection_scope_generation_identity_key")
+  @@index([applicationServiceId, scopePath, generationId, layer, kind, canonicalName], map: "ArchitectureUnitProjection_scope_layer_kind_name_idx")
+  @@index([applicationServiceId, scopePath, generationId, parentUnitIdentity], map: "ArchitectureUnitProjection_scope_parent_idx")
+}
+
+model ArchitectureUnitMemberProjection {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  generationId         String
+  baselineId           String
+  projectionManifestId String
+  unitIdentity         String
+  assertionId          String
+  assetType            String?
+  semanticIdentity     String
+  contentDigest        String
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, generationId, unitIdentity, assertionId], map: "ArchitectureUnitMemberProjection_scope_gen_unit_assertion_key")
+  @@index([applicationServiceId, scopePath, generationId, assertionId], map: "ArchitectureUnitMemberProjection_scope_assertion_idx")
+  @@index([applicationServiceId, scopePath, generationId, semanticIdentity], map: "ArchitectureUnitMemberProjection_scope_identity_idx")
+}
+
+model ArchitectureUnitMappingProjection {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  generationId         String
+  baselineId           String
+  projectionManifestId String
+  mappingIdentity      String
+  sourceUnitIdentity   String
+  targetUnitIdentity   String
+  sourceLayer          String
+  targetLayer          String
+  mappingFamily        String
+  relationshipCount    Int
+  evidenceCount        Int
+  confidence           Float
+  contentDigest        String
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, generationId, mappingIdentity], map: "ArchitectureUnitMappingProjection_scope_generation_identity_key")
+  @@index([applicationServiceId, scopePath, generationId, sourceUnitIdentity], map: "ArchitectureUnitMappingProjection_scope_source_idx")
+  @@index([applicationServiceId, scopePath, generationId, targetUnitIdentity], map: "ArchitectureUnitMappingProjection_scope_target_idx")
+  @@index([applicationServiceId, scopePath, generationId, sourceLayer, targetLayer, mappingFamily], map: "ArchitectureUnitMappingProjection_scope_layers_family_idx")
+}
+
 model KnowledgeGraphAnalysis {
   dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   generationId          String

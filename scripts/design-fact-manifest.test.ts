@@ -164,7 +164,7 @@ it("records the proposed readable 3A architecture map separately from advanced n
   expect(decision?.proposalId).toBe("proposal-readable-3a-architecture-mapping");
   expect(decision?.proposalStatus).toBe("reviewing");
   expect(decision?.contextPackId).toBe("ctx-readable-3a-architecture-mapping");
-  expect(decision?.status).toBe("Written design complete; implementation not started");
+  expect(decision?.status).toBe("Implementation in progress; Task 1 contract and migration increment implemented, remaining tasks pending");
   expect(decision?.relatedAssetIds).toEqual([
     "api-specforge-3a-architecture-query",
     "data-specforge-3a-projection-read-model",

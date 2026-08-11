@@ -19,6 +19,7 @@ export * from "./architecture/types";
 export * from "./architecture/mock";
 export * from "./architecture/service";
 export * from "./architecture/principal";
+export * from "./architecture-map/types";
 export * from "./relationships/types";
 export * from "./relationships/ontology";
 export * from "./relationships/extract";
