@@ -95,7 +95,7 @@ export function SigmaArchitectureGraph({ store, view, selectedId, reducedMotion,
 
 export function createLayoutRequest(store: ArchitectureGraphStore, view: ArchitectureGraphView, reducedMotion: boolean): LayoutWorkerRequest {
   const snapshot = store.snapshot();
-  return { type: "refine", layout: view === "overview" ? "overview" : "explore", nodes: snapshot.nodes.map(({ id, attributes }) => ({ id, x: attributes.x, y: attributes.y, degree: attributes.degree })), edges: snapshot.edges.map(({ source, target, attributes }) => ({ source, target, weight: attributes.weight })), seed: stableSeed(`${store.identity.applicationServiceId}:${store.identity.baselineId}:${store.identity.projectionManifestId}:${view}`), maxRuntimeMs: LAYOUT_RUNTIME_MS, reducedMotion };
+  return { type: "refine", layout: view === "overview" ? "overview" : "explore", nodes: snapshot.nodes.map(({ id, attributes }) => ({ id, x: attributes.x, y: attributes.y, degree: attributes.degree, layer: attributes.layer })), edges: snapshot.edges.map(({ source, target, attributes }) => ({ source, target, weight: attributes.weight })), seed: stableSeed(`${store.identity.applicationServiceId}:${store.identity.baselineId}:${store.identity.projectionManifestId}:${view}`), maxRuntimeMs: LAYOUT_RUNTIME_MS, reducedMotion };
 }
 
 export function applyLayoutPositions(store: ArchitectureGraphStore, positions: readonly { id: string; x: number; y: number }[]): void {
@@ -112,7 +112,7 @@ export function createSigmaSettings(store: ArchitectureGraphStore, selectedRef: 
       const semantic = semanticStateRef.current;
       const selected = selectedRef.current === nodeId;
       const hovered = hoverRef.current === nodeId;
-      return { ...data, color: nodeColor(data), size: nodeSize({ ...data, stableId: nodeId }, semantic), label: visibleLabel({ ...data, stableId: nodeId }, semantic ?? 1, { selected, hovered }) ?? null, forceLabel: selected || hovered, highlighted: selected || hovered || data.highlighted === true, zIndex: selected ? 3 : hovered ? 2 : 1, hidden: false };
+      return { ...data, color: nodeColor(data), size: nodeSize({ ...data, stableId: nodeId }, semantic), label: visibleLabel({ ...data, stableId: nodeId }, semantic ?? 0.72, { selected, hovered }) ?? null, forceLabel: selected || hovered, highlighted: selected || hovered || data.highlighted === true, zIndex: selected ? 3 : hovered ? 2 : 1, hidden: false };
     },
     edgeReducer: (edgeId: string, data: GraphEdgeAttributes) => {
       const source = store.graph.source(edgeId);

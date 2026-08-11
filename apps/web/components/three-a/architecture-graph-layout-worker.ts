@@ -5,6 +5,7 @@ export interface LayoutWorkerNode {
   x: number;
   y: number;
   degree: number;
+  layer?: "BIZ" | "SYS" | "TECH";
 }
 
 export interface LayoutWorkerEdge {
@@ -78,10 +79,13 @@ export function refineArchitectureGraphLayout(request: LayoutWorkerRequest, now:
       );
       const anchor = fallback.find((candidate) => candidate.id === nodeId)!;
       const attraction = request.layout === "overview" ? 0.08 : 0.14;
+      const anchorWeight = request.layout === "overview" ? 0.14 : 0.05;
+      const repulsion = calculateRepulsion(nodeId, position, positions, nodeIds, request.layout, request.seed);
+      const target = center.weight ? { x: center.x / center.weight, y: center.y / center.weight } : anchor;
       next.set(nodeId, {
         id: nodeId,
-        x: position.x * (1 - attraction) + (center.weight ? center.x / center.weight : anchor.x) * attraction,
-        y: position.y * (1 - attraction) + (center.weight ? center.y / center.weight : anchor.y) * attraction
+        x: position.x * (1 - attraction - anchorWeight) + target.x * attraction + anchor.x * anchorWeight + repulsion.x,
+        y: position.y * (1 - attraction - anchorWeight) + target.y * attraction + anchor.y * anchorWeight + repulsion.y
       });
     }
     for (const [nodeId, position] of next) positions.set(nodeId, position);
@@ -91,16 +95,29 @@ export function refineArchitectureGraphLayout(request: LayoutWorkerRequest, now:
 
 export function deterministicLayout(request: Pick<LayoutWorkerRequest, "layout" | "nodes" | "seed">): LayoutWorkerPosition[] {
   const nodes = [...request.nodes].sort((left, right) => left.id.localeCompare(right.id));
-  const radius = request.layout === "overview" ? 340 : 220;
-  return nodes.map((node, index) => {
-    const angle = (Math.PI * 2 * index) / Math.max(1, nodes.length) + seededUnit(`${request.seed}:${node.id}`) * 0.36;
-    const radialOffset = Math.min(160, Math.max(0, node.degree) * 8) + seededUnit(`${node.id}:${request.seed}`) * 24;
-    return {
-      id: node.id,
-      x: Math.round((node.x || Math.cos(angle) * (radius + radialOffset)) * 1_000) / 1_000,
-      y: Math.round((node.y || Math.sin(angle) * (radius + radialOffset)) * 1_000) / 1_000
-    };
-  });
+  const useInputCoordinates = request.layout !== "overview"
+    && nodes.length > 0
+    && nodes.every((node) => Number.isFinite(node.x) && Number.isFinite(node.y) && Math.hypot(node.x, node.y) >= 64);
+  if (useInputCoordinates) return nodes.map((node) => ({ id: node.id, x: roundCoordinate(node.x), y: roundCoordinate(node.y) }));
+
+  const grouped = new Map<LayoutLayer, LayoutWorkerNode[]>(LAYERS.map((layer) => [layer, []]));
+  for (const node of nodes) grouped.get(normalizeLayer(node.layer))!.push(node);
+  const positions = new Map<string, LayoutWorkerPosition>();
+  for (const layer of LAYERS) {
+    const group = grouped.get(layer)!;
+    const radius = Math.max(request.layout === "overview" ? 280 : 220, Math.sqrt(Math.max(1, group.length)) * (request.layout === "overview" ? 42 : 34));
+    const bandY = request.layout === "overview" ? LAYER_BAND_Y[layer] : 0;
+    group.forEach((node, index) => {
+      const angle = (Math.PI * 2 * index) / Math.max(1, group.length) + (seededUnit(`${request.seed}:${node.id}`) - 0.5) * 0.28;
+      const radialOffset = Math.min(180, Math.max(0, node.degree) * 7) + seededUnit(`${node.id}:${request.seed}`) * 18;
+      positions.set(node.id, {
+        id: node.id,
+        x: roundCoordinate(Math.cos(angle) * (radius + radialOffset)),
+        y: roundCoordinate(bandY + Math.sin(angle) * (radius * 0.62 + radialOffset * 0.4))
+      });
+    });
+  }
+  return nodes.map((node) => positions.get(node.id)!);
 }
 
 export function shouldTerminateLayout(previous: LayoutIdentity, next: LayoutIdentity): boolean {
@@ -131,6 +148,43 @@ function buildAdjacency(edges: readonly LayoutWorkerEdge[], nodeIds: readonly st
   return adjacency;
 }
 
+function calculateRepulsion(
+  nodeId: string,
+  position: LayoutWorkerPosition,
+  positions: ReadonlyMap<string, LayoutWorkerPosition>,
+  nodeIds: readonly string[],
+  layout: ArchitectureGraphLayoutKind,
+  seed: number
+): { x: number; y: number } {
+  const minimumDistance = layout === "overview" ? 220 : 140;
+  const strength = layout === "overview" ? 34 : 18;
+  let x = 0;
+  let y = 0;
+  for (const otherId of nodeIds) {
+    if (otherId === nodeId) continue;
+    const other = positions.get(otherId);
+    if (!other) continue;
+    let deltaX = position.x - other.x;
+    let deltaY = position.y - other.y;
+    let distance = Math.hypot(deltaX, deltaY);
+    if (distance === 0) {
+      const angle = seededUnit(`${seed}:${nodeId}:${otherId}`) * Math.PI * 2;
+      deltaX = Math.cos(angle);
+      deltaY = Math.sin(angle);
+      distance = 1;
+    }
+    if (distance >= minimumDistance) continue;
+    const push = ((minimumDistance - distance) / minimumDistance) * strength;
+    x += (deltaX / distance) * push;
+    y += (deltaY / distance) * push;
+  }
+  return { x: clamp(x, -52, 52), y: clamp(y, -52, 52) };
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
 function seededUnit(value: string): number {
   let hash = 2_166_136_261;
   for (let index = 0; index < value.length; index += 1) {
@@ -138,6 +192,18 @@ function seededUnit(value: string): number {
     hash = Math.imul(hash, 16_777_619);
   }
   return (hash >>> 0) / 0xffff_ffff;
+}
+
+type LayoutLayer = "BIZ" | "SYS" | "TECH";
+const LAYERS: readonly LayoutLayer[] = ["BIZ", "SYS", "TECH"];
+const LAYER_BAND_Y: Record<LayoutLayer, number> = { BIZ: -420, SYS: 0, TECH: 420 };
+
+function normalizeLayer(layer: LayoutWorkerNode["layer"]): LayoutLayer {
+  return layer && LAYERS.includes(layer) ? layer : "SYS";
+}
+
+function roundCoordinate(value: number): number {
+  return Math.round((Number.isFinite(value) ? value : 0) * 1_000) / 1_000;
 }
 
 const workerScope = typeof self !== "undefined" && !("document" in self) ? self as unknown as LayoutWorkerRuntime : undefined;

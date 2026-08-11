@@ -1330,6 +1330,30 @@
                                            {
                                                "command":  "pnpm design-facts:sync; $env:SPECFORGE_DESIGN_FACT_IDS='adr-webgl-3a-graph-exploration'; pnpm design-facts:check",
                                                "result":  "Synchronization returned complete; reconciliation returned missing=[], mismatched=[], outOfScope=[], and blocked=[]."
+                                           },
+                                           {
+                                               "command":  "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Fix-the-3A-graph-overview-layout-for-unit-scale-seeds --affected adr-webgl-3a-graph-exploration,proposal-webgl-3a-graph-exploration,ctx-webgl-3a-graph-exploration,data-specforge-3a-projection-read-model --evidence approved-3a-layered-layout-fix,current-browser-151-nodes-234-edges-collapsed-layout",
+                                               "result":  "Opened design-change-session:162ef116-c479-4658-ab42-d77ad92594ab in the exact Designer Scope, read 228 scoped assets, and returned design context digest 4dab63e2263dc911e704c1d71842f9ff19fdf74d224d74cf0ac4fd23291b5ca1 with relationship digest 6d97fd5aced21ea3ee439e125b6e1c539026c24bc494bed58c05095302bbc6aa."
+                                           },
+                                           {
+                                               "command":  "node .\\node_modules\\vitest\\vitest.mjs run apps/web/components/three-a/architecture-graph-layout-worker.test.ts apps/web/components/three-a/sigma-architecture-graph.test.tsx apps/web/components/three-a/architecture-graph-store.test.ts apps/web/components/three-a/architecture-graph-workspace.test.ts",
+                                               "result":  "Passed 4 test files and 20 tests, including unit-scale expansion, layer-band separation, connected-cluster repulsion, Sigma label behavior, Graphology store behavior, and workspace fallback behavior."
+                                           },
+                                           {
+                                               "command":  "pnpm --filter @specforge/web typecheck; git diff --check",
+                                               "result":  "Web typecheck exited 0 and git diff --check exited 0."
+                                           },
+                                           {
+                                               "command":  "In-app browser graph acceptance at the exact Designer Scope after the layered layout change",
+                                               "result":  "Rendered 151 bounded nodes and 234 bounded edges with PostgreSQL bounded fallback, exposed 7 Canvas elements, visibly separated BIZ/SYS/TECH bands with readable edges and default label suppression, and reported no new console errors after reload."
+                                           },
+                                           {
+                                               "command":  "pnpm design-context:close -- --session design-change-session:162ef116-c479-4658-ab42-d77ad92594ab --status CONVERGED --evidence focused-layout-vitest-4-files-20-tests-PASS,pnpm-web-typecheck-PASS,git-diff-check-PASS,browser-graph-overview-151-nodes-234-edges-3-layer-bands,browser-canvas-count-7,browser-new-console-errors-0",
+                                               "result":  "Returned CONVERGED in the exact Designer Scope."
+                                           },
+                                           {
+                                               "command":  "pnpm design-facts:sync; $env:SPECFORGE_DESIGN_FACT_IDS='adr-webgl-3a-graph-exploration'; pnpm design-facts:check",
+                                               "result":  "Synchronization returned complete; reconciliation returned missing=[], mismatched=[], outOfScope=[], and blocked=[]."
                                            }
                                        ]
                       }

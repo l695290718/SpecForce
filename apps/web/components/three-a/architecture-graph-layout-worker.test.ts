@@ -39,6 +39,39 @@ describe("architecture graph layout worker", () => {
     expect(reduced.positions).toEqual(deterministicLayout(request));
   });
 
+  it("expands unit-scale overview seeds into separated architecture-layer bands", () => {
+    const collapsed: LayoutWorkerRequest = {
+      ...request,
+      layout: "overview",
+      nodes: [
+        ...Array.from({ length: 4 }, (_, index) => ({ id: `biz-${index}`, x: Math.cos(index), y: Math.sin(index), degree: 1, layer: "BIZ" as const })),
+        ...Array.from({ length: 4 }, (_, index) => ({ id: `sys-${index}`, x: Math.cos(index), y: Math.sin(index), degree: 1, layer: "SYS" as const })),
+        ...Array.from({ length: 4 }, (_, index) => ({ id: `tech-${index}`, x: Math.cos(index), y: Math.sin(index), degree: 1, layer: "TECH" as const }))
+      ]
+    };
+    const positions = deterministicLayout(collapsed);
+    const byId = new Map(positions.map((position) => [position.id, position]));
+    expect(new Set(positions.map(({ x, y }) => `${x}:${y}`)).size).toBe(positions.length);
+    expect(Math.max(...positions.map(({ x, y }) => Math.hypot(x, y)))).toBeGreaterThan(300);
+    expect(byId.get("biz-0")!.y).toBeLessThan(-200);
+    expect(byId.get("sys-0")!.y).toBeGreaterThan(-200);
+    expect(byId.get("sys-0")!.y).toBeLessThan(200);
+    expect(byId.get("tech-0")!.y).toBeGreaterThan(200);
+  });
+
+  it("keeps the refined overview from collapsing a connected cluster", () => {
+    const collapsed: LayoutWorkerRequest = {
+      ...request,
+      layout: "overview",
+      nodes: Array.from({ length: 12 }, (_, index) => ({ id: `node-${index}`, x: 1, y: 1, degree: 11, layer: index < 4 ? "BIZ" as const : index < 8 ? "SYS" as const : "TECH" as const })),
+      edges: Array.from({ length: 12 }, (_, index) => ({ source: `node-${index}`, target: `node-${(index + 1) % 12}`, weight: 1 }))
+    };
+    const refined = refineArchitectureGraphLayout(collapsed, () => 0);
+    const positions = refined.positions;
+    expect(Math.max(...positions.map(({ x, y }) => Math.hypot(x, y))) - Math.min(...positions.map(({ x, y }) => Math.hypot(x, y)))).toBeGreaterThan(100);
+    expect(new Set(positions.map(({ x, y }) => `${Math.round(x)}:${Math.round(y)}`)).size).toBeGreaterThan(8);
+  });
+
   it("terminates layout when Scope, Baseline, or Projection identity changes", () => {
     expect(shouldTerminateLayout(identity, identity)).toBe(false);
     expect(shouldTerminateLayout(identity, { ...identity, projectionManifestId: "manifest-2" })).toBe(true);

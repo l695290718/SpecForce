@@ -10,7 +10,9 @@
 - Design Change Session: `design-change-session:c024c443-93b5-4462-852f-c12c82c726d0`
 - Follow-up Renderer Fix Session: `design-change-session:e2f19fdf-a96e-4ee5-98cd-56accd965680`
 - Follow-up Edge Fallback Session: `design-change-session:d442616a-078b-4dd0-ba82-6204409fbca3`
+- Follow-up Layered Layout Session: `design-change-session:162ef116-c479-4658-ab42-d77ad92594ab`
 - Approved Spec: `docs/superpowers/specs/2026-08-11-webgl-3a-graph-exploration-design.md`
+- Follow-up Layout Spec: `docs/superpowers/specs/2026-08-11-3a-layered-graph-layout-design.md`
 - Parent ADR: `adr-scalable-3a-exploration`
 
 ## Context
@@ -72,6 +74,10 @@ PostgreSQL remains authoritative for authored facts and relationship events. Gra
 - The focused follow-up suite passed 5 files and 28 tests, including bounded relationship forwarding, graph workspace fallback selection, loader edge loading, Graphology store behavior, and Sigma reducer behavior. Knowledge-query and Web typechecks both exited 0; the browser had 7 Canvas elements and no console errors.
 - `pnpm design-context:close -- --session design-change-session:d442616a-078b-4dd0-ba82-6204409fbca3 --status CONVERGED --evidence "node vitest focused 5 files 28 tests=PASS,pnpm knowledge-query typecheck=PASS,pnpm web typecheck=PASS,browser graph overview=151 nodes 234 edges,browser canvas count=7,browser console errors=0"` returned `CONVERGED` in the exact Designer Scope.
 - `pnpm design-facts:sync` returned `complete` for the matching ADR, Proposal, Context Pack, Evidence, and typed links; `SPECFORGE_DESIGN_FACT_IDS=adr-webgl-3a-graph-exploration pnpm design-facts:check` returned `missing=[]`, `mismatched=[]`, `outOfScope=[]`, and `blocked=[]`.
+- The layered layout follow-up opened `design-change-session:162ef116-c479-4658-ab42-d77ad92594ab` in the exact Designer Scope and read 228 scoped assets. The worker now ignores unit-scale Overview seeds, lays out BIZ/SYS/TECH in deterministic bands, applies bounded repulsion during refinement, and hides unselected labels so edges remain readable.
+- The layout regression suite passed 4 files and 20 tests, including unit-scale expansion, distinct layer bands, connected-cluster separation, Sigma label behavior, Graphology store behavior, and workspace fallback behavior. Web typecheck and `git diff --check` exited 0.
+- In-app browser acceptance after reload rendered 151 nodes and 234 edges with 7 Canvas elements, showed PostgreSQL bounded fallback, visibly separated the three layer bands with readable edges, and reported no new console errors.
+- `pnpm design-context:close -- --session design-change-session:162ef116-c479-4658-ab42-d77ad92594ab --status CONVERGED --evidence "focused-layout-vitest-4-files-20-tests-PASS,pnpm-web-typecheck-PASS,git-diff-check-PASS,browser-graph-overview-151-nodes-234-edges-3-layer-bands,browser-canvas-count-7,browser-new-console-errors-0"` returned `CONVERGED` in the exact Designer Scope.
 
 ## MCP Record
 
@@ -170,3 +176,6 @@ PostgreSQL 继续作为已编写事实和关系事件的权威存储。图谱摘
 - 必需关系：Proposal `IMPLEMENTS_DECISION` ADR；Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal；ADR `DECIDES` 查询 API 和投影模型；Proposal `IMPACTS` 查询 API 和投影模型；Evidence `VALIDATES` ADR。
 - 同步状态：对应 ADR、Proposal、Context Pack、Evidence 和有类型影响关系已在精确所属 Scope 中同步并回读；原始实施会话 `design-change-session:c024c443-93b5-4462-852f-c12c82c726d0` 与渲染器修复会话 `design-change-session:e2f19fdf-a96e-4ee5-98cd-56accd965680` 均已使用验证证据以 `CONVERGED` 关闭。
 - 本次边关系回退会话：`design-change-session:d442616a-078b-4dd0-ba82-6204409fbca3`；完成针对性验证和同步回读后关闭为 `CONVERGED`。
+- 本次分层布局会话：`design-change-session:162ef116-c479-4658-ab42-d77ad92594ab`；Worker 现将单位尺度 Overview 坐标视为种子，按 BIZ/SYS/TECH 分带布局并在迭代中加入有界排斥力；未选中节点默认隐藏长标签，以保留关系可读性。
+- 分层布局定向测试通过 4 个文件、20 项测试，Web 类型检查和 `git diff --check` 均通过；浏览器验收显示 151 个节点、234 条关系、7 个 Canvas 和三层清晰分布，刷新后无新增控制台错误。
+- 本次会话关闭命令以 `CONVERGED` 返回，证据包含精确 Scope、布局测试、类型检查、浏览器节点/边数量、分层视觉验收和控制台检查。

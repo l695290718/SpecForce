@@ -15,7 +15,8 @@ describe("SigmaArchitectureGraph adapters", () => {
     store.graph.addNode("fact:two", { ...node, stableId: "fact:two", label: "two", x: 20, y: 8 });
     store.graph.addDirectedEdgeWithKey("relationship:one", "fact:one", "fact:two", { stableId: "relationship:one", relationCode: "CALLS", confidence: 1, bridge: false, weight: 1 });
     const settings = createSigmaSettings(store, { current: undefined }, { current: undefined }, { current: undefined });
-    expect(settings.nodeReducer("fact:one", node)).toMatchObject({ x: 12, y: -4, kind: "fact", label: "one" });
+    expect(settings.nodeReducer("fact:one", node)).toMatchObject({ x: 12, y: -4, kind: "fact", label: null });
+    expect(settings.nodeReducer("fact:one", node).label).toBeNull();
     expect(settings.edgeReducer("relationship:one", store.graph.getEdgeAttributes("relationship:one"))).toMatchObject({ stableId: "relationship:one", relationCode: "CALLS" });
   });
 });
