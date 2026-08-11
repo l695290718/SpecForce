@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(21);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(21);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(21);
+  expect(manifest.decisions).toHaveLength(22);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(22);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(22);
   const proposalByContextPack = new Map<string, string>();
 
   for (const decision of manifest.decisions) {
@@ -130,6 +130,26 @@ it("includes the implemented scalable 3A exploration design and bounded query co
     expect.objectContaining({ command: expect.stringContaining("next build --no-lint --experimental-app-only") }),
     expect.objectContaining({ command: expect.stringContaining("In-app browser acceptance") })
   ]));
+});
+
+it("records the approved WebGL 3A graph and impact-analysis design without claiming implementation", () => {
+  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-webgl-3a-graph-exploration");
+  expect(decision?.proposalId).toBe("proposal-webgl-3a-graph-exploration");
+  expect(decision?.proposalStatus).toBe("approved");
+  expect(decision?.contextPackId).toBe("ctx-webgl-3a-graph-exploration");
+  expect(decision?.status).toBe("Approved design; implementation has not started");
+  expect(decision?.scope).toEqual(expectedScope);
+  expect(decision?.relatedAssetIds).toEqual([
+    "api-specforge-3a-architecture-query",
+    "data-specforge-3a-projection-read-model",
+    "adr-scalable-3a-exploration"
+  ]);
+  expect(decision?.managedRelationships).toEqual(expect.arrayContaining([
+    expect.objectContaining({ sourceId: "proposal-webgl-3a-graph-exploration", targetId: "api-specforge-3a-architecture-query", relationType: "IMPACTS" }),
+    expect.objectContaining({ sourceId: "proposal-webgl-3a-graph-exploration", targetId: "data-specforge-3a-projection-read-model", relationType: "IMPACTS" })
+  ]));
+  expect(decision?.reason).toContain("Sigma.js, Graphology, and WebGL");
+  expect(decision?.retryTrigger).toContain("implementation plan");
 });
 
 it("includes the single-host Docker deployment decision in the baseline", () => {

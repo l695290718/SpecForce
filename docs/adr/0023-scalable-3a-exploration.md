@@ -11,6 +11,7 @@
 - Approved Spec: `docs/superpowers/specs/2026-08-10-scalable-3a-exploration-design.md`
 - Implementation Plan: `docs/superpowers/plans/2026-08-10-scalable-3a-exploration.md`
 - Parent ADR: `adr-3a-architecture-navigation-workspace`
+- Successor for Graph rendering and impact analysis: `adr-webgl-3a-graph-exploration`
 
 ## Context
 
@@ -25,6 +26,8 @@ Split the Architecture tab into two primary views. The Lane Catalog uses three i
 The page loads only the active tab and view. It must not eagerly fetch trace, Alignment, Drift, all catalog nodes, or all projection edges. PostgreSQL traversal must query indexed adjacency for the current frontier rather than filtering a full edge list in memory.
 
 The graph reuses `@xyflow/react` and applies deterministic positions across three horizontal architecture bands with upstream on the left, the focus in the center, and downstream on the right. This bounded architecture-specific layout is preferred over a moving force layout. The graph provides typed relation and layer filters, impact highlighting, node and edge inspection, continuation markers, icon controls, and an accessible list fallback.
+
+This renderer decision describes the implemented first increment. ADR-0024 supersedes it for the next Graph increment by selecting a bounded Sigma.js, Graphology, and WebGL workspace with Overview, Explore, and Impact views. ADR-0023 remains authoritative for Lane Catalog behavior, exact-Scope bounded queries, continuation, and PostgreSQL authority.
 
 The existing URL model adds `mode=graph`, preserves `mode=lanes` and `mode=list`, and keeps Scope, Baseline, Projection, focus, and direction across mode changes. Scope, Baseline, or Projection changes invalidate all client query state before rendering new results.
 
@@ -106,6 +109,7 @@ The existing URL model adds `mode=graph`, preserves `mode=lanes` and `mode=list`
 - 已批准 Spec：`docs/superpowers/specs/2026-08-10-scalable-3a-exploration-design.md`
 - 实施计划：`docs/superpowers/plans/2026-08-10-scalable-3a-exploration.md`
 - 父 ADR：`adr-3a-architecture-navigation-workspace`
+- Graph 渲染与影响分析的后续 ADR：`adr-webgl-3a-graph-exploration`
 
 ### 背景
 
@@ -120,6 +124,8 @@ The existing URL model adds `mode=graph`, preserves `mode=lanes` and `mode=list`
 页面只加载活动标签和视图。禁止提前获取 Trace、Alignment、Drift、全部目录节点或全部投影关系。PostgreSQL 遍历必须根据当前前沿查询索引邻接关系，禁止在内存中过滤完整关系列表。
 
 图谱复用 `@xyflow/react`，在三条水平架构带上使用确定性位置：上游位于左侧，焦点位于中央，下游位于右侧。该有界且架构专属的布局优先于持续移动的力导向布局。图谱提供有类型关系和层筛选、影响高亮、节点与关系检查、继续标记、图标控件和无障碍列表回退。
+
+该渲染器决策描述已实施的第一增量。ADR-0024 在下一 Graph 增量中用有界的 Sigma.js、Graphology 与 WebGL 工作台取代该渲染选择，并提供总览、探索和影响分析视图。ADR-0023 继续作为泳道目录、精确 Scope 有界查询、继续状态和 PostgreSQL 权威性的有效决策。
 
 现有 URL 模型增加 `mode=graph`，保留 `mode=lanes` 和 `mode=list`，并在模式切换时保持 Scope、Baseline、Projection、焦点和方向。Scope、Baseline 或 Projection 变化后，必须先让全部客户端查询状态失效，再渲染新结果。
 

@@ -1245,6 +1245,57 @@
                                                 "result":  "Exited 0 for the implementation and governance changes."
                                             }
                                        ]
+                      },
+                      {
+                          "id":  "adr-webgl-3a-graph-exploration",
+                          "repositoryAdr":  "docs/adr/0024-webgl-3a-graph-exploration.md",
+                          "mcpAdrId":  "adr-webgl-3a-graph-exploration",
+                          "scope":  {
+                                        "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                          "proposalId":  "proposal-webgl-3a-graph-exploration",
+                          "proposalStatus":  "approved",
+                          "contextPackId":  "ctx-webgl-3a-graph-exploration",
+                          "relatedAssetIds":  [
+                                                  "api-specforge-3a-architecture-query",
+                                                  "data-specforge-3a-projection-read-model",
+                                                  "adr-scalable-3a-exploration"
+                                              ],
+                          "managedRelationships":  [
+                                                       { "sourceType":  "proposal", "sourceId":  "proposal-webgl-3a-graph-exploration", "targetType":  "api", "targetId":  "api-specforge-3a-architecture-query", "relationType":  "IMPACTS" },
+                                                       { "sourceType":  "proposal", "sourceId":  "proposal-webgl-3a-graph-exploration", "targetType":  "dataModel", "targetId":  "data-specforge-3a-projection-read-model", "relationType":  "IMPACTS" }
+                                                   ],
+                          "owner":  "SpecForge Architecture and Runtime",
+                          "status":  "Approved design; implementation has not started",
+                          "reason":  "The next Graph increment replaces the bounded React Flow relationship preview with a Sigma.js, Graphology, and WebGL workspace for cluster Overview, focused Explore, and explainable Impact analysis while retaining exact-Scope server budgets.",
+                          "retryTrigger":  "After written-Spec review, author and approve a separate implementation plan before changing query contracts, projection builders, dependencies, or Web behavior.",
+                          "evidence":  [
+                                           {
+                                               "command":  "User design review on 2026-08-11",
+                                               "result":  "Approved optimizing both topology exploration and impact analysis and confirmed Sigma.js, Graphology, and WebGL as the target direction."
+                                           },
+                                           {
+                                               "command":  "Review GitNexus official repository and current SpecForge graph components",
+                                               "result":  "Confirmed GitNexus uses Sigma.js plus Graphology WebGL visualization; SpecForge currently renders fixed-width React Flow cards and SVG edges in a static three-band layout."
+                                           },
+                                           {
+                                               "command":  "scripts/design-context.ts preflight --intent Design-WebGL-3A-graph-exploration-and-integrated-impact-analysis",
+                                               "result":  "Opened design-change-session:d3421b59-6797-44e9-bbd2-e393c7707a42 in the exact Designer Scope, read 210 scoped assets, and returned design context digest 8cb7e9464807cc7aa9d47e8dcbbcaf573aef412c6835cdcd1c3764f4287e0a77."
+                                           },
+                                           {
+                                               "command":  "Written-Spec self-review; manifest JSON parse; git diff --check",
+                                               "result":  "Confirmed 17 English and 17 Chinese sections, no placeholders, explicit non-implementation status, bounded browser budgets, PostgreSQL fallback, no whole-Scope fetch, valid JSON, and a clean diff."
+                                           },
+                                           {
+                                               "command":  "node apps\\web\\node_modules\\vitest\\vitest.mjs run --root . --exclude .worktrees/** --exclude .pnpm-store/** scripts\\design-fact-manifest.test.ts scripts\\sync-design-facts.test.ts",
+                                               "result":  "Passed 2 test files and 32 tests, including stable ID, exact Scope, approved status, typed impact links, and non-implementation boundary assertions."
+                                           },
+                                           {
+                                               "command":  "Selected exact-Scope scripts/sync-design-facts.ts and scripts/reconcile-design-facts.ts",
+                                               "result":  "Synchronization returned complete; read-back verified adr-webgl-3a-graph-exploration with empty missing, mismatched, outOfScope, and blocked lists."
+                                           }
+                                       ]
                       }
                   ]
 }
