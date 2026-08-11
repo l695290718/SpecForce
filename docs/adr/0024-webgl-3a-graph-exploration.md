@@ -2,12 +2,12 @@
 
 ## Status
 
-**Approved design; implementation has not started.**
+**Implemented and locally verified; MCP synchronized and exact-Scope session closed.**
 
 - Stable ID: `adr-webgl-3a-graph-exploration`
 - Owning application service: `com.huawei.celon.desiner`
 - Owning scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
-- Design Change Session: `design-change-session:d3421b59-6797-44e9-bbd2-e393c7707a42`
+- Design Change Session: `design-change-session:c024c443-93b5-4462-852f-c12c82c726d0`
 - Approved Spec: `docs/superpowers/specs/2026-08-11-webgl-3a-graph-exploration-design.md`
 - Parent ADR: `adr-scalable-3a-exploration`
 
@@ -56,10 +56,15 @@ PostgreSQL remains authoritative for authored facts and relationship events. Gra
 - User review on 2026-08-11 approved improving both topology exploration and impact analysis and confirmed Sigma.js + Graphology + WebGL as the target direction.
 - GitNexus official repository review confirmed its Web UI uses Sigma.js and Graphology for WebGL graph visualization and graph-native client behavior.
 - Repository inspection confirmed the current `ArchitectureGraphCanvas` renders React Flow nodes as fixed-width cards with SVG edges and a deterministic three-band layout.
-- Exact-Scope preflight opened `design-change-session:d3421b59-6797-44e9-bbd2-e393c7707a42`, read 210 scoped assets, and returned design-context digest `8cb7e9464807cc7aa9d47e8dcbbcaf573aef412c6835cdcd1c3764f4287e0a77`.
-- Written-Spec self-review confirmed 17 English and 17 Chinese sections, no placeholders, explicit non-implementation status, bounded browser budgets, PostgreSQL fallback, and no whole-Scope fetch. Manifest JSON parsing and `git diff --check` passed.
+- Exact-Scope implementation preflight opened `design-change-session:c024c443-93b5-4462-852f-c12c82c726d0`, read 219 scoped assets, and returned design-context digest `418131a017036b38df5e54c6eed71310910defea4ab6812e0aab6c3d2d01998f`; relationship digest: `a5d6c22452cf10ed46dce650a162388472aa2b961c0fd4712f59e5d8e4ade34b`.
+- Written-Spec self-review confirmed 17 English and 17 Chinese sections, no placeholders, implemented status, bounded browser budgets, PostgreSQL fallback, and no whole-Scope fetch. Manifest JSON parsing and `git diff --check` passed.
 - `node apps\\web\\node_modules\\vitest\\vitest.mjs run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" scripts\\design-fact-manifest.test.ts scripts\\sync-design-facts.test.ts` passed 2 files and 32 tests.
 - Selected exact-Scope `scripts/sync-design-facts.ts` returned `complete`; `scripts/reconcile-design-facts.ts` verified `adr-webgl-3a-graph-exploration` with empty `missing`, `mismatched`, `outOfScope`, and `blocked` lists.
+- UI focused suite passed 7 files and 27 tests; backend/projector focused suite passed 7 files and 37 tests.
+- `pnpm --filter @specforge/web typecheck`, `pnpm --filter @specforge/knowledge-query typecheck`, `pnpm --filter @specforge/knowledge-projector typecheck`, `pnpm exec prisma validate`, and `git diff --check` exited 0.
+- `$env:SPECFORGE_NEXT_STANDALONE='0'; pnpm --filter @specforge/web build` exited 0, compiled the application, checked types, generated 20 static pages, and emitted `/architecture/3a` plus `/api/architecture/3a/query`. The default standalone packaging additionally hit the known Windows/OneDrive pnpm symlink `EPERM`; this is an environment packaging limitation, not an application compilation failure.
+- In-app browser acceptance loaded 60 bounded catalog nodes for the exact Designer Scope. WebGL is unavailable in the embedded browser, so Sigma reports the semantic DOM fallback with the graph contents preserved instead of a blank canvas.
+- The graph API returns `503 GRAPH_ANALYSIS_UNAVAILABLE` when derived analysis is unavailable; the workspace immediately falls back to the exact-Scope PostgreSQL catalog and remains bounded.
 
 ## MCP Record
 
@@ -68,7 +73,7 @@ PostgreSQL remains authoritative for authored facts and relationship events. Gra
 - Matching Context Pack ID: `ctx-webgl-3a-graph-exploration`
 - Related assets: `api-specforge-3a-architecture-query`, `data-specforge-3a-projection-read-model`, and `adr-scalable-3a-exploration`
 - Required links: Proposal `IMPLEMENTS_DECISION` ADR; Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal; ADR `DECIDES` query API and projection model; Proposal `IMPACTS` query API and projection model; Evidence `VALIDATES` ADR.
-- Synchronization state: the approved ADR, Proposal, Context Pack, Evidence, and typed impact links are synchronized and read back in the exact owning Scope. No implementation claim is permitted.
+- Synchronization state: the matching ADR, Proposal, Context Pack, Evidence, and typed impact links were synchronized and read back in the exact owning Scope. `design-change-session:c024c443-93b5-4462-852f-c12c82c726d0` closed as `CONVERGED` with the verification evidence recorded below.
 
 ## 中文本地化覆盖
 
@@ -78,12 +83,12 @@ WebGL 3A 图谱探索与影响分析
 
 ### 状态
 
-**设计已批准，尚未开始实施。**
+**已完成本地实施并同步 MCP，精确 Scope 会话已关闭。**
 
 - 稳定 ID：`adr-webgl-3a-graph-exploration`
 - 所属应用服务：`com.huawei.celon.desiner`
 - 所属 Scope 路径：`pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
-- 设计变更会话：`design-change-session:d3421b59-6797-44e9-bbd2-e393c7707a42`
+- 设计变更会话：`design-change-session:c024c443-93b5-4462-852f-c12c82c726d0`
 - 已批准 Spec：`docs/superpowers/specs/2026-08-11-webgl-3a-graph-exploration-design.md`
 - 父 ADR：`adr-scalable-3a-exploration`
 
@@ -130,10 +135,15 @@ PostgreSQL 继续作为已编写事实和关系事件的权威存储。图谱摘
 - 2026-08-11 用户批准同时优化拓扑探索和影响分析，并确认 Sigma.js + Graphology + WebGL 技术方向；
 - GitNexus 官方仓库审视确认其 Web UI 使用 Sigma.js 与 Graphology 实现 WebGL 图谱可视化和图原生客户端行为；
 - 仓库检查确认当前 `ArchitectureGraphCanvas` 使用 React Flow 固定宽度卡片、SVG 关系和确定性三层布局；
-- 精确 Scope 预检打开 `design-change-session:d3421b59-6797-44e9-bbd2-e393c7707a42`，读取 210 条 Scope 内资产并返回设计上下文摘要 `8cb7e9464807cc7aa9d47e8dcbbcaf573aef412c6835cdcd1c3764f4287e0a77`。
-- 书面 Spec 自审确认英文和中文各 17 个章节、无占位符、明确未实施状态、浏览器预算有界、PostgreSQL 可回退且禁止完整 Scope 获取；Manifest JSON 解析与 `git diff --check` 通过；
+- 精确 Scope 实施预检打开 `design-change-session:c024c443-93b5-4462-852f-c12c82c726d0`，读取 219 条 Scope 内资产并返回设计上下文摘要 `418131a017036b38df5e54c6eed71310910defea4ab6812e0aab6c3d2d01998f`；关系摘要为 `a5d6c22452cf10ed46dce650a162388472aa2b961c0fd4712f59e5d8e4ade34b`。
+- 书面 Spec 自审确认英文和中文各 17 个章节、无占位符、已实施状态、浏览器预算有界、PostgreSQL 可回退且禁止完整 Scope 获取；Manifest JSON 解析与 `git diff --check` 通过；
 - `node apps\\web\\node_modules\\vitest\\vitest.mjs run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" scripts\\design-fact-manifest.test.ts scripts\\sync-design-facts.test.ts` 通过 2 个文件和 32 项测试。
 - 针对精确 Scope 执行选定的 `scripts/sync-design-facts.ts` 返回 `complete`；`scripts/reconcile-design-facts.ts` 验证 `adr-webgl-3a-graph-exploration`，`missing`、`mismatched`、`outOfScope` 和 `blocked` 列表均为空。
+- UI 定向测试通过 7 个文件、27 项测试；后端/投影定向测试通过 7 个文件、37 项测试。
+- Web、knowledge-query、knowledge-projector 类型检查，`pnpm exec prisma validate` 和 `git diff --check` 均返回 0。
+- `$env:SPECFORGE_NEXT_STANDALONE='0'; pnpm --filter @specforge/web build` 返回 0，完成编译、类型检查、20 个静态页面生成，并输出 `/architecture/3a` 与 `/api/architecture/3a/query`。默认 standalone 打包额外受到 Windows/OneDrive 下 pnpm 符号链接 `EPERM` 影响，这是环境打包限制，不是应用编译失败。
+- In-app Browser 在精确 Designer Scope 下加载了 60 个有界目录节点。嵌入式浏览器不可用 WebGL，因此展示 Sigma 的语义 DOM 回退，图谱内容没有变为空白。
+- 派生分析不可用时图谱 API 返回 `503 GRAPH_ANALYSIS_UNAVAILABLE`，工作台立即回退到精确 Scope 的 PostgreSQL 目录，并继续受有界预算保护。
 
 ### MCP 记录
 
@@ -142,4 +152,4 @@ PostgreSQL 继续作为已编写事实和关系事件的权威存储。图谱摘
 - 匹配 Context Pack ID：`ctx-webgl-3a-graph-exploration`
 - 相关资产：`api-specforge-3a-architecture-query`、`data-specforge-3a-projection-read-model` 和 `adr-scalable-3a-exploration`
 - 必需关系：Proposal `IMPLEMENTS_DECISION` ADR；Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal；ADR `DECIDES` 查询 API 和投影模型；Proposal `IMPACTS` 查询 API 和投影模型；Evidence `VALIDATES` ADR。
-- 同步状态：已批准 ADR、Proposal、Context Pack、Evidence 和有类型影响关系已在精确所属 Scope 中同步并回读；禁止声明已经实施。
+- 同步状态：对应 ADR、Proposal、Context Pack、Evidence 和有类型影响关系已在精确所属 Scope 中同步并回读；`design-change-session:c024c443-93b5-4462-852f-c12c82c726d0` 已使用验证证据以 `CONVERGED` 关闭。

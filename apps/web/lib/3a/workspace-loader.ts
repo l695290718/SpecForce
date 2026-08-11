@@ -82,7 +82,10 @@ export async function loadThreeAWorkspaceData(
   }
 
   if (state.mode === "graph") {
-    if (!state.focus) return base;
+    if (!state.focus) {
+      const layers = await Promise.all((["BIZ", "SYS", "TECH"] as const).map(async (layer) => [layer, await service.searchArchitectureFacts({ ...queryIdentity, layer, limit: 20 })] as const));
+      return { ...base, initialCatalog: Object.fromEntries(layers) as LayerPages };
+    }
     const [detail, trace] = await Promise.all([
       service.getArchitectureFactDetail({ ...queryIdentity, assertionId: state.focus }),
       service.traceArchitecturePath({

@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { DeterministicGraphAnalysisMaterializer } from "./graph-analysis-materializer.js";
 import { PrismaProjectionBuildRepository } from "./repository.js";
 import { ProjectionMaterializer } from "./materializer.js";
 import { createKnowledgeProjectorRuntime, runtimeConfigFromEnvironment } from "./runtime.js";
@@ -7,7 +8,9 @@ async function main(): Promise<void> {
   const config = runtimeConfigFromEnvironment(process.env);
   const prisma = new PrismaClient();
   const repository = new PrismaProjectionBuildRepository(prisma);
-  const materializer = new ProjectionMaterializer(repository);
+  const materializer = new ProjectionMaterializer(repository, {
+    graphAnalysisMaterializer: new DeterministicGraphAnalysisMaterializer()
+  });
   const runtime = createKnowledgeProjectorRuntime({ materializer, repository, pollIntervalMs: config.pollIntervalMs });
   await prisma.$connect();
   await runtime.listen(config.port, config.host);

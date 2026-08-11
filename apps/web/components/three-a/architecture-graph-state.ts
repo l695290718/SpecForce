@@ -9,6 +9,20 @@ export interface GraphFilters {
   layers: readonly ArchitectureLayer[];
 }
 
+export interface ArchitectureGraphSemanticState {
+  filters: GraphFilters;
+  selectedId?: string;
+  hoveredId?: string;
+  neighborhoodIds: ReadonlySet<string>;
+}
+
+export type ArchitectureGraphSemanticAction =
+  | { type: "filters"; filters: GraphFilters }
+  | { type: "select"; id?: string }
+  | { type: "hover"; id?: string }
+  | { type: "neighborhood"; ids: readonly string[] }
+  | { type: "reset" };
+
 export interface GraphExpansionPage {
   nodes: readonly KnowledgeProjectionNode[];
   edges: readonly KnowledgeProjectionEdge[];
@@ -29,6 +43,41 @@ export interface ArchitectureGraphState {
 
 const MAX_NODES = 500;
 const MAX_EDGES = 1_000;
+
+export function createArchitectureGraphSemanticState(filters: GraphFilters = { relationTypes: [], layers: [] }): ArchitectureGraphSemanticState {
+  return {
+    filters: normalizeGraphFilters(filters),
+    neighborhoodIds: new Set()
+  };
+}
+
+export function reduceArchitectureGraphSemanticState(
+  state: ArchitectureGraphSemanticState,
+  action: ArchitectureGraphSemanticAction
+): ArchitectureGraphSemanticState {
+  switch (action.type) {
+    case "filters":
+      return {
+        filters: normalizeGraphFilters(action.filters),
+        neighborhoodIds: new Set()
+      };
+    case "select":
+      return { ...state, selectedId: action.id };
+    case "hover":
+      return { ...state, hoveredId: action.id };
+    case "neighborhood":
+      return { ...state, neighborhoodIds: new Set([...action.ids].sort()) };
+    case "reset":
+      return createArchitectureGraphSemanticState();
+  }
+}
+
+export function normalizeGraphFilters(filters: GraphFilters): GraphFilters {
+  return {
+    relationTypes: uniqueSorted(filters.relationTypes),
+    layers: uniqueSorted(filters.layers) as ArchitectureLayer[]
+  };
+}
 
 export function expansionKey(assertionId: string, direction: TraceDirection, filters: GraphFilters): string {
   return JSON.stringify([assertionId, direction, uniqueSorted(filters.relationTypes), uniqueSorted(filters.layers)]);

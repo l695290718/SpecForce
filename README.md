@@ -105,6 +105,24 @@ The Web and MCP layers build the following from the exact scoped PostgreSQL cata
 - canonical English Context Packs with validated Chinese overlays; and
 - localized Markdown/JSON rendering without translating technical structures.
 
+## WebGL 3A Graph Explorer
+
+The 3A workspace provides three bounded views for one exact application-service Scope:
+
+- `Overview` shows precomputed cluster summaries and is the default Graph view.
+- `Explore` loads a focused neighborhood and follows explicit continuation instead of fetching the whole Scope.
+- `Impact` ranks upstream and downstream candidates with deterministic, policy-versioned explanations.
+
+Open the graph view with:
+
+```text
+http://localhost:3000/architecture/3a?scope=com.huawei.celon.desiner&tab=architecture&mode=graph&graphView=overview
+```
+
+The API initially caps Overview at 250 nodes and 500 edges. The browser store retains at most 2,000 nodes and 5,000 edges. Sigma.js/WebGL renders the bounded Graphology store when WebGL is available; browsers without WebGL or with a lost context receive the same graph as an accessible semantic list. PostgreSQL remains authoritative, while graph summaries and impact indexes are derived projections. A graph database is optional and must satisfy the same exact-Scope provider contract.
+
+Every graph request carries the subject, tenant, application service, full Scope path, Baseline, Projection, operation, filters, policy version, and expiry. The workspace never silently merges sibling services. If a derived analysis is unavailable, the UI keeps the exact-Scope catalog fallback and reports the bounded degraded mode.
+
 MCP Context Pack generation persists the canonical bilingual pack in the same application-service scope. No derived reader may fall back to another service's built-in fixture.
 
 ## Seeded Content

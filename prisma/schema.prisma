@@ -826,6 +826,91 @@ model KnowledgeProjectionEdge {
   @@index([applicationServiceId, scopePath, generationId, targetAssertionId, relationCode, sourceAssertionId], map: "KnowledgeProjectionEdge_target_idx")
 }
 
+model KnowledgeGraphAnalysis {
+  dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  generationId          String
+  baselineId            String
+  projectionManifestId  String
+  analysisVersion       String
+  policyVersion         String
+  status                String
+  sourceContentDigest   String
+  relationshipVersion   String
+  contentDigest         String
+  summaryEdges          Json     @default("[]") @db.JsonB
+  partialReasons        Json     @default("[]") @db.JsonB
+  clusterCount          Int      @default(0)
+  nodeMetricCount       Int      @default(0)
+  bridgeEdgeCount       Int      @default(0)
+  publishedAt           DateTime?
+  applicationServiceId  String
+  scopePath             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  clusters              KnowledgeGraphCluster[]    @relation("KnowledgeGraphAnalysisClusters")
+  nodeMetrics           KnowledgeGraphNodeMetric[] @relation("KnowledgeGraphAnalysisNodeMetrics")
+
+  @@unique([applicationServiceId, scopePath, generationId, projectionManifestId, analysisVersion], map: "KnowledgeGraphAnalysis_scope_generation_manifest_version_key")
+  @@unique([applicationServiceId, scopePath, dbId], map: "KnowledgeGraphAnalysis_scope_dbId_key")
+  @@index([applicationServiceId, scopePath, baselineId, projectionManifestId, status, publishedAt], map: "KnowledgeGraphAnalysis_scope_manifest_status_idx")
+  @@index([applicationServiceId, scopePath, generationId, analysisVersion, updatedAt], map: "KnowledgeGraphAnalysis_scope_generation_version_idx")
+}
+
+model KnowledgeGraphCluster {
+  dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  analysisId            String   @db.Uuid
+  clusterId             String
+  label                 String
+  layer                 String?
+  memberCount           Int
+  degree                Int
+  criticality           Float
+  positionX             Float
+  positionY             Float
+  contentDigest         String
+  applicationServiceId  String
+  scopePath             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  analysis              KnowledgeGraphAnalysis @relation("KnowledgeGraphAnalysisClusters", fields: [applicationServiceId, scopePath, analysisId], references: [applicationServiceId, scopePath, dbId], onDelete: Cascade, map: "KnowledgeGraphCluster_analysis_scope_fkey")
+
+  @@unique([analysisId, clusterId], map: "KnowledgeGraphCluster_analysis_cluster_key")
+  @@index([applicationServiceId, scopePath, analysisId, layer, clusterId], map: "KnowledgeGraphCluster_scope_analysis_layer_idx")
+  @@index([applicationServiceId, scopePath, analysisId, criticality, clusterId], map: "KnowledgeGraphCluster_scope_analysis_rank_idx")
+}
+
+model KnowledgeGraphNodeMetric {
+  dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  analysisId            String   @db.Uuid
+  assertionId           String
+  semanticIdentity      String
+  layer                 String
+  acceptedAssetType     String?
+  clusterId             String?
+  degree                Int
+  criticality           Float
+  isBridge              Boolean  @default(false)
+  positionX             Float
+  positionY             Float
+  inboundImpactWeight   Float    @default(1)
+  outboundImpactWeight  Float    @default(1)
+  contentDigest         String
+  applicationServiceId  String
+  scopePath             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  analysis              KnowledgeGraphAnalysis @relation("KnowledgeGraphAnalysisNodeMetrics", fields: [applicationServiceId, scopePath, analysisId], references: [applicationServiceId, scopePath, dbId], onDelete: Cascade, map: "KnowledgeGraphNodeMetric_analysis_scope_fkey")
+
+  @@unique([analysisId, assertionId], map: "KnowledgeGraphNodeMetric_analysis_assertion_key")
+  @@index([applicationServiceId, scopePath, analysisId, clusterId, semanticIdentity, assertionId], map: "KnowledgeGraphNodeMetric_scope_cluster_member_idx")
+  @@index([applicationServiceId, scopePath, analysisId, layer, acceptedAssetType, criticality], map: "KnowledgeGraphNodeMetric_scope_filter_rank_idx")
+  @@index([applicationServiceId, scopePath, analysisId, inboundImpactWeight, assertionId], map: "KnowledgeGraphNodeMetric_scope_inbound_impact_idx")
+  @@index([applicationServiceId, scopePath, analysisId, outboundImpactWeight, assertionId], map: "KnowledgeGraphNodeMetric_scope_outbound_impact_idx")
+}
+
 model TraceContinuation {
   dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   browseSessionId       String

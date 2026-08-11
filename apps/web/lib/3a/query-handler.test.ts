@@ -98,6 +98,14 @@ describe("handleThreeAQuery", () => {
     await expect(response.json()).resolves.toEqual({ code: "GRAPH_ANALYSIS_UNAVAILABLE" });
   });
 
+  it("collapses raw graph-provider failures to a safe unavailable response", async () => {
+    const { graphProvider, dependencies } = makeDependencies();
+    graphProvider.overview.mockRejectedValueOnce(new Error("database connection refused at 10.0.0.7"));
+    const response = await handleThreeAQuery(request({ operation: "overview", scope: scope.applicationServiceId, baselineId: "b1", projectionManifestId: "p1" }), dependencies);
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ code: "UNAVAILABLE" });
+  });
+
   it("returns a safe error for malformed input", async () => {
     const { dependencies } = makeDependencies();
     const response = await handleThreeAQuery(request({ operation: "search", scope: scope.applicationServiceId }), dependencies);

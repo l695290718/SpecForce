@@ -12,7 +12,7 @@ export type ArchitectureGraphFlowNode = Node<{
 }, "architecture">;
 
 export function ArchitectureGraphNode({ data, selected }: NodeProps<ArchitectureGraphFlowNode>) {
-  return <div className={`rounded-lg border bg-white shadow-panel ${selected ? "border-accent ring-2 ring-blue-100" : "border-border"}`}>
+  return <div className={`rounded-lg border bg-white shadow-panel ${selected ? "border-accent ring-2 ring-blue-100" : "border-border"}`} data-testid={`architecture-flow-node-${data.fact.assertionId}`}>
     <Handle type="target" position={Position.Left} className="opacity-60" />
     <button type="button" className="w-56 p-3 text-left focus:outline-none focus:ring-2 focus:ring-accent" aria-pressed={selected} onClick={data.onSelect}>
       <span className="font-mono text-[11px] font-bold text-accent">{data.fact.layer} · {data.roleLabel}</span>

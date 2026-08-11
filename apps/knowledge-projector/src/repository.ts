@@ -56,6 +56,76 @@ export interface ProjectionPublication {
   edgeCount: number;
 }
 
+export interface GraphAnalysisCluster {
+  clusterId: string;
+  label: string;
+  layer?: "BIZ" | "SYS" | "TECH";
+  memberCount: number;
+  degree: number;
+  criticality: number;
+  positionX: number;
+  positionY: number;
+  contentDigest: string;
+}
+
+export interface GraphAnalysisNodeMetric {
+  assertionId: string;
+  semanticIdentity: string;
+  layer: "BIZ" | "SYS" | "TECH";
+  acceptedAssetType?: string;
+  clusterId?: string;
+  degree: number;
+  criticality: number;
+  isBridge: boolean;
+  positionX: number;
+  positionY: number;
+  inboundImpactWeight: number;
+  outboundImpactWeight: number;
+  contentDigest: string;
+}
+
+export interface GraphAnalysisSummaryEdge {
+  id: string;
+  sourceClusterId: string;
+  targetClusterId: string;
+  sourceAssertionId: string;
+  targetAssertionId: string;
+  sourceSemanticIdentity: string;
+  targetSemanticIdentity: string;
+  relationCode: string;
+  confidence: number;
+  bridge: boolean;
+  contentDigest: string;
+}
+
+export interface GraphAnalysisPublication {
+  scope: ArchitectureScopeRef;
+  generationId: string;
+  baselineId: string;
+  projectionManifestId: string;
+  analysisVersion: string;
+  policyVersion: string;
+  relationshipVersion: string;
+  sourceContentDigest: string;
+  contentDigest: string;
+  clusters: readonly GraphAnalysisCluster[];
+  nodeMetrics: readonly GraphAnalysisNodeMetric[];
+  summaryEdges: readonly GraphAnalysisSummaryEdge[];
+  partialReasons: readonly string[];
+}
+
+export interface GraphAnalysisPublicationResult {
+  status: "PUBLISHED" | "UNAVAILABLE";
+  analysisId?: string;
+  idempotent: boolean;
+  code?: string;
+}
+
+export interface PublishedProjectionSnapshot {
+  nodes: KnowledgeProjectionNode[];
+  edges: KnowledgeProjectionEdge[];
+}
+
 export interface ProjectionBuildHealth {
   status: "ok" | "degraded" | "unavailable";
   code: string;
@@ -73,6 +143,12 @@ export interface ProjectionBuildRepository {
   publish(job: ProjectionBuildJob, owner: string, result: ProjectionPublication): Promise<ProjectionManifestV2>;
   fail(job: ProjectionBuildJob, owner: string, code: string, diagnosticRef: string): Promise<boolean>;
   health(scope: ArchitectureScopeRef, now: Date): Promise<ProjectionBuildHealth>;
+}
+
+export interface GraphAnalysisPublicationRepository {
+  loadPublishedProjection(job: ProjectionBuildJob, manifest: ProjectionManifestV2): Promise<PublishedProjectionSnapshot>;
+  publishGraphAnalysis(job: ProjectionBuildJob, manifest: ProjectionManifestV2, publication: GraphAnalysisPublication): Promise<GraphAnalysisPublicationResult>;
+  markGraphAnalysisUnavailable(job: ProjectionBuildJob, manifest: ProjectionManifestV2, analysisVersion: string, code: string): Promise<GraphAnalysisPublicationResult>;
 }
 
 type SqlBuildRow = {
@@ -96,7 +172,7 @@ type SqlBuildRow = {
   diagnosticRef: string | null;
 };
 
-export class PrismaProjectionBuildRepository implements ProjectionBuildRepository {
+export class PrismaProjectionBuildRepository implements ProjectionBuildRepository, GraphAnalysisPublicationRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async claim(owner: string, now: Date, leaseExpiresAt: Date): Promise<ProjectionBuildJob | null> {
@@ -163,6 +239,52 @@ export class PrismaProjectionBuildRepository implements ProjectionBuildRepositor
       const manifest = await transaction.projectionManifest.create({ data: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, id: `projection-manifest:${job.generationId}`, baselineId: job.baselineId, projectionType: "3A", projectionSchemaVersion: job.projectionSchemaVersion, sourceRevisionIds: result.sourceRevisionIds, relationshipVersion: result.relationshipVersion, query: result.query as Prisma.InputJsonValue, digest: result.contentDigest, generatedAt: publishedAt, profileId: job.profileId, profileVersion: job.profileVersion, generationId: job.generationId, inputDigest: result.inputDigest, contentDigest: result.contentDigest, nodeCount, edgeCount, publishedAt } });
       await transaction.projectionBuildJob.update({ where: { applicationServiceId_scopePath_id: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, id: job.id } }, data: { status: "READY", nodeCount, edgeCount, completedAt: publishedAt, leaseOwner: null, leaseExpiresAt: null } });
       return manifestFromRow(manifest);
+    });
+  }
+
+  async loadPublishedProjection(job: ProjectionBuildJob, manifest: ProjectionManifestV2): Promise<PublishedProjectionSnapshot> {
+    assertManifestMatchesJob(job, manifest);
+    const where = { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, generationId: job.generationId, baselineId: job.baselineId };
+    const [nodes, edges] = await Promise.all([
+      this.prisma.knowledgeProjectionNode.findMany({ where, orderBy: [{ layer: "asc" }, { semanticIdentity: "asc" }, { assertionId: "asc" }] }),
+      this.prisma.knowledgeProjectionEdge.findMany({ where, orderBy: [{ sourceAssertionId: "asc" }, { targetAssertionId: "asc" }, { relationCode: "asc" }, { relationshipIdentity: "asc" }] })
+    ]);
+    return { nodes: nodes.map(projectionNodeFromRow), edges: edges.map(projectionEdgeFromRow) };
+  }
+
+  async publishGraphAnalysis(job: ProjectionBuildJob, manifest: ProjectionManifestV2, publication: GraphAnalysisPublication): Promise<GraphAnalysisPublicationResult> {
+    validateGraphAnalysisPublication(job, manifest, publication);
+    return this.prisma.$transaction(async (transaction) => {
+      const graph = graphClient(transaction);
+      const existing = await graph.knowledgeGraphAnalysis.findUnique({ where: { applicationServiceId_scopePath_generationId_projectionManifestId_analysisVersion: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, generationId: job.generationId, projectionManifestId: manifest.id, analysisVersion: publication.analysisVersion } } });
+      if (existing?.status === "PUBLISHED" && existing.contentDigest === publication.contentDigest) return { status: "PUBLISHED", analysisId: existing.dbId, idempotent: true };
+      const publishedAt = new Date();
+      const analysis = await graph.knowledgeGraphAnalysis.upsert({
+        where: { applicationServiceId_scopePath_generationId_projectionManifestId_analysisVersion: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, generationId: job.generationId, projectionManifestId: manifest.id, analysisVersion: publication.analysisVersion } },
+        create: graphAnalysisData(job, publication, "PUBLISHED", publishedAt),
+        update: graphAnalysisData(job, publication, "PUBLISHED", publishedAt)
+      });
+      await graph.knowledgeGraphCluster.deleteMany({ where: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, analysisId: analysis.dbId } });
+      await graph.knowledgeGraphNodeMetric.deleteMany({ where: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, analysisId: analysis.dbId } });
+      if (publication.clusters.length) await graph.knowledgeGraphCluster.createMany({ data: publication.clusters.map((cluster) => ({ ...cluster, analysisId: analysis.dbId, applicationServiceId: job.applicationServiceId, scopePath: job.scopePath })) });
+      if (publication.nodeMetrics.length) await graph.knowledgeGraphNodeMetric.createMany({ data: publication.nodeMetrics.map((metric) => ({ ...metric, acceptedAssetType: metric.acceptedAssetType ?? null, clusterId: metric.clusterId ?? null, analysisId: analysis.dbId, applicationServiceId: job.applicationServiceId, scopePath: job.scopePath })) });
+      return { status: "PUBLISHED", analysisId: analysis.dbId, idempotent: false };
+    });
+  }
+
+  async markGraphAnalysisUnavailable(job: ProjectionBuildJob, manifest: ProjectionManifestV2, analysisVersion: string, code: string): Promise<GraphAnalysisPublicationResult> {
+    assertManifestMatchesJob(job, manifest);
+    const unavailable = unavailableGraphAnalysisPublication(job, manifest, analysisVersion, code);
+    return this.prisma.$transaction(async (transaction) => {
+      const graph = graphClient(transaction);
+      const analysis = await graph.knowledgeGraphAnalysis.upsert({
+        where: { applicationServiceId_scopePath_generationId_projectionManifestId_analysisVersion: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, generationId: job.generationId, projectionManifestId: manifest.id, analysisVersion } },
+        create: graphAnalysisData(job, unavailable, "UNAVAILABLE", undefined),
+        update: graphAnalysisData(job, unavailable, "UNAVAILABLE", undefined)
+      });
+      await graph.knowledgeGraphCluster.deleteMany({ where: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, analysisId: analysis.dbId } });
+      await graph.knowledgeGraphNodeMetric.deleteMany({ where: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, analysisId: analysis.dbId } });
+      return { status: "UNAVAILABLE", analysisId: analysis.dbId, idempotent: false, code };
     });
   }
 
@@ -234,11 +356,74 @@ function parseSortKey(value: string): { layer: string; semanticIdentity: string;
 
 function nodeData(node: KnowledgeProjectionNode) { return { generationId: node.generationId, baselineId: node.baselineId, assertionId: node.assertionId, semanticIdentity: node.semanticIdentity, layer: node.layer, sortKey: node.sortKey, acceptedAssetType: node.acceptedAssetType ?? null, acceptedAssetId: node.acceptedAssetId ?? null, contentDigest: node.contentDigest, applicationServiceId: node.applicationServiceId, scopePath: node.scopePath }; }
 function edgeData(edge: KnowledgeProjectionEdge) { return { generationId: edge.generationId, baselineId: edge.baselineId, relationshipIdentity: edge.relationshipIdentity, relationshipAssertionId: edge.relationshipAssertionId ?? null, relationshipEventId: edge.relationshipEventId ?? null, sourceAssertionId: edge.sourceAssertionId, targetAssertionId: edge.targetAssertionId, sourceSemanticIdentity: edge.sourceSemanticIdentity, targetSemanticIdentity: edge.targetSemanticIdentity, relationCode: edge.relationCode, confidence: edge.confidence, relationshipVersion: edge.relationshipVersion, contentDigest: edge.contentDigest, applicationServiceId: edge.applicationServiceId, scopePath: edge.scopePath }; }
+function projectionNodeFromRow(row: any): KnowledgeProjectionNode { return { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath, generationId: row.generationId, baselineId: row.baselineId, assertionId: row.assertionId, semanticIdentity: row.semanticIdentity, layer: row.layer as KnowledgeProjectionNode["layer"], sortKey: row.sortKey, ...(row.acceptedAssetType ? { acceptedAssetType: row.acceptedAssetType } : {}), ...(row.acceptedAssetId ? { acceptedAssetId: row.acceptedAssetId } : {}), contentDigest: row.contentDigest }; }
+function projectionEdgeFromRow(row: any): KnowledgeProjectionEdge { return { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath, generationId: row.generationId, baselineId: row.baselineId, relationshipIdentity: row.relationshipIdentity, ...(row.relationshipAssertionId ? { relationshipAssertionId: row.relationshipAssertionId } : {}), ...(row.relationshipEventId ? { relationshipEventId: row.relationshipEventId } : {}), sourceAssertionId: row.sourceAssertionId, targetAssertionId: row.targetAssertionId, sourceSemanticIdentity: row.sourceSemanticIdentity, targetSemanticIdentity: row.targetSemanticIdentity, relationCode: row.relationCode, confidence: row.confidence, relationshipVersion: row.relationshipVersion, contentDigest: row.contentDigest }; }
 function toBuildJob(row: SqlBuildRow): ProjectionBuildJob { return { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath, id: row.id, buildKey: row.buildKey, generationId: row.generationId, baselineId: row.baselineId, profileId: row.profileId, profileVersion: row.profileVersion, projectionSchemaVersion: "3a.v2", status: row.status as ProjectionBuildJob["status"], attempt: row.attempt, ...(row.leaseOwner ? { leaseOwner: row.leaseOwner } : {}), ...(row.leaseExpiresAt ? { leaseExpiresAt: row.leaseExpiresAt.toISOString() } : {}), checkpoint: jsonObject(row.checkpoint), nodeCount: row.nodeCount, edgeCount: row.edgeCount, ...(row.errorCode ? { errorCode: row.errorCode } : {}), ...(row.diagnosticRef ? { diagnosticRef: row.diagnosticRef } : {}) }; }
 function manifestFromRow(row: any): ProjectionManifestV2 { return { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath, id: row.id, baselineId: row.baselineId, generationId: row.generationId!, profileId: row.profileId!, profileVersion: row.profileVersion!, projectionSchemaVersion: "3a.v2", sourceRevisionIds: row.sourceRevisionIds as string[], relationshipVersion: row.relationshipVersion, query: row.query as Record<string, unknown>, inputDigest: row.inputDigest!, contentDigest: row.contentDigest!, nodeCount: row.nodeCount!, edgeCount: row.edgeCount!, publishedAt: row.publishedAt!.toISOString() }; }
 function jsonObject(value: Prisma.JsonValue): { assertionSortKey?: string; relationshipVersion?: string } { return typeof value === "object" && value !== null && !Array.isArray(value) ? value as { assertionSortKey?: string; relationshipVersion?: string } : {}; }
 function stringArray(value: unknown): string[] { return Array.isArray(value) && value.every((item) => typeof item === "string") ? value as string[] : []; }
 function stringValue(value: unknown): string | undefined { return typeof value === "string" && value.trim() ? value : undefined; }
+
+export function validateGraphAnalysisPublication(job: ProjectionBuildJob, manifest: ProjectionManifestV2, publication: GraphAnalysisPublication): void {
+  assertManifestMatchesJob(job, manifest);
+  const matches = publication.scope.applicationServiceId === job.applicationServiceId
+    && publication.scope.scopePath === job.scopePath
+    && publication.generationId === job.generationId
+    && publication.baselineId === job.baselineId
+    && publication.projectionManifestId === manifest.id;
+  if (!matches || !publication.analysisVersion || !publication.contentDigest) throw new Error("GRAPH_ANALYSIS_SCOPE_MISMATCH");
+}
+
+function assertManifestMatchesJob(job: ProjectionBuildJob, manifest: ProjectionManifestV2): void {
+  const matches = manifest.applicationServiceId === job.applicationServiceId
+    && manifest.scopePath === job.scopePath
+    && manifest.generationId === job.generationId
+    && manifest.baselineId === job.baselineId;
+  if (!matches) throw new Error("GRAPH_ANALYSIS_SCOPE_MISMATCH");
+}
+
+function unavailableGraphAnalysisPublication(job: ProjectionBuildJob, manifest: ProjectionManifestV2, analysisVersion: string, code: string): GraphAnalysisPublication {
+  const scope = { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath };
+  const sourceContentDigest = manifest.contentDigest;
+  const partialReasons = [code];
+  const base = { scope, generationId: job.generationId, baselineId: job.baselineId, projectionManifestId: manifest.id, analysisVersion, policyVersion: "impact-v1", relationshipVersion: manifest.relationshipVersion, sourceContentDigest, clusters: [], nodeMetrics: [], summaryEdges: [], partialReasons };
+  return { ...base, contentDigest: contentDigest(base) };
+}
+
+function graphAnalysisData(job: ProjectionBuildJob, publication: GraphAnalysisPublication, status: "PUBLISHED" | "UNAVAILABLE", publishedAt: Date | undefined) {
+  return {
+    applicationServiceId: job.applicationServiceId,
+    scopePath: job.scopePath,
+    generationId: publication.generationId,
+    baselineId: publication.baselineId,
+    projectionManifestId: publication.projectionManifestId,
+    analysisVersion: publication.analysisVersion,
+    policyVersion: publication.policyVersion,
+    status,
+    sourceContentDigest: publication.sourceContentDigest,
+    relationshipVersion: publication.relationshipVersion,
+    contentDigest: publication.contentDigest,
+    summaryEdges: publication.summaryEdges as unknown as Prisma.InputJsonValue,
+    partialReasons: publication.partialReasons as Prisma.InputJsonValue,
+    clusterCount: publication.clusters.length,
+    nodeMetricCount: publication.nodeMetrics.length,
+    bridgeEdgeCount: publication.summaryEdges.filter((edge) => edge.bridge).length,
+    publishedAt: publishedAt ?? null
+  };
+}
+
+type GraphAnalysisPrismaClient = {
+  knowledgeGraphAnalysis: {
+    findUnique(args: unknown): Promise<{ dbId: string; status: string; contentDigest: string } | null>;
+    upsert(args: unknown): Promise<{ dbId: string }>;
+  };
+  knowledgeGraphCluster: { deleteMany(args: unknown): Promise<unknown>; createMany(args: unknown): Promise<unknown>; };
+  knowledgeGraphNodeMetric: { deleteMany(args: unknown): Promise<unknown>; createMany(args: unknown): Promise<unknown>; };
+};
+
+function graphClient(client: unknown): GraphAnalysisPrismaClient {
+  return client as GraphAnalysisPrismaClient;
+}
 
 const CLAIM_SQL = `
   WITH candidate AS (

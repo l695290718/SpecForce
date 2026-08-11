@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ProjectionBuildError, ProjectionMaterializer, materializeBatch } from "./materializer.js";
-import type { ProjectionBuildRepository, ProjectionSourceBatch } from "./repository.js";
+import type { GraphAnalysisPublication, GraphAnalysisPublicationRepository, ProjectionBuildRepository, ProjectionSourceBatch } from "./repository.js";
 import type { ProjectionBuildJob } from "@specforge/core";
 
 const scope = { applicationServiceId: "com.example.orders", scopePath: "org/orders/service" };
@@ -27,5 +27,27 @@ describe("3A projection materializer", () => {
     const result = await new ProjectionMaterializer(repository, { owner: "test-owner" }).process({ ...job, checkpoint: { assertionSortKey: "SYS|orders.api|a-1" } });
     expect(result).toMatchObject({ status: "READY", resumed: true });
     expect(calls).toEqual(["a-2"]);
+  });
+
+  it("publishes default derived analysis after the authoritative projection manifest", async () => {
+    const published: GraphAnalysisPublication[] = [];
+    const manifest = { ...scope, id: "manifest-1", baselineId: job.baselineId, generationId: job.generationId, profileId: job.profileId, profileVersion: job.profileVersion, projectionSchemaVersion: "3a.v2" as const, sourceRevisionIds: [], relationshipVersion: "r1", query: {}, inputDigest: "input", contentDigest: "content", nodeCount: 2, edgeCount: 1, publishedAt: "2026-08-10T00:00:00.000Z" };
+    const repository: ProjectionBuildRepository & GraphAnalysisPublicationRepository = {
+      claim: async () => job,
+      loadBatch: async () => batch,
+      writeBatch: async () => true,
+      publish: async () => manifest,
+      fail: async () => true,
+      health: async () => ({ status: "ok", code: "OK", queued: 0, building: 0, failed: 0, oldestQueuedAgeSeconds: null, lastPublishedAt: null }),
+      loadPublishedProjection: async () => ({ nodes: materializeBatch(job, batch).nodes, edges: materializeBatch(job, batch).edges }),
+      publishGraphAnalysis: async (_job, _manifest, publication) => { published.push(publication); return { status: "PUBLISHED", analysisId: "analysis-1", idempotent: false }; },
+      markGraphAnalysisUnavailable: async () => ({ status: "UNAVAILABLE", idempotent: false, code: "unexpected" })
+    };
+
+    const result = await new ProjectionMaterializer(repository, { owner: "test-owner" }).process(job);
+
+    expect(result).toMatchObject({ status: "READY", manifestId: manifest.id, derivedAnalysis: "PUBLISHED" });
+    expect(published).toHaveLength(1);
+    expect(published[0]).toMatchObject({ scope, generationId: job.generationId, projectionManifestId: manifest.id });
   });
 });

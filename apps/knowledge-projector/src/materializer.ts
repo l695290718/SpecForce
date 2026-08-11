@@ -1,5 +1,6 @@
 import { contentDigest, projectionBuildKey, type KnowledgeProjectionEdge, type KnowledgeProjectionNode, type ProjectionBuildJob } from "@specforge/core";
-import type { MaterializedProjectionBatch, ProjectionBuildRepository, ProjectionEndpoint, ProjectionSourceAssertion, ProjectionSourceBatch, ProjectionSourceRelationship, ProjectionPublication } from "./repository.js";
+import type { GraphAnalysisPublicationRepository, MaterializedProjectionBatch, ProjectionBuildRepository, ProjectionEndpoint, ProjectionSourceAssertion, ProjectionSourceBatch, ProjectionSourceRelationship, ProjectionPublication } from "./repository.js";
+import { DEFAULT_GRAPH_ANALYSIS_VERSION, DeterministicGraphAnalysisMaterializer, type GraphAnalysisMaterializer } from "./graph-analysis-materializer.js";
 
 export const DEFAULT_PROJECTION_BATCH_SIZE = 500;
 export const PROJECTION_LEASE_MS = 30_000;
@@ -9,6 +10,7 @@ export interface ProjectionProcessResult {
   resumed?: boolean;
   manifestId?: string;
   errorCode?: string;
+  derivedAnalysis?: "PUBLISHED" | "UNAVAILABLE";
 }
 
 export class ProjectionBuildError extends Error {
@@ -22,7 +24,7 @@ export interface ProjectionEndpointResolutionInput {
 }
 
 export class ProjectionMaterializer {
-  constructor(private readonly repository: ProjectionBuildRepository, private readonly options: { owner?: string; now?: () => Date; batchSize?: number; leaseDurationMs?: number } = {}) {}
+  constructor(private readonly repository: ProjectionBuildRepository, private readonly options: { owner?: string; now?: () => Date; batchSize?: number; leaseDurationMs?: number; analysisVersion?: string; graphAnalysisMaterializer?: GraphAnalysisMaterializer } = {}) {}
 
   async processOnce(): Promise<ProjectionProcessResult> {
     const now = this.now();
@@ -41,7 +43,8 @@ export class ProjectionMaterializer {
       if (!batch.complete) return { status: "BATCHED", resumed: Boolean(job.checkpoint.assertionSortKey) };
       const publication = publicationFrom(job, batch, materialized);
       const manifest = await this.repository.publish(job, owner, publication);
-      return { status: "READY", manifestId: manifest.id, resumed: Boolean(job.checkpoint.assertionSortKey) };
+      const derivedAnalysis = await this.publishDerivedAnalysis(job, manifest);
+      return { status: "READY", manifestId: manifest.id, resumed: Boolean(job.checkpoint.assertionSortKey), derivedAnalysis };
     } catch (error) {
       const code = error instanceof ProjectionBuildError ? error.code : error instanceof Error && /^[A-Z0-9_]+$/u.test(error.message) ? error.message : "PROJECTION_BUILD_FAILED";
       await this.repository.fail(job, owner, code, `projection-build:${job.id}:${code}`);
@@ -51,6 +54,44 @@ export class ProjectionMaterializer {
 
   private owner(): string { return this.options.owner ?? `knowledge-projector:${process.pid}`; }
   private now(): Date { return this.options.now?.() ?? new Date(); }
+
+  private async publishDerivedAnalysis(job: ProjectionBuildJob, manifest: import("@specforge/core").ProjectionManifestV2): Promise<"PUBLISHED" | "UNAVAILABLE"> {
+    if (!isGraphAnalysisPublicationRepository(this.repository)) return "UNAVAILABLE";
+    const analysisVersion = this.options.analysisVersion ?? DEFAULT_GRAPH_ANALYSIS_VERSION;
+    try {
+      const snapshot = await this.repository.loadPublishedProjection(job, manifest);
+      const publication = await (this.options.graphAnalysisMaterializer ?? new DeterministicGraphAnalysisMaterializer()).build({
+        scope: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath },
+        generationId: job.generationId,
+        baselineId: job.baselineId,
+        projectionManifestId: manifest.id,
+        nodes: snapshot.nodes,
+        edges: snapshot.edges,
+        analysisVersion
+      });
+      const result = await this.repository.publishGraphAnalysis(job, manifest, publication);
+      return result.status;
+    } catch (error) {
+      const code = graphAnalysisErrorCode(error);
+      try {
+        await this.repository.markGraphAnalysisUnavailable(job, manifest, analysisVersion, code);
+      } catch {
+        // Projection publication remains authoritative even when a derived-status write is unavailable.
+      }
+      return "UNAVAILABLE";
+    }
+  }
+}
+
+function isGraphAnalysisPublicationRepository(repository: ProjectionBuildRepository): repository is ProjectionBuildRepository & GraphAnalysisPublicationRepository {
+  const candidate = repository as Partial<GraphAnalysisPublicationRepository>;
+  return typeof candidate.loadPublishedProjection === "function"
+    && typeof candidate.publishGraphAnalysis === "function"
+    && typeof candidate.markGraphAnalysisUnavailable === "function";
+}
+
+function graphAnalysisErrorCode(error: unknown): string {
+  return error instanceof Error && /^[A-Z0-9_]+$/u.test(error.message) ? error.message : "DERIVED_ANALYSIS_UNAVAILABLE";
 }
 
 export function materializeBatch(job: ProjectionBuildJob, batch: ProjectionSourceBatch): MaterializedProjectionBatch {

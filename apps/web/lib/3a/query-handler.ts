@@ -1,5 +1,5 @@
 import { scopeById, type ArchitectureScopeRef } from "@specforge/core";
-import { ThreeAQueryError, type ArchitectureGraphQueryProvider, type GraphAnalysisBudget, type ThreeAProjectionQueryService } from "@specforge/knowledge-query";
+import { defaultGraphAnalysisBudget, defaultImpactGraphAnalysisBudget, normalizeGraphAnalysisBudget, ThreeAQueryError, type ArchitectureGraphQueryProvider, type ThreeAProjectionQueryService } from "@specforge/knowledge-query";
 import { z } from "zod";
 import { resolveThreeARequest, type ResolvedThreeARequest } from "./principal";
 import { threeAWebQuerySchema, type ThreeAWebQuery } from "./query-protocol";
@@ -43,7 +43,7 @@ export async function handleThreeAQuery(request: Request, dependencies: ThreeAQu
         assetTypes: uniqueText(parsed.assetTypes),
         relationTypes: uniqueText(parsed.relationTypes),
         ...(parsed.continuation ? { continuation: parsed.continuation } : {}),
-        budget: normalizeGraphBudget(parsed.budget, defaultGraphBudget)
+        budget: normalizeGraphAnalysisBudget(parsed.budget, defaultGraphAnalysisBudget)
       }));
     }
     if (parsed.operation === "impact") {
@@ -57,7 +57,7 @@ export async function handleThreeAQuery(request: Request, dependencies: ThreeAQu
         relationTypes: uniqueText(parsed.relationTypes),
         ...(parsed.policyVersion?.trim() ? { policyVersion: parsed.policyVersion.trim() } : {}),
         ...(parsed.continuation ? { continuation: parsed.continuation } : {}),
-        budget: normalizeGraphBudget(parsed.budget, defaultImpactGraphBudget)
+        budget: normalizeGraphAnalysisBudget(parsed.budget, defaultImpactGraphAnalysisBudget)
       }));
     }
     const service = dependencies.createService();
@@ -101,19 +101,6 @@ function unique<T extends string>(values: T[]): T[] {
 
 function uniqueText(values: string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort();
-}
-
-const defaultGraphBudget: GraphAnalysisBudget = { maxNodes: 250, maxEdges: 500, maxPaths: 100, timeoutMs: 3_000, maxPayloadBytes: 1_048_576 };
-const defaultImpactGraphBudget: GraphAnalysisBudget = { maxNodes: 150, maxEdges: 300, maxPaths: 100, timeoutMs: 3_000, maxPayloadBytes: 1_048_576 };
-const hardGraphBudget: GraphAnalysisBudget = { maxNodes: 500, maxEdges: 1_000, maxPaths: 100, timeoutMs: 3_000, maxPayloadBytes: 1_048_576 };
-
-function normalizeGraphBudget(input: Partial<GraphAnalysisBudget> | undefined, defaults: GraphAnalysisBudget): GraphAnalysisBudget {
-  const budget = { ...defaults, ...input };
-  for (const key of ["maxNodes", "maxEdges", "maxPaths", "timeoutMs", "maxPayloadBytes"] as const) {
-    const value = budget[key];
-    if (!Number.isSafeInteger(value) || value <= 0 || value > hardGraphBudget[key]) throw new ThreeAQueryError("QUERY_BUDGET_INVALID");
-  }
-  return budget;
 }
 
 function jsonError(code: string, status: number): Response {
