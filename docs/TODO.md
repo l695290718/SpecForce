@@ -171,3 +171,31 @@ Only incomplete work is listed here. Completed and superseded records are preser
 **完成证据：** 聚焦检查证明有界重试和超时行为、可操作的可达性诊断、确定性的失败收据、无重复写入、精确 Scope 强制、PostgreSQL 权威性以及恢复后的 MCP 成功回读。阻塞尝试必须明确记录失败原因和重试触发条件。
 
 **设计引用：** ADR-0002、ADR-0004、ADR-0007、ADR-0016、ADR-0021；2026-08-09 隧道事件解决回执。
+
+## 7. Local Change-Attestation Hook Deployment And Signing Endpoint
+
+**Status:** Deferred (not deployed in the local environment).
+
+**Owner:** SpecForge Architecture and Runtime.
+
+**Rationale:** ADR-0017's local enforcement increment (the Go `specforge` CLI and Ed25519 Change Attestation protocol) is designed and its verification contract is locally tested, but the per-commit gate is not active in this repository clone: the Go CLI is not built (`apps/specforge-cli`), `.specforge.yaml` does not exist, the MCP server runs stdio transport without an authenticated Streamable HTTP `/mcp` endpoint or bearer token, and no Ed25519 signing-key lifecycle is provisioned. Commits (including `db0c832` and `5bfff08`) therefore carry no Change Attestation; the 3A continuous-supervisor session `design-change-session:42c82e52-5b6f-460a-9675-b95c8cde75cc` closed `CONVERGED` and reconciled clean, so the design record is consistent, but the per-commit gate remains a documented gap rather than an enforced control.
+
+**Trigger:** Start when the maintainer approves deploying the local gate: build `specforge.exe` from `apps/specforge-cli`, author `.specforge.yaml` (identity and path mappings only — no credentials), run the MCP server over Streamable HTTP at `/mcp` with bearer authentication and a provisioned Ed25519 signing key, install the idempotent `pre-commit` dispatcher, and verify that an un-attested commit fails closed while an attested commit passes `verify_change_attestation`.
+
+**Completion evidence:** `specforge hook install` is idempotent; a normal commit without an exact-Scope `CONVERGED` session and evidence is rejected with a deterministic failure code; a commit under the closed `CONVERGED` session `42c82e52` (or a later governed change) succeeds only after the CLI verifies the staged tree, signature, scope, and reconciliation; `.specforge.yaml` contains no credentials; the signing-key lifecycle (issue, short expiry, revocation, trusted and revoked key policy) is exercised; CodeArts/CodeHub merge enforcement remains a separate backlog item (TODO item 2).
+
+**Design references:** ADR-0017, ADR-0021, ADR-0007; `docs/operations/local-git-hook-attestation.md`; `apps/specforge-cli/`.
+
+**中文本地化：**
+
+**状态：** 延期（未在当前环境部署）。
+
+**负责人：** SpecForge 架构与运行时团队。
+
+**理由：** ADR-0017 的本地强制增量（Go `specforge` CLI 与 Ed25519 变更证明协议）已完成设计，其校验契约已通过本地测试，但本仓库克隆中每次提交的门禁并未生效：Go CLI 未构建（`apps/specforge-cli`）、`.specforge.yaml` 不存在、MCP 服务仅运行 stdio 传输而没有带 Bearer 鉴权的 Streamable HTTP `/mcp` 端点，也未配置 Ed25519 签名密钥生命周期。因此包括 `db0c832` 与 `5bfff08` 在内的提交均无变更证明；3A 持续 Supervisor 会话 `design-change-session:42c82e52-5b6f-460a-9675-b95c8cde75cc` 已 `CONVERGED` 关闭且对账干净，设计记录一致，但每次提交的门禁仍是文档化缺口而非强制控制。
+
+**启动条件：** 维护者批准部署本地门禁后启动：从 `apps/specforge-cli` 构建 `specforge.exe`，编写 `.specforge.yaml`（仅身份与路径映射，不含凭据），以 Streamable HTTP `/mcp` 运行 MCP 服务并提供 Bearer 鉴权和已配置的 Ed25519 签名密钥，安装幂等 `pre-commit` 分发器，并验证无证明提交失败关闭、有证明提交通过 `verify_change_attestation`。
+
+**完成证据：** `specforge hook install` 幂等；缺少精确 Scope `CONVERGED` 会话与证据的普通提交以确定性失败码被拒绝；在已关闭的 `CONVERGED` 会话 `42c82e52`（或后续受治理变更）下的提交仅在 CLI 验证暂存 tree、签名、Scope 和对账后成功；`.specforge.yaml` 不含凭据；签名密钥生命周期（签发、短有效期、撤销、信任/撤销密钥策略）得到演练；CodeArts/CodeHub 合入门禁仍为独立待办（TODO 第 2 项）。
+
+**设计引用：** ADR-0017、ADR-0021、ADR-0007；`docs/operations/local-git-hook-attestation.md`；`apps/specforge-cli/`。
