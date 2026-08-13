@@ -1,14 +1,32 @@
 services:
   postgres: !reset null
+  bootstrap:
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in deploy/.env for external PostgreSQL mode}
+    depends_on: !reset []
+  three-a-bootstrap:
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in deploy/.env for external PostgreSQL mode}
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      knowledge-projector:
+        condition: service_healthy
   web:
     environment:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in deploy/.env for external PostgreSQL mode}
       PGHOST: ${SPECFORGE_EXTERNAL_PG_HOST:?Set SPECFORGE_EXTERNAL_PG_HOST in deploy/.env for external PostgreSQL mode}
       PGPORT: ${SPECFORGE_EXTERNAL_PG_PORT:-5432}
-    depends_on: !reset []
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      three-a-bootstrap:
+        condition: service_completed_successfully
   knowledge-projector:
     environment:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in deploy/.env for external PostgreSQL mode}
       SPECFORGE_PROJECTOR_HEALTH_APPLICATION_SERVICE_ID: ${SPECFORGE_PROJECTOR_HEALTH_APPLICATION_SERVICE_ID:-com.huawei.celon.desiner}
       SPECFORGE_PROJECTOR_HEALTH_SCOPE_PATH: ${SPECFORGE_PROJECTOR_HEALTH_SCOPE_PATH:-pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner}
-    depends_on: !reset []
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully

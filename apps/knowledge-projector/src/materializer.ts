@@ -44,18 +44,28 @@ export class ProjectionMaterializer {
   async process(job: ProjectionBuildJob): Promise<ProjectionProcessResult> {
     const owner = this.owner();
     try {
+      if (!await this.renewLease(job, owner)) throw new ProjectionBuildError("PROJECTION_BUILD_LEASE_LOST");
       const batch = await this.repository.loadBatch(job, this.options.batchSize ?? DEFAULT_PROJECTION_BATCH_SIZE);
       const materialized = materializeBatch(job, batch);
       const architectureRepository = isArchitectureUnitProjectionRepository(this.repository) ? this.repository : undefined;
       const architectureUnits = batch.complete && architectureRepository
         ? await this.materializeArchitectureUnits(job, batch)
         : undefined;
-      if (!await this.repository.writeBatch(job, owner, materialized)) throw new ProjectionBuildError("PROJECTION_BUILD_LEASE_LOST");
+      if (!await this.renewLease(job, owner)) throw new ProjectionBuildError("PROJECTION_BUILD_LEASE_LOST");
+      if (!await this.repository.writeBatch(job, owner, materialized)) {
+        console.error(`[knowledge-projector] batch write rejected id=${job.id} owner=${owner}`);
+        throw new ProjectionBuildError("PROJECTION_BUILD_LEASE_LOST");
+      }
       if (!batch.complete) return { status: "BATCHED", resumed: Boolean(job.checkpoint.assertionSortKey) };
       if (architectureUnits) {
+        if (!await this.renewLease(job, owner)) throw new ProjectionBuildError("PROJECTION_BUILD_LEASE_LOST");
         if (!architectureRepository) throw new ProjectionBuildError("ARCHITECTURE_UNIT_REPOSITORY_UNAVAILABLE");
-        if (!await architectureRepository.writeArchitectureUnitBatch(job, owner, architectureUnits)) throw new ProjectionBuildError("PROJECTION_BUILD_LEASE_LOST");
+        if (!await architectureRepository.writeArchitectureUnitBatch(job, owner, architectureUnits)) {
+          console.error(`[knowledge-projector] architecture unit write rejected id=${job.id} owner=${owner}`);
+          throw new ProjectionBuildError("PROJECTION_BUILD_LEASE_LOST");
+        }
       }
+      if (!await this.renewLease(job, owner)) throw new ProjectionBuildError("PROJECTION_BUILD_LEASE_LOST");
       const publication = publicationFrom(job, batch, materialized);
       const manifest = await this.repository.publish(job, owner, publication);
       const derivedAnalysis = await this.publishDerivedAnalysis(job, manifest);
@@ -69,6 +79,14 @@ export class ProjectionMaterializer {
 
   private owner(): string { return this.options.owner ?? `knowledge-projector:${process.pid}`; }
   private now(): Date { return this.options.now?.() ?? new Date(); }
+  private async renewLease(job: ProjectionBuildJob, owner: string): Promise<boolean> {
+    const renewLease = this.repository.renewLease;
+    if (!renewLease) return true;
+    const leaseExpiresAt = new Date(this.now().getTime() + (this.options.leaseDurationMs ?? PROJECTION_LEASE_MS));
+    const renewed = await renewLease.call(this.repository, job, owner, leaseExpiresAt);
+    if (!renewed) console.error(`[knowledge-projector] lease renewal rejected id=${job.id} owner=${owner}`);
+    return renewed;
+  }
 
   private async materializeArchitectureUnits(job: ProjectionBuildJob, batch: ProjectionSourceBatch): Promise<ArchitectureUnitMaterialization> {
     const input = this.options.architectureUnitSource

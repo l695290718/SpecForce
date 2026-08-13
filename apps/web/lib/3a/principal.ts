@@ -1,6 +1,6 @@
 import { authorizePrincipalScope, defaultHuaweiActor, normalizePrincipalClaims, scopeById, seedHuaweiActor, type ArchitectureScopeRef, type ScopedPrincipal } from "@specforge/core";
 
-export type WebAuthMode = "seed" | "production";
+export type WebAuthMode = "seed" | "production" | "static";
 
 export interface CookieReader {
   get(name: string): { value: string } | undefined;
@@ -28,8 +28,17 @@ export interface ResolvedThreeARequest {
 
 export async function resolveWebPrincipal(input: WebPrincipalResolutionInput): Promise<ScopedPrincipal> {
   if (input.authMode === "seed") return seedWebPrincipal();
+  if (input.authMode === "static") return configuredWebPrincipal();
   if (!input.provider) throw new Error("WEB_PRINCIPAL_RESOLVER_REQUIRED");
   return input.provider.resolve({ headers: input.headers, cookies: input.cookies });
+}
+
+export function resolveWebAuthMode(): WebAuthMode {
+  const configured = process.env.SPECFORGE_WEB_AUTH_MODE?.trim().toLowerCase();
+  if (configured === "static") return "static";
+  if (configured === "production") return "production";
+  if (configured === "seed" && process.env.NODE_ENV !== "production") return "seed";
+  return process.env.NODE_ENV === "production" ? "production" : "seed";
 }
 
 export async function resolveThreeARequest(input: ThreeARequestResolutionInput): Promise<ResolvedThreeARequest> {
@@ -55,4 +64,31 @@ export function seedWebPrincipal(): ScopedPrincipal {
     permissions: ["knowledge:read"],
     decisionRef: "seed-web-principal"
   }, { allowSeed: true });
+}
+
+function configuredWebPrincipal(): ScopedPrincipal {
+  const raw = process.env.SPECFORGE_WEB_PRINCIPAL_CLAIMS?.trim();
+  if (!raw) throw new Error("WEB_PRINCIPAL_CLAIMS_REQUIRED");
+  let claims: Record<string, unknown>;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid");
+    claims = parsed as Record<string, unknown>;
+  } catch {
+    throw new Error("WEB_PRINCIPAL_CLAIMS_INVALID");
+  }
+  const actor = isRecord(claims.actor) ? claims.actor : claims;
+  return normalizePrincipalClaims({
+    actorType: actor.actorType,
+    subject: actor.subject ?? actor.actorId ?? claims.subject ?? claims.clientId,
+    tenantId: actor.tenantId ?? claims.tenantId,
+    authSource: actor.authSource ?? claims.authSource ?? "static-bearer",
+    grants: actor.grants,
+    permissions: actor.permissions ?? claims.permissions,
+    decisionRef: actor.decisionRef ?? claims.decisionRef
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

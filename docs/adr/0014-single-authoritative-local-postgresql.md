@@ -42,6 +42,18 @@ Use one PostgreSQL instance as the sole local authority for authored SpecForge r
 - Canonical Web route checks rendered the scoped API, data-model, graph, and workspace pages without Prisma errors.
 - `pnpm design-facts:sync` and `pnpm design-facts:check` persisted and read back all 11 decisions in the exact Designer Scope with no missing, mismatched, out-of-scope, or blocked records.
 
+## Legacy Verification Stack Retirement (2026-08-13)
+
+The legacy graph-verification authority is retired. Read-only Docker inspection found no remaining `specforge-graph-verify-postgres` container or volume, and every retained Graph Projector configuration targets `deploy-postgres-1:5432/specforge_canonical`. The preserved source backup remains recoverable at `artifacts/db-consolidation/2026-07-29/source-graph-verify.dump`; its SHA-256 is `525BF44496C212CEE7330EB1927C965AB32FF3FE82F11AD608AA4C7E962481DF`, and `pg_restore --list` returned 174 TOC entries.
+
+After the canonical live projection gate passed, all local graph-verification services were stopped by exact container name. Their containers and both Nebula volume sets were retained. `deploy-postgres-1` and the MCP PostgreSQL tunnel remained healthy and running. No database, payload, container, or volume was deleted.
+
+## 旧验证栈退役（2026-08-13）
+
+旧图验证权威已完成退役。只读 Docker 核查未发现仍存在的 `specforge-graph-verify-postgres` 容器或卷，所有保留的 Graph Projector 配置均指向 `deploy-postgres-1:5432/specforge_canonical`。源库备份仍保存在 `artifacts/db-consolidation/2026-07-29/source-graph-verify.dump`，其 SHA-256 为 `525BF44496C212CEE7330EB1927C965AB32FF3FE82F11AD608AA4C7E962481DF`，并已通过包含 174 个 TOC 条目的可恢复性检查。
+
+规范 live 投影门禁通过后，所有本地图验证服务均按精确容器名停止；容器和两组 Nebula 卷全部保留。`deploy-postgres-1` 与 MCP PostgreSQL 隧道继续健康运行，未删除任何数据库、载荷、容器或卷。
+
 ## Chinese Localization / 中文本地化
 
 ### 备选方案

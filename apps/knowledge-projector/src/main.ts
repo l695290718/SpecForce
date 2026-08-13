@@ -9,7 +9,8 @@ async function main(): Promise<void> {
   const prisma = new PrismaClient();
   const repository = new PrismaProjectionBuildRepository(prisma);
   const materializer = new ProjectionMaterializer(repository, {
-    graphAnalysisMaterializer: new DeterministicGraphAnalysisMaterializer()
+    graphAnalysisMaterializer: new DeterministicGraphAnalysisMaterializer(),
+    leaseDurationMs: config.leaseDurationMs
   });
   const runtime = createKnowledgeProjectorRuntime({ materializer, repository, pollIntervalMs: config.pollIntervalMs });
   await prisma.$connect();

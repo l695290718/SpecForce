@@ -115,6 +115,21 @@ model ArchitectureScope {
   @@index([level])
 }
 
+model DeploymentBootstrap {
+  bootstrapKey String   @id
+  status       String
+  version      String
+  attemptCount Int      @default(0)
+  counts       String   @default("{}")
+  errorMessage String?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([status])
+}
+
 model ActorScopeGrant {
   id        String   @id @default(cuid())
   actorType String

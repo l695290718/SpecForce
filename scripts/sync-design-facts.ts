@@ -98,7 +98,7 @@ export async function synchronizeDesignFacts(input: {
     assertDecision(decision);
     const source = await input.readAdr(decision.repositoryAdr);
     if (!source.english.trim() || !source.chinese.trim()) throw new Error(`DESIGN_FACT_LOCALIZATION_MISSING: ${decision.id}`);
-    const parsed = parseAdrSource(source);
+    const parsed = applyManifestLocalizedContent(decision, parseAdrSource(source));
 
     for (const managed of decision.managedAssets ?? []) {
       await callOrThrow(input.callTool, "upsert_design_asset", {
@@ -557,6 +557,27 @@ function listValue(value: string): string[] {
 
 function firstParagraph(value: string): string {
   return value.split(/\r?\n\s*\r?\n/)[0].replace(/^[-*+]\s+/, "").trim();
+}
+
+function applyManifestLocalizedContent(decision: DesignFactManifestDecision, parsed: ParsedAdr): ParsedAdr {
+  const localized = mergeAdrLocalizedContent(decision, parsed);
+  return {
+    en: applyLocalizedAdrFields(parsed.en, localized.en),
+    zh: applyLocalizedAdrFields(parsed.zh, localized.zh)
+  };
+}
+
+function applyLocalizedAdrFields(fields: AdrFields, localized: Record<string, string | string[]>): AdrFields {
+  return {
+    ...fields,
+    title: localized.title as string,
+    description: localized.description as string,
+    context: localized.context as string,
+    decision: localized.decision as string,
+    alternatives: localized.alternatives as string[],
+    consequences: localized.consequences as string[],
+    constraints: localized.constraints as string[]
+  };
 }
 
 function completeLocalizedFields(input: {

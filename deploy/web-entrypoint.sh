@@ -15,6 +15,4 @@ until node -e 'const net=require("net"); const socket=net.connect({host:process.
   sleep 1
 done
 
-node /app/node_modules/prisma/build/index.js db push --schema=/app/prisma/schema.prisma --skip-generate
-
 exec node /app/apps/web/server.js

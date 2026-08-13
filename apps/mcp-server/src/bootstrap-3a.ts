@@ -8,6 +8,9 @@ const architectureScope = {
   scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
 };
 
+const projectionPollIntervalMs = Number(process.env.SPECFORGE_3A_BOOTSTRAP_POLL_INTERVAL_MS ?? "1000");
+const projectionPollTimeoutMs = Number(process.env.SPECFORGE_3A_BOOTSTRAP_TIMEOUT_MS ?? "300000");
+
 function textResult(result: unknown): string {
   if (!result || typeof result !== "object" || !("content" in result)) return "";
   const content = (result as { content?: unknown }).content;
@@ -16,6 +19,46 @@ function textResult(result: unknown): string {
     .filter((item): item is { type: string; text: string } => Boolean(item && typeof item === "object" && "type" in item && "text" in item))
     .map((item) => item.text)
     .join("");
+}
+
+function parseJsonResult<T>(result: unknown): T {
+  const text = textResult(result);
+  if (!text) throw new Error("MCP_EMPTY_RESULT");
+  return JSON.parse(text) as T;
+}
+
+function assertToolSuccess(result: unknown): void {
+  if (result && typeof result === "object" && "isError" in result && result.isError) throw new Error(textResult(result));
+}
+
+async function closeSession(client: Client, sessionId: string, status: "CONVERGED" | "BLOCKED", evidence: string[], closureReason?: string): Promise<void> {
+  const result = await client.callTool({
+    name: "close_design_change_session",
+    arguments: {
+      sessionId,
+      status,
+      verificationEvidenceRefs: evidence,
+      ...(closureReason ? { closureReason } : {}),
+      architectureScope
+    }
+  }, undefined, { timeout: 300_000, maxTotalTimeout: 300_000 });
+  assertToolSuccess(result);
+}
+
+async function waitForProjection(client: Client, buildId: string): Promise<Record<string, unknown>> {
+  const deadline = Date.now() + projectionPollTimeoutMs;
+  while (Date.now() < deadline) {
+    const result = await client.callTool({
+      name: "get_3a_projection_build",
+      arguments: { architectureScope, id: buildId }
+    }, undefined, { timeout: 300_000, maxTotalTimeout: 300_000 });
+    assertToolSuccess(result);
+    const status = parseJsonResult<Record<string, unknown>>(result);
+    if (status.status === "READY") return status;
+    if (status.status === "FAILED") throw new Error(`THREE_A_PROJECTION_FAILED: ${String(status.errorCode ?? status.diagnosticRef ?? "unknown")}`);
+    await new Promise((resolve) => setTimeout(resolve, projectionPollIntervalMs));
+  }
+  throw new Error(`THREE_A_PROJECTION_TIMEOUT: ${projectionPollTimeoutMs}ms`);
 }
 
 async function main(): Promise<void> {
@@ -31,6 +74,7 @@ async function main(): Promise<void> {
   console.error("[bootstrap-3a] connecting");
   await client.connect(transport);
   console.error("[bootstrap-3a] connected");
+  let sessionId: string | undefined;
   try {
     console.error("[bootstrap-3a] preparing design change");
     const result = await client.callTool({
@@ -48,14 +92,15 @@ async function main(): Promise<void> {
         architectureScope
       }
     }, undefined, requestOptions);
-    if (result && typeof result === "object" && "isError" in result && result.isError) throw new Error(textResult(result));
-    const receipt = JSON.parse(textResult(result)).receipt as { sessionId: string };
+    assertToolSuccess(result);
+    const receipt = parseJsonResult<{ receipt: { sessionId: string } }>(result).receipt;
+    sessionId = receipt.sessionId;
     const migration = await client.callTool({
       name: "bootstrap_3a_from_design_assets",
       arguments: { architectureScope, designChangeSessionId: receipt.sessionId }
     }, undefined, requestOptions);
-    if (migration && typeof migration === "object" && "isError" in migration && migration.isError) throw new Error(textResult(migration));
-    const migrationResult = JSON.parse(textResult(migration)) as { baselineId: string };
+    assertToolSuccess(migration);
+    const migrationResult = parseJsonResult<{ baselineId: string }>(migration);
     const build = await client.callTool({
       name: "request_3a_projection_build",
       arguments: {
@@ -67,8 +112,25 @@ async function main(): Promise<void> {
         query: { layers: ["BIZ", "SYS", "TECH"] }
       }
     }, undefined, requestOptions);
-    if (build && typeof build === "object" && "isError" in build && build.isError) throw new Error(textResult(build));
-    process.stdout.write(JSON.stringify({ preflight: JSON.parse(textResult(result)), migration: JSON.parse(textResult(migration)), build: JSON.parse(textResult(build)) }, null, 2));
+    assertToolSuccess(build);
+    const buildResult = parseJsonResult<{ id: string; status?: string; manifestId?: string }>(build);
+    console.error(`[bootstrap-3a] waiting for projection build ${buildResult.id}`);
+    const projection = buildResult.status === "READY" ? buildResult : await waitForProjection(client, buildResult.id);
+    await closeSession(client, receipt.sessionId, "CONVERGED", [
+      `bootstrap_3a_from_design_assets=${migrationResult.baselineId}`,
+      `request_3a_projection_build=${buildResult.id}`,
+      `get_3a_projection_build=${String(projection.status)}`
+    ]);
+    process.stdout.write(JSON.stringify({ preflight: parseJsonResult(result), migration: migrationResult, build: buildResult, projection, session: { id: receipt.sessionId, status: "CONVERGED" } }, null, 2));
+  } catch (error) {
+    if (sessionId) {
+      try {
+        await closeSession(client, sessionId, "BLOCKED", ["bootstrap-3a=failed"], error instanceof Error ? error.message : String(error));
+      } catch (closeError) {
+        console.error(`[bootstrap-3a] unable to close blocked session: ${closeError instanceof Error ? closeError.message : String(closeError)}`);
+      }
+    }
+    throw error;
   } finally {
     await client.close();
     await transport.close();

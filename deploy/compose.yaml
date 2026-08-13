@@ -23,16 +23,23 @@ services:
       dockerfile: deploy/Dockerfile
     restart: unless-stopped
     environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in deploy/.env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in deploy/.env}?schema=public
       PGHOST: postgres
       PGPORT: "5432"
       POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in deploy/.env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
       POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in deploy/.env}
+      SPECFORGE_3A_CURSOR_KEYS: ${SPECFORGE_3A_CURSOR_KEYS:?Set SPECFORGE_3A_CURSOR_KEYS in deploy/.env}
+      SPECFORGE_3A_CURSOR_ACTIVE_KEY_ID: ${SPECFORGE_3A_CURSOR_ACTIVE_KEY_ID:?Set SPECFORGE_3A_CURSOR_ACTIVE_KEY_ID in deploy/.env}
+      SPECFORGE_WEB_AUTH_MODE: ${SPECFORGE_WEB_AUTH_MODE:-static}
+      SPECFORGE_WEB_PRINCIPAL_CLAIMS: ${SPECFORGE_WEB_PRINCIPAL_CLAIMS:?Set SPECFORGE_WEB_PRINCIPAL_CLAIMS in deploy/.env}
     depends_on:
-      postgres:
-        condition: service_healthy
+      bootstrap:
+        condition: service_completed_successfully
+      three-a-bootstrap:
+        condition: service_completed_successfully
     ports:
-      - "${SPECFORGE_WEB_PORT:-3000}:3000"
+      - "${SPECFORGE_WEB_PORT:-3010}:3000"
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/healthz', response => process.exit(response.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 10s
@@ -49,11 +56,12 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in deploy/.env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in deploy/.env}?schema=public
       SPECFORGE_KNOWLEDGE_PROJECTOR_HOST: 0.0.0.0
       SPECFORGE_KNOWLEDGE_PROJECTOR_PORT: "8091"
+      SPECFORGE_KNOWLEDGE_PROJECTOR_LEASE_MS: ${SPECFORGE_KNOWLEDGE_PROJECTOR_LEASE_MS:-300000}
       SPECFORGE_PROJECTOR_HEALTH_APPLICATION_SERVICE_ID: ${SPECFORGE_PROJECTOR_HEALTH_APPLICATION_SERVICE_ID:-com.huawei.celon.desiner}
       SPECFORGE_PROJECTOR_HEALTH_SCOPE_PATH: ${SPECFORGE_PROJECTOR_HEALTH_SCOPE_PATH:-pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner}
     depends_on:
-      postgres:
-        condition: service_healthy
+      bootstrap:
+        condition: service_completed_successfully
     healthcheck:
       test:
         - CMD
@@ -67,6 +75,35 @@ services:
       timeout: 5s
       retries: 12
       start_period: 20s
+
+  bootstrap:
+    build:
+      context: ..
+      dockerfile: deploy/bootstrap.Dockerfile
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in deploy/.env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in deploy/.env}?schema=public
+      SPECFORGE_BOOTSTRAP_VERSION: ${SPECFORGE_BOOTSTRAP_VERSION:-2026-08-12.v1}
+      SPECFORGE_BOOTSTRAP_ADOPT_EXISTING: ${SPECFORGE_BOOTSTRAP_ADOPT_EXISTING:-0}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  three-a-bootstrap:
+    build:
+      context: ..
+      dockerfile: deploy/three-a-bootstrap.Dockerfile
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in deploy/.env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in deploy/.env}?schema=public
+      SPECFORGE_ENTERPRISE_ID: ${SPECFORGE_ENTERPRISE_ID:-legacy-enterprise}
+      SPECFORGE_3A_BOOTSTRAP_POLL_INTERVAL_MS: ${SPECFORGE_3A_BOOTSTRAP_POLL_INTERVAL_MS:-1000}
+      SPECFORGE_3A_BOOTSTRAP_TIMEOUT_MS: ${SPECFORGE_3A_BOOTSTRAP_TIMEOUT_MS:-300000}
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      knowledge-projector:
+        condition: service_healthy
 
 volumes:
   specforge_pgdata:

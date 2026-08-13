@@ -55,6 +55,7 @@ English fields are canonical. Chinese localized sections are complete human-faci
 - **Locally verified:** repository inspection confirms the three policy records and the exact Designer Scope path are present; this ADR and ADR 0006 use stable IDs and all required sections.
 - **Locally verified:** `pnpm design-facts:sync` persisted all seven manifest ADR IDs, matching Proposals, Context Packs, typed links, Evidence assets, and `VALIDATES` links through the MCP stdio write boundary using the exact Designer scope.
 - **Locally verified:** `pnpm design-facts:check` read the scoped MCP graph and reported all seven decisions as verified with no missing, mismatched, out-of-scope, or blocked records.
+- **Locally verified:** design-fact synchronization now applies the manifest-approved bilingual overlay before deriving the ADR, Proposal, and Context Pack payloads. The focused synchronization regression verifies that all three records share the same canonical decision, constraints, and localized structure.
 
 ## MCP Record
 
@@ -119,6 +120,7 @@ SpecForge 同时通过 Git 面向评审者、通过 MCP 面向代理公开架构
 
 ### 证据
 
+- **已本地验证：** 设计事实同步会先合并 manifest 审批后的双语覆盖，再生成 ADR、Proposal 和 Context Pack。聚焦同步回归测试证明三类记录共享同一份规范决策、约束和本地化结构。
 - **已实现：** `AGENTS.md` 定义双记录完成政策、精确 Scope 要求、双语要求、MCP 唯一写入边界、证据要求，以及已实现、本地验证和延期行为的区分。
 - **已实现：** `docs/adr/README.md` 定义稳定文件名、必需章节、MCP Record 要求、PostgreSQL 权威性和同步受阻处理。
 - **已实现：** `docs/superpowers/specs/2026-07-17-design-fact-governance-design.md` 定义事实分类、双语规范规则、稳定 ID、有类型链接和完成流程。

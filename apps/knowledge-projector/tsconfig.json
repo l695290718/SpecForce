@@ -7,5 +7,6 @@
     "declarationMap": true,
     "module": "ESNext"
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/bootstrap-initializer.ts", "src/bootstrap-initializer.test.ts"]
 }

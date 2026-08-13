@@ -149,6 +149,10 @@
                                            {
                                                "command":  "pnpm exec vitest run scripts/design-fact-governance.test.ts",
                                                "result":  "Dual-record governance policy test passes."
+                                           },
+                                           {
+                                               "command":  "node apps/web/node_modules/vitest/vitest.mjs run scripts/sync-design-facts.test.ts scripts/design-fact-manifest.test.ts",
+                                               "result":  "Design-fact synchronization and manifest regression tests passed, including canonical bilingual overlay reuse across ADR, Proposal, and Context Pack payloads."
                                            }
                                        ]
                       },
@@ -242,6 +246,18 @@
                                            {
                                                "command":  "powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -Live",
                                                "result":  "Isolated deployment stack passed health and Web restart persistence verification on port 3010."
+                                           },
+                                           {
+                                               "command":  "PowerShell parser validation for deploy/scripts/common.ps1, start.ps1, status.ps1, and stop.ps1",
+                                               "result":  "All four lifecycle scripts parsed successfully; environment template validation accepted the 3A cursor key JSON."
+                                           },
+                                           {
+                                               "command":  "powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -ConfigurationOnly; git diff --check",
+                                               "result":  "Bundled and external Compose topology validation passed after the default 3010 port and cursor-key environment changes; diff check passed."
+                                           },
+                                           {
+                                               "command":  "powershell -ExecutionPolicy Bypass -File deploy/scripts/stop.ps1; powershell -ExecutionPolicy Bypass -File deploy/scripts/start.ps1",
+                                               "result":  "The persistent PostgreSQL volume survived a full stack stop and restart; bootstrap and 3A bootstrap exited successfully, the published 3A baseline was reused idempotently, the READY projection contained 261 nodes and 156 edges, and both Web and Knowledge Projector health checks passed."
                                            }
                                        ]
                       },
@@ -342,9 +358,17 @@
                                                "command":  "Compare-Object source-pre-import-fingerprint.txt canonical-post-import-fingerprint.txt",
                                                "result":  "The canonical fingerprint matched the complete source catalog: 70 design assets, 115 links, 173 current relationships, 411 relationship events, and 411 outbox records."
                                            },
-                                           {
+                                          {
                                                "command":  "Invoke-WebRequest http://localhost:3000/assets/apis?scope=com.huawei.celon.desiner",
                                                "result":  "The canonical Web service rendered the scoped API, data-model, graph, and workspace routes without Prisma errors."
+                                           },
+                                           {
+                                               "command":  "docker exec deploy-postgres-1 pg_restore --list /tmp/legacy-graph-verify-retirement.dump",
+                                               "result":  "The preserved legacy custom-format backup remained readable with 174 TOC entries and SHA-256 525BF44496C212CEE7330EB1927C965AB32FF3FE82F11AD608AA4C7E962481DF."
+                                           },
+                                           {
+                                               "command":  "docker stop deploy-graph-projector-1 deploy-graph-gateway-1 deploy-nebula-bootstrap-1 deploy-nebula-graphd-1 deploy-nebula-storaged-1 deploy-nebula-metad-1 specforge-canonical-graph-graph-projector-1 specforge-canonical-graph-graph-gateway-1 specforge-canonical-graph-nebula-graphd-1 specforge-canonical-graph-nebula-storaged-1 specforge-canonical-graph-nebula-metad-1",
+                                               "result":  "All local graph and Nebula verification containers stopped; both historical Nebula volume sets were retained, while deploy-postgres-1 and the MCP PostgreSQL tunnel remained running."
                                            }
                                        ]
                       },
@@ -767,7 +791,16 @@
                           "localizedContent":  {
                                                    "en":  {
                                                               "decision":  "PostgreSQL remains authoritative; NebulaGraph is a derived exact-scope projection reached only through the typed Gateway and leased outbox Projector.",
-                                                               "constraints":  [
+                                                              "consequences":  [
+                                                                                   "PostgreSQL writes remain available when the graph runtime is unavailable.",
+                                                                                   "NebulaGraph can be rebuilt from retained PostgreSQL relationship events and outbox state.",
+                                                                                   "At-least-once delivery requires idempotent graph writes, leased claims, retries, dead-letter handling, and monotonic checkpoints.",
+                                                                                   "Exact-scope identity and sibling-scope tests make application-service isolation enforceable at each projection and query boundary.",
+                                                                                   "Local and enterprise profiles share contracts, but live compatibility must still be proven against a running NebulaGraph 3.8.0 service.",
+                                                                                   "Operators must monitor projection lag and explicitly choose PostgreSQL fallback during a graph incident.",
+                                                                                   "Multi-node production sizing, hundred-million-edge capacity certification, Kubernetes deployment, and corporate secret-store integration remain deferred."
+                                                                               ],
+                                                              "constraints":  [
                                                                                    "The local single-node compatibility gate has passed for outbox projection, checkpoint advancement, two-hop traversal, Projector restart, and idempotent replay; external-cluster and production-scale evidence remain deferred."
                                                                               ]
                                                           },
@@ -802,7 +835,11 @@
                                             },
                                             {
                                                 "command":  "powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -Live",
-                                                "result":  "Exact-Scope MCP fixture was accepted; RelationshipOutbox reached COMPLETED; checkpoint reached graph version 13; two-hop traversal returned 3 nodes and 2 edges; Projector restart preserved one logical edge with eventCount=1; backlog, retries, and dead letters were zero."
+                                                "result":  "Exact-Scope MCP fixture was accepted; RelationshipOutbox graph version 17 reached COMPLETED; checkpoint reached 18; two-hop traversal returned 3 nodes and 2 edges; Projector restart preserved one logical edge with eventCount=1; backlog, retries, and dead letters were zero."
+                                            },
+                                            {
+                                                "command":  "docker inspect deploy-graph-projector-1 specforge-canonical-graph-graph-projector-1; docker ps -a --format {{.Names}}|{{.State}}|{{.Status}}; docker volume ls --format {{.Name}}",
+                                                "result":  "Every retained Projector targets deploy-postgres-1:5432/specforge_canonical; no specforge-graph-verify PostgreSQL authority remains; all graph verification services are stopped and their containers and volumes are preserved."
                                             },
                                            {
                                                "command":  "pnpm design-facts:sync; pnpm design-facts:check; pnpm design-facts:federation:check",

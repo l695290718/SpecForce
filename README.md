@@ -231,7 +231,7 @@ pnpm exec prisma validate
 pnpm --filter @specforge/mcp-server smoke
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The selected application service is carried in the `scope` query parameter and restored from the validated application-service cookie; the locale is restored independently from `specforge-locale`.
+Open [http://localhost:3000](http://localhost:3000) for local development. For the supported Docker deployment, use [http://localhost:3010](http://localhost:3010). The selected application service is carried in the `scope` query parameter and restored from the validated application-service cookie; the locale is restored independently from `specforge-locale`.
 
 ## Legacy Baseline Discovery
 
@@ -252,14 +252,16 @@ See [Legacy Baseline Discovery Operations](docs/operations/legacy-baseline-disco
 
 ## Single-Host Docker Deployment
 
-Deploy the Web console and PostgreSQL on one Linux host with Docker Compose. PostgreSQL remains private to the Compose network; MCP stays a client-side stdio process and is not deployed as a network container.
+Deploy the Web console, PostgreSQL, direct first-startup Bootstrap, Knowledge Projector, and governed 3A Bootstrap on one host with Docker. On a fresh empty database, direct Bootstrap applies the versioned initial catalog and canonical relationship events once; the governed 3A Bootstrap then invokes MCP to create and publish the exact-Scope baseline projection before Web starts. After that, business design changes still use MCP. PostgreSQL remains private to the Compose network; MCP stays a client-side stdio process and is not deployed as a network container.
 
-```bash
-cp deploy/.env.example deploy/.env
-# Set a strong POSTGRES_PASSWORD in deploy/.env.
-docker compose --env-file deploy/.env -f deploy/compose.yaml up -d --build
-curl --fail http://localhost:3000/healthz
+```powershell
+Copy-Item deploy/.env.example deploy/.env
+# Set a strong POSTGRES_PASSWORD and deployment-only 3A cursor secret in deploy/.env.
+.\deploy\scripts\start.ps1
+.\deploy\scripts\status.ps1
 ```
+
+The default Docker Web port is `3010`; local development remains on `3000`. Stop the deployment with `.\deploy\scripts\stop.ps1`; the PostgreSQL volume is preserved. See [Single-Host Docker Compose Operations](docs/operations/single-host-docker-compose.md) and [deployment operations](deploy/README.md) for external PostgreSQL mode, configuration checks, and recovery.
 
 See [Single-Host Docker Compose Operations](docs/operations/single-host-docker-compose.md) for upgrades, backup/restore, verification, and external PostgreSQL mode.
 

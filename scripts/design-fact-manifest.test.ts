@@ -156,7 +156,7 @@ it("includes the single-host Docker deployment decision in the baseline", () => 
   const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-single-host-docker-compose-deployment");
   expect(decision?.proposalId).toBe("proposal-single-host-docker-deployment");
   expect(decision?.contextPackId).toBe("context-pack-single-host-docker-deployment");
-  expect(decision?.evidence).toHaveLength(3);
+  expect(decision?.evidence).toHaveLength(6);
 });
 
 it("records the proposed readable 3A architecture map separately from advanced network exploration", () => {

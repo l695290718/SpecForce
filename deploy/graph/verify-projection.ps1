@@ -79,6 +79,10 @@ POSTGRES_USER=specforge
 POSTGRES_PASSWORD=configuration-check-only
 POSTGRES_DB=specforge
 SPECFORGE_WEB_PORT=3000
+SPECFORGE_WEB_AUTH_MODE=static
+SPECFORGE_WEB_PRINCIPAL_CLAIMS='{"actorType":"agent","actorId":"specforge-configuration-check","tenantId":"configuration-check","authSource":"static-bearer","grants":[{"scopeId":"com.huawei.celon.desiner","action":"read"}],"permissions":["knowledge:read"]}'
+SPECFORGE_3A_CURSOR_ACTIVE_KEY_ID=configuration-check
+SPECFORGE_3A_CURSOR_KEYS='{"configuration-check":"c3BlY2ZvcmdlLWdyYXBoLWNvbmZpZ3VyYXRpb24tY2hlY2s="}'
 SPECFORGE_NEBULA_USER=root
 SPECFORGE_NEBULA_PASSWORD=configuration-check-only
 SPECFORGE_NEBULA_SPACE=specforge_graph
@@ -155,6 +159,9 @@ try {
     }
     if ([string]::IsNullOrWhiteSpace($env:DATABASE_URL)) {
       throw "GRAPH_LIVE_DATABASE_REQUIRED: set DATABASE_URL to the canonical PostgreSQL authority before running -Live."
+    }
+    if ($env:DATABASE_URL -match "specforge-graph-verify" -or $env:DATABASE_URL -notmatch "/specforge_canonical(?:\?|$)") {
+      throw "GRAPH_LIVE_DATABASE_NOT_CANONICAL: host-side live verification must use the canonical specforge_canonical database."
     }
     $gatewayUrl = $env:SPECFORGE_GRAPH_GATEWAY_URL
     if ([string]::IsNullOrWhiteSpace($gatewayUrl)) { $gatewayUrl = "http://127.0.0.1:18088" }

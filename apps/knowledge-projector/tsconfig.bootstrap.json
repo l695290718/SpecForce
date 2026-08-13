@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist-bootstrap",
+    "rootDir": "../..",
+    "module": "ESNext",
+    "noEmit": true,
+    "baseUrl": "../..",
+    "paths": {
+      "@specforge/core": ["packages/core/src/index.ts"],
+      "@specforge/scan-contract": ["packages/scan-contract/src/index.ts"]
+    }
+  },
+  "include": ["src/bootstrap-initializer.ts", "src/bootstrap-initializer.test.ts", "../../prisma/data/**/*.ts"]
+}

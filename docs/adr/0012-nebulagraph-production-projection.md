@@ -272,6 +272,20 @@ The final live gate passed against the canonical Docker PostgreSQL tunnel and th
 
 This closure proves the local single-node compatibility topology only. External Nebula clusters, multi-node production sizing, Kubernetes deployment, enterprise secret management, and billion-scale certification remain deferred.
 
+## Legacy Runtime Retirement Closure (2026-08-13)
+
+- `deploy/graph/verify-projection.ps1` now supplies the required 3A cursor configuration for Compose assertions and rejects any live host-side database other than `specforge_canonical`. The host gate uses `localhost:15433`; the containerized Projector continues to use `deploy-postgres-1:5432`.
+- The final exact-Scope live gate completed `RelationshipOutbox` graph version `17`, checkpoint `18`, a two-hop impact traversal with 3 nodes and 2 edges, Projector restart, and idempotent replay with `eventCount=1`. Backlog, retries, and dead letters were zero.
+- All local graph-verification and Nebula services are stopped. Their containers and the `deploy_specforge_nebula_*` and `specforge-canonical-graph_specforge_nebula_*` volumes remain retained. PostgreSQL and its MCP tunnel remain running.
+- A rebuild attempt could not authenticate to Docker Hub for the pinned Node and Go base images. No runtime change depended on that failed pull; the verified local images were used for the closure. A future image refresh must rerun the same live gate after registry access is restored.
+
+## 旧运行时退役闭环（2026-08-13）
+
+- 图验证脚本已补齐 Compose 断言需要的 3A 游标配置，并拒绝主机侧 live 检查连接到 `specforge_canonical` 之外的数据库。主机门禁使用 `localhost:15433`，容器内 Projector 继续使用 `deploy-postgres-1:5432`。
+- 最终精确 Scope live 门禁完成 Outbox 图版本 17、检查点 18、3 个节点和 2 条边的两跳影响遍历、Projector 重启及 `eventCount=1` 的幂等重放；积压、重试和死信均为 0。
+- 所有本地图验证与 Nebula 服务均已停止，容器和两组 Nebula 卷继续保留；PostgreSQL 及 MCP 隧道继续运行。
+- 固定摘要的 Node 与 Go 基础镜像重建因 Docker Hub 鉴权网络中断而未完成，本次闭环未依赖该失败拉取，而是使用已验证的本地镜像。恢复镜像仓库访问后，未来镜像刷新必须重新执行同一 live 门禁。
+
 ## 本地兼容拓扑最终闭环（2026-08-09）
 
 最终 live gate 已在规范 Docker PostgreSQL 隧道和本地 NebulaGraph 3.8.0 拓扑上通过：精确 Scope 的 MCP 验证夹具成功写入，`RelationshipOutbox` 进入 `COMPLETED`，检查点推进到图版本 `13`，两跳遍历返回 3 个节点和 2 条边，Projector 重启后重放仍只有 1 条逻辑边且 `eventCount=1`、死信为 0。期间发现并修复了 PostgreSQL 原始检查点写入遗漏非空 `updatedAt` 的缺陷。

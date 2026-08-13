@@ -8,6 +8,8 @@
 
 **Deferred:** Cross-service aggregation and production identity/authorization integration remain deferred. The repository-only ADR does not claim MCP persistence for this record until a scoped MCP write and read-back are performed.
 
+The Web 3A boundary now supports an explicitly configured static Principal for local or single-host deployment. This is a deployment identity, not a production IdP integration: it must carry exact application-service grants, and missing or malformed claims fail closed. Production OIDC or gateway integration continues through the `WebPrincipalResolver` boundary.
+
 **Stable ID:** `adr-application-service-scope-isolation`
 
 **Owning architectureScope:**
@@ -82,6 +84,10 @@ The system gains predictable isolation, consistent authorization, and auditable 
 - 生产身份、租户策略和跨服务授权已延期，不得从模拟操作者推断。
 
 ## Evidence
+
+- `pnpm --filter @specforge/web typecheck` passed after wiring Web 3A to the configured auth mode; focused Principal and query tests passed 11/11. Static claims authorize the exact `com.huawei.celon.desiner` application service, while missing or malformed claims fail closed.
+- `docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet` and `powershell -NoProfile -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -ConfigurationOnly` passed after adding the required Web principal configuration to deployment checks.
+- `SPECFORGE_APPLICATION_SERVICE_ID=com.huawei.celon.desiner SPECFORGE_SCOPE_PATH=pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner pnpm design-facts:federation:check` returned `blocking:false`; exact-Scope design-fact reconciliation returned no missing, mismatched, outOfScope, or blocked facts.
 
 - `pnpm exec vitest run packages/core/src/__tests__/architecture-scope.test.ts apps/web/lib/__tests__/scope.test.ts`: blocked before test startup because `vitest` is unavailable in this worktree.
 - `pnpm exec vitest run packages/core/src/__tests__/mcp-services.test.ts`: blocked before test startup for the same missing-binary reason.

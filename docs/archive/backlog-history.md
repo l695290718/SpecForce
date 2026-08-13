@@ -87,6 +87,19 @@ The archive is historical. An item listed here does not imply that related produ
 - **Evidence:** `powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -Live` passed the exact-Scope MCP fixture, `RelationshipOutbox` completion, checkpoint `13`, two-hop traversal with 3 nodes and 2 edges, Projector restart, idempotent replay with one logical edge and `eventCount=1`, and zero dead letters.
 - **Boundary:** External Nebula clusters, multi-node production sizing, Kubernetes deployment, enterprise secret management, and billion-scale certification remain active deferred capabilities in `docs/TODO.md`.
 
+### Legacy graph verification stack retirement
+
+- **Outcome:** Completed the reversible retirement of the legacy graph-verification runtime. No `specforge-graph-verify-*` PostgreSQL container or volume remains active, all retained Projectors target `deploy-postgres-1/specforge_canonical`, and all local graph-verification services are stopped while their containers and Nebula volumes remain available for rollback inspection.
+- **Stable references:** ADR-0012 (`adr-nebulagraph-production-projection`), ADR-0014 (`adr-single-authoritative-local-postgresql`), and Design Change Session `design-change-session:44d17797-b9e1-4594-b938-5027c7ea4583`.
+- **Evidence:** The preserved custom-format backup `artifacts/db-consolidation/2026-07-29/source-graph-verify.dump` has SHA-256 `525BF44496C212CEE7330EB1927C965AB32FF3FE82F11AD608AA4C7E962481DF` and `pg_restore --list` returned 174 TOC entries. The final exact-Scope live gate completed graph version 17 with checkpoint 18, 3 traversal nodes, 2 traversal edges, one idempotent event, zero backlog, zero retries, and zero dead letters. Post-retirement inspection found every graph and Nebula container stopped, both historical Nebula volume sets retained, and `deploy-postgres-1` plus the MCP PostgreSQL tunnel still running.
+- **Boundary:** This retirement closes only the obsolete local verification topology. External clusters, production-scale certification, and Knowledge-Assertion-aware Nebula projection remain deferred.
+
+### 旧图验证栈退役
+
+- **结果：** 已完成旧图验证运行时的可逆退役。当前不存在活跃的 `specforge-graph-verify-*` PostgreSQL 容器或卷；保留的 Projector 均指向 `deploy-postgres-1/specforge_canonical`。所有本地图验证服务均已停止，但容器和 Nebula 卷仍保留用于回滚核查。
+- **证据：** 保留的自定义格式备份可由 `pg_restore --list` 读取，共 174 个 TOC 条目。最终精确 Scope live 门禁完成图版本 17、检查点 18、3 个遍历节点和 2 条边；幂等事件数为 1，积压、重试和死信均为 0。退役后，权威 PostgreSQL 与 MCP 隧道继续运行。
+- **边界：** 本次只关闭旧的本地验证拓扑；外部集群、生产规模认证和 Knowledge Assertion 感知的 Nebula 投影仍为延期能力。
+
 ## Resolved Incidents
 
 ### Canonical PostgreSQL tunnel outage
@@ -124,4 +137,3 @@ The archive is historical. An item listed here does not imply that related produ
 ### 已解决事件
 
 - **权威 PostgreSQL 隧道中断：** `localhost:15433` 的临时不可达问题已恢复。后续治理会话已收敛，设计事实检查和精确 Scope 联邦对账均通过；有界重试与运维诊断加固仍保留在活动待办中。
-

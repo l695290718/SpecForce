@@ -700,6 +700,21 @@ English canonical decision.
     expect(Object.keys(adr.localizedContent.zh).sort()).toEqual(["alternatives", "consequences", "constraints", "context", "decision", "description", "name", "title"]);
     expect(() => validateAssetLocalization("adr", adr as unknown as Asset)).not.toThrow();
 
+    const proposalCall = callTool.mock.calls.find(([name]) => name === "upsert_proposal");
+    const proposal = proposalCall?.[1]?.proposal as {
+      goal: string;
+      scope: string;
+      localizedContent: { zh: { goal: string; scope: string } };
+    };
+    expect(proposal.goal).toContain("FEDERATION_TOOL_ERROR");
+    expect(proposal.scope).toContain("MCP synchronization blocked");
+    expect(proposal.localizedContent.zh.goal).toContain("FEDERATION_TOOL_ERROR");
+
+    const contextPackCall = callTool.mock.calls.find(([name]) => name === "upsert_context_pack");
+    const contextPack = contextPackCall?.[1]?.contextPack as { constraints: string[]; instructions: string[] };
+    expect(contextPack.constraints[0]).toContain("MCP synchronization blocked");
+    expect(contextPack.instructions[0]).toContain("FEDERATION_TOOL_ERROR");
+
     expect(callTool).toHaveBeenCalledWith("link_assets", expect.objectContaining({
       sourceType: "evidence",
       sourceId: "evidence-adr-federated-design-fact-synchronization-6",

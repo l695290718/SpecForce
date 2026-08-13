@@ -1,36 +1,94 @@
 # SpecForge Design Center deployment
 
-The default deployment starts the Web service, PostgreSQL, and the asynchronous Knowledge Projector. The 3A architecture view is PostgreSQL-first; NebulaGraph is optional and is not started by the default Compose file.
+This directory provides the supported single-host deployment. It manages one Web service, one authoritative PostgreSQL service, a direct first-startup Bootstrap service, a governed one-shot 3A baseline/projection Bootstrap service, and the asynchronous Knowledge Projector. The default Web port is `3010` so it does not conflict with a local development server on `3000`.
 
-## Bundled PostgreSQL
+PostgreSQL is authoritative for authored design facts and relationship events. On a brand-new empty database, the direct one-shot Bootstrap service creates the authored catalog and canonical relationship events. After it succeeds, the governed 3A Bootstrap service invokes the MCP tools `prepare_design_change`, `bootstrap_3a_from_design_assets`, `request_3a_projection_build`, `get_3a_projection_build`, and `close_design_change_session`; it waits for a `READY` projection before the Web service is released. Business design changes continue through MCP. The startup scripts never run a recurring seed, clean, reset, or delete the PostgreSQL volume. NebulaGraph is optional and is not started by this deployment profile. MCP remains an Agent-launched stdio process, not a network container.
 
-1. Copy `deploy/.env.example` to `deploy/.env` and set a long random `POSTGRES_PASSWORD`.
-2. Start the stack:
+## First Startup
+
+Run these commands from the repository root in PowerShell:
 
 ```powershell
-docker compose --env-file deploy/.env -f deploy/compose.yaml up -d --build
+Copy-Item deploy/.env.example deploy/.env
+# Edit deploy/.env. Set a strong unique POSTGRES_PASSWORD.
+.\deploy\scripts\start.ps1
 ```
 
-3. Open `http://localhost:3000/` and check `docker compose --env-file deploy/.env -f deploy/compose.yaml ps`.
+The first run validates Docker, the PostgreSQL password, the 3A cursor key JSON, and the active key ID. It then starts PostgreSQL, runs the direct Bootstrap only when the database is empty, builds the governed 3A baseline and PostgreSQL projection, waits for `/healthz`, and prints the Web URL.
 
-The Web container runs the Prisma schema push on startup. The Projector consumes queued `3a.v2` builds from the same PostgreSQL database and exposes an internal `/health` endpoint on port `8091`.
+If either one-shot initializer fails, the command prints the failure and keeps the PostgreSQL volume intact. Inspect `docker compose --env-file deploy/.env -f deploy/compose.yaml logs bootstrap` or `... logs three-a-bootstrap`; do not delete the volume unless the database is intentionally being retired.
+
+Open [http://localhost:3010](http://localhost:3010).
+
+## Daily Operations
+
+```powershell
+# Start or update the stack. Rebuilds the Web and Projector images by default.
+.\deploy\scripts\start.ps1
+
+# Start without rebuilding images.
+.\deploy\scripts\start.ps1 -NoBuild
+
+# Inspect containers, Web health, and PostgreSQL readiness.
+.\deploy\scripts\status.ps1
+
+# Stop containers and preserve the PostgreSQL volume.
+.\deploy\scripts\stop.ps1
+```
+
+`stop.ps1` is reversible. It does not run `down -v`, remove images, or delete data. There is intentionally no reset script in this deployment directory.
+
+If the database already contains authored rows but has no completed Bootstrap record, startup stops with `NON_EMPTY_UNINITIALIZED`. This protects an existing database from being claimed or overwritten automatically. A completed Bootstrap record makes later starts a no-op for initialization.
+
+For a verified existing SpecForge database, set `SPECFORGE_BOOTSTRAP_ADOPT_EXISTING=1` for one startup. The one-shot service records deployment ownership and repairs canonical relationship projections without reseeding or deleting authored assets. After successful adoption, return the value to `0`.
 
 ## External PostgreSQL
 
-Set `DATABASE_URL` and `SPECFORGE_EXTERNAL_PG_HOST` in `deploy/.env`, then apply the overlay:
+Set `DATABASE_URL`, `SPECFORGE_EXTERNAL_PG_HOST`, and optionally `SPECFORGE_EXTERNAL_PG_PORT` in `deploy/.env`, then use the same lifecycle scripts with `-ExternalPostgres`:
 
 ```powershell
-docker compose --env-file deploy/.env -f deploy/compose.yaml -f deploy/compose.external-postgres.yaml up -d --build
+.\deploy\scripts\start.ps1 -ExternalPostgres
+.\deploy\scripts\status.ps1 -ExternalPostgres
+.\deploy\scripts\stop.ps1 -ExternalPostgres
 ```
 
-Both Web and Knowledge Projector use the external `DATABASE_URL`. The bundled PostgreSQL service and volume are omitted.
+The external overlay removes the bundled PostgreSQL container and volume. Web and Knowledge Projector use the configured `DATABASE_URL`. This is the intended production replacement path when PostgreSQL is managed by the enterprise platform.
 
-## Configuration verification
+## Environment Contract
 
-Render both topologies without starting containers:
+Required in `deploy/.env`:
+
+| Variable | Purpose |
+| --- | --- |
+| `POSTGRES_USER` | Bundled PostgreSQL user; retained for Compose interpolation and bundled mode. |
+| `POSTGRES_PASSWORD` | Bundled PostgreSQL password; never use the example placeholder. |
+| `POSTGRES_DB` | Bundled PostgreSQL database name. |
+| `SPECFORGE_WEB_PORT` | Host port for Web; defaults to `3010`. |
+| `SPECFORGE_3A_CURSOR_ACTIVE_KEY_ID` | Active key ID used to sign bounded 3A cursors. |
+| `SPECFORGE_3A_CURSOR_KEYS` | JSON object of key IDs to base64-encoded secrets. |
+| `SPECFORGE_WEB_AUTH_MODE` | `static` for an explicitly configured local/deployment principal, or `production` when an injected WebPrincipalResolver is provided by the host integration. |
+| `SPECFORGE_WEB_PRINCIPAL_CLAIMS` | JSON claims for `static` mode. Include only the exact application-service grants the Web user may read; never put raw bearer tokens here. |
+
+Production must replace the example 3A secret and configure the Web authentication provider. The 3A boundary fails closed when cursor keys are missing or invalid.
+
+## Configuration Verification
+
+Render both bundled and external topologies without starting containers:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -ConfigurationOnly
 ```
 
-Keep `deploy/.env` out of source control. Production must also configure the Web authentication provider and `SPECFORGE_3A_CURSOR_KEYS` with `SPECFORGE_3A_CURSOR_ACTIVE_KEY_ID`; the 3A Web boundary fails closed when those are missing.
+For a live deployment check, create `deploy/.env` first and run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -Live
+```
+
+The live check validates Web health and design-asset count across a Web restart. It does not seed or mutate design facts.
+
+## What The Scripts Manage
+
+Managed: Docker Web, bundled PostgreSQL, direct first-startup Bootstrap, governed 3A Bootstrap, Knowledge Projector, health checks, and the named PostgreSQL volume.
+
+Not managed: local Node development on port `3000`, MCP stdio client processes, NebulaGraph, TLS termination, enterprise identity, backups, and external PostgreSQL lifecycle.

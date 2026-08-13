@@ -56,6 +56,18 @@ powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -Con
 
 The later live procedure creates an exact-scope relationship through MCP persistence, waits for the Projector checkpoint, verifies a Nebula traversal, restarts the Projector, and proves the logical edge remains singular.
 
+## Retired Local Verification State
+
+The old `specforge-graph-verify-*` database authority is retired. Local graph verification must use the canonical PostgreSQL database only: host-side checks connect through `localhost:15433/specforge_canonical`, while the containerized Projector connects through `deploy-postgres-1:5432/specforge_canonical` on `deploy_default`.
+
+After a verification run, stop only the graph services and retain their containers and volumes. Do not use `down -v`. The recoverable source backup is retained under `artifacts/db-consolidation/2026-07-29/`; it is historical rollback evidence, not an active authoring source.
+
+## 已退役的本地验证状态
+
+旧 `specforge-graph-verify-*` 数据库权威已退役。本地图验证只能读取规范 PostgreSQL：主机检查通过 `localhost:15433/specforge_canonical` 连接，容器内 Projector 通过 `deploy_default` 网络连接 `deploy-postgres-1:5432/specforge_canonical`。
+
+验证结束后仅停止图服务，并保留容器和卷；禁止使用 `down -v`。可恢复的历史源库备份保存在 `artifacts/db-consolidation/2026-07-29/`，它只用于回滚取证，不是活跃编写源。
+
 ## 中文说明
 
 PostgreSQL 是设计资产、关系和 Outbox 事件的权威数据源；NebulaGraph 仅保存可重建的派生投影。MCP 写入不依赖 NebulaGraph。`compose.graph-local.yaml` 仅用于本地单节点兼容性验证，不是生产多节点集群。企业集群模式不加载该文件，平台负责部署 Gateway 与 Projector，并通过密钥管理系统提供 Nebula 凭据。图服务异常时，必须显式选择 `SPECFORGE_GRAPH_STORE=postgres` 进行降级，不允许静默切换。

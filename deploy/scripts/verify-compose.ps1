@@ -29,6 +29,9 @@ function Get-ComposeConfiguration([string[]]$ComposeFiles, [string]$EnvFile = $e
 
 $bundled = Get-ComposeConfiguration @($composeFile)
 if (-not $bundled.services.web.healthcheck -or -not $bundled.services.postgres.healthcheck -or -not $bundled.services.'knowledge-projector'.healthcheck) { throw "Web, PostgreSQL, and Knowledge Projector require health checks." }
+if (-not $bundled.services.bootstrap -or $bundled.services.bootstrap.restart -ne "no" -or -not $bundled.services.'three-a-bootstrap' -or $bundled.services.'three-a-bootstrap'.restart -ne "no") { throw "Bootstrap and governed 3A bootstrap must be one-shot services." }
+if ($bundled.services.bootstrap.ports -or $bundled.services.'three-a-bootstrap'.ports) { throw "Bootstrap services must not publish a host port." }
+if ($bundled.services.web.depends_on.bootstrap.condition -ne "service_completed_successfully" -or $bundled.services.web.depends_on.'three-a-bootstrap'.condition -ne "service_completed_successfully" -or $bundled.services.'knowledge-projector'.depends_on.bootstrap.condition -ne "service_completed_successfully" -or $bundled.services.'three-a-bootstrap'.depends_on.'knowledge-projector'.condition -ne "service_healthy") { throw "Web and Knowledge Projector must wait for the correct bootstrap chain." }
 if ($bundled.services.postgres.ports) { throw "PostgreSQL must not publish a host port." }
 if ($bundled.services.'knowledge-projector'.ports) { throw "Knowledge Projector must not publish a host port in the default topology." }
 if (-not $bundled.volumes.specforge_pgdata) { throw "Missing specforge_pgdata volume." }
@@ -43,6 +46,8 @@ try {
 }
 if ($external.services.postgres) { throw "External PostgreSQL mode must omit the bundled postgres service." }
 if (-not $external.services.'knowledge-projector'.environment.DATABASE_URL) { throw "External PostgreSQL mode must configure the Knowledge Projector DATABASE_URL." }
+if (-not $external.services.bootstrap.environment.DATABASE_URL) { throw "External PostgreSQL mode must configure the Bootstrap DATABASE_URL." }
+if (-not $external.services.'three-a-bootstrap'.environment.DATABASE_URL) { throw "External PostgreSQL mode must configure the governed 3A Bootstrap DATABASE_URL." }
 
 if ($ConfigurationOnly) {
   Write-Output "Compose configuration verified."
@@ -63,7 +68,7 @@ $deploymentEnvironment = @{}
 Get-Content $deploymentEnvironmentFile | ForEach-Object {
   if ($_ -match '^([^#=]+)=(.*)$') { $deploymentEnvironment[$matches[1]] = $matches[2] }
 }
-$webPort = if ($deploymentEnvironment.SPECFORGE_WEB_PORT) { $deploymentEnvironment.SPECFORGE_WEB_PORT } else { "3000" }
+$webPort = if ($deploymentEnvironment.SPECFORGE_WEB_PORT) { $deploymentEnvironment.SPECFORGE_WEB_PORT } else { "3010" }
 $databaseUser = $deploymentEnvironment.POSTGRES_USER
 $databaseName = $deploymentEnvironment.POSTGRES_DB
 

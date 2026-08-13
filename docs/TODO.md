@@ -171,31 +171,3 @@ Only incomplete work is listed here. Completed and superseded records are preser
 **完成证据：** 聚焦检查证明有界重试和超时行为、可操作的可达性诊断、确定性的失败收据、无重复写入、精确 Scope 强制、PostgreSQL 权威性以及恢复后的 MCP 成功回读。阻塞尝试必须明确记录失败原因和重试触发条件。
 
 **设计引用：** ADR-0002、ADR-0004、ADR-0007、ADR-0016、ADR-0021；2026-08-09 隧道事件解决回执。
-
-## 7. Legacy Graph Verification Stack Retirement
-
-**Status:** In progress.
-
-**Owner:** SpecForge Architecture.
-
-**Rationale:** The complete authored catalog was restored into `deploy-postgres/specforge_canonical`, and the local Web/MCP runtime uses that single authority. The legacy `specforge-graph-verify-postgres` container remains preserved as a rollback source because the graph verification Compose stack still depends on its isolated PostgreSQL service; it is no longer an active authoring or projection authority.
-
-**Trigger:** After a recoverable backup and read-only verification confirm that no active application process reads `specforge-graph-verify-postgres`, stop the legacy `specforge-graph-verify-*` services without removing their Docker volumes, then complete the impact-query and projection-checkpoint checks.
-
-**Completion evidence:** The graph verifier uses the canonical PostgreSQL connection, projection checkpoints and an impact query pass succeed, no active application process reads the legacy container, no historical payloads or volumes are deleted, and scoped MCP reconciliation remains clean after the retirement.
-
-**Design references:** ADR-0005, ADR-0006, ADR-0012, ADR-0014; canonical graph verification operational evidence dated 2026-07-30.
-
-**中文本地化：**
-
-**状态：** 进行中。
-
-**负责人：** SpecForge Architecture。
-
-**理由：** 完整编写目录已恢复到 `deploy-postgres/specforge_canonical`，本地 Web/MCP 运行时使用该单一权威库。旧的 `specforge-graph-verify-postgres` 容器仍作为回滚来源保留，因为图验证 Compose 栈仍依赖其隔离 PostgreSQL 服务；它已不再是活跃的编写或投影权威。
-
-**启动条件：** 可恢复备份和只读检查确认没有活跃应用进程读取 `specforge-graph-verify-postgres` 后，停止旧的 `specforge-graph-verify-*` 服务，但不得删除其 Docker 卷；随后完成影响查询和投影检查点检查。
-
-**完成证据：** 图验证器使用权威 PostgreSQL 连接，投影检查点和影响查询通过，没有活跃应用进程读取旧容器，没有删除历史负载或卷，退役后精确 Scope MCP 对账仍保持干净。
-
-**设计引用：** ADR-0005、ADR-0006、ADR-0012、ADR-0014；2026-07-30 权威图验证运维证据。

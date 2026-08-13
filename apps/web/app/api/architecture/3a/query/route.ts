@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { createGraphAnalysisRepository, createThreeAProjectionQueryService, PrismaThreeAQueryRepository, PrismaTraceContinuationStore, type ArchitectureGraphQueryProvider, type CursorKeyring } from "@specforge/knowledge-query";
 import { handleThreeAQuery } from "../../../../../lib/3a/query-handler";
-import { resolveThreeARequest } from "../../../../../lib/3a/principal";
+import { resolveThreeARequest, resolveWebAuthMode } from "../../../../../lib/3a/principal";
 import { createWebThreeAQueryService } from "../../../../../lib/3a/service";
 import { prisma } from "../../../../../lib/db";
 
@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   return handleThreeAQuery(request, {
     resolveRequest: (_request, architectureScope) => resolveThreeARequest({
       architectureScope,
-      authMode: process.env.NODE_ENV === "production" ? "production" : "seed",
+      authMode: resolveWebAuthMode(),
       headers: request.headers,
       cookies: cookieStore
     }),

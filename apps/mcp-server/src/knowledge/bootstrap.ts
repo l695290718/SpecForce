@@ -126,6 +126,39 @@ export async function bootstrapThreeAFromDesignAssets(input: BootstrapThreeAInpu
   };
 
   const existingBaseline = await prisma.knowledgeBaseline.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: baselineId } } });
+  const reusableBaseline = existingBaseline ?? await prisma.knowledgeBaseline.findFirst({
+    where: { ...scope, streamId, status: "PUBLISHED", publishedAt: { not: null } },
+    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }]
+  });
+  if (reusableBaseline?.status === "PUBLISHED" && reusableBaseline.publishedAt) {
+    const existingAssertions = await prisma.knowledgeAssertion.groupBy({
+      by: ["layer", "factType"],
+      where: { ...scope, changeSetId: reusableBaseline.changeSetId, status: "ACCEPTED" },
+      _count: { _all: true }
+    });
+    const layerCounts = { BIZ: 0, SYS: 0, TECH: 0 };
+    let assertionCount = 0;
+    let relationshipCount = 0;
+    for (const row of existingAssertions) {
+      const count = row._count._all;
+      assertionCount += count;
+      if (row.factType === "typed-relationship") relationshipCount += count;
+      else if (row.layer === "BIZ" || row.layer === "SYS" || row.layer === "TECH") layerCounts[row.layer] += count;
+    }
+    return {
+      architectureScope: scope,
+      baselineId: reusableBaseline.id,
+      changeSetId: reusableBaseline.changeSetId,
+      streamId: reusableBaseline.streamId,
+      reconciliationReceiptId,
+      sourceDigest,
+      assertionCount: assertionCount - relationshipCount,
+      relationshipCount,
+      layerCounts,
+      skippedRelationshipCount: 0,
+      idempotent: true
+    };
+  }
   await prisma.$transaction(async (transaction) => {
     await transaction.workingStream.upsert({
       where: { applicationServiceId_scopePath_id: { ...scope, id: streamId } },

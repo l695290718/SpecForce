@@ -39,7 +39,8 @@ COPY --from=builder /workspace/node_modules ./node_modules
 COPY --from=builder /workspace/prisma ./prisma
 COPY deploy/web-entrypoint.sh /usr/local/bin/specforge-web
 
-RUN chmod +x /usr/local/bin/specforge-web
+RUN sed -i 's/\r$//' /usr/local/bin/specforge-web \
+  && chmod +x /usr/local/bin/specforge-web
 
 EXPOSE 3000
 

@@ -45,6 +45,8 @@ The existing NebulaGraph design-asset projection is not reused for 3A traversal.
 - Search and traversal are resumable and bounded, but the first increment does not certify billion-scale capacity.
 - Production OAuth/OIDC, cross-application-service comparison, and a dedicated Nebula 3A projection remain visible deferred capabilities.
 
+For local and single-host deployment, Web may use `SPECFORGE_WEB_AUTH_MODE=static` with server-side `SPECFORGE_WEB_PRINCIPAL_CLAIMS`. The claims are normalized into the same `ScopedPrincipal` used by MCP and must grant the exact selected application-service Scope. Production identity remains provider-injected; no default Principal is inferred when production mode has no resolver.
+
 ## Constraints
 
 - Exact tenant, `applicationServiceId`, and full `scopePath` are mandatory for every build, read, cursor, continuation, node, and edge.
@@ -58,6 +60,9 @@ The existing NebulaGraph design-asset projection is not reused for 3A traversal.
 - Implementation must open a new exact-Scope Design Change Session and close it only after focused verification, MCP synchronization, read-back, and reconciliation.
 
 ## Evidence
+
+- Web 3A now resolves `SPECFORGE_WEB_AUTH_MODE=static` through the same `ScopedPrincipal` authorization boundary as MCP, with server-side `SPECFORGE_WEB_PRINCIPAL_CLAIMS` carrying exact application-service grants. No implicit production identity is inferred.
+- `pnpm --filter @specforge/web typecheck` passed; `apps/web/lib/3a/principal.test.ts` and `apps/web/lib/3a/query-handler.test.ts` passed 11/11; Compose and graph projection configuration checks passed.
 
 - `pnpm design-context:preflight -- --intent <approved 3A navigation design> --affected <four existing facts> --evidence <design review references>` opened `design-change-session:882fb4fb-cd55-4bba-a75c-d05c1d01b7bc` in the exact Designer Scope.
 - Commit `f24c25f` rewrote the bilingual 3A navigation Spec after architecture review.

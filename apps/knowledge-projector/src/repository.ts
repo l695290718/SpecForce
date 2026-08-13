@@ -166,6 +166,7 @@ export interface ProjectionBuildHealth {
 
 export interface ProjectionBuildRepository {
   claim(owner: string, now: Date, leaseExpiresAt: Date): Promise<ProjectionBuildJob | null>;
+  renewLease?(job: ProjectionBuildJob, owner: string, leaseExpiresAt: Date): Promise<boolean>;
   loadBatch(job: ProjectionBuildJob, limit: number): Promise<ProjectionSourceBatch>;
   writeBatch(job: ProjectionBuildJob, owner: string, batch: MaterializedProjectionBatch): Promise<boolean>;
   publish(job: ProjectionBuildJob, owner: string, result: ProjectionPublication): Promise<ProjectionManifestV2>;
@@ -208,6 +209,15 @@ export class PrismaProjectionBuildRepository implements ProjectionBuildRepositor
     return rows[0] ? toBuildJob(rows[0]) : null;
   }
 
+  async renewLease(job: ProjectionBuildJob, owner: string, leaseExpiresAt: Date): Promise<boolean> {
+    const updated = await this.prisma.projectionBuildJob.updateMany({
+      where: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, id: job.id, status: "BUILDING", leaseOwner: owner },
+      data: { leaseExpiresAt }
+    });
+    if (updated.count !== 1) console.error(`[knowledge-projector] lease renewal rejected id=${job.id} owner=${owner}`);
+    return updated.count === 1;
+  }
+
   async loadBatch(job: ProjectionBuildJob, limit: number): Promise<ProjectionSourceBatch> {
     const baseline = await this.prisma.knowledgeBaseline.findUnique({ where: { applicationServiceId_scopePath_id: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, id: job.baselineId } } });
     if (!baseline || (baseline.status !== "PUBLISHED" && baseline.status !== "SUPERSEDED") || !baseline.publishedAt) throw new Error("BASELINE_NOT_OFFICIAL");
@@ -240,7 +250,7 @@ export class PrismaProjectionBuildRepository implements ProjectionBuildRepositor
 
   async writeBatch(job: ProjectionBuildJob, owner: string, batch: MaterializedProjectionBatch): Promise<boolean> {
     return this.prisma.$transaction(async (transaction) => {
-      const updated = await transaction.projectionBuildJob.updateMany({ where: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, id: job.id, status: "BUILDING", leaseOwner: owner, leaseExpiresAt: { gt: new Date() } }, data: { checkpoint: batch.checkpoint as Prisma.InputJsonValue, nodeCount: { increment: batch.nodes.length }, edgeCount: { increment: batch.edges.length } } });
+      const updated = await transaction.projectionBuildJob.updateMany({ where: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, id: job.id, status: "BUILDING", leaseOwner: owner }, data: { checkpoint: batch.checkpoint as Prisma.InputJsonValue, nodeCount: { increment: batch.nodes.length }, edgeCount: { increment: batch.edges.length } } });
       if (updated.count !== 1) return false;
       for (const node of batch.nodes) {
         await transaction.knowledgeProjectionNode.upsert({ where: { applicationServiceId_scopePath_generationId_assertionId: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, generationId: node.generationId, assertionId: node.assertionId } }, create: nodeData(node), update: nodeData(node) });
@@ -261,10 +271,9 @@ export class PrismaProjectionBuildRepository implements ProjectionBuildRepositor
           scopePath: job.scopePath,
           id: job.id,
           status: "BUILDING",
-          leaseOwner: owner,
-          leaseExpiresAt: { gt: new Date() }
+          leaseOwner: owner
         },
-        data: {}
+        data: { updatedAt: new Date() }
       });
       if (updated.count !== 1) return false;
       await deleteArchitectureUnitRows(transaction, architectureUnitScopePredicate(architectureMaterializationIdentity(materialization)));
@@ -327,7 +336,7 @@ export class PrismaProjectionBuildRepository implements ProjectionBuildRepositor
 
   async publish(job: ProjectionBuildJob, owner: string, result: ProjectionPublication): Promise<ProjectionManifestV2> {
     return this.prisma.$transaction(async (transaction) => {
-      const locked = await transaction.projectionBuildJob.findFirst({ where: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, id: job.id, status: "BUILDING", leaseOwner: owner, leaseExpiresAt: { gt: new Date() } } });
+      const locked = await transaction.projectionBuildJob.findFirst({ where: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, id: job.id, status: "BUILDING", leaseOwner: owner } });
       if (!locked) throw new Error("PROJECTION_BUILD_LEASE_LOST");
       const [nodeCount, edgeCount] = await Promise.all([
         transaction.knowledgeProjectionNode.count({ where: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, generationId: job.generationId } }),

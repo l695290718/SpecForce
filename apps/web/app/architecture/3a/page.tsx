@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { cookies } from "next/headers";
 import { PageHeader } from "../../../components/ui";
 import { T } from "../../../components/language-provider";
-import { resolveThreeARequest } from "../../../lib/3a/principal";
+import { resolveThreeARequest, resolveWebAuthMode } from "../../../lib/3a/principal";
 import { createWebThreeAQueryService } from "../../../lib/3a/service";
 import { parseThreeAUrlState, type ThreeAUrlState } from "../../../lib/3a/url-state";
 import { scopeById } from "@specforge/core";
@@ -17,7 +17,7 @@ export default async function ThreeAArchitecturePage({ searchParams }: { searchP
   if (!scopeRef) return <ThreeAFrame><ThreeAWorkspace data={{ ...base, errorCode: "SCOPE_ACCESS_DENIED" }} /></ThreeAFrame>;
 
   try {
-    const request = await resolveThreeARequest({ architectureScope: scopeRef, authMode: process.env.NODE_ENV === "production" ? "production" : "seed", headers: await headers(), cookies: await cookies() });
+    const request = await resolveThreeARequest({ architectureScope: scopeRef, authMode: resolveWebAuthMode(), headers: await headers(), cookies: await cookies() });
     const service = createWebThreeAQueryService();
     const data = await loadThreeAWorkspaceData(service, request, state);
     return <ThreeAFrame><ThreeAWorkspace data={data} /></ThreeAFrame>;
@@ -31,5 +31,5 @@ function ThreeAFrame({ children }: { children: React.ReactNode }) {
 }
 
 function emptyData(state: ThreeAUrlState): ThreeAWorkspaceData { return { state, baselines: [], manifests: [] }; }
-function safeErrorCode(error: unknown): string { const known = new Set(["SCOPE_ACCESS_DENIED", "BASELINE_NOT_FOUND", "PROJECTION_MANIFEST_REQUIRED", "THREE_A_CURSOR_KEY_REQUIRED", "WEB_PRINCIPAL_RESOLVER_REQUIRED"]); const code = error instanceof Error ? error.message : "UNAVAILABLE"; return known.has(code) ? code : "UNAVAILABLE"; }
+function safeErrorCode(error: unknown): string { const known = new Set(["SCOPE_ACCESS_DENIED", "BASELINE_NOT_FOUND", "PROJECTION_MANIFEST_REQUIRED", "THREE_A_CURSOR_KEY_REQUIRED", "WEB_PRINCIPAL_RESOLVER_REQUIRED", "WEB_PRINCIPAL_CLAIMS_REQUIRED", "WEB_PRINCIPAL_CLAIMS_INVALID"]); const code = error instanceof Error ? error.message : "UNAVAILABLE"; return known.has(code) ? code : "UNAVAILABLE"; }
 async function awaitSearchParams(input: Promise<Record<string, string | string[] | undefined>>): Promise<URLSearchParams> { const values = await input; const params = new URLSearchParams(); for (const [key, value] of Object.entries(values)) if (typeof value === "string") params.set(key, value); return params; }
