@@ -8,7 +8,7 @@
 
 **Deferred:** Cross-service aggregation and production identity/authorization integration remain deferred. The repository-only ADR does not claim MCP persistence for this record until a scoped MCP write and read-back are performed.
 
-The Web 3A boundary now supports an explicitly configured static Principal for local or single-host deployment. This is a deployment identity, not a production IdP integration: it must carry exact application-service grants, and missing or malformed claims fail closed. Production OIDC or gateway integration continues through the `WebPrincipalResolver` boundary.
+The Web boundary now uses one request-scoped Principal for the application shell, Scope switcher, asset catalog, dashboard, proposals, Context Packs, governance, graph, APIs, and 3A queries. The public overview route may render without a Principal, but it exposes no design facts or Scope options. This is a deployment identity, not a production IdP integration: it must carry exact application-service grants, and missing or malformed claims fail closed. Production OIDC or gateway integration continues through the `WebPrincipalResolver` boundary.
 
 **Stable ID:** `adr-application-service-scope-isolation`
 
@@ -43,7 +43,7 @@ SpecForge 通过 Web 视图和 MCP 工具暴露设计资产。隐式默认范围
 
 ## Decision
 
-Normal reads and writes require an explicit, authorized application-service scope. The shared scope model validates service level and actor access; persistence filters use both `applicationServiceId` and `scopePath`; MCP is the write boundary. Cross-service reads are permitted only through an explicitly authorized future impact-analysis flow.
+Normal reads and writes require an explicit, authorized application-service scope. The shared scope model validates service level and request Principal access; persistence filters use both `applicationServiceId` and `scopePath`; MCP is the write boundary. All Web read paths and 3A queries use the same request Principal and fail closed for missing or unauthorized Scope. Cross-service reads are permitted only through an explicitly authorized future impact-analysis flow.
 
 **中文本地化覆盖：**
 
@@ -88,6 +88,13 @@ The system gains predictable isolation, consistent authorization, and auditable 
 - `pnpm --filter @specforge/web typecheck` passed after wiring Web 3A to the configured auth mode; focused Principal and query tests passed 11/11. Static claims authorize the exact `com.huawei.celon.desiner` application service, while missing or malformed claims fail closed.
 - `docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet` and `powershell -NoProfile -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -ConfigurationOnly` passed after adding the required Web principal configuration to deployment checks.
 - `SPECFORGE_APPLICATION_SERVICE_ID=com.huawei.celon.desiner SPECFORGE_SCOPE_PATH=pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner pnpm design-facts:federation:check` returned `blocking:false`; exact-Scope design-fact reconciliation returned no missing, mismatched, outOfScope, or blocked facts.
+- `pnpm --filter @specforge/web typecheck` passed after routing Web pages and API read paths through the request-scoped Principal; `node apps/web/node_modules/vitest/vitest.mjs run apps/web/lib/__tests__/scope.test.ts apps/web/lib/3a/principal.test.ts` passed the focused authorization tests.
+- `pnpm --filter @specforge/web build` compiled, type-checked, and generated 20 static pages; final standalone trace copying was blocked by Windows/OneDrive symlink permission (`EPERM`), not by application compilation.
+
+- `pnpm db:generate` regenerated Prisma Client with structured Scope fields for `GovernanceCheckSnapshot` and `AuditLog`.
+- `pnpm --filter @specforge/core typecheck`, `pnpm --filter @specforge/mcp-server typecheck`, and `pnpm --filter @specforge/web typecheck` passed after the persistence change.
+- `node apps/web/node_modules/vitest/vitest.mjs run packages/core/src/__tests__/mcp-services.test.ts apps/mcp-server/src/federation/tools.test.ts` passed the focused governance/audit tests after updating the cross-Scope expectation; the command discovers existing worktree copies as well.
+- `pnpm exec prisma validate` passed for the Scope-paired nullable columns and composite indexes.
 
 - `pnpm exec vitest run packages/core/src/__tests__/architecture-scope.test.ts apps/web/lib/__tests__/scope.test.ts`: blocked before test startup because `vitest` is unavailable in this worktree.
 - `pnpm exec vitest run packages/core/src/__tests__/mcp-services.test.ts`: blocked before test startup for the same missing-binary reason.
@@ -103,6 +110,8 @@ The system gains predictable isolation, consistent authorization, and auditable 
 
 This update supersedes earlier statements that this ADR, its matching Proposal/Context Pack, typed links, or evidence were deferred solely because MCP synchronization had not run. The baseline record is now persisted and read back through MCP in its exact Designer scope. Cross-service aggregation and production identity/authorization remain deferred.
 
+Operational records are part of the same boundary. `GovernanceCheckSnapshot` and scoped `AuditLog` rows carry structured `applicationServiceId` and `scopePath` columns. The pair is written atomically, indexed together, and constrained so a partial Scope cannot be persisted. Legacy global operational audit rows may remain null in both columns; they are not eligible for a scoped read. Scoped audit repair queries filter by both columns before inspecting any payload summary, so a sibling Scope is indistinguishable from a missing record.
+
 ### 对账更新（2026-07-19）
 
 本更新覆盖此前仅因未执行 MCP 同步而将本 ADR、关联 Proposal/Context Pack、类型化关系或证据标记为延期的描述。基线记录现已在精确 Designer Scope 中通过 MCP 持久化并回读验证。跨服务聚合和生产身份/授权仍保持延期。
@@ -111,11 +120,11 @@ This update supersedes earlier statements that this ADR, its matching Proposal/C
 
 - **MCP ADR ID:** `adr-application-service-scope-isolation`
 - **Scope:** `com.huawei.celon.desiner` / `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
-- **Matching Proposal:** deferred; no stable Proposal ID was supplied or verified in this assignment.
-- **Matching Context Pack:** deferred; no stable Context Pack ID was supplied or verified in this assignment.
-- **Related assets and typed links:** scope authorization, scoped persistence, MCP read/write boundary, and Web scope resolver; typed MCP links are deferred until synchronization.
+- **Matching Proposal:** `proposal-strict-application-service-isolation`
+- **Matching Context Pack:** `context-pack-specforge-architecture`
+- **Related assets and typed links:** `data-specforge-assets`, `data-specforge-audit`, scope authorization, scoped persistence, MCP read/write boundary, and Web scope resolver.
 - **Evidence references:** the commands in Evidence.
-- **Synchronization state:** `deferred` for this repository-only change. If a write fails, record **`MCP synchronization blocked`**, the failure reason, and retry trigger in the tracked backlog fact.
+- **Synchronization state:** pending the exact-Scope MCP synchronization and read-back for this change session. If a write fails, record **`MCP synchronization blocked`**, the failure reason, and retry trigger in the tracked backlog fact.
 
 **中文本地化覆盖：**
 

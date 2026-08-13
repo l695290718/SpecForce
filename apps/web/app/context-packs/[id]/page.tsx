@@ -4,12 +4,13 @@ import { T } from "../../../components/language-provider";
 import { CopyMarkdownButton } from "../../../components/copy-markdown-button";
 import { getContextPackWithDatabase } from "../../../lib/assets";
 import { getRequestLocale } from "../../../lib/locale";
+import { getRequestPrincipal } from "../../../lib/request-principal";
 
 export default async function ContextPackDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ scope?: string }> }) {
   const { id } = await params;
   const { scope = "" } = await searchParams;
   const locale = await getRequestLocale();
-  const pack = await getContextPackWithDatabase(id, scope, locale);
+  const pack = await getContextPackWithDatabase(id, scope, locale, await getRequestPrincipal());
 
   return (
     <>

@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { LanguageSwitcher, T } from "./language-provider";
 import { ArchitectureScopeSwitcher } from "./architecture-scope-switcher";
 import type { MessageKey } from "../lib/i18n";
+import type { ResolvedApplicationServiceScope } from "../lib/scope";
 
 const assetLinks = [
   ["nav.domains", "/assets/domains"],
@@ -20,7 +21,7 @@ const assetLinks = [
   ["nav.observability", "/assets/observability"]
 ] as const;
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, readableScopes }: { children: ReactNode; readableScopes: ResolvedApplicationServiceScope[] }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const scope = searchParams.get("scope");
@@ -67,7 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <T k="app.name" />
             </div>
             <div className="flex min-w-0 items-center gap-3">
-              <ArchitectureScopeSwitcher />
+              <ArchitectureScopeSwitcher readableScopes={readableScopes} />
               <div className="hidden font-mono text-[11px] uppercase text-muted md:block"><T k="app.topline" /></div>
             </div>
           </div>

@@ -35,7 +35,7 @@ const persistence = vi.hoisted(() => ({
     return registered;
   }),
   prisma: {
-    auditLog: { create: vi.fn(), update: vi.fn(), findUnique: vi.fn() },
+  auditLog: { create: vi.fn(), update: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn() },
     connectorInstance: { findMany: vi.fn() },
     federationOutbox: { count: vi.fn() },
     sourceObservation: { count: vi.fn() },
@@ -173,7 +173,7 @@ beforeEach(() => {
   });
   persistence.prisma.auditLog.create.mockResolvedValue({ id: "audit-1" });
   persistence.prisma.auditLog.update.mockResolvedValue({ id: "audit-1" });
-  persistence.prisma.auditLog.findUnique.mockResolvedValue({ id: "audit-1", status: "SUCCESS_REPAIR_REQUIRED", outputSummary: "{\"ok\":true}", inputSummary: JSON.stringify({ architectureScope: designerScope }) });
+  persistence.prisma.auditLog.findFirst.mockResolvedValue({ id: "audit-1", status: "SUCCESS_REPAIR_REQUIRED", outputSummary: "{\"ok\":true}", inputSummary: JSON.stringify({ architectureScope: designerScope }), ...designerScope });
   persistence.prisma.connectorInstance.findMany.mockResolvedValue([{ id: connector.id, status: "ACTIVE", applicationServiceId: designerScope.applicationServiceId, scopePath: designerScope.scopePath }]);
   persistence.prisma.federationOutbox.count.mockResolvedValue(2);
   persistence.prisma.sourceObservation.count.mockResolvedValue(1);
@@ -403,7 +403,9 @@ describe("federation MCP tools", () => {
       actorId: "caller-agent",
       channel: "mcp",
       action: "register_connector",
-      status: "PENDING"
+      status: "PENDING",
+      applicationServiceId: designerScope.applicationServiceId,
+      scopePath: designerScope.scopePath
     }) });
     expect(persistence.prisma.auditLog.update).toHaveBeenCalledWith({
       where: { id: "audit-1" },
@@ -443,7 +445,9 @@ describe("federation MCP tools", () => {
       actorType: "user",
       actorId: "read-only-user",
       action: "register_connector",
-      status: "PENDING"
+      status: "PENDING",
+      applicationServiceId: designerScope.applicationServiceId,
+      scopePath: designerScope.scopePath
     }) });
     expect(persistence.prisma.auditLog.update).toHaveBeenCalledWith({
       where: { id: "audit-1" },
@@ -474,7 +478,7 @@ describe("federation MCP tools", () => {
   it("repairs a successful mutation audit to its original terminal success", async () => {
     await retryFederationAuditFinalization("audit-1", designerScope);
 
-    expect(persistence.prisma.auditLog.findUnique).toHaveBeenCalledWith({ where: { id: "audit-1" } });
+    expect(persistence.prisma.auditLog.findFirst).toHaveBeenCalledWith({ where: { id: "audit-1", applicationServiceId: designerScope.applicationServiceId, scopePath: designerScope.scopePath } });
     expect(persistence.prisma.auditLog.update).toHaveBeenCalledWith({
       where: { id: "audit-1" },
       data: { status: "success", errorMessage: undefined }
@@ -482,45 +486,46 @@ describe("federation MCP tools", () => {
   });
 
   it("makes repeated successful audit repair idempotent", async () => {
-    persistence.prisma.auditLog.findUnique
-      .mockResolvedValueOnce({ id: "audit-1", status: "SUCCESS_REPAIR_REQUIRED", outputSummary: "{\"ok\":true}", inputSummary: JSON.stringify({ architectureScope: designerScope }) })
-      .mockResolvedValueOnce({ id: "audit-1", status: "success", outputSummary: "{\"ok\":true}", inputSummary: JSON.stringify({ architectureScope: designerScope }) });
+    persistence.prisma.auditLog.findFirst
+      .mockResolvedValueOnce({ id: "audit-1", status: "SUCCESS_REPAIR_REQUIRED", outputSummary: "{\"ok\":true}", inputSummary: JSON.stringify({ architectureScope: designerScope }), ...designerScope })
+      .mockResolvedValueOnce({ id: "audit-1", status: "success", outputSummary: "{\"ok\":true}", inputSummary: JSON.stringify({ architectureScope: designerScope }), ...designerScope });
     await retryFederationAuditFinalization("audit-1", designerScope);
     await retryFederationAuditFinalization("audit-1", designerScope);
 
-    expect(persistence.prisma.auditLog.findUnique).toHaveBeenCalledTimes(2);
+    expect(persistence.prisma.auditLog.findFirst).toHaveBeenCalledTimes(2);
     expect(persistence.prisma.auditLog.update).toHaveBeenCalledOnce();
   });
 
   it("retries a repair marker through the protected audited maintenance tool", async () => {
     persistence.prisma.auditLog.create.mockResolvedValueOnce({ id: "maintenance-audit" });
-    persistence.prisma.auditLog.findUnique.mockResolvedValueOnce({
+    persistence.prisma.auditLog.findFirst.mockResolvedValueOnce({
       id: "target-audit",
       status: "SUCCESS_REPAIR_REQUIRED",
       outputSummary: "{\"id\":\"designer-connector\"}",
-      inputSummary: JSON.stringify({ architectureScope: designerScope })
+      inputSummary: JSON.stringify({ architectureScope: designerScope }),
+      ...designerScope
     });
 
     const result = await callTool("retry_federated_audit_finalization", { auditId: "target-audit", architectureScope: designerScope });
 
     expect(result.isError).not.toBe(true);
     expect(persistence.prisma.auditLog.create).toHaveBeenCalledWith({ data: expect.objectContaining({ action: "retry_federated_audit_finalization", status: "PENDING" }) });
-    expect(persistence.prisma.auditLog.findUnique).toHaveBeenCalledWith({ where: { id: "target-audit" } });
+    expect(persistence.prisma.auditLog.findFirst).toHaveBeenCalledWith({ where: { id: "target-audit", applicationServiceId: designerScope.applicationServiceId, scopePath: designerScope.scopePath } });
     expect(persistence.prisma.auditLog.update).toHaveBeenCalledWith({ where: { id: "target-audit" }, data: { status: "success", errorMessage: undefined } });
   });
 
   it("makes repeated maintenance retries idempotent after the first convergence", async () => {
     persistence.prisma.auditLog.create.mockResolvedValueOnce({ id: "maintenance-audit-1" }).mockResolvedValueOnce({ id: "maintenance-audit-2" });
-    persistence.prisma.auditLog.findUnique
-      .mockResolvedValueOnce({ id: "target-audit", status: "SUCCESS_REPAIR_REQUIRED", outputSummary: "{\"ok\":true}", inputSummary: JSON.stringify({ architectureScope: designerScope }) })
-      .mockResolvedValueOnce({ id: "target-audit", status: "success", outputSummary: "{\"ok\":true}", inputSummary: JSON.stringify({ architectureScope: designerScope }) });
+    persistence.prisma.auditLog.findFirst
+      .mockResolvedValueOnce({ id: "target-audit", status: "SUCCESS_REPAIR_REQUIRED", outputSummary: "{\"ok\":true}", inputSummary: JSON.stringify({ architectureScope: designerScope }), ...designerScope })
+      .mockResolvedValueOnce({ id: "target-audit", status: "success", outputSummary: "{\"ok\":true}", inputSummary: JSON.stringify({ architectureScope: designerScope }), ...designerScope });
 
     const firstResult = await callTool("retry_federated_audit_finalization", { auditId: "target-audit", architectureScope: designerScope });
     const secondResult = await callTool("retry_federated_audit_finalization", { auditId: "target-audit", architectureScope: designerScope });
     expect(firstResult.isError).not.toBe(true);
     expect(secondResult.isError).not.toBe(true);
 
-    expect(persistence.prisma.auditLog.findUnique).toHaveBeenCalledTimes(2);
+    expect(persistence.prisma.auditLog.findFirst).toHaveBeenCalledTimes(2);
     expect(persistence.prisma.auditLog.update).toHaveBeenCalledWith({ where: { id: "target-audit" }, data: { status: "success", errorMessage: undefined } });
   });
 
@@ -539,14 +544,9 @@ describe("federation MCP tools", () => {
   });
 
   it("rejects a repair marker persisted under a different Scope", async () => {
-    persistence.prisma.auditLog.findUnique.mockResolvedValueOnce({
-      id: "target-audit",
-      status: "SUCCESS_REPAIR_REQUIRED",
-      outputSummary: "{\"ok\":true}",
-      inputSummary: JSON.stringify({ architectureScope: siblingScope })
-    });
+    persistence.prisma.auditLog.findFirst.mockResolvedValueOnce(null);
 
-    expect(errorCode(await callTool("retry_federated_audit_finalization", { auditId: "target-audit", architectureScope: designerScope }))).toBe("SCOPE_MISMATCH");
+    expect(errorCode(await callTool("retry_federated_audit_finalization", { auditId: "target-audit", architectureScope: designerScope }))).toBe("AUDIT_PERSISTENCE_FAILED");
   });
 
   it("keeps the client result safe when the recoverable audit marker cannot be written", async () => {

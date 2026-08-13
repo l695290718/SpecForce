@@ -9,6 +9,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getRequestLocale } from "../../lib/locale";
 import { buildDashboardScopeView, type DashboardSpecificShortcut } from "../../lib/dashboard";
+import { getRequestPrincipal } from "../../lib/request-principal";
 
 const defaultScopeId = "com.huawei.celon.desiner";
 
@@ -16,17 +17,18 @@ export default async function WorkspaceDashboardPage({ searchParams }: { searchP
   const { scope } = await searchParams;
   if (!scope) {
     const savedScope = (await cookies()).get("specforge-architecture-scope")?.value;
-    const initialScope = listReadableApplicationServices().some((item) => item.id === savedScope) ? savedScope! : defaultScopeId;
+    const initialScope = listReadableApplicationServices(await getRequestPrincipal()).some((item) => item.id === savedScope) ? savedScope! : defaultScopeId;
     redirect(buildScopedHref("/workspace", initialScope));
   }
   const locale = await getRequestLocale();
+  const principal = await getRequestPrincipal();
   const [workspace, catalog, proposals, contextPacks, adrs, governanceResults] = await Promise.all([
-    getAgentServiceWorkspace(scope),
-    getScopedAssetCatalog(scope),
-    getProposalsWithDatabase(scope, locale),
-    getContextPacksWithDatabase(scope, locale),
-    getRouteAssetsWithDatabase("adrs", scope, locale),
-    getScopedGovernanceOverview(scope, locale)
+    getAgentServiceWorkspace(scope, "specforge-default-agent", principal),
+    getScopedAssetCatalog(scope, principal),
+    getProposalsWithDatabase(scope, locale, principal),
+    getContextPacksWithDatabase(scope, locale, principal),
+    getRouteAssetsWithDatabase("adrs", scope, locale, principal),
+    getScopedGovernanceOverview(scope, locale, principal)
   ]);
   const dashboard = buildDashboardScopeView(catalog, governanceResults);
   const quickLinks = buildQuickLinks(dashboard.specificShortcuts);

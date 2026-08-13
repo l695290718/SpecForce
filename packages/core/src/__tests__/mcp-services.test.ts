@@ -134,4 +134,19 @@ describe("MCP-facing core services", () => {
     expect(entry.id).toMatch(/^audit-/);
     expect(listAuditLogs().length).toBe(before + 1);
   });
+
+  it("rejects a partial Scope on an audit record", () => {
+    expect(() => recordAuditLog({
+      actorType: "agent",
+      actorId: "test-agent",
+      channel: "mcp",
+      action: "search_design_assets",
+      targetType: "asset",
+      targetId: "all",
+      inputSummary: "query=refund",
+      outputSummary: "results=3",
+      status: "success",
+      applicationServiceId: "com.huawei.celon.desiner"
+    })).toThrow("AuditLog Scope must provide applicationServiceId and scopePath together.");
+  });
 });

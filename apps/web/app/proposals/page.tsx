@@ -4,11 +4,12 @@ import { getProposalsWithDatabase } from "../../lib/assets";
 import { T } from "../../components/language-provider";
 import { buildScopedHref } from "../../lib/scope";
 import { getRequestLocale } from "../../lib/locale";
+import { getRequestPrincipal } from "../../lib/request-principal";
 
 export default async function ProposalsPage({ searchParams }: { searchParams: Promise<{ scope?: string }> }) {
   const { scope = "" } = await searchParams;
   const locale = await getRequestLocale();
-  const proposals = await getProposalsWithDatabase(scope, locale);
+  const proposals = await getProposalsWithDatabase(scope, locale, await getRequestPrincipal());
   return (
     <>
       <PageHeader title={<T k="proposal.title" />} description={<T k="proposal.description" />} action={<span className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-muted">{locale === "zh" ? "提案由 MCP 管理" : "Proposals managed via MCP"}</span>} />

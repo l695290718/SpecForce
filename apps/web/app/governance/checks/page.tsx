@@ -2,10 +2,11 @@ import { Badge, Card, DataTable, PageHeader } from "../../../components/ui";
 import { T } from "../../../components/language-provider";
 import { getScopedGovernanceOverview } from "../../../lib/assets";
 import { getRequestLocale } from "../../../lib/locale";
+import { getRequestPrincipal } from "../../../lib/request-principal";
 
 export default async function GovernanceChecksPage({ searchParams }: { searchParams: Promise<{ assetType?: string; severity?: string; status?: string; scope?: string }> }) {
   const { scope = "", ...filters } = await searchParams;
-  const checks = (await getScopedGovernanceOverview(scope, await getRequestLocale())).filter((check) => {
+  const checks = (await getScopedGovernanceOverview(scope, await getRequestLocale(), await getRequestPrincipal())).filter((check) => {
     const matchesType = !filters.assetType || check.assetType === filters.assetType;
     const matchesSeverity = !filters.severity || check.severity === filters.severity;
     const matchesStatus = !filters.status || check.status === filters.status;

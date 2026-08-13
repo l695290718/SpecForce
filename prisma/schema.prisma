@@ -69,13 +69,16 @@ model ContextPack {
 }
 
 model GovernanceCheckSnapshot {
-  id         String   @id @default(cuid())
-  assetType  String
-  assetId    String
-  results    String
-  createdAt  DateTime @default(now())
+  id                   String   @id @default(cuid())
+  assetType            String
+  assetId              String
+  results              String
+  applicationServiceId String?
+  scopePath            String?
+  createdAt            DateTime @default(now())
 
   @@index([assetType, assetId])
+  @@index([applicationServiceId, scopePath, assetType, assetId])
 }
 
 model AssetLink {
@@ -159,22 +162,26 @@ model AgentServiceWorkspace {
 }
 
 model AuditLog {
-  id            String   @id @default(cuid())
-  actorType     String
-  actorId       String
-  channel       String
-  action        String
-  targetType    String
-  targetId      String
-  inputSummary  String
-  outputSummary String
-  status        String
-  errorMessage  String?
-  createdAt     DateTime @default(now())
+  id                   String   @id @default(cuid())
+  actorType            String
+  actorId              String
+  channel              String
+  action               String
+  targetType           String
+  targetId             String
+  inputSummary         String
+  outputSummary        String
+  status               String
+  errorMessage         String?
+  applicationServiceId String?
+  scopePath            String?
+  createdAt            DateTime @default(now())
 
   @@index([actorType, actorId])
   @@index([channel, action])
   @@index([targetType, targetId])
+  @@index([applicationServiceId, scopePath, createdAt])
+  @@index([applicationServiceId, scopePath, targetType, targetId])
   @@index([createdAt])
 }
 

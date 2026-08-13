@@ -14,6 +14,7 @@ import {
   type SpecForgeDataStore
 } from "@specforge/core";
 import type { ContextPack, DomainModel, Proposal } from "@specforge/core";
+import type { ScopedPrincipal } from "@specforge/core";
 import type { MessageKey } from "./i18n";
 import { prisma } from "./db";
 import { requireReadableApplicationService, scopeDatabaseWhere } from "./scope";
@@ -88,13 +89,13 @@ export function routeToAssetType(route: string): AssetType {
   return assetType;
 }
 
-export async function getRouteAssetsWithDatabase(route: string, scopeId: string, locale: AssetLocale = "en"): Promise<Asset[]> {
+export async function getRouteAssetsWithDatabase(route: string, scopeId: string, locale: AssetLocale = "en", principal?: ScopedPrincipal): Promise<Asset[]> {
   const assetType = routeToAssetType(route);
-  return getDatabaseAssets(assetType, scopeId, locale);
+  return getDatabaseAssets(assetType, scopeId, locale, principal);
 }
 
-export async function getScopedAssetCatalog(scopeId: string): Promise<ScopedAssetCatalog> {
-  const scope = requireReadableApplicationService(scopeId);
+export async function getScopedAssetCatalog(scopeId: string, principal?: ScopedPrincipal): Promise<ScopedAssetCatalog> {
+  const scope = requireReadableApplicationService(scopeId, principal);
   const where = scopeDatabaseWhere(scope);
   const trustedScope = { applicationServiceId: scope.id, scopePath: scope.scopePath };
   const [assetRows, proposalRows, contextPackRows, assetLinks] = await Promise.all([
@@ -133,9 +134,10 @@ export async function searchScopedAssets<TType extends AssetType>(
   scopeId: string,
   query: string,
   locale: AssetLocale,
-  options: ScopedSearchOptions
+  options: ScopedSearchOptions,
+  principal?: ScopedPrincipal
 ) {
-  const catalog = await getScopedAssetCatalog(scopeId);
+  const catalog = await getScopedAssetCatalog(scopeId, principal);
   const terms = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const matches = (catalog[assetCollections[assetType]] as Asset[])
     .map((asset) => ({ asset, score: terms.reduce((score, term) => score + (JSON.stringify(asset).toLocaleLowerCase().includes(term) ? 1 : 0), 0) }))
@@ -164,9 +166,10 @@ export async function getScopedAssetGraph(
   scopeId: string,
   domainId?: string,
   assetType?: AssetType,
-  locale: AssetLocale = "en"
+  locale: AssetLocale = "en",
+  principal?: ScopedPrincipal
 ): Promise<LocalizedAssetGraph> {
-  const catalog = await getScopedAssetCatalog(scopeId);
+  const catalog = await getScopedAssetCatalog(scopeId, principal);
   const graph = await withLegacyDerivedReadFallback(locale, (resolvedLocale) =>
     buildAssetGraph(domainId, assetType, { catalog, locale: resolvedLocale })
   );
@@ -205,8 +208,8 @@ function normalizePersistedAsset<TAsset extends Asset>(asset: TAsset, row: Persi
   return { ...asset, architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath } };
 }
 
-export async function getScopedAssetDetail(assetType: AssetType, assetId: string, scopeId: string, locale: AssetLocale = "en") {
-  const catalog = await getScopedAssetCatalog(scopeId);
+export async function getScopedAssetDetail(assetType: AssetType, assetId: string, scopeId: string, locale: AssetLocale = "en", principal?: ScopedPrincipal) {
+  const catalog = await getScopedAssetCatalog(scopeId, principal);
   const canonical = (catalog[assetCollections[assetType]] as Asset[]).find((asset) => asset.id === assetId);
   if (!canonical) throw new Error(`Asset not found: ${assetType}/${assetId}`);
   const options = { catalog, locale };
@@ -218,13 +221,13 @@ export async function getScopedAssetDetail(assetType: AssetType, assetId: string
   return { asset: safeLocalizeAssetForRead(assetType, canonical, locale), summary, markdown, governance };
 }
 
-export async function getScopedProposalImpact(proposalId: string, scopeId: string, locale: AssetLocale = "en") {
-  const catalog = await getScopedAssetCatalog(scopeId);
+export async function getScopedProposalImpact(proposalId: string, scopeId: string, locale: AssetLocale = "en", principal?: ScopedPrincipal) {
+  const catalog = await getScopedAssetCatalog(scopeId, principal);
   return withLegacyDerivedReadFallback(locale, (resolvedLocale) => analyzeProposalImpact(proposalId, { catalog, locale: resolvedLocale }));
 }
 
-export async function generateScopedContextPack(proposalId: string, scopeId: string, locale: AssetLocale = "en") {
-  const catalog = await getScopedAssetCatalog(scopeId);
+export async function generateScopedContextPack(proposalId: string, scopeId: string, locale: AssetLocale = "en", principal?: ScopedPrincipal) {
+  const catalog = await getScopedAssetCatalog(scopeId, principal);
   try {
     return await generateContextPack(proposalId, { catalog, locale });
   } catch (error) {
@@ -270,13 +273,13 @@ async function generateCanonicalLegacyContextPack(proposalId: string, catalog: S
   };
 }
 
-export async function getScopedGovernanceChecks(assetType: AssetType, assetId: string, scopeId: string, locale: AssetLocale = "en") {
-  const catalog = await getScopedAssetCatalog(scopeId);
+export async function getScopedGovernanceChecks(assetType: AssetType, assetId: string, scopeId: string, locale: AssetLocale = "en", principal?: ScopedPrincipal) {
+  const catalog = await getScopedAssetCatalog(scopeId, principal);
   return runGovernanceChecks(assetType, assetId, { catalog, locale });
 }
 
-export async function getScopedGovernanceOverview(scopeId: string, locale: AssetLocale = "en") {
-  const catalog = await getScopedAssetCatalog(scopeId);
+export async function getScopedGovernanceOverview(scopeId: string, locale: AssetLocale = "en", principal?: ScopedPrincipal) {
+  const catalog = await getScopedAssetCatalog(scopeId, principal);
   const targetTypes: AssetType[] = ["api", "event", "dataModel", "businessRule", "proposal"];
   const targets = targetTypes.flatMap((type) =>
     (catalog[assetCollections[type]] as Asset[]).map((asset) => ({ type, id: asset.id }))
@@ -284,13 +287,13 @@ export async function getScopedGovernanceOverview(scopeId: string, locale: Asset
   return (await Promise.all(targets.map((target) => runGovernanceChecks(target.type, target.id, { catalog, locale })))).flat();
 }
 
-export async function renderScopedAssetSummary(assetType: AssetType, assetId: string, scopeId: string, locale: AssetLocale = "en") {
-  const catalog = await getScopedAssetCatalog(scopeId);
+export async function renderScopedAssetSummary(assetType: AssetType, assetId: string, scopeId: string, locale: AssetLocale = "en", principal?: ScopedPrincipal) {
+  const catalog = await getScopedAssetCatalog(scopeId, principal);
   return withLegacyDerivedReadFallback(locale, (resolvedLocale) => renderAssetSummary(assetType, assetId, { catalog, locale: resolvedLocale }));
 }
 
-export async function renderScopedAssetMarkdown(assetType: AssetType, assetId: string, scopeId: string, locale: AssetLocale = "en") {
-  const catalog = await getScopedAssetCatalog(scopeId);
+export async function renderScopedAssetMarkdown(assetType: AssetType, assetId: string, scopeId: string, locale: AssetLocale = "en", principal?: ScopedPrincipal) {
+  const catalog = await getScopedAssetCatalog(scopeId, principal);
   return withLegacyDerivedReadFallback(locale, (resolvedLocale) => renderAssetAsMarkdown(assetType, assetId, { catalog, locale: resolvedLocale }));
 }
 
@@ -301,25 +304,25 @@ function emptyCatalog(): SpecForgeDataStore {
   };
 }
 
-export async function getRouteAssetWithDatabase(route: string, id: string, scopeId: string, locale: AssetLocale = "en"): Promise<Asset> {
+export async function getRouteAssetWithDatabase(route: string, id: string, scopeId: string, locale: AssetLocale = "en", principal?: ScopedPrincipal): Promise<Asset> {
   const assetType = routeToAssetType(route);
-  const dbAssets = await getDatabaseAssets(assetType, scopeId, locale);
+  const dbAssets = await getDatabaseAssets(assetType, scopeId, locale, principal);
   const dbAsset = dbAssets.find((asset) => asset.id === id);
   if (dbAsset) return dbAsset;
   throw new Error(`Asset not found: ${assetType}/${id}`);
 }
 
-export async function getDomainsWithDatabase(scopeId: string, locale: AssetLocale = "en"): Promise<DomainModel[]> {
-  return (await getRouteAssetsWithDatabase("domains", scopeId, locale)) as DomainModel[];
+export async function getDomainsWithDatabase(scopeId: string, locale: AssetLocale = "en", principal?: ScopedPrincipal): Promise<DomainModel[]> {
+  return (await getRouteAssetsWithDatabase("domains", scopeId, locale, principal)) as DomainModel[];
 }
 
-export async function getGovernanceTargetsWithDatabase(scopeId: string): Promise<Array<{ type: AssetType; id: string }>> {
+export async function getGovernanceTargetsWithDatabase(scopeId: string, principal?: ScopedPrincipal): Promise<Array<{ type: AssetType; id: string }>> {
   const [apis, events, dataModels, businessRules, proposals] = await Promise.all([
-    getRouteAssetsWithDatabase("apis", scopeId),
-    getRouteAssetsWithDatabase("events", scopeId),
-    getRouteAssetsWithDatabase("data-models", scopeId),
-    getRouteAssetsWithDatabase("rules", scopeId),
-    getProposalsWithDatabase(scopeId)
+    getRouteAssetsWithDatabase("apis", scopeId, "en", principal),
+    getRouteAssetsWithDatabase("events", scopeId, "en", principal),
+    getRouteAssetsWithDatabase("data-models", scopeId, "en", principal),
+    getRouteAssetsWithDatabase("rules", scopeId, "en", principal),
+    getProposalsWithDatabase(scopeId, "en", principal)
   ]);
   return [
     ...apis.map((asset) => ({ type: "api" as AssetType, id: asset.id })),
@@ -330,21 +333,21 @@ export async function getGovernanceTargetsWithDatabase(scopeId: string): Promise
   ];
 }
 
-export async function getProposalsWithDatabase(scopeId: string, locale: AssetLocale = "en"): Promise<Proposal[]> {
-  const scope = requireReadableApplicationService(scopeId);
+export async function getProposalsWithDatabase(scopeId: string, locale: AssetLocale = "en", principal?: ScopedPrincipal): Promise<Proposal[]> {
+  const scope = requireReadableApplicationService(scopeId, principal);
   const rows = await prisma.proposal.findMany({ where: scopeDatabaseWhere(scope), orderBy: { createdAt: "asc" } });
   return rows.map((row) => safeLocalizeAssetForRead("proposal", JSON.parse(row.payload) as Proposal, locale));
 }
 
-export async function getProposalWithDatabase(id: string, scopeId: string, locale: AssetLocale = "en"): Promise<Proposal> {
-  const scope = requireReadableApplicationService(scopeId);
+export async function getProposalWithDatabase(id: string, scopeId: string, locale: AssetLocale = "en", principal?: ScopedPrincipal): Promise<Proposal> {
+  const scope = requireReadableApplicationService(scopeId, principal);
   const row = await prisma.proposal.findFirst({ where: { id, ...scopeDatabaseWhere(scope) } });
   if (row) return safeLocalizeAssetForRead("proposal", JSON.parse(row.payload) as Proposal, locale);
   throw new Error(`Proposal not found: ${id}`);
 }
 
-export async function getContextPacksWithDatabase(scopeId: string, locale: AssetLocale = "en"): Promise<ContextPack[]> {
-  const scope = requireReadableApplicationService(scopeId);
+export async function getContextPacksWithDatabase(scopeId: string, locale: AssetLocale = "en", principal?: ScopedPrincipal): Promise<ContextPack[]> {
+  const scope = requireReadableApplicationService(scopeId, principal);
   const rows = await prisma.contextPack.findMany({ where: scopeDatabaseWhere(scope), orderBy: { createdAt: "asc" } });
   return rows.map((row) => localizeContextPackRow(row, locale));
 }
@@ -393,8 +396,8 @@ function contextPackFromLegacyRow(row: ContextPackRow): ContextPack {
   };
 }
 
-export async function getContextPackWithDatabase(id: string, scopeId: string, locale: AssetLocale = "en"): Promise<ContextPack> {
-  const scope = requireReadableApplicationService(scopeId);
+export async function getContextPackWithDatabase(id: string, scopeId: string, locale: AssetLocale = "en", principal?: ScopedPrincipal): Promise<ContextPack> {
+  const scope = requireReadableApplicationService(scopeId, principal);
   const row = await prisma.contextPack.findFirst({ where: { id, ...scopeDatabaseWhere(scope) } });
   if (row) {
     return localizeContextPackRow(row, locale);
@@ -402,8 +405,8 @@ export async function getContextPackWithDatabase(id: string, scopeId: string, lo
   throw new Error(`Context Pack not found: ${id}`);
 }
 
-export async function dashboardStats(scopeId: string) {
-  const scope = requireReadableApplicationService(scopeId);
+export async function dashboardStats(scopeId: string, principal?: ScopedPrincipal) {
+  const scope = requireReadableApplicationService(scopeId, principal);
   const dbRows = await prisma.designAsset.findMany({ where: scopeDatabaseWhere(scope), select: { id: true, type: true } });
   return Object.entries(assetCollections)
     .filter(([type]) => !["proposal", "contextPack"].includes(type))
@@ -413,8 +416,8 @@ export async function dashboardStats(scopeId: string) {
     }));
 }
 
-export async function getAgentServiceWorkspace(applicationServiceId: string, agentId = "specforge-default-agent") {
-  requireReadableApplicationService(applicationServiceId);
+export async function getAgentServiceWorkspace(applicationServiceId: string, agentId = "specforge-default-agent", principal?: ScopedPrincipal) {
+  requireReadableApplicationService(applicationServiceId, principal);
   return prisma.agentServiceWorkspace.upsert({
     where: { agentType_agentId_applicationServiceId: { agentType: "agent", agentId, applicationServiceId } },
     create: { agentType: "agent", agentId, applicationServiceId },
@@ -422,12 +425,12 @@ export async function getAgentServiceWorkspace(applicationServiceId: string, age
   });
 }
 
-export async function getAssetGraphWithDatabase(scopeId: string, domainId?: string, assetType?: AssetType, locale: AssetLocale = "en"): Promise<AssetGraph> {
-  return getScopedAssetGraph(scopeId, domainId, assetType, locale);
+export async function getAssetGraphWithDatabase(scopeId: string, domainId?: string, assetType?: AssetType, locale: AssetLocale = "en", principal?: ScopedPrincipal): Promise<AssetGraph> {
+  return getScopedAssetGraph(scopeId, domainId, assetType, locale, principal);
 }
 
-async function getDatabaseAssets(assetType: AssetType, scopeId: string, locale: AssetLocale): Promise<Asset[]> {
-  const scope = requireReadableApplicationService(scopeId);
+async function getDatabaseAssets(assetType: AssetType, scopeId: string, locale: AssetLocale, principal?: ScopedPrincipal): Promise<Asset[]> {
+  const scope = requireReadableApplicationService(scopeId, principal);
   const rows = await prisma.designAsset.findMany({
     where: { type: assetType, ...scopeDatabaseWhere(scope) },
     orderBy: { createdAt: "asc" }

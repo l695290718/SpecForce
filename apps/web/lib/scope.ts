@@ -1,20 +1,20 @@
-import { defaultHuaweiActor, hasScopeAccess, huaweiArchitectureScopes, scopeById, type ArchitectureScope } from "@specforge/core";
+import { defaultHuaweiActor, hasScopeAccess, huaweiArchitectureScopes, scopeById, type ArchitectureScope, type ScopedPrincipal } from "@specforge/core";
 
 export type ResolvedApplicationServiceScope = ArchitectureScope & {
   level: "applicationService";
 };
 
-export function requireReadableApplicationService(scopeId: string): ResolvedApplicationServiceScope {
+export function requireReadableApplicationService(scopeId: string, principal: ScopedPrincipal = localDevelopmentPrincipal()): ResolvedApplicationServiceScope {
   const scope = scopeById(scopeId);
   if (!scope) throw new Error("Application-service scope is required or unknown.");
   if (scope.level !== "applicationService") throw new Error("Scope must be an application service.");
-  if (!hasScopeAccess(defaultHuaweiActor, scope, "read")) throw new Error("Scope read is not authorized.");
+  if (!hasScopeAccess(principal, scope, "read")) throw new Error("Scope read is not authorized.");
   return scope as ResolvedApplicationServiceScope;
 }
 
-export function listReadableApplicationServices(): ResolvedApplicationServiceScope[] {
+export function listReadableApplicationServices(principal: ScopedPrincipal = localDevelopmentPrincipal()): ResolvedApplicationServiceScope[] {
   return huaweiArchitectureScopes.filter(
-    (scope): scope is ResolvedApplicationServiceScope => scope.level === "applicationService" && hasScopeAccess(defaultHuaweiActor, scope, "read")
+    (scope): scope is ResolvedApplicationServiceScope => scope.level === "applicationService" && hasScopeAccess(principal, scope, "read")
   );
 }
 
@@ -28,4 +28,15 @@ export function scopeDatabaseWhere(scope: ResolvedApplicationServiceScope) {
 export function buildScopedHref(href: string, scopeId: string): string {
   const separator = href.includes("?") ? "&" : "?";
   return `${href}${separator}scope=${encodeURIComponent(scopeId)}`;
+}
+
+function localDevelopmentPrincipal(): ScopedPrincipal {
+  return {
+    ...defaultHuaweiActor,
+    subject: defaultHuaweiActor.actorId,
+    tenantId: "local-development",
+    authSource: "seed",
+    permissions: ["asset:read", "proposal:read", "context-pack:generate", "governance:run", "graph:read", "knowledge:read"],
+    decisionRef: "local-development-scope-helper"
+  };
 }

@@ -55,6 +55,20 @@ export const dataModelZhById: Record<string, DataModelLocalizedFields> = {
     lifecycle: "MVP 阶段在内存中保留审计记录；下一阶段后端切片再通过 Prisma 持久化。",
     lineage: "MCP 工具包装层以及未来的 Web/API 中间件",
     fields: {
+      application_service_id: {
+        displayName: "应用服务 ID",
+        meaning: "有 Scope 的审计记录所属的精确应用服务。",
+        constraint: "必须与 scope_path 成对出现；空值仅用于全局运维记录。",
+        classification: "范围身份",
+        example: "com.huawei.celon.desiner"
+      },
+      scope_path: {
+        displayName: "范围路径",
+        meaning: "与应用服务 ID 成对保存的物化架构路径。",
+        constraint: "读取有 Scope 的审计记录时必须与 application_service_id 一起过滤。",
+        classification: "范围身份",
+        example: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+      },
       id: {
         displayName: "审计 ID",
         meaning: "审计日志的唯一标识。",

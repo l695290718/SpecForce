@@ -4,11 +4,12 @@ import { T } from "../../components/language-provider";
 import { getContextPacksWithDatabase } from "../../lib/assets";
 import { buildScopedHref } from "../../lib/scope";
 import { getRequestLocale } from "../../lib/locale";
+import { getRequestPrincipal } from "../../lib/request-principal";
 
 export default async function ContextPacksPage({ searchParams }: { searchParams: Promise<{ scope?: string }> }) {
   const { scope = "" } = await searchParams;
   const locale = await getRequestLocale();
-  const packs = await getContextPacksWithDatabase(scope, locale);
+  const packs = await getContextPacksWithDatabase(scope, locale, await getRequestPrincipal());
   return (
     <>
       <PageHeader title={<T k="contextPacks.title" />} description={<T k="contextPacks.description" />} />

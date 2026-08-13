@@ -278,7 +278,13 @@ type FederationAuditInput = {
   errorMessage?: string;
 };
 
+function auditScopeFromInput(value: unknown): ArchitectureScopeRef | undefined {
+  if (!isRecord(value) || !isArchitectureScope(value.architectureScope)) return undefined;
+  return value.architectureScope;
+}
+
 async function createFederationAudit(input: FederationAuditInput): Promise<string> {
+  const architectureScope = auditScopeFromInput(input.toolInput);
   const row = await prisma.auditLog.create({
     data: {
       actorType: input.actor.actorType,
@@ -290,7 +296,9 @@ async function createFederationAudit(input: FederationAuditInput): Promise<strin
       inputSummary: summarizeAuditInput(input.toolInput),
       outputSummary: summarizeAudit(input.output),
       status: "PENDING",
-      errorMessage: undefined
+      errorMessage: undefined,
+      applicationServiceId: architectureScope?.applicationServiceId,
+      scopePath: architectureScope?.scopePath
     }
   });
   if (!row || typeof row.id !== "string") throw new FederationToolError("AUDIT_PERSISTENCE_FAILED");
@@ -332,12 +340,18 @@ async function finalizeFederationAuditRecoverable(id: string, input: FederationA
 export async function retryFederationAuditFinalization(id: string, requestedScope: ArchitectureScopeRef): Promise<void> {
   try {
     if (!isArchitectureScope(requestedScope)) throw new FederationToolError("SCOPE_MISMATCH");
-    const row = await prisma.auditLog.findUnique({ where: { id } });
+    const row = await prisma.auditLog.findFirst({
+      where: {
+        id,
+        applicationServiceId: requestedScope.applicationServiceId,
+        scopePath: requestedScope.scopePath
+      }
+    });
     if (!row || (row.status !== "SUCCESS_REPAIR_REQUIRED" && row.status !== "FAILED_REPAIR_REQUIRED" && row.status !== "success" && row.status !== "failed")) {
       throw new FederationToolError("AUDIT_PERSISTENCE_FAILED");
     }
     const persistedScope = auditScopeFromSummary(row.inputSummary);
-    if (!persistedScope || persistedScope.applicationServiceId !== requestedScope.applicationServiceId || persistedScope.scopePath !== requestedScope.scopePath) {
+    if (!persistedScope || persistedScope.applicationServiceId !== row.applicationServiceId || persistedScope.scopePath !== row.scopePath) {
       throw new FederationToolError("SCOPE_MISMATCH");
     }
     if (row.status === "success" || row.status === "failed") return;

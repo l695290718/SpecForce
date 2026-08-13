@@ -6,15 +6,17 @@ import { T } from "../../../components/language-provider";
 import { LocalizedSearchInput } from "../../../components/localized-search-input";
 import { buildScopedHref } from "../../../lib/scope";
 import { getRequestLocale, withSearchParams } from "../../../lib/locale";
+import { getRequestPrincipal } from "../../../lib/request-principal";
 
 export default async function AssetListPage({ params, searchParams }: { params: Promise<{ type: AssetRouteType }>; searchParams: Promise<{ q?: string; scope?: string; limit?: string; offset?: string }> }) {
   const { type } = await params;
   const { q = "", scope = "", limit: limitParam, offset: offsetParam } = await searchParams;
   const locale = await getRequestLocale();
+  const principal = await getRequestPrincipal();
   const assetType = routeToAssetType(type);
   const limit = boundedInteger(limitParam, 20, 1, 100);
   const offset = boundedInteger(offsetParam, 0, 0, Number.MAX_SAFE_INTEGER);
-  const result = await searchScopedAssets(assetType, scope, q, locale, { limit, offset });
+  const result = await searchScopedAssets(assetType, scope, q, locale, { limit, offset }, principal);
   const assets = result.items.map((item) => item.asset);
 
   return (

@@ -4,12 +4,14 @@ import { Card, PageHeader } from "../../components/ui";
 import { T } from "../../components/language-provider";
 import { getAssetGraphWithDatabase, getDomainsWithDatabase } from "../../lib/assets";
 import { getRequestLocale } from "../../lib/locale";
+import { getRequestPrincipal } from "../../lib/request-principal";
 
 export default async function GraphPage({ searchParams }: { searchParams: Promise<{ domainId?: string; assetType?: AssetType; scope?: string }> }) {
   const { domainId, assetType, scope = "" } = await searchParams;
   const locale = await getRequestLocale();
-  const graph = await getAssetGraphWithDatabase(scope, domainId, assetType, locale);
-  const domains = await getDomainsWithDatabase(scope, locale);
+  const principal = await getRequestPrincipal();
+  const graph = await getAssetGraphWithDatabase(scope, domainId, assetType, locale, principal);
+  const domains = await getDomainsWithDatabase(scope, locale, principal);
   const assetTypes: AssetType[] = ["dataModel", "api", "event", "businessRule", "stateMachine", "integration", "quality", "observability", "adr", "proposal"];
 
   return (

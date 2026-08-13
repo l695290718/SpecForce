@@ -4,13 +4,14 @@ import { assetTitleKeys, getScopedAssetDetail, routeToAssetType, type AssetRoute
 import { T } from "../../../../components/language-provider";
 import { SpecializedAssetSections } from "../../../../components/asset-detail-sections";
 import { getRequestLocale } from "../../../../lib/locale";
+import { getRequestPrincipal } from "../../../../lib/request-principal";
 
 export default async function AssetDetailPage({ params, searchParams }: { params: Promise<{ type: AssetRouteType; id: string }>; searchParams: Promise<{ scope?: string }> }) {
   const { type, id } = await params;
   const { scope = "" } = await searchParams;
   const locale = await getRequestLocale();
   const assetType = routeToAssetType(type);
-  const detail = await getScopedAssetDetail(assetType, id, scope, locale);
+  const detail = await getScopedAssetDetail(assetType, id, scope, locale, await getRequestPrincipal());
   const asset = detail.asset as Record<string, any>;
   const checks = detail.governance;
   const title = asset.title ?? asset.name;

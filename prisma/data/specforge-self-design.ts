@@ -224,11 +224,37 @@ export const selfDesignDataModels: DataModel[] = [
         classification: "audit",
         example: "success",
         owner: "SpecForge Core Team"
+      },
+      {
+        fieldName: "application_service_id",
+        displayName: "Application Service ID",
+        dataType: "string",
+        meaning: "Exact application-service owner for a scoped audit record.",
+        nullable: true,
+        constraint: "must be paired with scope_path; null is reserved for global operational records",
+        sensitiveLevel: "none",
+        classification: "scope-identity",
+        example: "com.huawei.celon.desiner",
+        owner: "SpecForge Core Team"
+      },
+      {
+        fieldName: "scope_path",
+        displayName: "Scope Path",
+        dataType: "string",
+        meaning: "Materialized architecture path paired with application_service_id.",
+        nullable: true,
+        constraint: "must be paired with application_service_id; both are used in scoped reads",
+        sensitiveLevel: "none",
+        classification: "scope-identity",
+        example: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner",
+        owner: "SpecForge Core Team"
       }
     ],
     relationships: ["AuditLog references targetType/targetId instead of hard database foreign keys"],
     constraints: [
       "All MCP tool calls must produce an audit log",
+      "Scoped audit records must persist application_service_id and scope_path together",
+      "Scoped audit reads must filter by both application_service_id and scope_path",
       "Database errors must not be returned raw to MCP clients"
     ],
     dataClassification: "internal",

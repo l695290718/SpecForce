@@ -198,10 +198,25 @@ async function initializeMcpPersistenceSchema() {
       "assetType" TEXT NOT NULL,
       "assetId" TEXT NOT NULL,
       results TEXT NOT NULL,
+      "applicationServiceId" TEXT,
+      "scopePath" TEXT,
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "GovernanceCheckSnapshot" ADD COLUMN IF NOT EXISTS "applicationServiceId" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "GovernanceCheckSnapshot" ADD COLUMN IF NOT EXISTS "scopePath" TEXT`);
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'GovernanceCheckSnapshot_scope_pair_check') THEN
+        ALTER TABLE "GovernanceCheckSnapshot"
+          ADD CONSTRAINT "GovernanceCheckSnapshot_scope_pair_check"
+          CHECK (("applicationServiceId" IS NULL) = ("scopePath" IS NULL));
+      END IF;
+    END $$;
+  `);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "GovernanceCheckSnapshot_assetType_assetId_idx" ON "GovernanceCheckSnapshot"("assetType", "assetId")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "GovernanceCheckSnapshot_scope_asset_idx" ON "GovernanceCheckSnapshot"("applicationServiceId", "scopePath", "assetType", "assetId")`);
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "AssetLink" (
       "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),

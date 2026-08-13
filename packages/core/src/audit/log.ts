@@ -9,6 +9,11 @@ export type RecordAuditLogInput = Omit<AuditLog, "id" | "createdAt"> & {
 let auditSequence = 1;
 
 export function recordAuditLog(input: RecordAuditLogInput): AuditLog {
+  const hasApplicationService = Boolean(input.applicationServiceId);
+  const hasScopePath = Boolean(input.scopePath);
+  if (hasApplicationService !== hasScopePath) {
+    throw new Error("AuditLog Scope must provide applicationServiceId and scopePath together.");
+  }
   const store = getStore();
   if (!store.auditLogs) store.auditLogs = [];
   const entry: AuditLog = {

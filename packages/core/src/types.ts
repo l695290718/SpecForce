@@ -456,6 +456,9 @@ export interface AuditLog {
   outputSummary: string;
   status: AuditStatus;
   errorMessage?: string;
+  /** Structured ownership; legacy/global operational entries may omit both fields. */
+  applicationServiceId?: string;
+  scopePath?: string;
   createdAt: string;
 }
 
