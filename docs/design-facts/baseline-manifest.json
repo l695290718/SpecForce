@@ -1471,6 +1471,30 @@
                                            {
                                                "command":  "pnpm design-facts:sync; $env:SPECFORGE_DESIGN_FACT_IDS='adr-webgl-3a-graph-exploration'; pnpm design-facts:check",
                                                "result":  "Synchronization returned complete; reconciliation returned missing=[], mismatched=[], outOfScope=[], and blocked=[]."
+                                           },
+                                           {
+                                               "command":  "pnpm design-context:preflight -- --intent Implement-GitNexus-style-continuous-ForceAtlas2-supervisor-layout-for-the-3A-architecture-graph --affected adr-webgl-3a-graph-exploration,proposal-webgl-3a-graph-exploration,ctx-webgl-3a-graph-exploration --evidence web-typecheck,three-a-graph-tests,web-build",
+                                               "result":  "Opened design-change-session:42c82e52-5b6f-460a-9675-b95c8cde75cc in the exact Designer Scope, read 280 scoped assets, and returned design context digest a8a7aa57e3cfbf9efc34c4403aab665553b02cbfa2587d37c4347d753754ce33 with relationship digest ddb816e608c662842db21fedc5db5ab37cec0069e51cf022c8bccc54b9448bc1 and reconciliation UNVERIFIED."
+                                           },
+                                           {
+                                               "command":  "pnpm typecheck; node apps\\web\\node_modules\\vitest\\vitest.mjs run --pool=threads apps/web/components/three-a/architecture-graph-layout-force.test.ts apps/web/components/three-a/architecture-graph-layout-worker.test.ts apps/web/components/three-a/architecture-graph-motion.test.ts apps/web/components/three-a/sigma-architecture-graph.test.tsx; node apps\\web\\node_modules\\vitest\\vitest.mjs run --pool=threads apps/web; $env:SPECFORGE_NEXT_STANDALONE='0'; pnpm --filter @specforge/web build",
+                                               "result":  "Repository-wide typecheck exited 0 for core, knowledge-query, knowledge-projector, mcp-server, and web. Focused 3A graph tests passed 4 files and 28 tests, including updated motion-visibility reducer assertions. Web build exited 0 and emitted /architecture/3a. Full web suite passed 173 files and 777 tests; 4 pre-existing failures in apps/web/lib/__tests__/derived-routes.test.ts are caused by the HEAD WebPrincipal wiring and are unrelated to the continuous-layout change."
+                                           },
+                                           {
+                                               "command":  "pnpm design-context:preflight -- --intent Implement-GitNexus-style-continuous-ForceAtlas2-supervisor-layout-for-the-3A-architecture-graph --affected adr-webgl-3a-graph-exploration,proposal-webgl-3a-graph-exploration,ctx-webgl-3a-graph-exploration --evidence web-typecheck,three-a-graph-tests,web-build",
+                                               "result":  "Opened design-change-session:42c82e52-5b6f-460a-9675-b95c8cde75cc in the exact Designer Scope, read 280 scoped assets, and returned design context digest a8a7aa57e3cfbf9efc34c4403aab665553b02cbfa2587d37c4347d753754ce33 with relationship digest ddb816e608c662842db21fedc5db5ab37cec0069e51cf022c8bccc54b9448bc1 and reconciliation UNVERIFIED."
+                                           },
+                                           {
+                                               "command":  "pnpm typecheck; node apps\\web\\node_modules\\vitest\\vitest.mjs run --pool=threads apps/web/components/three-a/architecture-graph-layout-force.test.ts apps/web/components/three-a/architecture-graph-layout-worker.test.ts apps/web/components/three-a/architecture-graph-motion.test.ts apps/web/components/three-a/sigma-architecture-graph.test.tsx; node apps\\web\\node_modules\\vitest\\vitest.mjs run --pool=threads apps/web; $env:SPECFORGE_NEXT_STANDALONE='0'; pnpm --filter @specforge/web build",
+                                               "result":  "Repository-wide typecheck exited 0 for core, knowledge-query, knowledge-projector, mcp-server, and web. Focused 3A graph tests passed 4 files and 28 tests, including updated motion-visibility reducer assertions. Web build exited 0 and emitted /architecture/3a. Full web suite passed 173 files and 777 tests; 4 pre-existing failures in apps/web/lib/__tests__/derived-routes.test.ts are caused by the HEAD WebPrincipal wiring and are unrelated to the continuous-layout change."
+                                           },
+                                           {
+                                               "command":  "pnpm design-context:close -- --session design-change-session:42c82e52-5b6f-460a-9675-b95c8cde75cc --status CONVERGED --evidence pnpm-typecheck=exit-0,three-a-focused-tests=4-files-28-tests-pass,web-build=exit-0-emits-3a-route,web-full-suite=173-files-777-pass-4-preexisting-unrelated-failures,design-facts-sync=complete,design-facts-check=missing-0-mismatched-0",
+                                               "result":  "Returned CONVERGED in the exact Designer Scope for the continuous ForceAtlas2 supervisor increment."
+                                           },
+                                           {
+                                               "command":  "pnpm design-facts:sync; $env:SPECFORGE_DESIGN_FACT_IDS='adr-webgl-3a-graph-exploration'; pnpm design-facts:check",
+                                               "result":  "Synchronization returned complete; reconciliation returned missing=[], mismatched=[], outOfScope=[], and blocked=[]."
                                            }
                                        ]
                       },

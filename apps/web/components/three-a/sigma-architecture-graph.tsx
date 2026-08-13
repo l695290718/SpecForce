@@ -2,9 +2,12 @@
 
 import type Sigma from "sigma";
 import type { EdgeProgramType } from "sigma/rendering";
+import FA2LayoutSupervisor from "graphology-layout-forceatlas2/worker";
+import noverlap from "graphology-layout-noverlap";
 import { useEffect, useMemo, useRef } from "react";
-import { GRAPH_CAMERA_TRANSITION_MS, GRAPH_LAYOUT_TRANSITION_MS, GRAPH_PULSE_MS, interpolateGraphPositions, type GraphPulseState } from "./architecture-graph-motion";
-import { deterministicLayout, refineArchitectureGraphLayout, type LayoutLifecycle, type LayoutRunMode, type LayoutWorkerRequest, type LayoutWorkerResponse } from "./architecture-graph-layout-worker";
+import { GRAPH_CAMERA_TRANSITION_MS, GRAPH_PULSE_MS, type GraphPulseState } from "./architecture-graph-motion";
+import { deterministicLayout, type LayoutLifecycle, type LayoutRunMode, type LayoutWorkerRequest } from "./architecture-graph-layout-worker";
+import { NOVERLAP_PARAMETERS, forceSettings, runForceArchitectureLayout } from "./architecture-graph-layout-force";
 import { nodeColor, nodeSize, oneHopNeighborhood, visibleLabel, type ArchitectureGraphStore, type GraphEdgeAttributes, type GraphNodeAttributes } from "./architecture-graph-store";
 import type { ArchitectureGraphSemanticState } from "./architecture-graph-state";
 
@@ -144,14 +147,16 @@ export function createEdgeVisualState(edge: GraphEdgeInput, state: Partial<Graph
   const size = active
     ? (connected ? Math.max(1.4, Math.min(4.2, attributes.weight * 1.2)) : 0.35)
     : Math.max(0.45, Math.min(3.2, attributes.weight * 0.75));
+  const moving = layoutAnimating && !active;
+  const effectiveOpacity = moving ? Math.max(0.14, opacity * 0.6) : opacity;
 
   return {
-    color: edgeColor(attributes, opacity),
-    size,
-    hidden: layoutAnimating,
+    color: edgeColor(attributes, effectiveOpacity),
+    size: moving ? size * 0.8 : size,
+    hidden: false,
     highlighted: connected || attributes.highlighted === true,
     zIndex: connected && active ? 3 : attributes.highlighted ? 2 : 0,
-    opacity
+    opacity: effectiveOpacity
   };
 }
 
@@ -212,11 +217,11 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
   const hoverRef = useRef<string | undefined>(undefined);
   const highlightedRef = useRef<ReadonlySet<string> | undefined>(undefined);
   const semanticStateRef = useRef(semanticState);
-  const layoutFrameRef = useRef<number | undefined>(undefined);
   const layoutAnimatingRef = useRef(false);
   const pulseFrameRef = useRef<number | undefined>(undefined);
   const pulseRef = useRef<GraphPulseState | undefined>(undefined);
-  const layoutWorkerRef = useRef<Worker | undefined>(undefined);
+  const supervisorRef = useRef<FA2LayoutSupervisor<GraphNodeAttributes, GraphEdgeAttributes> | undefined>(undefined);
+  const layoutRefreshRef = useRef<number | undefined>(undefined);
   const layoutRunIdRef = useRef(0);
   const layoutLifecycleRef = useRef<LayoutLifecycle>("seeded");
   const layoutActionsRef = useRef<SigmaArchitectureGraphLayoutActions>({ start: () => undefined, stop: () => undefined, restart: () => undefined });
@@ -230,17 +235,95 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
     callbacksRef.current.onLayoutLifecycleChange?.(lifecycle);
   };
 
-  const cancelLayoutAnimation = () => {
-    if (layoutFrameRef.current !== undefined) cancelAnimationFrame(layoutFrameRef.current);
-    layoutFrameRef.current = undefined;
+  const cancelLayoutRun = () => {
+    layoutRunIdRef.current += 1;
+    if (layoutRefreshRef.current !== undefined) {
+      window.clearInterval(layoutRefreshRef.current);
+      layoutRefreshRef.current = undefined;
+    }
+    const supervisor = supervisorRef.current;
+    supervisorRef.current = undefined;
+    if (supervisor) {
+      try {
+        supervisor.kill();
+      } catch {
+        // The supervisor worker may already be gone; killing is best-effort.
+      }
+    }
     layoutAnimatingRef.current = false;
   };
 
-  const cancelLayoutRun = () => {
-    layoutRunIdRef.current += 1;
-    layoutWorkerRef.current?.terminate();
-    layoutWorkerRef.current = undefined;
-    cancelLayoutAnimation();
+  const settleLayout = (lifecycle: LayoutLifecycle) => {
+    cancelLayoutRun();
+    try {
+      noverlap.assign(store.graph, NOVERLAP_PARAMETERS);
+    } catch {
+      // Noverlap is a readability cleanup; settled force positions remain usable.
+    }
+    sigmaRef.current?.refresh();
+    if (!selectedRef.current) void sigmaRef.current?.getCamera().animatedReset({ duration: GRAPH_CAMERA_TRANSITION_MS });
+    notifyLayoutLifecycle(lifecycle);
+  };
+
+  const startLayoutRun = () => {
+    cancelLayoutRun();
+    const runId = layoutRunIdRef.current;
+    notifyLayoutLifecycle("running");
+    const deterministic = deterministicLayout(layoutRequest);
+    if (reducedMotion || layoutRequest.layout === "tree" || layoutRequest.layout === "circles" || store.graph.order < 2) {
+      applyLayoutPositions(store, deterministic);
+      layoutAnimatingRef.current = false;
+      sigmaRef.current?.refresh();
+      notifyLayoutLifecycle(reducedMotion ? "stopped" : "settled");
+      return;
+    }
+    layoutAnimatingRef.current = true;
+    try {
+      const supervisor = new FA2LayoutSupervisor<GraphNodeAttributes, GraphEdgeAttributes>(store.graph, {
+        settings: forceSettings(store.graph.order, layoutRequest.seed)
+      });
+      if (runId !== layoutRunIdRef.current) {
+        supervisor.kill();
+        return;
+      }
+      supervisorRef.current = supervisor;
+      layoutRefreshRef.current = window.setInterval(() => { sigmaRef.current?.refresh(); }, 60);
+      sigmaRef.current?.refresh();
+      supervisor.start();
+      if (!selectedRef.current) void sigmaRef.current?.getCamera().animatedReset({ duration: GRAPH_CAMERA_TRANSITION_MS });
+    } catch {
+      const fallback = runForceArchitectureLayout({
+        nodes: layoutRequest.nodes,
+        edges: layoutRequest.edges,
+        seed: layoutRequest.seed,
+        maxRuntimeMs: layoutRequest.maxRuntimeMs,
+        runNoverlap: true
+      });
+      applyLayoutPositions(store, fallback.positions);
+      layoutAnimatingRef.current = false;
+      sigmaRef.current?.refresh();
+      notifyLayoutLifecycle("failed");
+      callbacksRef.current.onRendererFailure("WORKER_ERROR");
+    }
+  };
+
+  const stopLayoutRun = () => {
+    const supervisor = supervisorRef.current;
+    if (!supervisor) {
+      notifyLayoutLifecycle("settled");
+      return;
+    }
+    try {
+      supervisor.stop();
+    } catch {
+      // A stopped or killed supervisor is already terminal; settling proceeds.
+    }
+    settleLayout("settled");
+  };
+
+  const restartLayoutRun = () => {
+    cancelLayoutRun();
+    startLayoutRun();
   };
 
   const cancelPulse = () => {
@@ -273,78 +356,12 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
     pulseFrameRef.current = requestAnimationFrame(tick);
   };
 
-  const animateLayout = (positions: readonly { id: string; x: number; y: number }[], onComplete?: () => void) => {
-    cancelLayoutAnimation();
-    const current = store.snapshot().nodes.map(({ id, attributes }) => ({ id, x: attributes.x, y: attributes.y }));
-    if (reducedMotion) {
-      applyLayoutPositions(store, positions);
-      sigmaRef.current?.refresh();
-      onComplete?.();
-      return;
-    }
-    layoutAnimatingRef.current = true;
-    const startedAt = performance.now();
-    const tick = (timestamp: number) => {
-      const progress = Math.min(1, (timestamp - startedAt) / GRAPH_LAYOUT_TRANSITION_MS);
-      applyLayoutPositions(store, interpolateGraphPositions(current, positions, progress));
-      sigmaRef.current?.refresh();
-      if (progress >= 1) {
-        layoutFrameRef.current = undefined;
-        layoutAnimatingRef.current = false;
-        if (!selectedRef.current) void sigmaRef.current?.getCamera().animatedReset({ duration: GRAPH_CAMERA_TRANSITION_MS });
-        sigmaRef.current?.refresh();
-        onComplete?.();
-        return;
-      }
-      layoutFrameRef.current = requestAnimationFrame(tick);
-    };
-    layoutFrameRef.current = requestAnimationFrame(tick);
-  };
-
   useEffect(() => {
-    let cancelled = false;
-    const run = () => {
-      cancelLayoutRun();
-      const runId = layoutRunIdRef.current;
-      notifyLayoutLifecycle("running");
-      const apply = (response: LayoutWorkerResponse) => {
-        if (cancelled || runId !== layoutRunIdRef.current) return;
-        layoutWorkerRef.current = undefined;
-        if (response.type === "failed") {
-          animateLayout(response.positions, () => notifyLayoutLifecycle("failed"));
-          callbacksRef.current.onRendererFailure("WORKER_ERROR");
-          return;
-        }
-        animateLayout(response.positions, () => notifyLayoutLifecycle(response.lifecycle ?? "settled"));
-      };
-      if (reducedMotion) {
-        apply({ type: "complete", positions: deterministicLayout(layoutRequest), lifecycle: "stopped" });
-        return;
-      }
-      try {
-        const worker = new Worker(new URL("./architecture-graph-layout-worker.ts", import.meta.url));
-        layoutWorkerRef.current = worker;
-        worker.addEventListener("message", (event: MessageEvent<LayoutWorkerResponse>) => apply(event.data), { once: true });
-        worker.addEventListener("error", () => apply({ type: "failed", positions: deterministicLayout(layoutRequest), lifecycle: "failed", reason: "WORKER_ERROR" }), { once: true });
-        worker.postMessage(layoutRequest);
-      } catch {
-        apply(refineArchitectureGraphLayout(layoutRequest));
-      }
-    };
-    const stop = () => {
-      cancelLayoutRun();
-      notifyLayoutLifecycle("stopped");
-    };
-    const restart = () => {
-      stop();
-      run();
-    };
-    layoutActionsRef.current = { start: run, stop, restart };
-    run();
+    layoutActionsRef.current = { start: startLayoutRun, stop: stopLayoutRun, restart: restartLayoutRun };
+    startLayoutRun();
     return () => {
-      cancelled = true;
       cancelLayoutRun();
-      if (layoutActionsRef.current.start === run) layoutActionsRef.current = { start: () => undefined, stop: () => undefined, restart: () => undefined };
+      if (layoutActionsRef.current.start === startLayoutRun) layoutActionsRef.current = { start: () => undefined, stop: () => undefined, restart: () => undefined };
     };
   }, [layoutRequest, reducedMotion, store]);
 
@@ -397,7 +414,7 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
       focusSelectedNode(sigma, store, selectedRef.current, reducedMotion);
       callbacksRef.current.onRendererReady?.();
     }).catch(() => callbacksRef.current.onRendererFailure("WEBGL_UNAVAILABLE"));
-    return () => { disposed = true; if (contextLossHandler) container.removeEventListener("webglcontextlost", contextLossHandler, true); cancelPulse(); cancelLayoutAnimation(); teardown(); };
+    return () => { disposed = true; if (contextLossHandler) container.removeEventListener("webglcontextlost", contextLossHandler, true); cancelPulse(); cancelLayoutRun(); teardown(); };
   }, [retryKey, store, reducedMotion]);
 
   useEffect(() => {

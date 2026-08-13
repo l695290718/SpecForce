@@ -4,6 +4,8 @@
 
 Approved for implementation design. This document defines the next graph interaction increment; it does not claim the implementation is complete.
 
+> Superseded note (2026-08-13): the bounded one-shot ForceAtlas2 refinement and settle-only motion described here are replaced for the `force` layout by `docs/superpowers/specs/2026-08-13-continuous-forceatlas2-supervisor-design.md` (continuous `FA2LayoutSupervisor` motion until stopped). Force/tree/circles modes, controls, node/edge states, data boundaries, error handling, and accessibility sections remain in effect.
+
 ## Scope
 
 - Application service: com.huawei.celon.desiner

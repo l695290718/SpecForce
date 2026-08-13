@@ -29,7 +29,7 @@ interface ForceEdgeAttributes {
   weight: number;
 }
 
-const NOVERLAP_PARAMETERS = {
+export const NOVERLAP_PARAMETERS = {
   maxIterations: 20,
   settings: {
     margin: 10,

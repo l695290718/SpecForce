@@ -4,6 +4,8 @@
 
 Approved for implementation on 2026-08-11.
 
+> Superseded note (2026-08-13): the non-goal "Do not run an unbounded force simulation in the browser" is reversed for the `force` layout only by `docs/superpowers/specs/2026-08-13-continuous-forceatlas2-supervisor-design.md` (continuous `FA2LayoutSupervisor` motion). `tree`, `circles`, reduced-motion, camera, pulse, and hover/selection behaviors described here remain in effect.
+
 Owning Scope: `com.huawei.celon.desiner`
 
 Implementation preflight: `design-change-session:dd17470e-6417-40e1-93fe-e3c41f841a0d`

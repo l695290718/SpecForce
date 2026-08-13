@@ -21,7 +21,7 @@ describe("SigmaArchitectureGraph adapters", () => {
     expect(settings.edgeReducer("relationship:one", store.graph.getEdgeAttributes("relationship:one"))).toMatchObject({ stableId: "relationship:one", relationCode: "CALLS" });
   });
 
-  it("emphasizes the selected neighborhood and hides edges while layout settles", () => {
+  it("emphasizes the selected neighborhood and keeps edges visible while layout runs", () => {
     const store = createArchitectureGraphStore(identity);
     const node = { stableId: "fact:one", kind: "fact" as const, label: "one", layer: "SYS" as const, memberCount: 1, degree: 1, criticality: 0, x: 12, y: -4 };
     store.graph.addNode("fact:one", node);
@@ -38,8 +38,13 @@ describe("SigmaArchitectureGraph adapters", () => {
     expect(unrelated.color).toBe("rgba(100,116,139,0.24)");
     expect(settings.edgeReducer("relationship:one", store.graph.getEdgeAttributes("relationship:one")).size).toBeGreaterThan(settings.edgeReducer("relationship:two", store.graph.getEdgeAttributes("relationship:two")).size);
 
-    const settlingSettings = createSigmaSettings(store, { current: "fact:one" }, { current: undefined }, { current: undefined }, { current: true });
-    expect(settlingSettings.edgeReducer("relationship:one", store.graph.getEdgeAttributes("relationship:one")).hidden).toBe(true);
+    const movingSettings = createSigmaSettings(store, { current: undefined }, { current: undefined }, { current: undefined }, { current: true });
+    const stillSettings = createSigmaSettings(store, { current: undefined }, { current: undefined }, { current: undefined }, { current: false });
+    const movingEdge = movingSettings.edgeReducer("relationship:one", store.graph.getEdgeAttributes("relationship:one"));
+    const stillEdge = stillSettings.edgeReducer("relationship:one", store.graph.getEdgeAttributes("relationship:one"));
+    expect(movingEdge.hidden).toBe(false);
+    expect(stillEdge.hidden).toBe(false);
+    expect(movingEdge.opacity).toBeLessThan(stillEdge.opacity);
   });
 
   it("derives one-hop visual states without replacing the Graphology graph", () => {
