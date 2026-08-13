@@ -13,5 +13,8 @@ coverage
 artifacts/db-consolidation/
 .specforge/design-context/
 .specforge/cache/
+.specforge/runtime/
+.specforge.yaml
+apps/specforge-cli/.tmp-go-build/
 .worktrees
 worktrees

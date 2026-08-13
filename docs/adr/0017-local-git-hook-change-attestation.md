@@ -112,3 +112,6 @@ SpecForge 已提供 MCP 设计上下文预检和带证据的 Design Change Sessi
 - `go build -o specforge.exe .` 在 `apps/specforge-cli/` 生成了独立 Windows 可执行文件。
 - `pnpm db:push` 已将 `ChangeAttestation` 同步到权威 `localhost:15433/specforge_canonical` 数据库。
 - `pnpm design-facts:sync` 的 15 条基线决策全部返回 `complete`；`pnpm design-facts:check` 的 `missing`、`mismatched`、`outOfScope` 和 `blocked` 均为空，15 条全部 verified。
+- `go test ./...`（`apps/specforge-cli`，仓库内 `GOCACHE`）通过 CLI 及全部内部包测试；临时 Windows 构建产物生成成功。
+- PowerShell AST 解析通过 `deploy/scripts/new-attestation-key.ps1`、`deploy/scripts/start-mcp-http.ps1` 和 `deploy/scripts/start.ps1`；启动器在缺少 Bearer Token 时失败关闭。
+- `specforge hook install` 的 Go 测试验证既有 Hook 保留、幂等重装和卸载恢复；无暂存变更返回 `NO_STAGED_CHANGES`。

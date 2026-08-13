@@ -467,6 +467,14 @@
                                            {
                                                "command":  "pnpm design-facts:sync && pnpm design-facts:check",
                                                "result":  "All 15 baseline decisions synchronized and verified; missing, mismatched, outOfScope, and blocked lists were empty."
+                                           },
+                                           {
+                                               "command":  "go test ./... (apps/specforge-cli); go build -o $env:TEMP\\specforge-cli-attestation-check.exe . (apps/specforge-cli)",
+                                               "result":  "Go CLI and all internal packages passed; a temporary Windows executable was built successfully with repository-local GOCACHE."
+                                           },
+                                           {
+                                               "command":  "PowerShell AST parse; git diff --check; pnpm exec vitest run scripts/design-fact-manifest.test.ts --exclude .worktrees/** --exclude .pnpm-store/**",
+                                               "result":  "new-attestation-key.ps1, start-mcp-http.ps1, and start.ps1 parsed successfully; diff check passed; manifest tests passed 14 tests."
                                            }
                                        ]
                       },

@@ -1,13 +1,13 @@
 version: 1
 repository:
-  id: codehub://enterprise/project/your-repository
+  id: codehub://enterprise/l695290718/SpecForce
   defaultApplicationServiceId: com.huawei.celon.desiner
 governance:
   endpoint: http://127.0.0.1:3001/mcp
 scopeMappings:
-  - paths: ["apps/designer/**", "packages/designer-core/**"]
-    applicationServiceIds: ["com.huawei.celon.desiner"]
-  - paths: ["package.json", "pnpm-lock.yaml", "deploy/**"]
+  # This repository is governed as one application-service Scope.
+  # Split this mapping only when a repository path is owned by another Scope.
+  - paths: ["**"]
     applicationServiceIds: ["com.huawei.celon.desiner"]
 # Session IDs are returned by the governed design-context preflight.
 # They are intentionally not generated or silently inferred by the hook.
