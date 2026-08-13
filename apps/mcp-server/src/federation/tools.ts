@@ -8,6 +8,7 @@ import { loadScopedAssetCatalog } from "../scoped-derived";
 import {
   closeDesignChangeSession,
   createDesignChangeSession,
+  archiveFederationOutbox,
   promoteCandidate,
   reconcilePersistedScope,
   recordObservation,
@@ -107,6 +108,10 @@ const stableErrorCodes = new Set([
   "IDENTITY_MAPPING_INVALID",
   "IDENTITY_MAPPING_MISSING",
   "LOCALIZATION_INCOMPLETE",
+  "OUTBOX_ARCHIVE_CUTOFF_INVALID",
+  "OUTBOX_ARCHIVE_LIMIT_INVALID",
+  "OUTBOX_ARCHIVE_REASON_REQUIRED",
+  "OUTBOX_ARCHIVE_STATUS_INVALID",
   "PERMISSION_DENIED",
   "PROMOTION_INPUT_INVALID",
   "POLICY_DISABLED",
@@ -175,6 +180,10 @@ function safeClientMessage(code: string): string {
     FEDERATION_TOOL_ERROR: "The federation tool request could not be completed.",
     IDENTITY_CONFLICT: "The requested fact has an identity conflict.",
     LOCALIZATION_INCOMPLETE: "The requested fact has incomplete localization.",
+    OUTBOX_ARCHIVE_CUTOFF_INVALID: "The federation Outbox archive cutoff is invalid.",
+    OUTBOX_ARCHIVE_LIMIT_INVALID: "The federation Outbox archive limit is invalid.",
+    OUTBOX_ARCHIVE_REASON_REQUIRED: "A reason is required to archive federation Outbox records.",
+    OUTBOX_ARCHIVE_STATUS_INVALID: "The federation Outbox archive status filter is invalid.",
     PERMISSION_DENIED: "The authenticated caller is not authorized for this federation operation.",
     PROMOTION_INPUT_INVALID: "Promotion input is invalid.",
     SCOPE_MISMATCH: "The requested architecture Scope is not authorized.",
@@ -808,6 +817,26 @@ export function registerFederationTools(server: McpServer): void {
     const architectureScope = assertReadableExactScope(input.architectureScope, caller);
     return reconcilePersistedScope({ architectureScope });
   });
+
+  registerFederationJsonTool(server, "archive_stale_federation_outbox", {
+    title: "Archive stale federation Outbox",
+    description: "Archives bounded historical federation Outbox records in one exact Scope without deleting payloads, diagnostics, or audit history.",
+    inputSchema: {
+      before: z.string().datetime(),
+      statuses: z.array(z.enum(["PENDING", "DELIVERING", "DEAD_LETTER"])).min(1),
+      limit: z.number().int().min(1).max(5000),
+      reason: z.string().min(1),
+      architectureScope: architectureScopeSchema
+    },
+    permissions: ["asset:write", "governance:run"],
+    readOnly: false
+  }, async (input, caller) => archiveFederationOutbox({
+    before: input.before,
+    statuses: input.statuses,
+    limit: input.limit,
+    reason: input.reason,
+    architectureScope: assertWritableExactScope(input.architectureScope, caller)
+  }));
 
   registerFederationJsonTool(server, "retry_federated_audit_finalization", {
     title: "Retry federation audit finalization",

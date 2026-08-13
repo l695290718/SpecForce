@@ -70,6 +70,14 @@ export interface ReconcilePersistedScopeInput {
   localizationDrift?: boolean;
 }
 
+export interface ArchiveFederationOutboxInput {
+  architectureScope: ArchitectureScopeRef;
+  before: string;
+  statuses: string[];
+  limit: number;
+  reason: string;
+}
+
 type FederationTransaction = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">;
 
 export async function registerConnector(input: RegisterConnectorInput): Promise<ConnectorInstance> {
@@ -441,6 +449,48 @@ function observation(row: { id: string; connectorId: string; sourceNamespace: st
 
 function session(row: { id: string; actorId: string; intent: string; affectedFactIds: Prisma.JsonValue; expectedEvidenceRefs: Prisma.JsonValue; preflightDigest?: string | null; preflightRelationshipDigest?: string | null; preflightReadAssetIds?: Prisma.JsonValue; closureReason?: string | null; status: string; openedAt: Date; updatedAt: Date; applicationServiceId: string; scopePath: string }): DesignChangeSession {
   return { id: row.id, actorId: row.actorId, intent: row.intent, affectedFactIds: row.affectedFactIds as string[], expectedEvidenceRefs: row.expectedEvidenceRefs as string[], ...(row.preflightDigest ? { preflightDigest: row.preflightDigest } : {}), ...(row.preflightRelationshipDigest ? { preflightRelationshipDigest: row.preflightRelationshipDigest } : {}), preflightReadAssetIds: (row.preflightReadAssetIds as string[] | undefined) ?? [], ...(row.closureReason ? { closureReason: row.closureReason } : {}), status: row.status as DesignChangeSessionStatus, openedAt: row.openedAt.toISOString(), updatedAt: row.updatedAt.toISOString(), architectureScope: scopeOf(row) };
+}
+
+export async function archiveFederationOutbox(input: ArchiveFederationOutboxInput) {
+  const scope = writableScope(input.architectureScope);
+  const cutoff = new Date(input.before);
+  if (!Number.isFinite(cutoff.getTime())) throw new Error("OUTBOX_ARCHIVE_CUTOFF_INVALID");
+  if (!input.reason.trim()) throw new Error("OUTBOX_ARCHIVE_REASON_REQUIRED");
+  if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 5000) throw new Error("OUTBOX_ARCHIVE_LIMIT_INVALID");
+  const allowedStatuses = new Set(["PENDING", "DELIVERING", "DEAD_LETTER"]);
+  if (!input.statuses.length || input.statuses.some((status) => !allowedStatuses.has(status))) throw new Error("OUTBOX_ARCHIVE_STATUS_INVALID");
+
+  return prisma.$transaction(async (transaction) => {
+    const candidates = await transaction.federationOutbox.findMany({
+      where: { ...scope, status: { in: input.statuses }, createdAt: { lt: cutoff } },
+      orderBy: [{ createdAt: "asc" }, { dbId: "asc" }],
+      take: input.limit,
+      select: { dbId: true, eventType: true, status: true, createdAt: true, designChangeSessionId: true }
+    });
+    if (!candidates.length) {
+      return { architectureScope: scope, cutoff: cutoff.toISOString(), statuses: input.statuses, archivedCount: 0, archivedIds: [] as string[], reason: input.reason };
+    }
+    const update = await transaction.federationOutbox.updateMany({
+      where: { ...scope, dbId: { in: candidates.map((candidate) => candidate.dbId) }, status: { in: input.statuses } },
+      data: { status: "ARCHIVED", sentAt: null }
+    });
+    await transaction.auditLog.create({
+      data: {
+        actorType: "system",
+        actorId: writableActor().actorId,
+        channel: "mcp",
+        action: "archive_stale_federation_outbox",
+        targetType: "FederationOutbox",
+        targetId: `${scope.applicationServiceId}:${cutoff.toISOString()}`,
+        inputSummary: JSON.stringify({ architectureScope: scope, before: cutoff.toISOString(), statuses: input.statuses, limit: input.limit, reason: input.reason }),
+        outputSummary: JSON.stringify({ archivedCount: update.count, archivedIds: candidates.map((candidate) => candidate.dbId), eventTypes: [...new Set(candidates.map((candidate) => candidate.eventType))] }),
+        status: "COMPLETED",
+        applicationServiceId: scope.applicationServiceId,
+        scopePath: scope.scopePath
+      }
+    });
+    return { architectureScope: scope, cutoff: cutoff.toISOString(), statuses: input.statuses, archivedCount: update.count, archivedIds: candidates.slice(0, update.count).map((candidate) => candidate.dbId), reason: input.reason };
+  });
 }
 
 function outbox(row: { dbId: string; eventType: string; payload: Prisma.JsonValue; idempotencyKey: string; status: string; availableAt: Date; sentAt: Date | null; attemptCount: number; lastError: string | null; designChangeSessionId: string | null; applicationServiceId: string; scopePath: string }): FederationOutboxRecord {

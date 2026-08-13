@@ -4,6 +4,17 @@ This file preserves completed, superseded, and resolved backlog records. Active 
 
 The archive is historical. An item listed here does not imply that related production capabilities are complete. Deferred extensions remain in the active backlog.
 
+### Governance operational-state reconciliation
+
+- **Outcome:** Completed exact-Scope operational reconciliation through MCP. Six stale `DesignChangeSession` records were closed as `BLOCKED`; the active continuous 3A graph-layout session remained `OPEN`; 110 historical `FederationOutbox` records were bounded-archived as `ARCHIVED` without deleting payloads, diagnostics, or audit history; 21 current pending delivery records remained for the next operational cycle.
+- **Stable references:** ADR-0010 (`adr-federated-design-fact-synchronization`), `pnpm design-context:archive-outbox`, `pnpm design-context:status`, and the matching Proposal, Context Pack, Evidence, and typed links synchronized in the exact Designer Scope.
+- **Evidence:** MCP persistence and tool tests passed 22 files and 1065 tests; the exact-Scope federation check returned `blocking: false`; `pnpm design-facts:sync` and `pnpm design-facts:check` returned 23 verified decisions with no missing, mismatched, out-of-scope, or blocked records. No direct database write was used.
+
+### 运行态治理对账
+
+- **结果：** 已通过 MCP 完成精确 Scope 运行态对账。6 个陈旧 `DesignChangeSession` 关闭为 `BLOCKED`；连续 3A 图布局会话保持 `OPEN`；110 条历史 `FederationOutbox` 记录有界归档为 `ARCHIVED`，未删除负载、诊断信息或审计历史；21 条当前待投递记录保留给下一轮运行对账。
+- **证据：** MCP 持久化和工具测试共 22 个文件、1065 个测试通过；精确 Scope 联邦检查返回 `blocking: false`；设计事实同步和回读返回 23 项决策且无缺失、不匹配、越界或受阻记录。未执行直接写库。
+
 ## Completed Governance And Deployment Increments
 
 ### Design-fact dual-record synchronization and historical ADR reconciliation

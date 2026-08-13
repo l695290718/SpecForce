@@ -114,12 +114,32 @@ async function close(args: Arguments): Promise<void> {
   console.log(JSON.stringify(result, null, 2));
 }
 
+async function archiveOutbox(args: Arguments): Promise<void> {
+  const result = await callMcpTool("archive_stale_federation_outbox", {
+    before: required(args, "before"),
+    statuses: list(required(args, "statuses")),
+    limit: Number(required(args, "limit")),
+    reason: required(args, "reason"),
+    architectureScope: architectureScope(args)
+  });
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function status(args: Arguments): Promise<void> {
+  const result = await callMcpTool("get_federated_sync_status", {
+    architectureScope: architectureScope(args)
+  });
+  console.log(JSON.stringify(result, null, 2));
+}
+
 async function main(): Promise<void> {
   const [command, ...values] = process.argv.slice(2).filter((value) => value !== "--");
   const args = parseArguments(values);
   if (command === "preflight") return preflight(args);
   if (command === "close") return close(args);
-  throw new Error("Usage: pnpm design-context:preflight -- --intent <text> --affected <id,...> --evidence <ref,...> | pnpm design-context:close -- --session <id> --status <CONVERGED|BLOCKED> --evidence <ref,...>");
+  if (command === "archive-outbox") return archiveOutbox(args);
+  if (command === "status") return status(args);
+  throw new Error("Usage: pnpm design-context:preflight -- --intent <text> --affected <id,...> --evidence <ref,...> | pnpm design-context:close -- --session <id> --status <CONVERGED|BLOCKED> --evidence <ref,...> | pnpm design-context:archive-outbox -- --before <ISO> --statuses <PENDING,...> --limit <n> --reason <text> | pnpm design-context:status");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

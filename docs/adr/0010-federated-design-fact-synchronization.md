@@ -95,6 +95,18 @@ Local evidence: `node .\\node_modules\\.pnpm\\vitest@2.1.9_@types+node@22.20.1\\
 
 The configured Docker PostgreSQL authority at `localhost:5433/specforge` is reachable. `pnpm design-facts:sync` persisted the complete eight-decision baseline through MCP; `pnpm design-facts:check` read back all eight decisions with no missing, mismatched, out-of-scope, or blocked records. The exact Designer Scope federation reconciliation returned `blocking: false`, zero verified federated facts, and no issue counts. This verification supersedes the earlier environment-blocked notes above, which remain as historical implementation evidence.
 
+## Operational-State Reconciliation (2026-08-13)
+
+The exact Designer Scope now has an explicit MCP-only operational reconciliation path. Six stale `DesignChangeSession` records were closed as `BLOCKED`; the active continuous 3A graph-layout session remained `OPEN`. Historical federation Outbox records were archived in a bounded batch through `archive_stale_federation_outbox`; payloads, event identities, diagnostics, and audit history were retained, and `ARCHIVED` does not mean externally delivered. The archive requires the exact application-service Scope, a cutoff, an allowed nonterminal status filter, a bound no greater than 5000, and a reason. PostgreSQL remains authoritative and no direct database write is permitted.
+
+Evidence: `pnpm --filter @specforge/mcp-server typecheck` passed; the persistence and MCP tool suites passed 22 files and 1065 tests; `pnpm design-context:status` read back 21 current pending delivery records; six stale sessions were closed through `close_design_change_session`; `pnpm design-context:archive-outbox` archived 110 historical records; the exact-Scope federation check returned `blocking: false`; and `pnpm design-facts:sync` followed by `pnpm design-facts:check` returned 23 verified decisions with no missing, mismatched, out-of-scope, or blocked records.
+
+### 2026-08-13 Chinese Localization
+
+精确 Designer Scope 现在具备明确的、仅通过 MCP 执行的运行态对账路径。6 个陈旧 `DesignChangeSession` 已关闭为 `BLOCKED`；当前连续 3A 图布局会话保持 `OPEN`。历史 Federation Outbox 记录通过 `archive_stale_federation_outbox` 以有界批次归档；负载、事件标识、诊断信息和审计历史均保留，`ARCHIVED` 不表示已经对外投递。归档要求精确的应用服务 Scope、截止时间、允许的非终态过滤器、最大 5000 的上限和原因。PostgreSQL 保持权威，禁止直接写库。
+
+证据：MCP 服务类型检查通过；持久化和 MCP 工具测试共 22 个文件、1065 个测试通过；状态回读得到 21 条当前待投递记录；6 个陈旧会话通过 `close_design_change_session` 关闭；归档命令归档 110 条历史记录；精确 Scope 联邦检查返回 `blocking: false`；设计事实同步和回读返回 23 项决策，未发现缺失、不匹配、越界或受阻记录。
+
 ### Slice 3C Chinese Localization
 
 联邦失败现在具有明确的审计安全契约。失败的联邦调用只在 `AuditLog.errorMessage` 中保存稳定代码 `FEDERATION_TOOL_ERROR` 和确定性的 `diagnosticRef=<64 位十六进制 SHA-256 摘要>`。摘要由操作、目标标识符和私有异常细节生成，用于关联诊断；不会持久化原始异常消息、密码、令牌、密钥引用或其他凭据文本。客户端仍只获得现有的安全稳定错误代码和消息。

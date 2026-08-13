@@ -24,6 +24,8 @@
     "scanner-contract:check": "tsx scripts/generate-scan-contract.ts --check",
     "legacy-baseline:verify": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-legacy-baseline.ps1",
     "design-context:close": "tsx scripts/design-context.ts close",
+    "design-context:archive-outbox": "tsx scripts/design-context.ts archive-outbox",
+    "design-context:status": "tsx scripts/design-context.ts status",
     "design-facts:federation:check": "tsx scripts/reconcile-federated-facts.ts",
     "graph-outbox:archive": "tsx scripts/archive-legacy-graph-outbox.ts",
     "format": "prettier --write ."

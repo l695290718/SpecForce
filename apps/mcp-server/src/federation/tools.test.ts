@@ -8,7 +8,8 @@ const federationPersistence = vi.hoisted(() => ({
   promoteCandidate: vi.fn(),
   createDesignChangeSession: vi.fn(),
   closeDesignChangeSession: vi.fn(),
-  reconcilePersistedScope: vi.fn()
+  reconcilePersistedScope: vi.fn(),
+  archiveFederationOutbox: vi.fn()
 }));
 
 const continuousPersistence = vi.hoisted(() => ({
@@ -35,9 +36,10 @@ const persistence = vi.hoisted(() => ({
     return registered;
   }),
   prisma: {
-  auditLog: { create: vi.fn(), update: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn() },
+    $transaction: vi.fn(),
+    auditLog: { create: vi.fn(), update: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn() },
+    federationOutbox: { findMany: vi.fn(), updateMany: vi.fn(), count: vi.fn() },
     connectorInstance: { findMany: vi.fn() },
-    federationOutbox: { count: vi.fn() },
     sourceObservation: { count: vi.fn() },
     reconciliationSnapshot: { findFirst: vi.fn() }
   }
@@ -156,6 +158,7 @@ function errorCode(result: { content: Array<{ text: string }> }): string | undef
 
 beforeEach(() => {
   vi.clearAllMocks();
+  persistence.prisma.$transaction.mockImplementation(async (callback: (transaction: typeof persistence.prisma) => unknown) => callback(persistence.prisma));
   vi.spyOn(console, "error").mockImplementation(() => undefined);
   federationPersistence.registerConnector.mockResolvedValue({ ...connector, status: "ACTIVE", architectureScope: designerScope });
   federationPersistence.recordObservation.mockResolvedValue({ id: "observation-1", architectureScope: designerScope });
@@ -163,6 +166,7 @@ beforeEach(() => {
   federationPersistence.createDesignChangeSession.mockResolvedValue({ id: "session-1", architectureScope: designerScope });
   federationPersistence.closeDesignChangeSession.mockResolvedValue({ id: "session-1", status: "CONVERGED", architectureScope: designerScope });
   federationPersistence.reconcilePersistedScope.mockResolvedValue({ architectureScope: designerScope, root: "root-1", status: "CONVERGED", issues: [], factDigests: [] });
+  federationPersistence.archiveFederationOutbox.mockResolvedValue({ architectureScope: designerScope, cutoff: "2026-08-13T00:00:00.000Z", statuses: ["PENDING"], archivedCount: 2, archivedIds: ["outbox-1", "outbox-2"], reason: "Superseded historical events after exact-Scope operational reconciliation." });
   continuousPersistence.submitContinuousObservationBatch.mockResolvedValue({ status: "ACCEPTED", idempotent: false });
   continuousPersistence.getContinuousObservationCursor.mockResolvedValue(null);
   persistence.listPersistedAssetLinks.mockResolvedValue([]);
@@ -174,6 +178,8 @@ beforeEach(() => {
   persistence.prisma.auditLog.create.mockResolvedValue({ id: "audit-1" });
   persistence.prisma.auditLog.update.mockResolvedValue({ id: "audit-1" });
   persistence.prisma.auditLog.findFirst.mockResolvedValue({ id: "audit-1", status: "SUCCESS_REPAIR_REQUIRED", outputSummary: "{\"ok\":true}", inputSummary: JSON.stringify({ architectureScope: designerScope }), ...designerScope });
+  persistence.prisma.federationOutbox.findMany.mockResolvedValue([]);
+  persistence.prisma.federationOutbox.updateMany.mockResolvedValue({ count: 0 });
   persistence.prisma.connectorInstance.findMany.mockResolvedValue([{ id: connector.id, status: "ACTIVE", applicationServiceId: designerScope.applicationServiceId, scopePath: designerScope.scopePath }]);
   persistence.prisma.federationOutbox.count.mockResolvedValue(2);
   persistence.prisma.sourceObservation.count.mockResolvedValue(1);
@@ -410,6 +416,25 @@ describe("federation MCP tools", () => {
     expect(persistence.prisma.auditLog.update).toHaveBeenCalledWith({
       where: { id: "audit-1" },
       data: expect.objectContaining({ status: "success" })
+    });
+  });
+
+  it("archives only bounded historical Outbox records in the exact Scope", async () => {
+    const result = await callTool("archive_stale_federation_outbox", {
+      before: "2026-08-13T00:00:00.000Z",
+      statuses: ["PENDING"],
+      limit: 2,
+      reason: "Superseded historical events after exact-Scope operational reconciliation.",
+      architectureScope: designerScope
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(federationPersistence.archiveFederationOutbox).toHaveBeenCalledWith({
+      before: "2026-08-13T00:00:00.000Z",
+      statuses: ["PENDING"],
+      limit: 2,
+      reason: "Superseded historical events after exact-Scope operational reconciliation.",
+      architectureScope: designerScope
     });
   });
 

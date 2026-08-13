@@ -4,34 +4,6 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 仅列出尚未完成的工作。已完成和已替代的记录保存在 `docs/archive/backlog-history.md`。英文是规范字段；中文字段用于面向人的本地化展示。
 
-## 1. Governance Operational-State Reconciliation
-
-**Status:** In progress.
-
-**Owner:** SpecForge Architecture and Runtime.
-
-**Rationale:** The operational catalog must distinguish active design-change work from historical or resolved activity. The current dated observation records 5 `OPEN` Design Change Sessions and 65 pending Federation Outbox events. Reconciliation must use MCP commands, preserve audit history, and must not delete sessions, events, payloads, diagnostics, or evidence.
-
-**Trigger:** Start the cleanup when the exact Designer Scope operational snapshot confirms stale `OPEN` sessions or pending outbox records that have exceeded their operational handling window; classify each record before taking a scope-safe MCP action.
-
-**Completion evidence:** A read-only post-check records the final session and outbox status, every changed record has an MCP receipt and exact Scope, unresolved work has an owner and retry trigger, and the reconciliation report is non-blocking. Audit history remains intact; no direct database deletion is permitted.
-
-**Design references:** ADR-0007, ADR-0010, ADR-0016, ADR-0020, ADR-0021, ADR-0022; `docs/archive/backlog-history.md`.
-
-**中文本地化：**
-
-**状态：** 进行中。
-
-**负责人：** SpecForge 架构与运行时团队。
-
-**理由：** 运行设计目录必须区分活跃的设计变更与历史或已解决活动。当前日期快照记录有 5 个 `OPEN` 设计变更会话和 65 条待处理 Federation Outbox 事件。对账必须使用 MCP 命令，保留审计历史，不得删除会话、事件、负载、诊断信息或证据。
-
-**启动条件：** 当精确 Designer Scope 的运行快照确认存在超过运行处理窗口仍未处理的 `OPEN` 会话或 Outbox 事件时启动；任何 Scope 安全的 MCP 操作前必须先对每条记录分类。
-
-**完成证据：** 只读后检查记录最终会话和 Outbox 状态；每条变更记录都具备 MCP 回执和精确 Scope；未解决工作具备负责人和重试触发条件；对账报告为非阻塞。审计历史保持完整，禁止直接删除数据库记录。
-
-**设计引用：** ADR-0007、ADR-0010、ADR-0016、ADR-0020、ADR-0021、ADR-0022；`docs/archive/backlog-history.md`。
-
 ## 2. CodeArts/CodeHub Protected-Branch Enforcement
 
 **Status:** Deferred.

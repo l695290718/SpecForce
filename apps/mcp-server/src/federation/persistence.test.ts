@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { contentDigest } from "@specforge/core";
 import { prisma } from "../persistence";
-import { appendFederationOutbox, closeDesignChangeSession, createDesignChangeSession, listConnectors, listPersistedCanonicalFederatedFacts, promoteCandidate, reconcilePersistedScope, recordObservation, registerConnector } from "./persistence";
+import { appendFederationOutbox, archiveFederationOutbox, closeDesignChangeSession, createDesignChangeSession, listConnectors, listPersistedCanonicalFederatedFacts, promoteCandidate, reconcilePersistedScope, recordObservation, registerConnector } from "./persistence";
 
 const designerScope = {
   applicationServiceId: "com.huawei.celon.desiner",
@@ -163,6 +163,7 @@ beforeEach(() => {
     await predecessor;
     const snapshot = structuredClone(rows);
     try { return await operation({
+    auditLog: { create: vi.fn(async ({ data }: { data: Row }) => data) },
     connectorInstance: {
       upsert: vi.fn(async ({ create, update, where }: { create: Row; update: Row; where: { applicationServiceId_scopePath_id: Row } }) => {
         const key = where.applicationServiceId_scopePath_id;
@@ -213,6 +214,16 @@ beforeEach(() => {
       return [];
     }),
     federationOutbox: {
+      findMany: vi.fn(async ({ where, take }: { where: Row; take: number }) => rows.outbox
+        .filter((row) => row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath && statusMatches(row.status, where.status) && (row.createdAt as Date) < (where.createdAt as { lt: Date }).lt)
+        .slice(0, take)
+        .map((row) => ({ dbId: row.dbId, eventType: row.eventType, status: row.status, createdAt: row.createdAt, designChangeSessionId: row.designChangeSessionId }))),
+      updateMany: vi.fn(async ({ where, data }: { where: Row; data: Row }) => {
+        const ids = new Set(((where.dbId as { in: string[] }).in));
+        const matches = rows.outbox.filter((row) => ids.has(String(row.dbId)) && row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath && statusMatches(row.status, where.status));
+        for (const row of matches) Object.assign(row, data);
+        return { count: matches.length };
+      }),
       findUnique: vi.fn(async ({ where }: { where: { applicationServiceId_scopePath_idempotencyKey: Row } }) => rows.outbox.find((row) => row.idempotencyKey === where.applicationServiceId_scopePath_idempotencyKey.idempotencyKey && row.applicationServiceId === where.applicationServiceId_scopePath_idempotencyKey.applicationServiceId && row.scopePath === where.applicationServiceId_scopePath_idempotencyKey.scopePath) ?? null),
       create: vi.fn(async ({ data }: { data: Row }) => {
         if (failOutbox) throw new Error("OUTBOX_WRITE_FAILED");
@@ -277,6 +288,29 @@ describe("federation persistence", () => {
 
     expect(rows.connectors).toHaveLength(1);
     expect(rows.outbox).toHaveLength(1);
+  });
+
+  it("archives a bounded historical Outbox slice without deleting payload records", async () => {
+    rows.outbox.push(
+      { dbId: "outbox-old-1", eventType: "FEDERATION_DESIGN_CHANGE_SESSION_CREATED", status: "PENDING", payload: { keep: true }, createdAt: new Date("2026-08-01T00:00:00.000Z"), designChangeSessionId: "session-1", ...designerScope },
+      { dbId: "outbox-current", eventType: "FEDERATION_DESIGN_CHANGE_SESSION_CREATED", status: "PENDING", payload: { keep: true }, createdAt: new Date("2026-08-13T00:00:00.000Z"), designChangeSessionId: "session-1", ...designerScope },
+      { dbId: "outbox-other-scope", eventType: "FEDERATION_DESIGN_CHANGE_SESSION_CREATED", status: "PENDING", payload: { keep: true }, createdAt: new Date("2026-08-01T00:00:00.000Z"), designChangeSessionId: "session-1", ...policyScope }
+    );
+
+    const result = await archiveFederationOutbox({
+      architectureScope: designerScope,
+      before: "2026-08-13T00:00:00.000Z",
+      statuses: ["PENDING"],
+      limit: 1,
+      reason: "Superseded historical events after exact-Scope operational reconciliation."
+    });
+
+    expect(result).toMatchObject({ architectureScope: designerScope, archivedCount: 1, archivedIds: ["outbox-old-1"] });
+    expect(rows.outbox).toEqual(expect.arrayContaining([
+      expect.objectContaining({ dbId: "outbox-old-1", status: "ARCHIVED", payload: { keep: true }, ...designerScope }),
+      expect.objectContaining({ dbId: "outbox-current", status: "PENDING", ...designerScope }),
+      expect.objectContaining({ dbId: "outbox-other-scope", status: "PENDING", ...policyScope })
+    ]));
   });
 
   it("keeps connector registration delivery keys and references isolated by Scope", async () => {
@@ -809,6 +843,7 @@ function secondCandidateFact() {
 
 function statusMatches(rowStatus: unknown, requestedStatus: unknown): boolean {
   if (requestedStatus === undefined) return true;
+  if (requestedStatus && typeof requestedStatus === "object" && "in" in requestedStatus) return (requestedStatus as { in: unknown[] }).in.includes(rowStatus);
   if (requestedStatus && typeof requestedStatus === "object" && "not" in requestedStatus) return rowStatus !== (requestedStatus as { not: unknown }).not;
   return rowStatus === requestedStatus;
 }
