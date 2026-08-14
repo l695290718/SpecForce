@@ -38,6 +38,19 @@ func TestResolveScopesSupportsSharedFilesAndRejectsUnmapped(t *testing.T) {
 	}
 }
 
+func TestResolveScopesCarriesConfiguredScopePaths(t *testing.T) {
+	config := FileConfig{
+		Version: 1,
+		Repository: Repository{ID: "codehub://enterprise/project/repo"},
+		Mappings: []Mapping{{Paths: []string{"**"}, ApplicationServiceIDs: []string{"designer"}}},
+		ScopePaths: map[string]string{"designer": "pf/product/service/designer"},
+	}
+	scopes, err := resolveScopes(config, []StagedEntry{{Path: "main.go", Status: "M"}})
+	if err != nil || len(scopes) != 1 || scopes[0].ScopePath != "pf/product/service/designer" {
+		t.Fatalf("scopes=%v err=%v", scopes, err)
+	}
+}
+
 func TestCanonicalJSONSortsObjectKeys(t *testing.T) {
 	value := map[string]any{"z": 1, "a": map[string]any{"b": true, "a": "x"}}
 	got, err := canonicalJSON(value)
@@ -64,6 +77,21 @@ func TestStagedEntriesReadsGitIndexWithoutChangingFiles(t *testing.T) {
 	defer func() { runCommand = previous }()
 	entries, err := stagedEntries(context.Background(), "M\x00app.go\x00")
 	if err != nil || len(entries) != 1 || entries[0].Blob != "abc123" {
+		t.Fatalf("entries=%v err=%v", entries, err)
+	}
+}
+
+func TestCommittedEntriesReadsCommitTreeBlobs(t *testing.T) {
+	previous := runCommand
+	runCommand = func(_ context.Context, name string, args ...string) ([]byte, error) {
+		if name == "git" && len(args) >= 3 && args[0] == "ls-tree" {
+			return []byte("100644 blob abc123\tapp.go\n"), nil
+		}
+		return nil, nil
+	}
+	defer func() { runCommand = previous }()
+	entries, err := committedEntries(context.Background(), "M\x00app.go\x00")
+	if err != nil || len(entries) != 1 || entries[0].Blob != "abc123" || entries[0].Mode != "100644" {
 		t.Fatalf("entries=%v err=%v", entries, err)
 	}
 }

@@ -37,6 +37,16 @@ The managed `pre-commit` dispatcher preserves an existing hook as `pre-commit.sp
 
 `specforge hook uninstall` restores the preserved hook. Local hooks can still be bypassed with `git commit --no-verify`; CodeHub protected-branch enforcement remains a separate backlog item.
 
+### Provider-neutral CI entrypoint
+
+The protected-branch adapter must run the committed-tree verifier with an attestation artifact supplied by the pipeline. It recomputes the commit tree, parent, changed-file manifest, Scope mapping, and exact Scope paths, then calls the read-only MCP `verify_change_attestation` tool. A non-zero exit is the required status-check failure:
+
+```powershell
+specforge verify-commit --attestation .specforge/ci/change-attestation.json
+```
+
+The attestation artifact must be transferred by the pipeline or fetched from an approved artifact store; the local `.git/specforge/attestations` cache is not part of a clone. The actual CodeHub/CodeArts status registration remains a platform-specific follow-up.
+
 ## 中文
 
 第一增量是 `apps/specforge-cli/` 下的独立 Go 可执行文件，覆盖 Java、Go、Python、Node.js 和混合 Monorepo，不要求存量仓库安装特定语言 SDK。
@@ -69,3 +79,13 @@ specforge hook doctor
 托管的 `pre-commit` 分发器会把原 Hook 保存为 `pre-commit.specforge-original`，计算暂存 tree 和文件清单，申请证明，验证 Ed25519 签名，再次检查暂存区，最后才允许提交。路径未映射、会话缺失、Scope 未授权、对账为 `UNVERIFIED`、服务不可达、签名无效或暂存区发生变化都会阻止提交。
 
 `specforge hook uninstall` 会恢复原 Hook。本地 Hook 仍可被 `git commit --no-verify` 绕过；CodeHub 受保护分支门禁仍作为独立待办。
+
+### 与平台无关的 CI 入口
+
+受保护分支适配器必须使用流水线提供的变更证明产物运行提交校验器。校验器会重新计算提交 tree、父提交、变更文件清单、Scope 映射和精确 Scope 路径，然后调用只读 MCP `verify_change_attestation` 工具。非零退出码必须作为状态检查失败：
+
+```powershell
+specforge verify-commit --attestation .specforge/ci/change-attestation.json
+```
+
+证明产物必须由流水线传递或从批准的制品库获取；本地 `.git/specforge/attestations` 缓存不会进入代码检出。CodeHub/CodeArts 的实际状态检查注册仍需后续平台适配。

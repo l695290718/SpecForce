@@ -30,7 +30,7 @@ MCP normalizes HTTP and stdio claims through this boundary. Static bearer claims
 
 MCP now exposes read-only `verify_change_attestation`. It verifies the signed canonical payload, repository identity, parent commit when supplied, committed tree, file manifest, Scope mapping, expiry, trusted/revoked key policy, signature, complete multi-Scope coverage, and every referenced Design Change Session and reconciliation state. Every submitted Scope must be separately readable by the caller. The operation does not mutate authored facts, close sessions, or contact CodeHub.
 
-The Go CLI performs the same repository/evidence and multi-Scope coverage checks before caching a local attestation. CodeHub/CodeArts protected-branch status registration and mandatory merge blocking remain deferred.
+The Go CLI performs the same repository/evidence and multi-Scope coverage checks before caching a local attestation. `specforge verify-commit --attestation <file>` recomputes the committed tree, parent, changed-file manifest, Scope mapping, and registered Scope paths before calling read-only MCP verification. CodeHub/CodeArts protected-branch status registration and mandatory merge blocking remain deferred.
 
 ### Design-fact reconciliation
 
@@ -57,6 +57,7 @@ Repository records distinguish implemented local governance contracts from defer
 - PostgreSQL remains authoritative; graph stores are derived projections.
 - Seed identity is development-only; no raw credential is persisted.
 - CodeHub/CodeArts adapters, enterprise IdP integration, cross-Scope comparison, external `APPLY`, and graph projection closure remain deferred.
+- CI attestation artifacts must be supplied through an approved pipeline/artifact channel; a workstation-local `.git` cache is not authoritative.
 - English is canonical and all human-facing decision records require complete Chinese localization.
 
 ## Evidence
@@ -79,6 +80,7 @@ Repository records distinguish implemented local governance contracts from defer
 - Status-reconciliation preflight `design-change-session:e013fbc4-e852-48b5-9b46-cb2f4753aea8` read 165 exact-Scope assets before correcting stale backlog, ADR, manifest, and implementation-plan status records.
 - `node .\node_modules\vitest\vitest.mjs run scripts/design-fact-manifest.test.ts` passed 13 discovered files and 55 tests, including the root manifest's 10 tests; three affected MCP decisions synchronized as `complete`, all 19 decisions read back without issues, and exact-Scope federation reconciliation returned `blocking:false`.
 - `pnpm design-context:close -- --session design-change-session:e013fbc4-e852-48b5-9b46-cb2f4753aea8 --status CONVERGED --evidence "manifest-tests=13-files-55-tests,selected-design-facts-sync=3-complete,design-facts-check=19-verified,federation-check=blocking-false,diff-check=PASS"` returned the exact Designer Scope with status `CONVERGED`.
+- `go test ./...` in `apps/specforge-cli` passed the committed-tree verifier, configured exact `scopePath` propagation, and all internal packages; a temporary Windows CI verifier executable built successfully.
 
 ## Chinese Localization
 
@@ -93,6 +95,7 @@ SpecForge 已具备精确应用服务 Scope 隔离、MCP 预检与关闭、本�
 ### 决策
 
 Core 负责主体标准化和精确 Scope 授权；MCP 负责鉴权边界和审计安全上下文。`verify_change_attestation` 校验签名、仓库、父提交、提交树、文件清单、Scope 映射、有效期、密钥信任/撤销状态、多 Scope 覆盖、设计变更会话和对账状态。每个 Scope 都必须分别具备读取权限，校验过程不会修改设计资产、关闭会话或调用 CodeHub。
+Go CLI 的 `verify-commit --attestation <file>` 会独立重新计算已提交 tree、父提交、变更文件清单、Scope 映射和注册的 Scope 路径，再调用只读 MCP 校验；证明产物必须通过批准的流水线或制品通道提供，本地 `.git` 缓存不是权威输入。
 
 ### 备选方案
 
@@ -115,6 +118,7 @@ Core 负责主体标准化和精确 Scope 授权；MCP 负责鉴权边界和审�
 - PostgreSQL 保持权威，图数据库只能作为派生投影。
 - Seed 身份只允许开发模式，原始凭据不得持久化。
 - CodeHub/CodeArts 适配器、企业身份集成、跨 Scope 比较、外部 `APPLY` 和图投影闭环继续延期。
+- CI 变更证明必须通过批准的流水线/制品通道提供，工作站本地 `.git` 缓存不具备权威性。
 - 英文是规范字段，所有面向人的决策记录必须提供完整中文覆盖。
 
 ### 证据
@@ -123,3 +127,4 @@ Core 负责主体标准化和精确 Scope 授权；MCP 负责鉴权边界和审�
 - MCP 类型检查、认证/联邦测试和 Attestation 测试通过。
 - Go CLI 全套测试通过，包含仓库证据不匹配和多 Scope 覆盖不足场景。
 - MCP 同步、回读、精确 Scope 对账和同一会话 `CONVERGED` 关闭完成后，本 ADR 才最终完成。
+- Go CLI 测试覆盖 committed-tree 校验、精确 `scopePath` 传递和内部包；临时 Windows CI 校验器构建成功。

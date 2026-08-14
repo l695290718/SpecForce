@@ -10,9 +10,9 @@ SpecForge currently provides an MCP design-context preflight and evidence-backed
 
 ## Decision
 
-Build the first enforcement increment as a standalone Go `specforge` CLI with an idempotently installed Git `pre-commit` dispatcher. The CLI reads `.specforge.yaml`, maps every staged path to one or more application-service IDs, computes deterministic Git index evidence, and requests a short-lived Ed25519-signed Change Attestation from an authenticated remote MCP endpoint.
+Build the first enforcement increment as a standalone Go `specforge` CLI with an idempotently installed Git `pre-commit` dispatcher. The CLI reads `.specforge.yaml`, maps every staged path to one or more application-service IDs and their registered `scopePath` values, computes deterministic Git index evidence, and requests a short-lived Ed25519-signed Change Attestation from an authenticated remote MCP endpoint. The same CLI exposes `verify-commit --attestation <file>` for CI: it recomputes committed-tree evidence and delegates read-only verification to MCP.
 
-The service resolves canonical `scopePath` values, applies server-owned policy, requires a valid Design Change Session for every exact Scope, requires complete design coverage and evidence, treats every reconciliation state other than `CONVERGED` as blocking, and atomically closes sessions and persists signed attestations, audit, and Outbox records. The CLI verifies the signature and staged tree before allowing the commit. CodeArts/CodeHub merge enforcement is deferred as a separately tracked backlog fact.
+The service resolves canonical `scopePath` values, applies server-owned policy, requires a valid Design Change Session for every exact Scope, requires complete design coverage and evidence, treats every reconciliation state other than `CONVERGED` as blocking, and atomically closes sessions and persists signed attestations, audit, and Outbox records. The CLI verifies the signature and staged tree before allowing the commit, while CI recomputes the committed tree and reads an attestation artifact supplied by the pipeline. CodeArts/CodeHub merge enforcement is deferred as a separately tracked backlog fact.
 
 ## Alternatives
 
@@ -33,6 +33,7 @@ The service resolves canonical `scopePath` values, applies server-owned policy, 
 
 - The local first increment is implemented only within the reviewed boundaries; CodeHub enforcement still requires a separate approval and design change.
 - `.specforge.yaml` may declare identity and mappings but cannot weaken server policy or contain credentials.
+- `.specforge.yaml` may declare the server-registered `scopePath` for each mapped application service; an incorrect or missing path fails closed.
 - PostgreSQL is authoritative for sessions, attestations, audit, and Outbox; graph stores remain derived.
 - Every exact Scope must resolve server-side and have token authorization.
 - Only `CONVERGED` reconciliation may pass; `UNVERIFIED` is blocking.
@@ -40,6 +41,7 @@ The service resolves canonical `scopePath` values, applies server-owned policy, 
 - Hook logic is read-only with respect to Git index, code, and authored design facts.
 - Human-facing records are English-canonical with complete Chinese localization.
 - The remote MCP transport uses Streamable HTTP at `/mcp`; bearer authentication and the Ed25519 signing key are process configuration, never repository configuration.
+- CI must receive the attestation through a pipeline/artifact channel; the local `.git/specforge/attestations` cache is not a repository-authoritative input.
 
 ## Evidence
 
@@ -52,6 +54,7 @@ The service resolves canonical `scopePath` values, applies server-owned policy, 
 - `vitest run apps/mcp-server/src/federation/tools.test.ts apps/mcp-server/src/federation/persistence.test.ts --exclude .worktrees/** --exclude .pnpm-store/**` passed 102 tests.
 - `pnpm db:push` synchronized `ChangeAttestation` into the authoritative `localhost:15433/specforge_canonical` database.
 - `pnpm design-facts:sync` returned `complete` for all 15 baseline decisions; `pnpm design-facts:check` returned empty `missing`, `mismatched`, `outOfScope`, and `blocked` lists with all 15 verified.
+- `go test ./...` in `apps/specforge-cli` passed exact `scopePath` propagation and committed-tree blob-list tests; the temporary Windows CI verifier executable built successfully.
 
 ## MCP Record
 
@@ -76,6 +79,7 @@ SpecForge 已提供 MCP 设计上下文预检和带证据的 Design Change Sessi
 第一增量采用独立 Go `specforge` CLI 和幂等安装的 Git `pre-commit` 分发器。CLI 读取 `.specforge.yaml`，把每个暂存路径映射到一个或多个应用服务 ID，计算确定性的 Git 暂存区证据，并通过鉴权远程 MCP 申请短时 Ed25519 签名的 Change Attestation。
 
 服务端解析规范 `scopePath`、执行服务端策略、要求每个精确 Scope 都有有效 Design Change Session、完整设计覆盖和证据，并把除 `CONVERGED` 外的所有对账状态视为阻断。会话关闭、签名证明、审计和 Outbox 在一个事务中持久化。CLI 验证签名和暂存 tree 后才允许提交。CodeArts/CodeHub 合入门禁按用户要求延期，并作为独立待办跟踪。
+同一个 CLI 还提供 `verify-commit --attestation <file>`：重新计算已提交 tree、父提交、变更文件清单、Scope 映射和精确 Scope 路径，再调用只读 MCP 校验。CI 必须通过流水线或批准的制品通道提供证明，本地 `.git/specforge/attestations` 缓存不作为仓库权威输入。
 
 ### 备选方案
 
@@ -103,6 +107,8 @@ SpecForge 已提供 MCP 设计上下文预检和带证据的 Design Change Sessi
 - Hook 对 Git 暂存区、代码和已编写设计事实保持只读。
 - 面向人的记录以英文为规范内容，并提供完整中文本地化。
 - 远程 MCP 使用 `/mcp` Streamable HTTP；Bearer 鉴权和 Ed25519 私钥由服务进程配置提供，不进入仓库配置。
+- `.specforge.yaml` 可以声明每个应用服务注册的 `scopePath`；缺失或错误路径必须失败关闭。
+- CI 必须通过流水线或制品通道接收变更证明；本地 `.git/specforge/attestations` 缓存不具备仓库权威性。
 
 ### 证据
 
@@ -112,6 +118,7 @@ SpecForge 已提供 MCP 设计上下文预检和带证据的 Design Change Sessi
 - `go build -o specforge.exe .` 在 `apps/specforge-cli/` 生成了独立 Windows 可执行文件。
 - `pnpm db:push` 已将 `ChangeAttestation` 同步到权威 `localhost:15433/specforge_canonical` 数据库。
 - `pnpm design-facts:sync` 的 15 条基线决策全部返回 `complete`；`pnpm design-facts:check` 的 `missing`、`mismatched`、`outOfScope` 和 `blocked` 均为空，15 条全部 verified。
+- `go test ./...` 在 `apps/specforge-cli` 通过精确 `scopePath` 传递和 committed-tree 文件清单测试；临时 Windows CI 校验器构建成功。
 - `go test ./...`（`apps/specforge-cli`，仓库内 `GOCACHE`）通过 CLI 及全部内部包测试；临时 Windows 构建产物生成成功。
 - PowerShell AST 解析通过 `deploy/scripts/new-attestation-key.ps1`、`deploy/scripts/start-mcp-http.ps1` 和 `deploy/scripts/start.ps1`；启动器在缺少 Bearer Token 时失败关闭。
 - `specforge hook install` 的 Go 测试验证既有 Hook 保留、幂等重装和卸载恢复；无暂存变更返回 `NO_STAGED_CHANGES`。

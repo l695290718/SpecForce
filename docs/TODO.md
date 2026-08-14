@@ -6,29 +6,29 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 ## 2. CodeArts/CodeHub Protected-Branch Enforcement
 
-**Status:** Deferred.
+**Status:** Provider-neutral CI verifier implemented; CodeHub/CodeArts status registration deferred.
 
 **Owner:** SpecForge Enterprise Integration and Repository Governance.
 
-**Rationale:** A local `pre-commit` gate improves normal developer and Agent behavior, but Git permits `--no-verify` and Hooks are not installed automatically by clone. Repository-authoritative enforcement requires CodeArts/CodeHub to independently recompute the committed tree, validate the SpecForge Change Attestation with a CI service identity, and make the result mandatory for protected-branch merge.
+**Rationale:** The standalone CLI now exposes `verify-commit`, which recomputes committed-tree evidence and delegates read-only signed-attestation verification to MCP. Git still permits `--no-verify`, and Hooks are not installed automatically by clone. Repository-authoritative enforcement still requires CodeArts/CodeHub to register this command as a mandatory protected-branch status check with a CI service identity.
 
-**Trigger:** Start the platform-specific adapter only after the standalone Go Hook CLI, provider-neutral remote MCP verification contract, strict `CONVERGED` policy, signing-key lifecycle, and local developer workflow are reviewed for the target CodeHub deployment.
+**Trigger:** Implement the platform-specific adapter only after the provider-neutral `verify-commit` entrypoint, artifact transport, strict `CONVERGED` policy, signing-key lifecycle, and local developer workflow are reviewed for the target CodeHub deployment.
 
-**Completion evidence:** `verify_change_attestation` continues to validate signed repository evidence, exact multi-Scope coverage, session and reconciliation convergence, expiry, signature, trusted and revoked key policy, and deterministic failure codes. A CodeArts/CodeHub protected-branch status check must reject a merge request with missing proof, a bypassed Hook, stale tree, wrong repository or Scope, expired or revoked signature, incomplete multi-Scope coverage, or non-converged design.
+**Completion evidence:** `specforge verify-commit --attestation <artifact>` recomputes committed-tree evidence and fails closed for missing/invalid artifacts, stale tree, wrong repository or Scope, expired or revoked signature, incomplete multi-Scope coverage, or non-converged design. `verify_change_attestation` continues to validate the signed evidence server-side. A CodeArts/CodeHub protected-branch status check must still register this command as mandatory and reject the same failure cases.
 
 **Design references:** ADR-0017, ADR-0021, ADR-0007; local contract evidence dated 2026-08-09.
 
 **中文本地化：**
 
-**状态：** 延期。
+**状态：** 平台无关 CI 校验器已实现；CodeHub/CodeArts 状态检查注册仍延期。
 
 **负责人：** SpecForge 企业集成与仓库治理团队。
 
-**理由：** 本地 `pre-commit` 门禁可以约束普通开发者和 Agent 行为，但 Git 允许 `--no-verify`，且 clone 不会自动安装 Hook。仓库权威门禁要求 CodeArts/CodeHub 使用 CI 服务身份重新计算提交 tree，独立验证 SpecForge Change Attestation，并将结果设为受保护分支合入必选状态。
+**理由：** 独立 CLI 现已提供 `verify-commit`，重新计算提交 tree 证据，并将只读签名证明校验委托给 MCP。Git 仍允许 `--no-verify`，clone 也不会自动安装 Hook。仓库权威门禁仍要求 CodeArts/CodeHub 使用 CI 服务身份注册该命令为受保护分支必选状态检查。
 
-**启动条件：** 目标 CodeHub 部署完成 Go 单文件 Hook CLI、与平台无关的远程 MCP 校验契约、严格 `CONVERGED` 策略、签名密钥生命周期和本地开发流程评审后，再启动平台适配器。
+**启动条件：** 目标 CodeHub 部署完成平台无关的 `verify-commit` 入口、证明产物传输、严格 `CONVERGED` 策略、签名密钥生命周期和本地开发流程评审后，再实现平台适配器。
 
-**完成证据：** `verify_change_attestation` 持续校验签名仓库证据、精确多 Scope 覆盖、会话与对账收敛、有效期、签名、密钥信任与撤销策略及确定性失败码。CodeArts/CodeHub 受保护分支状态检查必须拒绝缺少证明、绕过 Hook、tree 过期、仓库或 Scope 错误、签名过期或撤销、多 Scope 覆盖不完整以及设计未收敛的合入请求。
+**完成证据：** `specforge verify-commit --attestation <artifact>` 重新计算提交 tree 证据，并在证明缺失或无效、tree 过期、仓库或 Scope 错误、签名过期或撤销、多 Scope 覆盖不足以及设计未收敛时失败关闭；服务端 `verify_change_attestation` 继续校验全部签名证据。CodeArts/CodeHub 仍需把该命令注册为必选状态检查并拒绝同类失败。
 
 **设计引用：** ADR-0017、ADR-0021、ADR-0007；2026-08-09 本地契约证据。
 

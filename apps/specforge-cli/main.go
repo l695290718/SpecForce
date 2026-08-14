@@ -36,6 +36,7 @@ type FileConfig struct {
 	Repository Repository        `yaml:"repository"`
 	Governance Governance        `yaml:"governance"`
 	Mappings   []Mapping         `yaml:"scopeMappings"`
+	ScopePaths map[string]string `yaml:"scopePaths"`
 	SessionIDs map[string]string `yaml:"sessionIds"`
 }
 
@@ -142,6 +143,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		}
 	case "verify-staged":
 		return verifyStaged(context.Background(), root, config, stdout, stderr)
+	case "verify-commit":
+		return verifyCommit(context.Background(), root, config, args[1:], stdout)
 	case "scan":
 		if len(args) > 1 && args[1] == "status" {
 			return runScanStatus(root, args[2:], stdout)
@@ -157,7 +160,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 }
 
 func usageError() error {
-	return errors.New("usage: specforge login | hook install|uninstall|doctor | verify-staged | status | scan --release <file> --session <file> --trust <file> [--spool <dir>] [--artifact <file>] | scan status --session <file> [--spool <dir>] | observe --connector-id <id> --scope-path <path> [--application-service-id <id>] [--source-cursor <cursor>] [--sequence <n>] [--previous-batch-digest <digest>] [--allow-dirty]")
+	return errors.New("usage: specforge login | hook install|uninstall|doctor | verify-staged | verify-commit --attestation <file> | status | scan --release <file> --session <file> --trust <file> [--spool <dir>] [--artifact <file>] | scan status --session <file> [--spool <dir>] | observe --connector-id <id> --scope-path <path> [--application-service-id <id>] [--source-cursor <cursor>] [--sequence <n>] [--previous-batch-digest <digest>] [--allow-dirty]")
 }
 
 func repositoryRoot(ctx context.Context) (string, error) {
@@ -311,7 +314,7 @@ func resolveScopes(config FileConfig, entries []StagedEntry) ([]Scope, error) {
 	}
 	result := make([]Scope, 0, len(ids))
 	for id := range ids {
-		result = append(result, Scope{ApplicationServiceID: id})
+		result = append(result, Scope{ApplicationServiceID: id, ScopePath: config.ScopePaths[id]})
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].ApplicationServiceID < result[j].ApplicationServiceID })
 	return result, nil
@@ -416,6 +419,9 @@ func verifyStaged(ctx context.Context, root string, config FileConfig, stdout, s
 	}
 	bindings := make([]ScopeBinding, 0, len(scopes))
 	for _, scope := range scopes {
+		if scope.ScopePath == "" {
+			return fmt.Errorf("SCOPE_PATH_REQUIRED: %s", scope.ApplicationServiceID)
+		}
 		sessionID := config.SessionIDs[scope.ApplicationServiceID]
 		if sessionID == "" {
 			sessionID = os.Getenv("SPECFORGE_SESSION_ID_" + strings.NewReplacer(".", "_", "-", "_").Replace(scope.ApplicationServiceID))
@@ -446,6 +452,123 @@ func verifyStaged(ctx context.Context, root string, config FileConfig, stdout, s
 	}
 	fmt.Fprintf(stdout, "SpecForge attestation verified for %d Scope(s).\n", len(bindings))
 	return nil
+}
+
+func verifyCommit(ctx context.Context, root string, config FileConfig, args []string, stdout io.Writer) error {
+	if len(args) != 2 || args[0] != "--attestation" || strings.TrimSpace(args[1]) == "" {
+		return errors.New("VERIFY_COMMIT_USAGE: --attestation <file> is required")
+	}
+	attestation, err := readAttestation(args[1])
+	if err != nil {
+		return err
+	}
+	evidence, _, err := collectCommittedEvidence(ctx, config)
+	if err != nil {
+		return err
+	}
+	client, err := newMCPClient(config)
+	if err != nil {
+		return err
+	}
+	if err := client.verifyCommitAttestation(ctx, attestation, evidence); err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "SpecForge commit attestation verified for %d Scope(s): %s\n", len(evidence.RequiredScopes), root)
+	return nil
+}
+
+func readAttestation(path string) (Attestation, error) {
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return Attestation{}, fmt.Errorf("ATTESTATION_FILE_UNAVAILABLE: %w", err)
+	}
+	var stored StoredAttestation
+	if err := json.Unmarshal(contents, &stored); err == nil && len(stored.Payload) > 0 && stored.Signature != "" && stored.PublicKey != "" {
+		return stored.Attestation, nil
+	}
+	var attestation Attestation
+	if err := json.Unmarshal(contents, &attestation); err != nil || len(attestation.Payload) == 0 || attestation.Signature == "" || attestation.PublicKey == "" {
+		return Attestation{}, errors.New("ATTESTATION_FILE_INVALID")
+	}
+	return attestation, nil
+}
+
+func collectCommittedEvidence(ctx context.Context, config FileConfig) (Evidence, []Scope, error) {
+	tree, err := gitOutput(ctx, "rev-parse", "HEAD^{tree}")
+	if err != nil {
+		return Evidence{}, nil, errors.New("GIT_COMMITTED_TREE_UNAVAILABLE")
+	}
+	statusOutput, err := gitOutput(ctx, "diff-tree", "--root", "--no-commit-id", "--name-status", "--no-renames", "-r", "-z", "HEAD")
+	if err != nil {
+		return Evidence{}, nil, errors.New("GIT_COMMITTED_MANIFEST_UNAVAILABLE")
+	}
+	entries, err := committedEntries(ctx, statusOutput)
+	if err != nil {
+		return Evidence{}, nil, err
+	}
+	if len(entries) == 0 {
+		return Evidence{}, nil, errors.New("NO_COMMITTED_CHANGES")
+	}
+	scopes, err := resolveScopes(config, entries)
+	if err != nil {
+		return Evidence{}, nil, err
+	}
+	for _, scope := range scopes {
+		if scope.ScopePath == "" {
+			return Evidence{}, nil, fmt.Errorf("SCOPE_PATH_REQUIRED: %s", scope.ApplicationServiceID)
+		}
+	}
+	parent, _ := gitOutput(ctx, "rev-parse", "HEAD^")
+	evidence := Evidence{
+		RepositoryID:       config.Repository.ID,
+		ParentCommit:       parent,
+		StagedTreeHash:     tree,
+		ManifestDigest:     digestMust(entries),
+		ScopeMappingDigest: digestMust(config.Mappings),
+		Manifest:           entries,
+		RequiredScopes:     scopes,
+	}
+	return evidence, scopes, nil
+}
+
+func committedEntries(ctx context.Context, statusOutput string) ([]StagedEntry, error) {
+	parts := bytes.Split([]byte(statusOutput), []byte{0})
+	entries := make([]StagedEntry, 0, len(parts)/2)
+	for i := 0; i < len(parts); {
+		if len(parts[i]) == 0 {
+			i++
+			continue
+		}
+		status := string(parts[i])
+		if len(status) > 1 {
+			status = status[:1]
+		}
+		i++
+		if i >= len(parts) || len(parts[i]) == 0 {
+			return nil, errors.New("GIT_COMMITTED_MANIFEST_INVALID: committed path is missing")
+		}
+		path := filepath.ToSlash(string(parts[i]))
+		i++
+		mode, blob := committedBlob(ctx, path)
+		if status == "D" {
+			mode, blob = "000000", ""
+		}
+		entries = append(entries, StagedEntry{Path: path, Status: status, Mode: mode, Blob: blob})
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Path < entries[j].Path })
+	return entries, nil
+}
+
+func committedBlob(ctx context.Context, path string) (string, string) {
+	output, err := runCommand(ctx, "git", "ls-tree", "HEAD", "--", path)
+	if err != nil || strings.TrimSpace(string(output)) == "" {
+		return "000000", ""
+	}
+	fields := strings.Fields(strings.TrimSpace(string(output)))
+	if len(fields) < 3 {
+		return "000000", ""
+	}
+	return fields[0], fields[2]
 }
 
 func verifyAttestation(attestation Attestation, evidence Evidence) error {
@@ -679,6 +802,36 @@ func (client *mcpClient) issueAttestation(ctx context.Context, evidence Evidence
 		return Attestation{}, errors.New("ATTESTATION_RESPONSE_INVALID")
 	}
 	return response, nil
+}
+
+func (client *mcpClient) verifyCommitAttestation(ctx context.Context, attestation Attestation, evidence Evidence) error {
+	var envelope map[string]any
+	encoded, err := json.Marshal(attestation)
+	if err != nil || json.Unmarshal(encoded, &envelope) != nil {
+		return errors.New("ATTESTATION_RESPONSE_INVALID")
+	}
+	result, err := client.callTool(ctx, "verify_change_attestation", map[string]any{
+		"attestation": envelope,
+		"evidence": map[string]any{
+			"repositoryId":       evidence.RepositoryID,
+			"parentCommit":       evidence.ParentCommit,
+			"committedTreeHash":  evidence.StagedTreeHash,
+			"fileManifestDigest": evidence.ManifestDigest,
+			"scopeMappingDigest": evidence.ScopeMappingDigest,
+			"requiredScopes":     evidence.RequiredScopes,
+		},
+		"architectureScope": evidence.RequiredScopes[0],
+	})
+	if err != nil {
+		return err
+	}
+	var verification struct {
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(result, &verification); err != nil || verification.Status != "VERIFIED" {
+		return errors.New("ATTESTATION_VERIFICATION_FAILED")
+	}
+	return verifyAttestation(attestation, evidence)
 }
 
 func (client *mcpClient) callTool(ctx context.Context, name string, args map[string]any) (json.RawMessage, error) {
