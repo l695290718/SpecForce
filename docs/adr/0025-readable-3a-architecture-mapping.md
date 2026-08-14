@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implementation in progress; Tasks 1-3 contract, projection, MCP read, and bounded query increments implemented, Tasks 4-6 pending.**
+**Implementation increment complete for the read-only Map/Network Web experience; governed architecture-unit data authoring remains pending.**
 
 - Stable ID: `adr-readable-3a-architecture-mapping`
 - Owning application service: `com.huawei.celon.desiner`
@@ -69,7 +69,10 @@ PostgreSQL remains authoritative for authored facts and relationship events. The
 - `pnpm design-context:close -- --session design-change-session:34a1a99a-6026-4060-a858-46654b1630f3 --status CONVERGED` closed the exact-Scope written-design session with bilingual Spec, manifest, test, diff, MCP synchronization, and read-back evidence.
 - Exact-Scope implementation session `design-change-session:41606f36-bbb9-4ae0-ba6c-7a651cbd5fbe` covered the Task 1 contract and migration increment.
 - `node .\\node_modules\\vitest\\vitest.mjs run packages/core/src/architecture-map/types.test.ts prisma/three-a-schema.test.ts` passed 2 files and 5 tests; `node node_modules/typescript/bin/tsc -p packages/core/tsconfig.json --noEmit` and `node node_modules/prisma/build/index.js validate` exited 0; `git diff --check` exited 0.
-- Task 1 created the exact-Scope architecture-unit projection models, bounded validators, and migration with PostgreSQL-safe constraint names; Task 2 added deterministic materialization, PostgreSQL persistence, and read-only MCP adapters; Task 3 adds bounded versioned Map and unit-neighborhood query contracts across knowledge-query, Web, and MCP. Tasks 4-6 remain unimplemented.
+- Task 1 created the exact-Scope architecture-unit projection models, bounded validators, and migration with PostgreSQL-safe constraint names; Task 2 added deterministic materialization, PostgreSQL persistence, and read-only MCP adapters; Task 3 adds bounded versioned Map and unit-neighborhood query contracts across knowledge-query, Web, and MCP.
+- Task 4 is implemented: graphRepresentation=map|network, bounded URL filters, deterministic desktop/mobile layout, explicit empty state, keyboard-focusable unit nodes, and bilingual Map/Network controls are integrated into the 3A workspace.
+- Task 5 is implemented: selecting a unit calls the generation-bound neighborhood query and renders a bounded bilingual inspector with members, neighbors, mappings, completeness, criticality, evidence, and breadcrumb back navigation.
+- Task 6 read-only UI evidence is complete for this increment: the live Designer Scope rendered Map with no console errors and showed NO_GOVERNED_ARCHITECTURE_UNITS; the Network link preserved exact Scope, Baseline, and Projection parameters. A classified BIZ-to-SYS-to-TECH chain could not be demonstrated because the current published generation contains zero governed architecture-unit projections.
 - `pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session design-change-session:41606f36-bbb9-4ae0-ba6c-7a651cbd5fbe --status CONVERGED` closed the Task 1 implementation session with the recorded focused evidence.
 - Exact-Scope implementation session `design-change-session:470a576b-0660-4bd7-bf5a-dd92a6f3ee94` covered deterministic architecture-unit materialization, PostgreSQL projection persistence, and read-only MCP adapters.
 - `node .\\node_modules\\vitest\\vitest.mjs run --exclude ".worktrees/**" --exclude ".pnpm-store/**" apps/knowledge-projector/src/materializer.test.ts apps/knowledge-projector/src/architecture-unit-materializer.test.ts apps/knowledge-projector/src/architecture-unit-repository.test.ts apps/knowledge-projector/src/repository.test.ts apps/mcp-server/src/tools.test.ts` passed 5 test files and 54 tests; the knowledge-projector and MCP Server TypeScript checks, Prisma validation, and `git diff --check` exited 0.
@@ -78,6 +81,15 @@ PostgreSQL remains authoritative for authored facts and relationship events. The
 - `node .\\node_modules\\vitest\\vitest.mjs run --exclude ".worktrees/**" --exclude ".pnpm-store/**" packages/knowledge-query/src/architecture-map.test.ts packages/knowledge-query/src/service.test.ts apps/web/lib/3a/query-handler.test.ts apps/web/lib/3a/url-state.test.ts apps/mcp-server/src/tools.test.ts` passed 5 test files and 54 tests; knowledge-query, Web, and MCP Server TypeScript checks exited 0.
 - `node node_modules/prisma/build/index.js validate; git diff --check` exited 0 for the Task 3 implementation increment.
 
+## Implementation Increment Evidence
+
+- Exact-Scope implementation session design-change-session:8efcc723-4dcd-4c0d-a286-14750864d1dd covered the read-only Map/Network Web increment.
+- pnpm exec vitest run apps/web/lib/3a/url-state.test.ts apps/web/lib/3a/workspace-loader.test.ts apps/web/components/three-a/three-a-workspace.test.tsx apps/web/components/three-a/architecture-map-layout.test.ts apps/web/components/three-a/architecture-map-renderer.test.tsx passed 5 files and 18 tests.
+- pnpm exec vitest run apps/web/lib/3a/query-handler.test.ts packages/knowledge-query/src/architecture-map.test.ts passed 2 files and 13 tests.
+- pnpm --filter @specforge/web typecheck exited 0.
+- Browser acceptance on http://localhost:3000/architecture/3a?scope=com.huawei.celon.desiner&mode=graph&graphRepresentation=map rendered the Map filter bar and the explicit governed-unit empty state with no console errors. The live published projection exposes no governed architecture-unit rows, so no semantic chain was invented.
+- pnpm design-context:close -- --session design-change-session:8efcc723-4dcd-4c0d-a286-14750864d1dd --status CONVERGED returned status CONVERGED with the evidence above.
+
 ## MCP Record
 
 - Matching MCP ADR ID: `adr-readable-3a-architecture-mapping`
@@ -85,8 +97,17 @@ PostgreSQL remains authoritative for authored facts and relationship events. The
 - Matching Context Pack ID: `ctx-readable-3a-architecture-mapping`
 - Related assets: `api-specforge-3a-architecture-query`, `data-specforge-3a-projection-read-model`, and `adr-webgl-3a-graph-exploration`
 - Required links: Proposal `IMPLEMENTS_DECISION` ADR; Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal; ADR `DECIDES` the query API, projection read model, and relationship to the advanced WebGL decision; Proposal `IMPACTS` the query API and projection read model; Evidence `VALIDATES` ADR.
-- Synchronization state: the reviewing ADR, Proposal, Context Pack, Evidence, and typed links were synchronized and read back in the exact owning Scope. Tasks 1-3 are implemented and locally verified; the remaining Web experience, browser acceptance, and final acceptance increments are still pending.
+- Synchronization state: the reviewing ADR, Proposal, Context Pack, Evidence, and typed links were synchronized and read back in the exact owning Scope. Tasks 1-5 and the read-only portion of Task 6 are implemented and locally verified. Governed architecture-unit authoring and a live classified-chain acceptance remain pending because the current published generation has zero semantic unit projections.
 - Session state: `design-change-session:34a1a99a-6026-4060-a858-46654b1630f3` is `CONVERGED` for the written-design increment.
+
+## 实施增量证据
+
+- 精确 Scope 的实现会话 design-change-session:8efcc723-4dcd-4c0d-a286-14750864d1dd 覆盖了只读 Map/Network Web 增量。
+- pnpm exec vitest run apps/web/lib/3a/url-state.test.ts apps/web/lib/3a/workspace-loader.test.ts apps/web/components/three-a/three-a-workspace.test.tsx apps/web/components/three-a/architecture-map-layout.test.ts apps/web/components/three-a/architecture-map-renderer.test.tsx 通过 5 个文件和 18 项测试。
+- pnpm exec vitest run apps/web/lib/3a/query-handler.test.ts packages/knowledge-query/src/architecture-map.test.ts 通过 2 个文件和 13 项测试。
+- pnpm --filter @specforge/web typecheck 返回 0。
+- 浏览器验收访问 http://localhost:3000/architecture/3a?scope=com.huawei.celon.desiner&mode=graph&graphRepresentation=map，渲染了 Map 筛选条和明确的治理单元空状态，没有控制台错误。当前发布投影没有治理架构单元行，因此没有伪造语义链路。
+- pnpm design-context:close -- --session design-change-session:8efcc723-4dcd-4c0d-a286-14750864d1dd --status CONVERGED 返回 CONVERGED，证据与上述验证一致。
 
 ## 中文本地化覆盖
 
@@ -96,7 +117,7 @@ PostgreSQL remains authoritative for authored facts and relationship events. The
 
 ### 状态
 
-**实施进行中；Task 1-3 契约、投影、MCP 读取与有界查询增量已实施，Task 4-6 待完成。**
+**只读 Map/Network Web 体验增量已完成；治理架构单元数据编写仍待完成。**
 
 - 稳定 ID：`adr-readable-3a-architecture-mapping`
 - 所属应用服务：`com.huawei.celon.desiner`
@@ -162,7 +183,10 @@ PostgreSQL 继续作为已编写事实和关系事件的权威来源。后续实
 - `pnpm design-context:close -- --session design-change-session:34a1a99a-6026-4060-a858-46654b1630f3 --status CONVERGED` 使用双语 Spec、清单、测试、差异检查、MCP 同步和回读证据关闭了精确 Scope 的书面设计会话。
 - 精确 Scope 的实现会话 `design-change-session:41606f36-bbb9-4ae0-ba6c-7a651cbd5fbe` 覆盖了 Task 1 契约与迁移增量。
 - `node .\\node_modules\\vitest\\vitest.mjs run packages/core/src/architecture-map/types.test.ts prisma/three-a-schema.test.ts` 通过 2 个文件和 5 项测试；`node node_modules/typescript/bin/tsc -p packages/core/tsconfig.json --noEmit`、`node node_modules/prisma/build/index.js validate` 和 `git diff --check` 均通过。
-- Task 1 已创建精确 Scope 架构单元投影模型、有界校验器和 PostgreSQL 安全约束名的迁移；Task 2 已实现确定性架构单元物化、PostgreSQL 投影持久化和只读 MCP 适配器；Task 3 已在 knowledge-query、Web 和 MCP 中增加有界版本化地图与单元邻域查询契约；Task 4 至 Task 6 尚未实施。
+- Task 1 已创建精确 Scope 架构单元投影模型、有界校验器和 PostgreSQL 安全约束名的迁移；Task 2 已实现确定性架构单元物化、PostgreSQL 投影持久化和只读 MCP 适配器；Task 3 已在 knowledge-query、Web 和 MCP 中增加有界版本化地图与单元邻域查询契约。
+- Task 4 已实施：graphRepresentation=map|network、受界 URL 筛选、确定性的桌面/移动端布局、明确空状态、支持键盘聚焦的单元节点，以及双语 Map/Network 控件已接入 3A 工作区。
+- Task 5 已实施：选择单元会调用绑定代际的邻域查询，并显示包含成员、邻居、映射、完整度、关键性、证据和返回导航的双语检查器。
+- Task 6 的只读 UI 证据已完成：Designer Scope 实际渲染了 Map，没有控制台错误，并显示 NO_GOVERNED_ARCHITECTURE_UNITS；Network 链接保留了精确 Scope、Baseline 和 Projection。由于当前发布代际没有治理架构单元投影，无法展示已分类的 BIZ 到 SYS 到 TECH 链路。
 - `pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session design-change-session:41606f36-bbb9-4ae0-ba6c-7a651cbd5fbe --status CONVERGED` 已使用上述针对性证据关闭 Task 1 实现会话。
 - 精确 Scope 的实现会话 `design-change-session:470a576b-0660-4bd7-bf5a-dd92a6f3ee94` 覆盖了确定性架构单元物化、PostgreSQL 投影持久化和只读 MCP 适配器。
 - 上述 5 个聚焦测试文件和 54 项测试通过；knowledge-projector 与 MCP Server TypeScript 检查、Prisma 校验和 `git diff --check` 均通过。
@@ -177,5 +201,5 @@ PostgreSQL 继续作为已编写事实和关系事件的权威来源。后续实
 - 对应 Context Pack ID：`ctx-readable-3a-architecture-mapping`
 - 相关资产：`api-specforge-3a-architecture-query`、`data-specforge-3a-projection-read-model`、`adr-webgl-3a-graph-exploration`
 - 必需关系：Proposal `IMPLEMENTS_DECISION` ADR；Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal；ADR `DECIDES` 查询 API、投影读取模型以及与高级 WebGL 决策的关系；Proposal `IMPACTS` 查询 API 和投影读取模型；Evidence `VALIDATES` ADR。
-- 同步状态：评审中的 ADR、Proposal、Context Pack、Evidence 和有类型关系已在精确所属 Scope 中同步并回读。Task 1-3 已实施并完成本地验证；其余 Web 体验、浏览器验收和最终验收增量仍待完成。
+- 同步状态：评审中的 ADR、Proposal、Context Pack、Evidence 和有类型关系已在精确所属 Scope 中同步并回读。Task 1-5 及 Task 6 的只读部分已实施并完成本地验证。由于当前发布代际没有语义单元投影，治理架构单元编写和已分类链路验收仍待完成。
 - 会话状态：`design-change-session:34a1a99a-6026-4060-a858-46654b1630f3` 已针对书面设计增量收敛为 `CONVERGED`。

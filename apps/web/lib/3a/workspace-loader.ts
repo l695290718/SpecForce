@@ -1,5 +1,7 @@
-import type { ArchitectureScopeRef, KnowledgeProjectionEdge, PublishedBaselineDrift } from "@specforge/core";
+import type { ArchitectureScopeRef, ArchitectureUnitKind, KnowledgeProjectionEdge, PublishedBaselineDrift } from "@specforge/core";
 import type {
+  ArchitectureMapQueryResult,
+  ArchitectureUnitNeighborhoodResult,
   ArchitectureFactDetail,
   SearchArchitectureFactsResult,
   PublishedBaselineSummary,
@@ -17,6 +19,7 @@ export interface BaselineOption {
 
 export interface ManifestOption {
   id: string;
+  generationId?: string;
   profileVersion: string;
   publishedAt: string;
 }
@@ -37,6 +40,8 @@ export interface ThreeAWorkspaceData {
   initialCatalog?: LayerPages;
   initialGraph?: InitialGraphPage;
   initialGraphEdges?: KnowledgeProjectionEdge[];
+  initialArchitectureMap?: ArchitectureMapQueryResult;
+  initialArchitectureUnitNeighborhood?: ArchitectureUnitNeighborhoodResult;
   alignmentEdges?: KnowledgeProjectionEdge[];
   drift?: PublishedBaselineDrift;
   errorCode?: string;
@@ -83,6 +88,38 @@ export async function loadThreeAWorkspaceData(
   }
 
   if (state.mode === "graph") {
+    if (state.graphRepresentation === "map" && selectedManifest.generationId) {
+      if (state.unit) {
+        return {
+          ...base,
+          initialArchitectureUnitNeighborhood: await service.architectureUnitNeighborhood({
+            ...queryIdentity,
+            generationId: selectedManifest.generationId,
+            unitIdentity: state.unit,
+            direction: state.direction,
+            depth: 2,
+            budget: { maxUnitsPerLayer: 12, maxMappings: 60, timeoutMs: 2_000, maxPayloadBytes: 524_288 }
+          })
+        };
+      }
+      return {
+        ...base,
+        initialArchitectureMap: await service.architectureMap({
+          ...queryIdentity,
+          generationId: selectedManifest.generationId,
+          filter: {
+            ...(state.mapQuery ? { query: state.mapQuery } : {}),
+            ...(state.mapLayers?.length ? { layers: state.mapLayers } : {}),
+            ...(state.mapKinds?.length ? { kinds: state.mapKinds as ArchitectureUnitKind[] } : {}),
+            ...(state.mappingFamilies?.length ? { mappingFamilies: state.mappingFamilies } : {}),
+            ...(state.minCriticality !== undefined ? { minCriticality: state.minCriticality } : {}),
+            ...(state.minCompleteness !== undefined ? { minCompleteness: state.minCompleteness } : {}),
+            ...(state.includeUnclassified !== undefined ? { includeUnclassified: state.includeUnclassified } : {})
+          },
+          budget: { maxUnitsPerLayer: 12, maxMappings: 60, timeoutMs: 2_000, maxPayloadBytes: 524_288 }
+        })
+      };
+    }
     if (!state.focus) {
       const [layers, alignment] = await Promise.all([
         Promise.all((["BIZ", "SYS", "TECH"] as const).map(async (layer) => [layer, await service.searchArchitectureFacts({ ...queryIdentity, layer, limit: 84 })] as const)),
@@ -118,8 +155,8 @@ function toBaselineOption(baseline: PublishedBaselineSummary): BaselineOption {
   return { id: baseline.id, status: baseline.status, publishedAt: baseline.publishedAt };
 }
 
-function toManifestOption(manifest: { id: string; profileVersion: string; publishedAt: string }): ManifestOption {
-  return { id: manifest.id, profileVersion: manifest.profileVersion, publishedAt: manifest.publishedAt };
+function toManifestOption(manifest: { id: string; generationId: string; profileVersion: string; publishedAt: string }): ManifestOption {
+  return { id: manifest.id, generationId: manifest.generationId, profileVersion: manifest.profileVersion, publishedAt: manifest.publishedAt };
 }
 
 async function loadPublishedDrift(
