@@ -1543,9 +1543,9 @@
                               }
                           ],
                           "owner": "SpecForge Architecture and Product",
-                          "status": "Implementation in progress; Tasks 1-3 contract, projection, MCP read, and bounded query increments implemented, Tasks 4-6 pending",
-                          "reason": "The default 3A representation must expose authored semantic BIZ, SYS, and TECH units and readable cross-layer mappings, while the existing WebGL network remains the bounded advanced exploration surface.",
-                          "retryTrigger": "User approves the written Spec and a separate exact-Scope implementation plan and design-change session are created.",
+                          "status": "Read-only Map and Network implementation complete; governed 3A architecture-fact authoring and Designer fact onboarding are designed and pending explicit implementation approval",
+                          "reason": "The current published Designer generation has no canonical source facts for authored semantic BIZ, SYS, and TECH units. First-class immutable revisions must enter the existing review, ChangeSet, Baseline, and deterministic projection lifecycle through MCP before a real BIZ-to-SYS-to-TECH chain can be published.",
+                          "retryTrigger": "User approves the two 2026-08-15 implementation plans, then a new exact-Scope implementation preflight session is opened before code changes.",
                           "evidence": [
                               {
                                   "command": "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Design-readable-3A-architecture-mapping",
@@ -1598,6 +1598,26 @@
                               {
                                   "command": "pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session design-change-session:c3471bcf-b2ee-485f-b9ec-c418f24b677b --status CONVERGED",
                                   "result": "Closed the exact-Scope Task 3 implementation session as CONVERGED; Tasks 4-6 remain pending."
+                              },
+                              {
+                                  "command": "pnpm design-context:preflight -- --intent Design-first-class-MCP-governed-3A-architecture-fact-authoring-and-Designer-onboarding --affected adr-readable-3a-architecture-mapping --evidence user-approval:2026-08-15:write-spec-and-plan-before-code",
+                                  "result": "Opened design-change-session:efd5df8b-492f-4e8c-949f-94f66b541cc7 in the exact Designer Scope, read 289 scoped assets, and returned design-context digest 690eb08158bedeec92c47d72f8ce5c63337c1a1b7bf2a2fb6d5a373f0ff0aea8 with relationship digest 438d6b0aeb41bb9a193cfe8b06f605f88dad75f6d81b78de0ba80353635f723b."
+                              },
+                              {
+                                  "command": "Written design and plan self-review on 2026-08-15",
+                                  "result": "Defined first-class immutable architecture fact revisions, additive shared governance references, MCP-only bounded submission, dedicated authored-fact promotion, deterministic Baseline source loading, live evidence-backed Designer onboarding, exact-Scope isolation, bilingual requirements, idempotency, compatibility, and explicit deferred coverage without claiming implementation."
+                              },
+                              {
+                                  "command": "node .\\node_modules\\vitest\\vitest.mjs run --root . --exclude .worktrees/** --exclude .pnpm-store/** scripts\\design-fact-manifest.test.ts scripts\\sync-design-facts.test.ts",
+                                  "result": "Passed 2 files and 33 tests for the governed 3A authoring written-design increment."
+                              },
+                              {
+                                  "command": "SPECFORGE_DESIGN_FACT_IDS=adr-readable-3a-architecture-mapping pnpm design-facts:sync; pnpm design-facts:check",
+                                  "result": "Synchronization returned complete; reconciliation verified adr-readable-3a-architecture-mapping with missing=[], mismatched=[], outOfScope=[], and blocked=[]."
+                              },
+                              {
+                                  "command": "pnpm design-context:close -- --session design-change-session:efd5df8b-492f-4e8c-949f-94f66b541cc7 --status CONVERGED --evidence written-spec,generic-plan,onboarding-plan,manifest-tests,json-validation,mcp-sync,reconciliation,diff-check",
+                                  "result": "Closed the exact-Scope governed 3A authoring written-design session as CONVERGED with all recorded evidence; code and Designer fact onboarding remain pending explicit implementation approval."
                               }
                           ]
                       }

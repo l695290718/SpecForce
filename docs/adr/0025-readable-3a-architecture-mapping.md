@@ -2,13 +2,16 @@
 
 ## Status
 
-**Implementation increment complete for the read-only Map/Network Web experience; governed architecture-unit data authoring remains pending.**
+**The read-only Map/Network experience is implemented. The governed architecture-fact authoring design is approved and documented; authoring code and Designer fact onboarding remain pending explicit implementation approval.**
 
 - Stable ID: `adr-readable-3a-architecture-mapping`
 - Owning application service: `com.huawei.celon.desiner`
 - Owning scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - Design Change Session: `design-change-session:34a1a99a-6026-4060-a858-46654b1630f3`
 - Written Spec: `docs/superpowers/specs/2026-08-11-readable-3a-architecture-mapping-design.md`
+- Authoring Design Session: `design-change-session:efd5df8b-492f-4e8c-949f-94f66b541cc7`
+- Authoring Spec: `docs/superpowers/specs/2026-08-15-governed-3a-architecture-fact-authoring-design.md`
+- Authoring Plans: `docs/superpowers/plans/2026-08-15-governed-3a-architecture-fact-authoring.md` and `docs/superpowers/plans/2026-08-15-designer-3a-fact-onboarding.md`
 - Parent decisions: `adr-3a-architecture-navigation-workspace`, `adr-scalable-3a-exploration`, `adr-webgl-3a-graph-exploration`
 
 ## Context
@@ -28,6 +31,16 @@ The overview shows only cross-layer mappings and must expose a readable BIZ-to-S
 Architecture-unit membership and mappings must come from explicit authored facts. The UI and projection pipeline may not invent canonical units through naming heuristics, community detection, or layout. Unclassified facts and incomplete mappings remain visible as quality signals.
 
 PostgreSQL remains authoritative for authored facts and relationship events. The implementation will add immutable derived `ArchitectureUnitProjection`, `ArchitectureUnitMemberProjection`, and `ArchitectureUnitMappingProjection` records behind the existing provider boundary. Additive `architectureMap` and `architectureUnitNeighborhood` query operations preserve the existing bounded network contracts.
+
+## Governed Authoring Addendum
+
+Architecture units, memberships, and cross-layer mappings will be represented as first-class immutable canonical revisions rather than generic scan-derived `KnowledgeAssertion` rows or direct projection writes. A bounded `ArchitectureFactBatch` is submitted only through MCP with exact Scope, an open design-change session, provider-neutral provenance, evidence, bilingual content, and a server-calculated idempotency digest.
+
+The shared governance envelope is extended additively: Review Bundles, promotion decisions, promotion receipts, ChangeSets, reconciliation, and Baseline manifests reference exact architecture revision IDs. Authored architecture facts use a dedicated promotion service because their provenance is not a scan session, but they still require the same authorized review, active Working Stream, immutable ChangeSet, converged reconciliation, and published Baseline. Existing scan-based promotion remains compatible.
+
+The projector reads accepted architecture revision IDs from the published Baseline and creates generation-bound `ArchitectureUnitProjection`, `ArchitectureUnitMemberProjection`, and `ArchitectureUnitMappingProjection` rows. A legacy Baseline with no architecture revisions retains the explicit empty state. A Baseline that declares missing, non-accepted, cross-Scope, or unresolved architecture revisions fails projection publication rather than silently producing an empty Map.
+
+The first Designer Scope data increment is a separate governed operation after the generic capability is implemented. It reads live scoped assets and typed relationships, builds an evidence matrix, submits only evidence-backed candidates through MCP, and publishes at least one real BIZ-to-SYS-to-TECH chain. Ambiguous classifications remain blocked or rejected and become explicit coverage backlog facts; implementation may not predefine or infer business names from repository labels or graph topology.
 
 ## Alternatives
 
@@ -89,6 +102,11 @@ PostgreSQL remains authoritative for authored facts and relationship events. The
 - pnpm --filter @specforge/web typecheck exited 0.
 - Browser acceptance on http://localhost:3000/architecture/3a?scope=com.huawei.celon.desiner&mode=graph&graphRepresentation=map rendered the Map filter bar and the explicit governed-unit empty state with no console errors. The live published projection exposes no governed architecture-unit rows, so no semantic chain was invented.
 - pnpm design-context:close -- --session design-change-session:8efcc723-4dcd-4c0d-a286-14750864d1dd --status CONVERGED returned status CONVERGED with the evidence above.
+- Authoring-design preflight opened `design-change-session:efd5df8b-492f-4e8c-949f-94f66b541cc7` in the exact Designer Scope, read 289 scoped assets, and returned design-context digest `690eb08158bedeec92c47d72f8ce5c63337c1a1b7bf2a2fb6d5a373f0ff0aea8` with relationship digest `438d6b0aeb41bb9a193cfe8b06f605f88dad75f6d81b78de0ba80353635f723b`.
+- The governed authoring Spec and two implementation plans define first-class revisions, additive shared governance references, MCP-only submission, dedicated authored-fact promotion, deterministic Baseline projection loading, and live Designer onboarding. They do not claim code or data implementation.
+- `node .\node_modules\vitest\vitest.mjs run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" scripts\design-fact-manifest.test.ts scripts\sync-design-facts.test.ts` passed 2 files and 33 tests for the authoring-design documentation increment.
+- With `SPECFORGE_DESIGN_FACT_IDS=adr-readable-3a-architecture-mapping`, `pnpm design-facts:sync` returned `complete`; `pnpm design-facts:check` verified the ADR with empty `missing`, `mismatched`, `outOfScope`, and `blocked` lists.
+- `pnpm design-context:close -- --session design-change-session:efd5df8b-492f-4e8c-949f-94f66b541cc7 --status CONVERGED` closed the exact-Scope written-authoring-design session with the Spec, both plans, manifest tests, JSON validation, MCP synchronization, reconciliation, and diff evidence.
 
 ## MCP Record
 
@@ -99,6 +117,18 @@ PostgreSQL remains authoritative for authored facts and relationship events. The
 - Required links: Proposal `IMPLEMENTS_DECISION` ADR; Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal; ADR `DECIDES` the query API, projection read model, and relationship to the advanced WebGL decision; Proposal `IMPACTS` the query API and projection read model; Evidence `VALIDATES` ADR.
 - Synchronization state: the reviewing ADR, Proposal, Context Pack, Evidence, and typed links were synchronized and read back in the exact owning Scope. Tasks 1-5 and the read-only portion of Task 6 are implemented and locally verified. Governed architecture-unit authoring and a live classified-chain acceptance remain pending because the current published generation has zero semantic unit projections.
 - Session state: `design-change-session:34a1a99a-6026-4060-a858-46654b1630f3` is `CONVERGED` for the written-design increment.
+
+## 中文写入设计增量
+
+只读 Map/Network 体验已经实现。受治理架构事实写入设计已经形成文档，但代码和 Designer 首批数据尚未实施。
+
+架构单元、成员归属和跨层映射将作为一等、不可变、精确 Scope 的规范修订保存。它们不会伪装成扫描生成的普通断言，也不会直接写入投影表。MCP 批次必须携带开放的设计变更会话、英文规范内容、完整中文覆盖、证据、来源和幂等键。
+
+现有 Review Bundle、审批决策、晋升回执、ChangeSet、对账和 Baseline 将增加架构事实修订引用。架构事实使用专用晋升服务处理显式编写来源，但仍遵循同一套授权审核和发布治理。投影器只从已发布 Baseline 中读取已接受修订；声明了修订却无法精确读取时必须阻止发布，不能静默生成空 Map。
+
+通用能力完成后，Designer 数据上线将读取实时精确 Scope 的设计资产与关系，建立证据矩阵，只通过 MCP 提交有证据的候选，并发布至少一条真实的 BIZ 到 SYS 到 TECH 链路。证据不足的内容保持阻塞或拒绝，并登记覆盖待办，不从名称或图拓扑猜测业务语义。
+
+本次书面设计验证中，设计事实清单与同步脚本测试通过 2 个文件、33 项测试；限定 ADR 的 MCP 同步返回 `complete`，回读检查的缺失、不匹配、越界和阻塞列表均为空。书面设计会话 `design-change-session:efd5df8b-492f-4e8c-949f-94f66b541cc7` 已使用上述证据关闭为 `CONVERGED`。
 
 ## 实施增量证据
 
