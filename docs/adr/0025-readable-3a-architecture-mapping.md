@@ -75,11 +75,28 @@ The first Designer Scope data increment is a separate governed operation after t
 - The Web remains read-only. Architecture semantics are authored through MCP.
 - This ADR cannot be marked implemented without exact-Scope query, projection, isolation, accessibility, browser, MCP read-back, and session-closure evidence.
 
-## Planned v5 Membership Expansion
+## Implemented v5 Membership Expansion
 
-The approved v5 design is a conservative membership-only increment and is not yet implemented. It preserves the 4 v4 units and 3 mappings, adds exactly 10 directly evidenced facts to the existing MCP governance gateway, and targets 38 memberships in a complete immutable snapshot.
+The approved v5 design is implemented as a conservative membership-only increment. It preserves the 4 v4 units and 3 mappings, adds exactly 10 directly evidenced facts to the existing MCP governance gateway, and publishes 38 memberships in a complete immutable snapshot. v4 remains immutable and published as the prior Baseline.
 
-The AI generation API, asset graph query API, Web Console API, and MCP audit observability design remain unclassified because each requires a separate architecture-unit decision. Nine `specforge-graph-verification-*` API rows are verification fixtures and are excluded from architecture coverage; their cleanup is tracked independently. Implementation requires a new exact-Scope session and must not reuse this written-design session.
+The AI generation API, asset graph query API, Web Console API, and MCP audit observability design remain unclassified because each requires a separate architecture-unit decision. Nine `specforge-graph-verification-*` API rows are verification fixtures and are excluded from architecture coverage; their cleanup is tracked independently. No naming inference, new unit, new mapping, or cross-Scope write was introduced.
+
+### v5 Implementation Evidence
+
+- Exact-Scope implementation session: `design-change-session:87996974-cab9-496d-84cd-9492518f0466`.
+- MCP publisher: `scripts/publish-designer-3a-v5.ts` read all ten candidate assets in English and Chinese, checked typed links, read the accepted v4 snapshot, and submitted the complete v5 snapshot through MCP.
+- MCP receipts: batch `architecture-fact-batch:designer:3a:coverage:v5`, ReviewBundle `knowledge-review-bundle:designer:3a:coverage:v5` (`READY`), decision `knowledge-promotion-decision:designer:3a:coverage:v5` (`APPROVE`), reconciliation `knowledge-reconciliation:...:406cc98059ad031ce9d0b02784aca6a45ac8517de86dfbed2f282941a928fc23` (`CONVERGED`), and Baseline `knowledge-baseline:designer:3a:v5` (`PUBLISHED`).
+- v5 counts: 4 units, 38 memberships, 3 mappings; relationship version `7036`; exact Scope readback matched.
+- `pnpm exec tsx scripts/process-designer-3a-v5-projection.ts` requested the v5 build through MCP and produced `READY` with derived graph analysis `PUBLISHED`.
+- `pnpm exec tsx scripts/verify-designer-3a-v5.ts` returned 4 units, 38 members, 3 mappings, `totalByLayer={BIZ:1,SYS:2,TECH:1}`, `unclassifiedCount=0`, `fixtureHits=[]`, `deferredHits=[]`, and `scopeMatches=true`.
+- `pnpm typecheck` passed all five workspace packages. `git diff --check` exited 0. The existing neighborhood adapter's Prisma field mismatch was not changed in this data-only increment; exact member verification used MCP map readback plus read-only PostgreSQL projection inspection.
+
+### v5 实施证据
+
+- 精确 Scope 实施会话：`design-change-session:87996974-cab9-496d-84cd-9492518f0466`。
+- MCP 发布器通过 MCP 重新读取 10 个候选资产的中英文内容和类型化关系，并只读读取已发布 v4 快照；所有权威事实写入均通过 MCP 完成。
+- v5 已发布为 4 个架构单元、38 个成员归属和 3 条映射；ReviewBundle 为 `READY`，对账为 `CONVERGED`，Baseline 为 `PUBLISHED`。
+- 投影回读为 `READY`，派生图分析为 `PUBLISHED`；精确 Scope 匹配，未分类数为 0，9 条图验证夹具和延期资产均未纳入 v5。
 
 ### v5 成员扩充计划
 

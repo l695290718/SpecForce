@@ -23,36 +23,36 @@
 ## Task 1: Record the implementation plan
 
 - [x] Open the exact-Scope implementation preflight and capture the session receipt.
-- [ ] Commit this plan without staging unrelated `outputs/` or workbook files.
+- [x] Commit this plan without staging unrelated `outputs/` or workbook files.
 
 **Evidence:** `design-change-session:87996974-cab9-496d-84cd-9492518f0466` and the approved Spec at `docs/superpowers/specs/2026-08-15-designer-3a-v5-membership-expansion-design.md`.
 
 ## Task 2: Build the MCP-only v5 publisher
 
-- [ ] Add `scripts/publish-designer-3a-v5.ts`.
-- [ ] Read the exact-Scope asset catalog and typed links through MCP before constructing the snapshot; assert all ten additions have English and Chinese content and the expected link evidence.
-- [ ] Read the accepted v4 baseline and revision rows read-only from PostgreSQL, assert v4 is `PUBLISHED`, and derive new v5 revision IDs without mutating v4.
-- [ ] Submit a complete v5 snapshot containing four carried-forward unit revisions, thirty-eight membership revisions, and three carried-forward mapping revisions.
-- [ ] Create the v5 review bundle with complete declared coverage, approve it, promote it to the existing working stream, reconcile it, and publish `knowledge-baseline:designer:3a:v5` through MCP.
-- [ ] Make reruns idempotent by using deterministic v5 IDs and idempotency keys; stop on any Scope, count, evidence, or localization mismatch.
+- [x] Add `scripts/publish-designer-3a-v5.ts`.
+- [x] Read the exact-Scope asset catalog and typed links through MCP before constructing the snapshot; assert all ten additions have English and Chinese content and the expected link evidence.
+- [x] Read the accepted v4 baseline and revision rows read-only from PostgreSQL, assert v4 is `PUBLISHED`, and derive new v5 revision IDs without mutating v4.
+- [x] Submit a complete v5 snapshot containing four carried-forward unit revisions, thirty-eight membership revisions, and three carried-forward mapping revisions.
+- [x] Create the v5 review bundle with complete declared coverage, approve it, promote it to the existing working stream, reconcile it, and publish `knowledge-baseline:designer:3a:v5` through MCP.
+- [x] Make reruns idempotent by using deterministic v5 IDs and idempotency keys; stop on any Scope, count, evidence, or localization mismatch.
 
 **Focused checks:** publisher must print the session ID, batch/review/decision/promotion/reconciliation/baseline receipts, exact Scope, and `4/38/3` snapshot counts.
 
 ## Task 3: Build and verify the v5 projection
 
-- [ ] Add `scripts/process-designer-3a-v5-projection.ts` using the existing projection service and baseline `knowledge-baseline:designer:3a:v5`.
-- [ ] Request the v5 projection build through MCP, wait for `READY`, and wait for derived relationship analysis to become `PUBLISHED`.
-- [ ] Add `scripts/verify-designer-3a-v5.ts` to read the published baseline and projection through MCP and assert exact Scope, `4` units, `38` memberships, `3` mappings, and zero unclassified memberships in the declared v5 evidence set.
-- [ ] Verify the nine excluded fixture APIs are not members of the v5 snapshot and the four deferred assets remain unclassified rather than inferred.
+- [x] Add `scripts/process-designer-3a-v5-projection.ts` using the existing projection service and baseline `knowledge-baseline:designer:3a:v5`.
+- [x] Request the v5 projection build through MCP, wait for `READY`, and wait for derived relationship analysis to become `PUBLISHED`.
+- [x] Add `scripts/verify-designer-3a-v5.ts` to read the published baseline and projection through MCP and assert exact Scope, `4` units, `38` memberships, `3` mappings, and zero unclassified memberships in the declared v5 evidence set.
+- [x] Verify the nine excluded fixture APIs are not members of the v5 snapshot and the four deferred assets remain unclassified rather than inferred.
 
 **Focused checks:** v5 baseline readback, projection manifest readback, derived analysis status, exclusion assertions, and exact count assertions.
 
 ## Task 4: Synchronize records and close the session
 
-- [ ] Add `docs/evidence/designer-3a-v5-membership-expansion-evidence.md` with exact commands, receipts, counts, projection status, and failure/recovery notes.
-- [ ] Update the v5 Spec and ADR with implementation status and evidence while preserving the deferred backlog item for fixture cleanup.
-- [ ] Run `pnpm design-facts:sync`, `pnpm design-facts:check`, focused governance tests, `pnpm typecheck`, and `git diff --check`.
-- [ ] Close `design-change-session:87996974-cab9-496d-84cd-9492518f0466` through `pnpm design-context:close -- --status CONVERGED` with exact verification evidence, only after all MCP readbacks pass.
-- [ ] Commit the implementation and evidence; leave unrelated untracked files untouched.
+- [x] Add `docs/evidence/designer-3a-v5-membership-expansion-evidence.md` with exact commands, receipts, counts, projection status, and failure/recovery notes.
+- [x] Update the v5 Spec and ADR with implementation status and evidence while preserving the deferred backlog item for fixture cleanup.
+- [x] Run `pnpm design-facts:sync`, `pnpm design-facts:check`, focused governance tests, `pnpm typecheck`, and `git diff --check`.
+- [x] Close `design-change-session:87996974-cab9-496d-84cd-9492518f0466` through `pnpm design-context:close -- --status CONVERGED` with exact verification evidence, only after all MCP readbacks pass.
+- [x] Commit the implementation and evidence; leave unrelated untracked files untouched.
 
 **Completion gate:** v5 MCP records, projection, repository evidence, and the same implementation session must all be converged. A failed MCP write or verification leaves the session open or closes it as `BLOCKED` with a retry trigger and must not be reported as complete.

@@ -2,13 +2,14 @@
 
 ## Status
 
-Approved for specification on 2026-08-15. Not implemented. No v5 architecture-fact batch, promotion, Baseline, or projection exists yet.
+Implemented on 2026-08-15 through the exact Designer Scope. v5 architecture-fact batch, promotion, Baseline, projection, and readback are converged; repository and MCP evidence are recorded below.
 
 - Owning application service: `com.huawei.celon.desiner`
 - Owning Scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 - Parent decision: `adr-readable-3a-architecture-mapping`
 - Current official source Baseline: `knowledge-baseline:designer:3a:v4`
 - Written-design session: `design-change-session:4a19af23-3adc-430e-b252-3fead241bb05`
+- Implementation session: `design-change-session:87996974-cab9-496d-84cd-9492518f0466`
 
 ## Objective
 
@@ -141,7 +142,7 @@ PostgreSQL remains authoritative for authored revisions, governance receipts, Ba
 
 ## Implementation Gate
 
-Implementation must not start until the user explicitly approves this written Spec. After approval, create a separate implementation plan and a new exact-Scope implementation session.
+Implementation started only after explicit user approval, the separate implementation plan, and the new exact-Scope implementation session. The implementation session is now closed as `CONVERGED` with the evidence recorded below.
 
 ---
 
@@ -149,7 +150,7 @@ Implementation must not start until the user explicitly approves this written Sp
 
 ## 状态
 
-已于 2026-08-15 批准编写 Spec，尚未实施。目前不存在 v5 架构事实批次、提升、Baseline 或投影。
+已于 2026-08-15 在精确 Designer Scope 下完成实施。v5 架构事实批次、提升、Baseline、投影和回读均已收敛，仓库与 MCP 证据记录如下。
 
 - 所属应用服务：`com.huawei.celon.desiner`
 - 所属 Scope 路径：`pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
@@ -252,4 +253,4 @@ PostgreSQL 继续作为已编写修订、治理回执、Baseline 和关系事件
 
 ## 实施门禁
 
-用户明确批准本书面 Spec 前不得开始实施。批准后必须先编写独立实施计划，并新建精确 Scope 的实施会话。
+实施仅在用户明确批准书面 Spec、完成独立实施计划并新建精确 Scope 会话后开始；当前实施会话已携带证据关闭为 `CONVERGED`。
