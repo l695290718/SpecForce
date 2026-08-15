@@ -15,6 +15,7 @@
 - Implementation Session: `design-change-session:fa68fdd5-8d04-4e64-a111-8e4c71f69a54`
 - Onboarding Evidence: `docs/evidence/designer-3a-onboarding-evidence.md` and `docs/evidence/designer-3a-candidate-review.md`
 - Coverage Evidence: `docs/evidence/designer-3a-coverage-expansion-evidence.md`
+- Planned v5 Membership Spec: `docs/superpowers/specs/2026-08-15-designer-3a-v5-membership-expansion-design.md`
 - Parent decisions: `adr-3a-architecture-navigation-workspace`, `adr-scalable-3a-exploration`, `adr-webgl-3a-graph-exploration`
 
 ## Context
@@ -74,8 +75,25 @@ The first Designer Scope data increment is a separate governed operation after t
 - The Web remains read-only. Architecture semantics are authored through MCP.
 - This ADR cannot be marked implemented without exact-Scope query, projection, isolation, accessibility, browser, MCP read-back, and session-closure evidence.
 
+## Planned v5 Membership Expansion
+
+The approved v5 design is a conservative membership-only increment and is not yet implemented. It preserves the 4 v4 units and 3 mappings, adds exactly 10 directly evidenced facts to the existing MCP governance gateway, and targets 38 memberships in a complete immutable snapshot.
+
+The AI generation API, asset graph query API, Web Console API, and MCP audit observability design remain unclassified because each requires a separate architecture-unit decision. Nine `specforge-graph-verification-*` API rows are verification fixtures and are excluded from architecture coverage; their cleanup is tracked independently. Implementation requires a new exact-Scope session and must not reuse this written-design session.
+
+### v5 成员扩充计划
+
+已批准的 v5 设计是保守的仅成员增量，目前尚未实施。它保留 v4 的 4 个单元和 3 条映射，只把 10 个具有直接证据的事实加入现有 MCP 治理网关，目标是在完整不可变快照中达到 38 个成员归属。
+
+AI 生成 API、资产图查询 API、Web Console API 和 MCP 审计可观测性设计继续保持未分类，因为它们分别需要独立的架构单元决策。9 条 `specforge-graph-verification-*` API 是验证数据，不纳入架构覆盖，并单独登记清理待办。实施必须新建精确 Scope 会话，不能复用本次书面设计会话。
+
 ## Evidence
 
+- Exact-Scope written-design session `design-change-session:4a19af23-3adc-430e-b252-3fead241bb05` read 298 scoped assets and relationship digest `86f22fca81d050efd28827d54545df5cff3ce91fab549aa25445963fbefc6a37` before the v5 Spec was written.
+- The v4 inventory review found 23 unclassified records in the selected categories: 10 directly evidenced memberships, 4 legitimate facts requiring new architecture units, and 9 persisted graph-verification fixtures excluded from production coverage.
+- Spec self-review found no placeholders or conflicting counts, preserved the 4/38/3 complete-snapshot boundary, and kept implementation explicitly blocked pending user approval.
+- `pnpm exec vitest run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" scripts/design-fact-manifest.test.ts scripts/sync-design-facts.test.ts` passed 2 files and 33 tests; `pnpm design-facts:check` verified 23 ADR records with empty missing, mismatched, out-of-Scope, and blocked lists; `git diff --check` exited 0.
+- `pnpm design-context:close -- --session design-change-session:4a19af23-3adc-430e-b252-3fead241bb05 --status CONVERGED` closed the written-design session. No v5 batch, Baseline, projection, or implementation code was created.
 - Exact-Scope preflight opened `design-change-session:34a1a99a-6026-4060-a858-46654b1630f3`, read 254 scoped assets, and returned design-context digest `d8bb3389e8eb85559f46c8a111b7c3abcda61725aec3b39690be43c02fe139d1` with relationship digest `dbb387eee30c0f19ba7dd8015d3e06dd971eab35464a4784ddfaef63b2d95055`.
 - In-app browser inspection observed 151 nodes, 234 edges, and 7 canvases in a 454-by-576-pixel graph surface; the default network did not expose a readable BIZ-to-SYS-to-TECH chain.
 - User design review selected semantic architecture units, bounded local drill-down with inspector and breadcrumb, and cross-layer-only overview mappings.

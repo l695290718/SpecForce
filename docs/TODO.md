@@ -195,3 +195,31 @@ Only incomplete work is listed here. Completed and superseded records are preser
 **完成证据：** 仓库模板将当前路径映射到精确 Designer Scope 且不含凭据；`new-attestation-key.ps1` 只写用户目录；`start-mcp-http.ps1` 强制要求 Bearer Token、精确 Scope 授权、PostgreSQL 和 Ed25519 密钥；`specforge hook install` 幂等；无暂存变更时返回 `NO_STAGED_CHANGES`；Go 与 PowerShell 聚焦检查通过。真实带证明提交需要操作者提供当前 MCP Token/会话，并因会改变 Git 历史保留为操作检查。CodeHub 合入门禁仍是独立待办（TODO 第 2 项）。
 
 **设计引用：** ADR-0017、ADR-0021、ADR-0007；`docs/operations/local-git-hook-attestation.md`；`apps/specforge-cli/`。
+
+## 9. Remove Persisted Graph Verification Fixtures From The Designer Catalog
+
+**Status:** Deferred; explicitly excluded from Designer 3A v5.
+
+**Owner:** SpecForge Runtime and Test Infrastructure.
+
+**Rationale:** Nine `specforge-graph-verification-*` API assets were persisted in the authoritative Designer catalog by graph verification workflows. They have bilingual payloads but represent test fixtures rather than production design facts. Classifying them would corrupt architecture coverage, while deleting them inside the v5 membership operation would mix data repair with governed architecture authoring.
+
+**Trigger:** Start after the fixture-producing verification path is identified and changed to use an isolated test Scope or transactional cleanup. Open a dedicated exact-Scope session before removing authoritative records.
+
+**Completion evidence:** The producer no longer writes verification fixtures into the Designer Scope; focused tests use an isolated Scope and clean up deterministically; all nine known records are removed through an approved, audited path; MCP catalog read-back confirms their absence without changing production design assets or v5 architecture memberships.
+
+**Design references:** ADR-0025; `docs/superpowers/specs/2026-08-15-designer-3a-v5-membership-expansion-design.md`.
+
+**中文本地化：**
+
+**状态：** 延期，并明确排除在 Designer 3A v5 之外。
+
+**负责人：** SpecForge 运行时与测试基础设施团队。
+
+**理由：** 图投影验证流程把 9 条 `specforge-graph-verification-*` API 资产写入了 Designer 权威目录。它们虽然包含双语内容，但属于测试数据，不是生产设计事实。把它们分类会污染架构覆盖；在 v5 成员操作中直接删除又会混合数据修复与受治理架构编写。
+
+**启动条件：** 找到产生这些数据的验证路径，并改为使用隔离测试 Scope 或事务清理后启动。删除权威记录前必须创建独立的精确 Scope 会话。
+
+**完成证据：** 生产者不再向 Designer Scope 写入验证数据；聚焦测试使用隔离 Scope 并确定性清理；9 条已知记录通过获批且可审计的路径删除；MCP 目录回读确认记录消失，同时不改变生产设计资产或 v5 架构成员。
+
+**设计引用：** ADR-0025；`docs/superpowers/specs/2026-08-15-designer-3a-v5-membership-expansion-design.md`。
