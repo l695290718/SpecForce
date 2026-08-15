@@ -1,0 +1,108 @@
+{
+  "receipt": {
+    "sessionId": "design-change-session:88f1b5ed-aaef-44d0-af22-4626433c0f51",
+    "actorId": "local-design-context",
+    "architectureScope": {
+      "applicationServiceId": "com.huawei.celon.desiner",
+      "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+    },
+    "intent": "Design isolation of graph verification fixtures and audited MCP cleanup of nine historical Designer-Scope fixtures",
+    "affectedFactIds": [
+      "adr-postgresql-authoritative-design-store",
+      "adr-nebulagraph-derived-impact-runtime",
+      "specforge-graph-verification-a",
+      "specforge-graph-verification-b",
+      "specforge-graph-verification-c",
+      "specforge-graph-verification-4029a64a45ab42f9aa2321f8d88cfc87-a",
+      "specforge-graph-verification-4029a64a45ab42f9aa2321f8d88cfc87-b",
+      "specforge-graph-verification-4029a64a45ab42f9aa2321f8d88cfc87-c",
+      "specforge-graph-verification-cf7ddbd736d049a6a681009090b59cb9-a",
+      "specforge-graph-verification-cf7ddbd736d049a6a681009090b59cb9-b",
+      "specforge-graph-verification-cf7ddbd736d049a6a681009090b59cb9-c"
+    ],
+    "readAssetIds": [
+      "adr-3a-architecture-navigation-workspace",
+      "adr-nebulagraph-derived-impact-runtime",
+      "adr-postgresql-authoritative-design-store",
+      "data-specforge-asset-graph",
+      "data-specforge-assets",
+      "evidence-adr-nebulagraph-derived-impact-runtime-1",
+      "evidence-adr-postgresql-authoritative-design-store-1",
+      "evidence-adr-postgresql-authoritative-design-store-2",
+      "proposal-enterprise-impact-analysis",
+      "proposal-specforge-self-design",
+      "quality-specforge-impact-ready",
+      "specforge-graph-verification-4029a64a45ab42f9aa2321f8d88cfc87-a",
+      "specforge-graph-verification-4029a64a45ab42f9aa2321f8d88cfc87-b",
+      "specforge-graph-verification-4029a64a45ab42f9aa2321f8d88cfc87-c",
+      "specforge-graph-verification-a",
+      "specforge-graph-verification-b",
+      "specforge-graph-verification-c",
+      "specforge-graph-verification-cf7ddbd736d049a6a681009090b59cb9-a",
+      "specforge-graph-verification-cf7ddbd736d049a6a681009090b59cb9-b",
+      "specforge-graph-verification-cf7ddbd736d049a6a681009090b59cb9-c"
+    ],
+    "readAssetCount": 298,
+    "relationshipDigest": "86f22fca81d050efd28827d54545df5cff3ce91fab549aa25445963fbefc6a37",
+    "designContextDigest": "4f6d0bb89595249bc5c1b3cffc156080f0f9d926218c7e0c02b004b41fd8cc32",
+    "reconciliation": {
+      "status": "UNVERIFIED"
+    },
+    "status": "OPEN"
+  },
+  "session": {
+    "id": "design-change-session:88f1b5ed-aaef-44d0-af22-4626433c0f51",
+    "actorId": "local-design-context",
+    "intent": "Design isolation of graph verification fixtures and audited MCP cleanup of nine historical Designer-Scope fixtures",
+    "affectedFactIds": [
+      "adr-postgresql-authoritative-design-store",
+      "adr-nebulagraph-derived-impact-runtime",
+      "specforge-graph-verification-a",
+      "specforge-graph-verification-b",
+      "specforge-graph-verification-c",
+      "specforge-graph-verification-4029a64a45ab42f9aa2321f8d88cfc87-a",
+      "specforge-graph-verification-4029a64a45ab42f9aa2321f8d88cfc87-b",
+      "specforge-graph-verification-4029a64a45ab42f9aa2321f8d88cfc87-c",
+      "specforge-graph-verification-cf7ddbd736d049a6a681009090b59cb9-a",
+      "specforge-graph-verification-cf7ddbd736d049a6a681009090b59cb9-b",
+      "specforge-graph-verification-cf7ddbd736d049a6a681009090b59cb9-c"
+    ],
+    "expectedEvidenceRefs": [
+      "docs/superpowers/specs/2026-08-15-graph-verification-fixture-isolation-cleanup-design.md",
+      "producer-isolation-evidence",
+      "mcp-fixture-absence-readback",
+      "v5-4-38-3-regression-check"
+    ],
+    "preflightDigest": "4f6d0bb89595249bc5c1b3cffc156080f0f9d926218c7e0c02b004b41fd8cc32",
+    "preflightRelationshipDigest": "86f22fca81d050efd28827d54545df5cff3ce91fab549aa25445963fbefc6a37",
+    "preflightReadAssetIds": [
+      "adr-3a-architecture-navigation-workspace",
+      "adr-nebulagraph-derived-impact-runtime",
+      "adr-postgresql-authoritative-design-store",
+      "data-specforge-asset-graph",
+      "data-specforge-assets",
+      "evidence-adr-nebulagraph-derived-impact-runtime-1",
+      "evidence-adr-postgresql-authoritative-design-store-1",
+      "evidence-adr-postgresql-authoritative-design-store-2",
+      "proposal-enterprise-impact-analysis",
+      "proposal-specforge-self-design",
+      "quality-specforge-impact-ready",
+      "specforge-graph-verification-4029a64a45ab42f9aa2321f8d88cfc87-a",
+      "specforge-graph-verification-4029a64a45ab42f9aa2321f8d88cfc87-b",
+      "specforge-graph-verification-4029a64a45ab42f9aa2321f8d88cfc87-c",
+      "specforge-graph-verification-a",
+      "specforge-graph-verification-b",
+      "specforge-graph-verification-c",
+      "specforge-graph-verification-cf7ddbd736d049a6a681009090b59cb9-a",
+      "specforge-graph-verification-cf7ddbd736d049a6a681009090b59cb9-b",
+      "specforge-graph-verification-cf7ddbd736d049a6a681009090b59cb9-c"
+    ],
+    "status": "OPEN",
+    "openedAt": "2026-08-15T14:59:29.891Z",
+    "updatedAt": "2026-08-15T14:59:29.891Z",
+    "architectureScope": {
+      "applicationServiceId": "com.huawei.celon.desiner",
+      "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+    }
+  }
+}
