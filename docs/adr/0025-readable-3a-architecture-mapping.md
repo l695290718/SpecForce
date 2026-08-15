@@ -289,12 +289,56 @@ PostgreSQL 继续作为已编写事实和关系事件的权威来源。后续实
 
 ## 3A Neighborhood Query Identity Repair
 
-Implementation preflight opened \`design-change-session:0b9f92e9-2a22-48e3-a058-104a67017590\` in the exact Designer Scope before code changes. It read 298 scoped assets and returned design-context digest \`b3022bb4167b88291985082aacef9aa7ebbb7127992b05f852ea2431b46c5bf7\`, relationship digest \`86f22fca81d050efd28827d54545df5cff3ce91fab549aa25445963fbefc6a37\`, and reconciliation status \`UNVERIFIED\` without a blocking status. Receipt: \`.specforge/design-context/design-change-session_0b9f92e9-2a22-48e3-a058-104a67017590.json\`.
+Implementation preflight opened `design-change-session:0b9f92e9-2a22-48e3-a058-104a67017590` in the exact Designer Scope before code changes. It read 298 scoped assets and returned design-context digest `b3022bb4167b88291985082aacef9aa7ebbb7127992b05f852ea2431b46c5bf7`, relationship digest `86f22fca81d050efd28827d54545df5cff3ce91fab549aa25445963fbefc6a37`, and reconciliation status `UNVERIFIED` without a blocking status. Receipt: `.specforge/design-context/design-change-session_0b9f92e9-2a22-48e3-a058-104a67017590.json`.
 
-The approved implementation repairs table-specific identity filters for both public neighborhood MCP paths. Architecture unit, member, and mapping projection queries retain \`projectionManifestId\`; manifest queries use \`id\`; generation-bound edge queries use Scope, generation, and Baseline without \`projectionManifestId\`. No schema migration or data rewrite is authorized.
+The approved implementation repairs table-specific identity filters for both public neighborhood MCP paths. Architecture unit, member, and mapping projection queries retain `projectionManifestId`; manifest queries use `id`; generation-bound edge queries use Scope, generation, and Baseline without `projectionManifestId`. No schema migration or data rewrite is authorized.
 
 ### 3A 邻域查询身份过滤修复
 
-在修改代码前，已在精确 Designer Scope 中打开实现前置会话 \`design-change-session:0b9f92e9-2a22-48e3-a058-104a67017590\`。会话读取 298 条 Scope 内资产，设计上下文摘要为 \`b3022bb4167b88291985082aacef9aa7ebbb7127992b05f852ea2431b46c5bf7\`，关系摘要为 \`86f22fca81d050efd28827d54545df5cff3ce91fab549aa25445963fbefc6a37\`，对账状态为 \`UNVERIFIED\` 且未阻塞。回执路径为 \`.specforge/design-context/design-change-session_0b9f92e9-2a22-48e3-a058-104a67017590.json\`。
+在修改代码前，已在精确 Designer Scope 中打开实现前置会话 `design-change-session:0b9f92e9-2a22-48e3-a058-104a67017590`。会话读取 298 条 Scope 内资产，设计上下文摘要为 `b3022bb4167b88291985082aacef9aa7ebbb7127992b05f852ea2431b46c5bf7`，关系摘要为 `86f22fca81d050efd28827d54545df5cff3ce91fab549aa25445963fbefc6a37`，对账状态为 `UNVERIFIED` 且未阻塞。回执路径为 `.specforge/design-context/design-change-session_0b9f92e9-2a22-48e3-a058-104a67017590.json`。
 
-已批准的实现将修复两个公开邻域 MCP 路径的表级身份过滤。架构单元、成员和映射投影查询继续保留 \`projectionManifestId\`；Manifest 查询使用 \`id\`；按 generation 绑定的边查询只使用 Scope、generation 和 Baseline，不发送 \`projectionManifestId\`。本次不允许 Schema 迁移或数据重写。
+已批准的实现将修复两个公开邻域 MCP 路径的表级身份过滤。架构单元、成员和映射投影查询继续保留 `projectionManifestId`；Manifest 查询使用 `id`；按 generation 绑定的边查询只使用 Scope、generation 和 Baseline，不发送 `projectionManifestId`。本次不允许 Schema 迁移或数据重写。
+
+
+## 3A Neighborhood Query Identity Repair Verification
+
+The implementation repaired the two public neighborhood MCP paths without a schema migration:
+
+- `packages/knowledge-query/src/prisma-repository.ts` now strips `projectionManifestId` from generation-bound edge filters while retaining Scope, generation, and Baseline.
+- `apps/mcp-server/src/knowledge/architecture-map-adapter.ts` now queries `ProjectionManifest.id` and uses a generation-bound edge identity; architecture unit, member, mapping, and traversal projection reads remain manifest-bound.
+- `scripts/verify-designer-3a-v5.ts` now verifies both public MCP paths and no longer reads the member projection directly.
+
+Focused evidence:
+
+- `pnpm exec vitest run packages/knowledge-query/src/prisma-repository.test.ts apps/mcp-server/src/tools.test.ts` -> 2 files passed, including the new table-specific identity assertions.
+- `pnpm --filter @specforge/knowledge-query typecheck` -> exit 0.
+- `pnpm --filter @specforge/mcp-server typecheck` -> exit 0.
+- `pnpm exec tsx scripts/verify-designer-3a-v5.ts` -> `READY`, 4 units, 38 members, 3 mappings, direct neighborhood `READY` with 23 members, shared neighborhood 23 members, member equality `true`, `unclassifiedCount=0`, `fixtureHits=[]`, `deferredHits=[]`, `missingExpected=[]`, and `scopeMatches=true`.
+- No Prisma migration or data rewrite was performed.
+
+### 3A 邻域查询身份过滤修复验证
+
+本次在不执行 Schema 迁移的前提下修复了两个公开邻域 MCP 路径：
+
+- `packages/knowledge-query/src/prisma-repository.ts` 现在会从按 generation 绑定的边过滤条件中移除 `projectionManifestId`，同时保留 Scope、generation 和 Baseline。
+- `apps/mcp-server/src/knowledge/architecture-map-adapter.ts` 现在查询 `ProjectionManifest.id`，并使用按 generation 绑定的边身份；架构单元、成员、映射和遍历投影查询仍绑定完整 Manifest。
+- `scripts/verify-designer-3a-v5.ts` 现在验证两个公开 MCP 路径，不再直接读取成员投影表。
+
+针对性证据：
+
+- `pnpm exec vitest run packages/knowledge-query/src/prisma-repository.test.ts apps/mcp-server/src/tools.test.ts` -> 2 个文件通过，包含新增的表级身份断言。
+- `pnpm --filter @specforge/knowledge-query typecheck` -> 返回 0。
+- `pnpm --filter @specforge/mcp-server typecheck` -> 返回 0。
+- `pnpm exec tsx scripts/verify-designer-3a-v5.ts` -> `READY`，4 个单元、38 个成员、3 个映射；直接邻域 `READY` 且返回 23 个成员，共享邻域返回 23 个成员，成员一致性为 `true`，`unclassifiedCount=0`，夹具、延期和缺失预期均为空，Scope 匹配为 `true`。
+- 未执行 Prisma 迁移或数据重写。
+
+
+Session closure:
+
+- \`pnpm design-context:close -- --session design-change-session:0b9f92e9-2a22-48e3-a058-104a67017590 --status CONVERGED\` returned \`CONVERGED\` with the focused test, typecheck, live v5 dual-path, synchronization, reconciliation, and diff evidence above.
+- The implementation session is closed in the exact Designer Scope. The only remaining untracked paths are pre-existing user files \`outputs/\` and \`scripts/build-design-code-challenge-workbook.mjs\`.
+
+会话关闭：
+
+- \`pnpm design-context:close -- --session design-change-session:0b9f92e9-2a22-48e3-a058-104a67017590 --status CONVERGED\` 返回 \`CONVERGED\`，并记录了上述聚焦测试、类型检查、v5 双路径、同步、对账和差异证据。
+- 实现会话已在精确 Designer Scope 中关闭。当前仅剩用户原有未跟踪路径 \`outputs/\` 和 \`scripts/build-design-code-challenge-workbook.mjs\`。

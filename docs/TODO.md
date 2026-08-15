@@ -150,7 +150,7 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
-**Rationale:** The MCP-governed Designer Baseline and controlled coverage expansions now contain 4 evidence-backed architecture units, 28 memberships, and 3 mappings. Remaining APIs, events, rules, data models, runtime facts, source-owner decisions, and ambiguous semantics must not be mass-classified by naming heuristics or automatic promotion.
+**Rationale:** The MCP-governed Designer Baseline and controlled coverage expansions now contain 4 evidence-backed architecture units, 38 memberships, and 3 mappings. Both public neighborhood MCP paths are verified against the v5 projection; remaining APIs, events, rules, data models, runtime facts, source-owner decisions, and ambiguous semantics must not be mass-classified by naming heuristics or automatic promotion.
 
 **Trigger:** Start after the first slice is accepted and coverage gaps are prioritized with source owners. Each expansion must use a new exact-Scope batch, evidence matrix, bilingual review, converged reconciliation, and Baseline revision.
 

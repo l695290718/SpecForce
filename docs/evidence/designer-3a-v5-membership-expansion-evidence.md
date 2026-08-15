@@ -53,7 +53,7 @@ All ten belong to `unit:sys:specforge-mcp-governance-gateway`. No new unit, mapp
 - Derived graph analysis status: `PUBLISHED`.
 - Projection manifest: `projection-manifest:projection-generation:4540f8ea5c9d2715f65929eeacb26f1f6051a57431f78cee3cce83f165fefa6c:1`.
 
-`pnpm exec tsx scripts/verify-designer-3a-v5.ts`:
+`pnpm exec tsx scripts/verify-designer-3a-v5.ts` now reads both public neighborhood MCP paths:
 
 ```text
 status=READY
@@ -62,6 +62,11 @@ members=38
 gatewayMembers=23
 memberCount=38
 mappings=3
+directNeighborhoodStatus=READY
+sharedNeighborhoodStatus=READY
+directNeighborhoodMembers=23
+sharedNeighborhoodMembers=23
+neighborhoodMembersEqual=true
 totalByLayer={BIZ:1,SYS:2,TECH:1}
 unclassifiedCount=0
 fixtureHits=[]
@@ -70,7 +75,7 @@ missingExpected=[]
 scopeMatches=true
 ```
 
-The exact member list was checked from the derived PostgreSQL projection read-only after the MCP map readback. This avoids the existing neighborhood adapter's Prisma-field mismatch; that unrelated runtime defect is intentionally not part of this data-only increment.
+The exact member lists were read through both public MCP neighborhood paths from the derived PostgreSQL projection and compared read-only. Both paths return the same 23 gateway members; no direct Prisma verification fallback remains.
 
 ## Repository Verification
 
@@ -91,3 +96,12 @@ The nine `specforge-graph-verification-*` API fixtures remain in the catalog but
 - 10 个新增候选均通过 MCP 读取了英文规范内容、中文本地化内容和类型化关系；权威事实批次、评审、批准、提升、对账和 Baseline 发布均通过 MCP 完成。
 - v5 回读结果为 4 个架构单元、38 个成员归属、3 条映射，投影为 `READY`，派生图分析为 `PUBLISHED`，未分类数为 0，Scope 匹配成功。
 - 9 条图验证夹具和需要独立架构单元的延期资产没有被错误归入 v5；本阶段不宣称企业级全量覆盖。
+
+
+## Dual MCP Neighborhood Verification
+
+The v5 verification now uses both public MCP paths. The direct adapter and shared query service each returned 23 members for `unit:sys:specforge-mcp-governance-gateway`, and their sorted member identities were equal. PostgreSQL remained the read-model source through MCP; no direct Prisma fallback was used.
+
+### 双 MCP 邻域验证
+
+v5 验证现在使用两个公开 MCP 路径。直接适配器和共享查询服务都为 `unit:sys:specforge-mcp-governance-gateway` 返回 23 个成员，排序后的成员身份完全一致。PostgreSQL 仍通过 MCP 作为读取模型来源，没有使用直接 Prisma 回退。
