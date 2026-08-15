@@ -237,7 +237,7 @@ export async function get3aArchitectureUnitNeighborhood(input: ArchitectureUnitN
   };
   const client = prisma as unknown as ArchitectureMapReadClient;
   const manifest = await client.projectionManifest.findFirst({
-    where: { ...identity, id: identity.projectionManifestId, baselineId: identity.baselineId, publishedAt: { not: null } },
+    where: { ...scope, generationId: identity.generationId, baselineId: identity.baselineId, id: identity.projectionManifestId, publishedAt: { not: null } },
     select: { id: true, baselineId: true, generationId: true, publishedAt: true }
   });
   if (!manifest?.generationId || manifest.generationId !== identity.generationId) throw new Error("ARCHITECTURE_MAP_GENERATION_MISMATCH");
@@ -256,9 +256,10 @@ export async function get3aArchitectureUnitNeighborhood(input: ArchitectureUnitN
   });
   const members = memberRows.slice(0, budget.maxMappings).map(toMember);
   const memberAssertionIds = members.map((member) => member.assertionId);
+  const { projectionManifestId: _projectionManifestId, ...edgeIdentity } = identity;
   const sameLayerRows = memberAssertionIds.length === 0 ? [] : await client.knowledgeProjectionEdge.findMany({
     where: {
-      ...identity,
+      ...edgeIdentity,
       OR: [
         { sourceAssertionId: { in: memberAssertionIds }, targetAssertionId: { in: memberAssertionIds } }
       ]

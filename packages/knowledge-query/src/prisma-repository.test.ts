@@ -17,4 +17,25 @@ describe("PrismaThreeAQueryRepository", () => {
       take: 26
     }));
   });
+
+  it("does not send projectionManifestId to the generation-bound edge table", async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const repository = new PrismaThreeAQueryRepository({ knowledgeProjectionEdge: { findMany } } as never);
+    const identity = { ...scope, generationId: manifest.generationId, baselineId: manifest.baselineId, projectionManifestId: "manifest-1" };
+
+    await repository.listSameLayerDependencies(identity, ["assertion-1", "assertion-2"], 25);
+
+    const call = findMany.mock.calls[0];
+    expect(call).toBeDefined();
+    const where = call![0].where;
+    expect(where).toEqual(expect.objectContaining({
+      ...scope,
+      generationId: manifest.generationId,
+      baselineId: manifest.baselineId,
+      OR: [
+        { sourceAssertionId: { in: ["assertion-1", "assertion-2"] }, targetAssertionId: { in: ["assertion-1", "assertion-2"] } }
+      ]
+    }));
+    expect(where).not.toHaveProperty("projectionManifestId");
+  });
 });

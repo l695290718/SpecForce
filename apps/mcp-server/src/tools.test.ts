@@ -451,6 +451,17 @@ describe("versioned 3A navigation MCP boundary", () => {
       depth: 2,
       budget: { maxMappings: 5 }
     };
+    persistence.prisma.architectureUnitMemberProjection.findMany.mockResolvedValueOnce([{
+      applicationServiceId: input.identity.architectureScope.applicationServiceId,
+      scopePath: input.identity.architectureScope.scopePath,
+      generationId: input.identity.generationId,
+      baselineId: input.identity.baselineId,
+      projectionManifestId: input.identity.projectionManifestId,
+      unitIdentity: input.unitIdentity,
+      assertionId: "assertion-1",
+      semanticIdentity: "asset:policy",
+      contentDigest: "member-digest"
+    }]);
     const result = await tool.handler(input);
     expect(result.isError).not.toBe(true);
     expect(persistence.prisma.architectureUnitProjection.findFirst).toHaveBeenCalledWith({ where: expect.objectContaining({
@@ -471,6 +482,30 @@ describe("versioned 3A navigation MCP boundary", () => {
         unitIdentity: input.unitIdentity
       })
     }));
+    const manifestCall = persistence.prisma.projectionManifest.findFirst.mock.calls[0];
+    expect(manifestCall).toBeDefined();
+    const manifestWhere = manifestCall![0].where;
+    expect(manifestWhere).toEqual(expect.objectContaining({
+      applicationServiceId: input.identity.architectureScope.applicationServiceId,
+      scopePath: input.identity.architectureScope.scopePath,
+      generationId: input.identity.generationId,
+      baselineId: input.identity.baselineId,
+      id: input.identity.projectionManifestId,
+      publishedAt: { not: null }
+    }));
+    expect(manifestWhere).not.toHaveProperty("projectionManifestId");
+
+    const edgeCall = persistence.prisma.knowledgeProjectionEdge.findMany.mock.calls[0];
+    expect(edgeCall).toBeDefined();
+    const edgeWhere = edgeCall![0].where;
+    expect(edgeWhere).toEqual(expect.objectContaining({
+      applicationServiceId: input.identity.architectureScope.applicationServiceId,
+      scopePath: input.identity.architectureScope.scopePath,
+      generationId: input.identity.generationId,
+      baselineId: input.identity.baselineId,
+      OR: expect.any(Array)
+    }));
+    expect(edgeWhere).not.toHaveProperty("projectionManifestId");
   });
 
   it("rejects a neighborhood Scope mismatch before reading the manifest", async () => {
