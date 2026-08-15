@@ -4,6 +4,38 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 仅列出尚未完成的工作。已完成和已替代的记录保存在 `docs/archive/backlog-history.md`。英文是规范字段；中文字段用于面向人的本地化展示。
 
+## P1 Closure Status
+
+### 3A Semantic Unit Expansion v6
+
+**Status:** Implemented and synchronized for the selected four-source slice. Enterprise-wide coverage remains deferred.
+
+**Owner:** SpecForge Architecture and Agent Integration.
+
+**Evidence:** `knowledge-baseline:designer:3a:v6`, projection manifest `projection-manifest:projection-generation:a5f2d9f6895b032648c4cab7dff81462aa36e2e9a406fffdec94562f7bd092ac:1`, 8 units, 42 memberships, 6 mappings, `unclassifiedCount=0`, v5 regression READY.
+
+### Graph Verification Fixture Isolation and Cleanup
+
+**Status:** Local implementation and PostgreSQL/MCP cleanup complete. Live Nebula prepare verification is externally blocked until the Gateway/Nebula profile is running.
+
+**Owner:** SpecForge Runtime and Test Infrastructure.
+
+**Trigger:** Start the configured Gateway/Nebula verification profile, then rerun `pnpm exec tsx deploy/graph/live-projection-check.ts --phase prepare` with the exact verification Scope and an explicit run ID.
+
+**Evidence:** Historical dry-run/delete/post-delete completed with exact fingerprint validation; recovery cleanup returned `assetIds=3`, `status=deleted`, `remainingLinks=0`; current blocker is `NEBULA_LIVE_GATEWAY_UNAVAILABLE` at `http://127.0.0.1:18088/health`.
+
+### 3A 语义单元扩充 v6
+
+**状态：** 选定的 4 个来源切片已经实现并通过 MCP 同步；企业级全量覆盖延期。
+
+**证据：** 已发布 8 个单元、42 个成员、6 个映射，未分类数为 0，v5 回归 READY。
+
+### 图验证夹具隔离与清理
+
+**状态：** 本地实现及 PostgreSQL/MCP 清理完成；实时 Nebula prepare 验证等待 Gateway/Nebula 配置启动。
+
+**触发条件：** 启动配置好的 Gateway/Nebula 验证配置，并使用精确验证 Scope 和显式运行 ID 重跑 prepare 命令。
+
 ## 2. CodeArts/CodeHub Protected-Branch Enforcement
 
 **Status:** Provider-neutral CI verifier implemented; CodeHub/CodeArts status registration deferred.

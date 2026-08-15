@@ -633,8 +633,11 @@ export function registerFederationTools(server: McpServer): void {
     const catalog = await loadScopedAssetCatalog(architectureScope.applicationServiceId);
     const allAssets = scopedCatalogAssetIds(catalog as unknown as Record<string, unknown>);
     const knownAssetIds = new Set(allAssets.map((asset) => asset.id));
-    const missing = input.affectedFactIds.filter((id) => !knownAssetIds.has(id));
+    const verificationScopeAnchors = input.affectedFactIds.filter((id) => id.startsWith("verification-scope:"));
+    const missing = input.affectedFactIds.filter((id) => !verificationScopeAnchors.includes(id) && !knownAssetIds.has(id));
     if (missing.length) throw new FederationToolError("DESIGN_CONTEXT_FACT_NOT_FOUND", missing.join(","));
+    const registeredScope = scopeById(architectureScope.applicationServiceId);
+    if (registeredScope?.purpose === "verification" && knownAssetIds.size === 0 && verificationScopeAnchors.length === 0) throw new FederationToolError("DESIGN_CONTEXT_VERIFICATION_SCOPE_ANCHOR_REQUIRED");
     const links = (await listPersistedAssetLinks(architectureScope.applicationServiceId)).filter((link) => link.architectureScope?.scopePath === architectureScope.scopePath);
     const latestReconciliation = await prisma.reconciliationSnapshot.findFirst({ where: architectureScope, orderBy: { createdAt: "desc" } });
     if (latestReconciliation?.status === "BLOCKED") throw new FederationToolError("DESIGN_CONTEXT_RECONCILIATION_BLOCKED");

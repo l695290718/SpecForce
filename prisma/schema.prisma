@@ -111,6 +111,7 @@ model ArchitectureScope {
   level       String
   parentId    String?
   scopePath   String   @unique
+  purpose     String   @default("product")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

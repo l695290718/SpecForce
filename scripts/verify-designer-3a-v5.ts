@@ -40,7 +40,7 @@ async function main(): Promise<void> {
   try {
     const baselines = await call("list_3a_published_baselines", { architectureScope: scope });
     const baselineRows = Array.isArray(baselines) ? baselines : array(baselines.baselines);
-    if (!baselineRows.some((row) => row.id === baselineId && row.status === "PUBLISHED")) throw new Error("V5_BASELINE_NOT_PUBLISHED");
+    if (!baselineRows.some((row) => row.id === baselineId && (row.status === "PUBLISHED" || row.status === "SUPERSEDED"))) throw new Error("V5_BASELINE_NOT_AVAILABLE");
     const manifests = await call("list_3a_projection_manifests", { architectureScope: scope, baselineId });
     const manifestRows = Array.isArray(manifests) ? manifests : array(manifests.manifests);
     const manifest = manifestRows.find((row) => row.baselineId === baselineId && row.publishedAt) ?? manifestRows[0];

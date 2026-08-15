@@ -106,6 +106,16 @@ This update supersedes the prior statement that MCP synchronization for this ADR
 
 本更新覆盖此前本 ADR 的 MCP 同步受阻描述。ADR、关联 Proposal/Context Pack、类型化关系和 Evidence 现已在精确 Designer Scope 中同步并回读。NebulaGraph 3.8.0 生产投影、官方客户端兼容性、部署拓扑和企业容量证据仍保持延期。
 
+## P1 Verification Runtime Boundary
+
+The live projection checker is fail-closed and requires an explicit verification Scope, enterprise, database URL, and run ID. It cleans the same run before preparation and in a `finally` path after verification. Historical cleanup is fingerprint-protected and MCP-only.
+
+Live Nebula readiness is externally blocked: `pnpm exec tsx deploy/graph/live-projection-check.ts --phase prepare` returned `NEBULA_LIVE_GATEWAY_UNAVAILABLE` at `http://127.0.0.1:18088/health`. Recovery cleanup for run `p1-cleanup-check` succeeded with `assetIds=3`, `status=deleted`, `remainingLinks=0`. The capability is locally implemented, but live Nebula is not claimed until the Gateway/Nebula profile is running and the same prepare command passes.
+
+### P1 验证运行时边界
+
+实时投影检查器失败关闭，必须显式提供验证 Scope、企业、数据库连接串和运行 ID，并在准备前及验证后的 finally 路径清理同一运行批次。实时 Nebula 就绪仍被网关阻塞；网关启动后必须重跑相同的 prepare 命令。恢复清理已成功，结果为 3 个资产、状态 `deleted`、剩余关系 `0`。
+
 ## MCP Record
 
 - Matching MCP ADR ID: `adr-nebulagraph-derived-impact-runtime`
@@ -115,7 +125,7 @@ This update supersedes the prior statement that MCP synchronization for this ADR
 - Related assets: `data-specforge-asset-graph`, `api-specforge-mcp-tools`, `quality-specforge-impact-ready`, `event-specforge-context-pack-generated`
 - Typed links: `derives-from`, `implements`, `queries`, and `blocked-by-deferred-work`, with all endpoints in the exact scope.
 - Evidence references: the commands and repository paths listed in `Evidence`.
-- MCP synchronization blocked: no MCP write and read-back verification was available in this documentation-only task. Retry trigger: persist this ADR through the scoped `create_adr` MCP operation, persist the typed links and deferred backlog fact, and read back the ID, scope, canonical English fields, Chinese overlay, targets, and evidence.
+- MCP synchronization: the P1 verification-runtime ADR, Proposal, Context Pack, Evidence, and three typed links were persisted and read back in the exact verification Scope. Live Nebula readiness remains blocked separately by the unavailable Gateway.
 
 中文本地化 MCP 记录：
 

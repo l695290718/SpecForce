@@ -54,7 +54,19 @@ export const huaweiArchitectureScopes: ArchitectureScope[] = [
     owner: "Celon Designer Team",
     level: "applicationService",
     parentId: "module-celon-designer",
-    scopePath: `${designerModulePath}/com.huawei.celon.desiner`
+    scopePath: `${designerModulePath}/com.huawei.celon.desiner`,
+    purpose: "product"
+  },
+  {
+    id: "com.huawei.celon.desiner.graph-verification",
+    code: "com.huawei.celon.desiner.graph-verification",
+    name: "Celon Designer Graph Verification",
+    description: "Internal verification-only scope for ephemeral graph projection fixtures.",
+    owner: "SpecForge Runtime and Test Infrastructure",
+    level: "applicationService",
+    parentId: "module-celon-designer",
+    scopePath: `${designerModulePath}/com.huawei.celon.desiner.graph-verification`,
+    purpose: "verification"
   },
   {
     id: "com.huawei.celon.specstudio",
@@ -64,7 +76,8 @@ export const huaweiArchitectureScopes: ArchitectureScope[] = [
     owner: "Celon Designer Team",
     level: "applicationService",
     parentId: "module-celon-designer",
-    scopePath: `${designerModulePath}/com.huawei.celon.specstudio`
+    scopePath: `${designerModulePath}/com.huawei.celon.specstudio`,
+    purpose: "product"
   },
   {
     id: "com.huawei.celon.policyhub",
@@ -74,7 +87,8 @@ export const huaweiArchitectureScopes: ArchitectureScope[] = [
     owner: "Celon Governance Team",
     level: "applicationService",
     parentId: "module-celon-designer",
-    scopePath: `${designerModulePath}/com.huawei.celon.policyhub`
+    scopePath: `${designerModulePath}/com.huawei.celon.policyhub`,
+    purpose: "product"
   },
   {
     id: "com.huawei.celon.integrationgateway",
@@ -84,7 +98,8 @@ export const huaweiArchitectureScopes: ArchitectureScope[] = [
     owner: "Celon Integration Team",
     level: "applicationService",
     parentId: "module-celon-designer",
-    scopePath: `${designerModulePath}/com.huawei.celon.integrationgateway`
+    scopePath: `${designerModulePath}/com.huawei.celon.integrationgateway`,
+    purpose: "product"
   },
   {
     id: "module-celon-runtime",
@@ -104,7 +119,8 @@ export const huaweiArchitectureScopes: ArchitectureScope[] = [
     owner: "Celon Runtime Team",
     level: "applicationService",
     parentId: "module-celon-runtime",
-    scopePath: `${runtimeModulePath}/com.huawei.celon.runtime`
+    scopePath: `${runtimeModulePath}/com.huawei.celon.runtime`,
+    purpose: "product"
   }
 ];
 
@@ -122,6 +138,8 @@ export const seedHuaweiActor: ScopedActor = {
   actorType: "system",
   actorId: "specforge-seed",
   grants: [
+    { scopeId: "com.huawei.celon.desiner.graph-verification", action: "read" },
+    { scopeId: "com.huawei.celon.desiner.graph-verification", action: "write" },
     { scopeId: "module-celon-designer", action: "read" },
     { scopeId: "module-celon-designer", action: "write" }
   ]

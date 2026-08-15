@@ -12,6 +12,9 @@ export function isDescendantScope(ancestor: ArchitectureScope, descendant: Archi
 }
 
 export function hasScopeAccess(actor: ScopedActor, requestedScope: ArchitectureScope, action: ScopeAction, registry: ArchitectureScopeRegistry = defaultRegistry): boolean {
+  if (requestedScope.purpose === "verification") {
+    return actor.grants.some((grant) => grant.scopeId === requestedScope.id && grant.action === action);
+  }
   return actor.grants.some((grant) => {
     if (grant.action !== action) return false;
     const grantedScope = scopeById(grant.scopeId, registry);

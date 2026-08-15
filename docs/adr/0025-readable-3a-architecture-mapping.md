@@ -146,6 +146,24 @@ AI 生成 API、资产图查询 API、Web Console API 和 MCP 审计可观测性
 - With `SPECFORGE_DESIGN_FACT_IDS=adr-readable-3a-architecture-mapping`, `pnpm design-facts:sync` returned `complete`; `pnpm design-facts:check` verified the ADR with empty `missing`, `mismatched`, `outOfScope`, and `blocked` lists.
 - `pnpm design-context:close -- --session design-change-session:efd5df8b-492f-4e8c-949f-94f66b541cc7 --status CONVERGED` closed the exact-Scope written-authoring-design session with the Spec, both plans, manifest tests, JSON validation, MCP synchronization, reconciliation, and diff evidence.
 
+## P1 Implementation Closure: 3A Semantic Unit Expansion v6
+
+The selected v6 semantic-unit slice is implemented and published in the exact Designer Scope. Enterprise-wide semantic coverage remains deferred.
+
+- Design Change Session: `design-change-session:8d24d98b-c3de-490c-9b58-96e85c6abf02`
+- Published Baseline: `knowledge-baseline:designer:3a:v6`
+- Relationship version: `7648`
+- Projection manifest: `projection-manifest:projection-generation:a5f2d9f6895b032648c4cab7dff81462aa36e2e9a406fffdec94562f7bd092ac:1`
+- Published counts: `8 units / 42 memberships / 6 mappings`; layer totals `BIZ=1, SYS=6, TECH=1`; `unclassifiedCount=0`.
+- New units: Web Console, AI Generation Service, Asset Graph Query Service, and MCP Audit Observability Service. Only three evidenced SYS-to-TECH PostgreSQL mappings were created; same-layer Web Console calls remain typed asset relationships.
+- Verification: `pnpm exec tsx scripts/verify-designer-3a-v6.ts` -> `READY`; v5 regression -> `4 units / 38 memberships / 3 mappings`, `scopeMatches=true`, no fixture hits.
+- Projection: `pnpm exec tsx scripts/process-designer-3a-v6-projection.ts` -> `READY`, derived analysis `PUBLISHED`.
+- Contract test: `pnpm exec vitest run scripts/designer-3a-v6-contract.test.ts` -> 4 passed; Core typecheck -> exit 0.
+
+### P1 实施收敛：3A 语义单元扩充 v6
+
+v6 选定语义单元切片已经在精确 Designer Scope 中实现并发布；企业级全量语义覆盖仍然延期。发布结果为 8 个单元、42 个成员和 6 个映射，层级计数为 BIZ=1、SYS=6、TECH=1。验证、投影和回归命令结果与上面的英文规范字段一致。
+
 ## MCP Record
 
 - Matching MCP ADR ID: `adr-readable-3a-architecture-mapping`

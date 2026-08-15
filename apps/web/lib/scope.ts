@@ -14,7 +14,7 @@ export function requireReadableApplicationService(scopeId: string, principal: Sc
 
 export function listReadableApplicationServices(principal: ScopedPrincipal = localDevelopmentPrincipal()): ResolvedApplicationServiceScope[] {
   return huaweiArchitectureScopes.filter(
-    (scope): scope is ResolvedApplicationServiceScope => scope.level === "applicationService" && hasScopeAccess(principal, scope, "read")
+    (scope): scope is ResolvedApplicationServiceScope => scope.level === "applicationService" && scope.purpose !== "verification" && hasScopeAccess(principal, scope, "read")
   );
 }
 

@@ -72,7 +72,7 @@ export function isSeedMode(): boolean {
 
 export function readableScope(applicationServiceId: string): ArchitectureScopeRef {
   const scope = scopeById(applicationServiceId);
-  const actor = currentRequestPrincipal() ?? defaultHuaweiActor;
+  const actor = currentRequestPrincipal() ?? (isSeedMode() ? seedHuaweiActor : defaultHuaweiActor);
   if (!scope || scope.level !== "applicationService") throw new Error("Scope read is not authorized.");
   if (isScopedPrincipal(actor)) return authorizePrincipalScope(actor, { applicationServiceId: scope.id, scopePath: scope.scopePath }, "read");
   if (!hasScopeAccess(actor, scope, "read")) throw new Error("Scope read is not authorized.");
@@ -95,7 +95,8 @@ export async function ensureArchitectureScopes() {
         owner: scope.owner,
         level: scope.level,
         parentId: scope.parentId,
-        scopePath: scope.scopePath
+        scopePath: scope.scopePath,
+        purpose: scope.purpose ?? "product"
       }
     });
   }
@@ -128,6 +129,7 @@ async function initializeMcpPersistenceSchema() {
       id TEXT PRIMARY KEY NOT NULL, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
       description TEXT NOT NULL, owner TEXT NOT NULL, level TEXT NOT NULL,
       "parentId" TEXT, "scopePath" TEXT NOT NULL UNIQUE,
+      purpose TEXT NOT NULL DEFAULT 'product',
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
@@ -203,6 +205,7 @@ async function initializeMcpPersistenceSchema() {
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ArchitectureScope" ADD COLUMN IF NOT EXISTS purpose TEXT NOT NULL DEFAULT 'product'`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "GovernanceCheckSnapshot" ADD COLUMN IF NOT EXISTS "applicationServiceId" TEXT`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "GovernanceCheckSnapshot" ADD COLUMN IF NOT EXISTS "scopePath" TEXT`);
   await prisma.$executeRawUnsafe(`

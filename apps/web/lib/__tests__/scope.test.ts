@@ -25,6 +25,7 @@ describe("application-service scope context", () => {
     expect(scopes.length).toBeGreaterThan(1);
     expect(scopes.every((scope) => scope.level === "applicationService")).toBe(true);
     expect(scopes.some((scope) => scope.id === "module-celon-designer")).toBe(false);
+    expect(scopes.some((scope) => scope.purpose === "verification")).toBe(false);
   });
 
   it("uses the request principal instead of the local default actor", () => {

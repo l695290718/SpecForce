@@ -100,6 +100,16 @@ This update supersedes earlier baseline-governance synchronization deferrals. Th
 
 本更新覆盖此前基线治理同步延期的描述。ADR、关联 Proposal/Context Pack、类型化关系和 Evidence 现已在精确 Designer Scope 中通过 MCP 持久化并回读。生产级运维加固和经明确授权的跨服务比较仍保持延期。
 
+## P1 Fixture Isolation Closure
+
+Graph verification fixtures are isolated in the dedicated verification-only Scope `com.huawei.celon.desiner.graph-verification`, with purpose `verification`, exact grants, and no product-Scope inheritance. The `ArchitectureScope.purpose` column is persisted in PostgreSQL. Cleanup deletes only explicit run IDs through MCP and validates nine historical fingerprints before deletion. PostgreSQL read-back after cleanup reported `remainingLinks=0`.
+
+Registration session: `design-change-session:fc5f7fb2-f714-4b4a-82d1-2875928d3503`; exact verification session: `design-change-session:3d4eb219-5c97-4cab-a410-13ab9d969041`.
+
+### P1 夹具隔离收敛
+
+图验证夹具已经隔离到专用验证 Scope `com.huawei.celon.desiner.graph-verification`，用途为 `verification`，只授予精确权限且不继承产品 Scope。`ArchitectureScope.purpose` 已持久化到 PostgreSQL。清理只通过 MCP 删除显式运行 ID，并在删除历史夹具前校验 9 条精确指纹；清理后的 PostgreSQL 回读为 `remainingLinks=0`。
+
 ## MCP Record
 
 - Matching MCP ADR ID: `adr-postgresql-authoritative-design-store`
@@ -109,7 +119,7 @@ This update supersedes earlier baseline-governance synchronization deferrals. Th
 - Related assets: `data-specforge-assets`, `data-specforge-asset-graph`, `api-specforge-mcp-tools`, `quality-specforge-impact-ready`
 - Typed links: `implements`, `governs`, and `provides-authoritative-store-for`, with all endpoints in the exact scope.
 - Evidence references: the commands and repository paths listed in `Evidence`.
-- MCP synchronization blocked: no MCP write and read-back verification was available in this documentation-only task. Retry trigger: persist this ADR through the scoped `create_adr` MCP operation, persist the listed typed links, and read back the ID, scope, canonical English fields, Chinese overlay, targets, and evidence.
+- MCP synchronization: the P1 fixture-isolation ADR, Proposal, Context Pack, Evidence, and three typed links were persisted and read back in the exact verification Scope. The historical cleanup and PostgreSQL read-back evidence is recorded in `docs/evidence/graph-verification-fixture-isolation-cleanup-evidence.md`.
 
 中文本地化 MCP 记录：
 

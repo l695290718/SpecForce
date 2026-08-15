@@ -13,6 +13,7 @@ describe("Huawei architecture scope authorization", () => {
   const designerService = scopeById("com.huawei.celon.desiner");
   const runtimeService = scopeById("com.huawei.celon.runtime");
   const designerModule = scopeById("module-celon-designer");
+  const verificationService = scopeById("com.huawei.celon.desiner.graph-verification");
 
   it("inherits module read access to the Celon Designer application service", () => {
     const moduleReader = {
@@ -81,6 +82,14 @@ describe("Huawei architecture scope authorization", () => {
 
     expect(filterByReadableScope(defaultHuaweiActor, assets)).toEqual(assets);
   });
+
+  it("does not inherit module grants into verification-purpose scopes", () => {
+    const moduleReader = { actorType: "agent" as const, actorId: "module-reader", grants: [{ scopeId: "module-celon-designer", action: "read" as const }] };
+    expect(verificationService?.purpose).toBe("verification");
+    expect(hasScopeAccess(moduleReader, verificationService!, "read")).toBe(false);
+    expect(hasScopeAccess(seedHuaweiActor, verificationService!, "read")).toBe(true);
+    expect(hasScopeAccess(seedHuaweiActor, verificationService!, "write")).toBe(true);
+  });
 });
 
 describe("profile-neutral architecture scope registry", () => {
@@ -97,4 +106,5 @@ describe("profile-neutral architecture scope registry", () => {
 
     expect(assertWritableApplicationService(actor, service, registry)).toEqual({ applicationServiceId: "service-orders", scopePath: "org-example/service-orders" });
   });
+
 });

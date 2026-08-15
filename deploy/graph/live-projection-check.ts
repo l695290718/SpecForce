@@ -1,14 +1,11 @@
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { PrismaClient } from "@prisma/client";
+import { resolveGraphHealthConfig } from "./live-projection-config";
+import { cleanupRunFixtures } from "../../scripts/cleanup-graph-verification-fixtures";
 
-const applicationServiceId = process.env.SPECFORGE_GRAPH_HEALTH_APPLICATION_SERVICE_ID?.trim() || "com.huawei.celon.desiner";
-const scopePath = process.env.SPECFORGE_GRAPH_HEALTH_SCOPE_PATH?.trim() || "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner";
-const enterpriseId = process.env.SPECFORGE_GRAPH_HEALTH_ENTERPRISE_ID?.trim() || process.env.SPECFORGE_ENTERPRISE_ID?.trim() || "enterprise-1";
-const gatewayUrl = (process.env.SPECFORGE_GRAPH_GATEWAY_URL?.trim() || "http://127.0.0.1:18088").replace(/\/+$/u, "");
-const projectorHealthUrl = (process.env.SPECFORGE_PROJECTOR_HEALTH_URL?.trim() || "http://127.0.0.1:18090").replace(/\/+$/u, "");
-const databaseUrl = process.env.DATABASE_URL?.trim();
-const liveRunId = process.env.SPECFORGE_GRAPH_LIVE_RUN_ID?.trim() || "manual";
+const config = resolveGraphHealthConfig(process.env);
+const { applicationServiceId, scopePath, enterpriseId, gatewayUrl, projectorHealthUrl, databaseUrl, liveRunId } = config;
 const fixture = {
   firstApiId: `specforge-graph-verification-${liveRunId}-a`,
   secondApiId: `specforge-graph-verification-${liveRunId}-b`,
@@ -43,11 +40,16 @@ type GatewayTraversal = {
 
 async function main(): Promise<void> {
   const phase = argument("phase");
-  if (phase !== "prepare" && phase !== "verify") throw new Error("GRAPH_LIVE_PHASE_REQUIRED: use --phase prepare or --phase verify");
-  if (!databaseUrl) throw new Error("GRAPH_LIVE_DATABASE_REQUIRED: set DATABASE_URL to the canonical PostgreSQL authority, not a graph verifier database.");
+  if (phase !== "prepare" && phase !== "verify" && phase !== "cleanup") throw new Error("GRAPH_LIVE_PHASE_REQUIRED: use --phase prepare, --phase verify, or --phase cleanup");
 
   const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
+  let verificationError: unknown;
   try {
+    if (phase === "cleanup") {
+      const cleanup = await cleanupRunFixturesThroughMcp();
+      console.log(JSON.stringify({ phase, architectureScope: { enterpriseId, applicationServiceId, scopePath }, cleanup }, null, 2));
+      return;
+    }
     await assertGatewayHealth();
     await assertProjectorReachable();
     if (phase === "prepare") await authorFixtureThroughMcp();
@@ -76,7 +78,14 @@ async function main(): Promise<void> {
       traversalEdges: traversal.edges?.length ?? 0,
       projectorHealth: health
     }, null, 2));
+  } catch (error) {
+    verificationError = error;
+    throw error;
   } finally {
+    if (phase === "verify") {
+      try { await cleanupRunFixturesThroughMcp(); }
+      catch (cleanupError) { console.error(`GRAPH_LIVE_CLEANUP_FAILED: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}; retry with --phase cleanup for run ${liveRunId}.`); if (!verificationError) throw cleanupError; }
+    }
     await prisma.$disconnect();
   }
 }
@@ -100,6 +109,7 @@ async function authorFixtureThroughMcp(): Promise<void> {
   const client = new Client({ name: "specforge-nebula-live-gate", version: "0.1.0" }, { capabilities: {} });
   await client.connect(transport);
   try {
+    await cleanupRunFixtures(client, config);
     for (const [index, id] of [fixture.firstApiId, fixture.secondApiId, fixture.thirdApiId].entries()) {
       await callMcp(client, "upsert_design_asset", {
         assetType: "api",
@@ -123,6 +133,16 @@ async function authorFixtureThroughMcp(): Promise<void> {
     await client.close();
     await transport.close();
   }
+}
+
+async function cleanupRunFixturesThroughMcp(): Promise<unknown> {
+  const clientModule = createRequire(resolve(process.cwd(), "apps/mcp-server/package.json"));
+  const { Client } = clientModule("@modelcontextprotocol/sdk/client/index.js") as typeof import("@modelcontextprotocol/sdk/client/index.js");
+  const { StdioClientTransport } = clientModule("@modelcontextprotocol/sdk/client/stdio.js") as typeof import("@modelcontextprotocol/sdk/client/stdio.js");
+  const transport = new StdioClientTransport({ command: process.platform === "win32" ? "pnpm.cmd" : "pnpm", args: ["--filter", "@specforge/mcp-server", "dev"], cwd: process.cwd(), env: { ...process.env, DATABASE_URL: databaseUrl, SPECFORGE_ENTERPRISE_ID: enterpriseId, SPECFORGE_MCP_SEED: "1", SPECFORGE_MCP_SEED_SCOPE: applicationServiceId } });
+  const client = new Client({ name: "specforge-nebula-live-cleanup", version: "0.1.0" }, { capabilities: {} });
+  await client.connect(transport);
+  try { return await cleanupRunFixtures(client, config); } finally { await client.close(); await transport.close(); }
 }
 
 function apiFixture(id: string, index: number): Record<string, unknown> {

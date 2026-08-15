@@ -1,5 +1,6 @@
 export type ArchitectureScopeLevel = "productFamily" | "product" | "subProduct" | "module" | "applicationService" | (string & {});
 export type ScopeAction = "read" | "write";
+export type ArchitectureScopePurpose = "product" | "verification";
 
 export interface ArchitectureScope {
   id: string;
@@ -10,6 +11,7 @@ export interface ArchitectureScope {
   level: ArchitectureScopeLevel;
   parentId?: string;
   scopePath: string;
+  purpose?: ArchitectureScopePurpose;
 }
 
 export interface ArchitectureScopeRef {
