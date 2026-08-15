@@ -26,6 +26,7 @@ export interface ChangeSetInput {
   architectureScope: ArchitectureScopeRef;
   assetRevisionIds: string[];
   relationshipRevisionIds: string[];
+  architectureFactRevisionIds?: string[];
   evidenceRefs: string[];
   promotionDecisionId?: string;
 }
@@ -37,6 +38,7 @@ export interface ReviewBundleInput {
   riskTier: ReviewRiskTier;
   assertionIds: string[];
   identityCandidateIds: string[];
+  architectureFactRevisionIds?: string[];
   evidenceRefs: string[];
   coverage: ReviewCoverage;
   blockingIssues: string[];
@@ -49,6 +51,7 @@ export interface PromotionDecisionInput {
   decision: "APPROVE" | "REJECT";
   approvedAssertionIds: string[];
   approvedIdentityCandidateIds: string[];
+  approvedArchitectureFactRevisionIds?: string[];
   evidenceRefs: string[];
   reason: string;
 }
@@ -59,6 +62,7 @@ export interface BaselineInput {
   changeSetId: string;
   architectureScope: ArchitectureScopeRef;
   sourceRevisionIds: string[];
+  architectureFactRevisionIds?: string[];
   relationshipVersion: string;
   reconciliationReceiptId?: string;
   /** Kept optional at the type boundary for source compatibility; publication rejects its absence. */
@@ -151,28 +155,33 @@ export async function createKnowledgeReviewBundle(input: ReviewBundleInput): Pro
   if (!input.id || !input.designChangeSessionId) throw new Error("REVIEW_BUNDLE_IDENTITY_REQUIRED");
   const assertionIds = [...new Set(input.assertionIds)];
   const identityCandidateIds = [...new Set(input.identityCandidateIds)];
+  const architectureFactRevisionIds = [...new Set(input.architectureFactRevisionIds ?? [])];
   const evidenceRefs = [...new Set(input.evidenceRefs)];
   const blockingIssues = [...new Set(input.blockingIssues)];
   const status = evaluateReviewBundle(input.coverage, blockingIssues);
-  const digest = reviewBundleDigest({ architectureScope: scope, designChangeSessionId: input.designChangeSessionId, riskTier: input.riskTier, assertionIds, identityCandidateIds, evidenceRefs, coverage: input.coverage, blockingIssues });
+  const digest = reviewBundleDigest({ architectureScope: scope, designChangeSessionId: input.designChangeSessionId, riskTier: input.riskTier, assertionIds, identityCandidateIds, architectureFactRevisionIds, evidenceRefs, coverage: input.coverage, blockingIssues });
   await ensureMcpPersistenceSchema();
   const row = await prisma.$transaction(async (transaction) => {
     const session = await transaction.designChangeSession.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.designChangeSessionId } } });
     if (!session) throw new Error("DESIGN_CHANGE_SESSION_NOT_FOUND");
     if (["BLOCKED", "CLOSED"].includes(session.status)) throw new Error("DESIGN_CHANGE_SESSION_NOT_OPEN");
-    const [assertions, candidates] = await Promise.all([
+    const [assertions, candidates, unitRevisions, membershipRevisions, mappingRevisions] = await Promise.all([
       transaction.knowledgeAssertion.findMany({ where: { ...scope, id: { in: assertionIds } }, select: { id: true } }),
-      transaction.identityCandidate.findMany({ where: { ...scope, id: { in: identityCandidateIds } }, select: { id: true } })
+      transaction.identityCandidate.findMany({ where: { ...scope, id: { in: identityCandidateIds } }, select: { id: true } }),
+      transaction.architectureUnitRevision.findMany({ where: { ...scope, id: { in: architectureFactRevisionIds } }, select: { id: true } }),
+      transaction.architectureUnitMembershipRevision.findMany({ where: { ...scope, id: { in: architectureFactRevisionIds } }, select: { id: true } }),
+      transaction.architectureUnitMappingRevision.findMany({ where: { ...scope, id: { in: architectureFactRevisionIds } }, select: { id: true } })
     ]);
-    if (assertions.length !== assertionIds.length || candidates.length !== identityCandidateIds.length) throw new Error("REVIEW_BUNDLE_FACT_SCOPE_MISMATCH");
+    const architectureCount = unitRevisions.length + membershipRevisions.length + mappingRevisions.length;
+    if (assertions.length !== assertionIds.length || candidates.length !== identityCandidateIds.length || architectureCount !== architectureFactRevisionIds.length) throw new Error("REVIEW_BUNDLE_FACT_SCOPE_MISMATCH");
     const existing = await transaction.knowledgeReviewBundle.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } } });
     if (existing) {
       if (existing.digest !== digest) throw new Error("REVIEW_BUNDLE_IDEMPOTENCY_CONFLICT");
       return existing;
     }
-    const created = await transaction.knowledgeReviewBundle.create({ data: { ...scope, id: input.id, designChangeSessionId: input.designChangeSessionId, status, riskTier: input.riskTier, assertionIds, identityCandidateIds, evidenceRefs, coverage: jsonValue(input.coverage), blockingIssues, digest, createdBy: writableActor().actorId } });
+    const created = await transaction.knowledgeReviewBundle.create({ data: { ...scope, id: input.id, designChangeSessionId: input.designChangeSessionId, status, riskTier: input.riskTier, assertionIds, identityCandidateIds, architectureFactRevisionIds, evidenceRefs, coverage: jsonValue(input.coverage), blockingIssues, digest, createdBy: writableActor().actorId } });
     await transaction.designChangeSession.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.designChangeSessionId } }, data: { status: status === "READY" ? "WAITING_FOR_REVIEW" : "CONFLICTED" } });
-    await appendGovernanceEvent(transaction, scope, input.designChangeSessionId, "KNOWLEDGE_REVIEW_BUNDLE_CREATED", `knowledge-review-bundle:${scope.applicationServiceId}:${scope.scopePath}:${input.id}`, { reviewBundleId: input.id, status, riskTier: input.riskTier, assertionIds, identityCandidateIds, blockingIssues });
+    await appendGovernanceEvent(transaction, scope, input.designChangeSessionId, "KNOWLEDGE_REVIEW_BUNDLE_CREATED", `knowledge-review-bundle:${scope.applicationServiceId}:${scope.scopePath}:${input.id}`, { reviewBundleId: input.id, status, riskTier: input.riskTier, assertionIds, identityCandidateIds, architectureFactRevisionIds, blockingIssues });
     return created;
   });
   return reviewBundleFromRow(row);
@@ -185,7 +194,7 @@ export async function decideKnowledgeReviewBundle(input: PromotionDecisionInput)
     const bundle = await transaction.knowledgeReviewBundle.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.reviewBundleId } } });
     if (!bundle) throw new Error("REVIEW_BUNDLE_NOT_FOUND");
     const bundleValue = reviewBundleFromRow(bundle);
-    assertPromotionDecisionValid({ decision: input.decision, reason: input.reason, evidenceRefs: input.evidenceRefs, approvedAssertionIds: input.approvedAssertionIds, approvedIdentityCandidateIds: input.approvedIdentityCandidateIds }, bundleValue);
+    assertPromotionDecisionValid({ decision: input.decision, reason: input.reason, evidenceRefs: input.evidenceRefs, approvedAssertionIds: input.approvedAssertionIds, approvedIdentityCandidateIds: input.approvedIdentityCandidateIds, approvedArchitectureFactRevisionIds: input.approvedArchitectureFactRevisionIds ?? [] }, bundleValue);
     if (input.decision === "APPROVE") {
       const bundleAssertions = await transaction.knowledgeAssertion.findMany({ where: { ...scope, id: { in: bundleValue.assertionIds } } });
       if (bundleAssertions.length !== bundleValue.assertionIds.length) throw new Error("REVIEW_BUNDLE_FACT_SCOPE_MISMATCH");
@@ -197,19 +206,23 @@ export async function decideKnowledgeReviewBundle(input: PromotionDecisionInput)
     if (!session) throw new Error("DESIGN_CHANGE_SESSION_NOT_FOUND");
     const approvedAssertionIds = [...new Set(input.approvedAssertionIds)];
     const approvedIdentityCandidateIds = [...new Set(input.approvedIdentityCandidateIds)];
+    const approvedArchitectureFactRevisionIds = [...new Set(input.approvedArchitectureFactRevisionIds ?? [])];
     if (input.decision === "APPROVE") {
-      const [assertions, candidates] = await Promise.all([
+      const [assertions, candidates, unitRevisions, membershipRevisions, mappingRevisions] = await Promise.all([
         transaction.knowledgeAssertion.findMany({ where: { ...scope, id: { in: approvedAssertionIds } }, select: { id: true } }),
-        transaction.identityCandidate.findMany({ where: { ...scope, id: { in: approvedIdentityCandidateIds } }, select: { id: true } })
+        transaction.identityCandidate.findMany({ where: { ...scope, id: { in: approvedIdentityCandidateIds } }, select: { id: true } }),
+        transaction.architectureUnitRevision.findMany({ where: { ...scope, id: { in: approvedArchitectureFactRevisionIds } }, select: { id: true } }),
+        transaction.architectureUnitMembershipRevision.findMany({ where: { ...scope, id: { in: approvedArchitectureFactRevisionIds } }, select: { id: true } }),
+        transaction.architectureUnitMappingRevision.findMany({ where: { ...scope, id: { in: approvedArchitectureFactRevisionIds } }, select: { id: true } })
       ]);
-      if (assertions.length !== approvedAssertionIds.length || candidates.length !== approvedIdentityCandidateIds.length) throw new Error("PROMOTION_TARGET_SCOPE_MISMATCH");
+      if (assertions.length !== approvedAssertionIds.length || candidates.length !== approvedIdentityCandidateIds.length || unitRevisions.length + membershipRevisions.length + mappingRevisions.length !== approvedArchitectureFactRevisionIds.length) throw new Error("PROMOTION_TARGET_SCOPE_MISMATCH");
       await transaction.knowledgeAssertion.updateMany({ where: { ...scope, id: { in: approvedAssertionIds } }, data: { status: "ACCEPTED" } });
       await transaction.identityCandidate.updateMany({ where: { ...scope, id: { in: approvedIdentityCandidateIds } }, data: { decision: "ACCEPTED", reviewedBy: writableActor().actorId, reviewedAt: new Date() } });
     }
-    const created = await transaction.knowledgePromotionDecision.create({ data: { ...scope, id: input.id, reviewBundleId: input.reviewBundleId, designChangeSessionId: bundle.designChangeSessionId, decision: input.decision, approvedAssertionIds, approvedIdentityCandidateIds, evidenceRefs: [...new Set(input.evidenceRefs)], reason: input.reason, actorId: writableActor().actorId } });
+    const created = await transaction.knowledgePromotionDecision.create({ data: { ...scope, id: input.id, reviewBundleId: input.reviewBundleId, designChangeSessionId: bundle.designChangeSessionId, decision: input.decision, approvedAssertionIds, approvedIdentityCandidateIds, approvedArchitectureFactRevisionIds, evidenceRefs: [...new Set(input.evidenceRefs)], reason: input.reason, actorId: writableActor().actorId } });
     await transaction.knowledgeReviewBundle.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.reviewBundleId } }, data: { status: input.decision === "APPROVE" ? "APPROVED" : "REJECTED" } });
     await transaction.designChangeSession.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: bundle.designChangeSessionId } }, data: { status: input.decision === "APPROVE" ? "WAITING_FOR_DELIVERY" : "BLOCKED", closureReason: input.decision === "REJECT" ? input.reason : null } });
-    await appendGovernanceEvent(transaction, scope, bundle.designChangeSessionId, "KNOWLEDGE_PROMOTION_DECISION_RECORDED", `knowledge-promotion-decision:${scope.applicationServiceId}:${scope.scopePath}:${input.id}`, { promotionDecisionId: input.id, reviewBundleId: input.reviewBundleId, decision: input.decision, approvedAssertionIds, approvedIdentityCandidateIds });
+    await appendGovernanceEvent(transaction, scope, bundle.designChangeSessionId, "KNOWLEDGE_PROMOTION_DECISION_RECORDED", `knowledge-promotion-decision:${scope.applicationServiceId}:${scope.scopePath}:${input.id}`, { promotionDecisionId: input.id, reviewBundleId: input.reviewBundleId, decision: input.decision, approvedAssertionIds, approvedIdentityCandidateIds, approvedArchitectureFactRevisionIds });
     return created;
   });
   return promotionDecisionFromRow(row);
@@ -229,7 +242,8 @@ export async function createWorkingStream(input: WorkingStreamInput) {
 
 export async function commitKnowledgeChangeSet(input: ChangeSetInput): Promise<ChangeSet> {
   const scope = resolveWritableScope(writableActor(), input.architectureScope);
-  if ((input.assetRevisionIds.length > 0 || input.relationshipRevisionIds.length > 0) && !input.promotionDecisionId) throw new Error("PROMOTION_DECISION_REQUIRED");
+  const architectureFactRevisionIds = [...new Set(input.architectureFactRevisionIds ?? [])];
+  if ((input.assetRevisionIds.length > 0 || input.relationshipRevisionIds.length > 0 || architectureFactRevisionIds.length > 0) && !input.promotionDecisionId) throw new Error("PROMOTION_DECISION_REQUIRED");
   await ensureMcpPersistenceSchema();
   const row = await prisma.$transaction(async (transaction) => {
     const stream = await transaction.workingStream.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.streamId } } });
@@ -238,19 +252,19 @@ export async function commitKnowledgeChangeSet(input: ChangeSetInput): Promise<C
     if (input.promotionDecisionId) {
       const decision = await transaction.knowledgePromotionDecision.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.promotionDecisionId } } });
       if (!decision || decision.decision !== "APPROVE") throw new Error("PROMOTION_DECISION_NOT_APPROVED");
-      const approvedIds = new Set([...(decision.approvedAssertionIds as string[]), ...(decision.approvedIdentityCandidateIds as string[])]);
-      if ([...input.assetRevisionIds, ...input.relationshipRevisionIds].some((id) => !approvedIds.has(id))) throw new Error("CHANGESET_TARGET_NOT_APPROVED");
+      const approvedIds = new Set([...(decision.approvedAssertionIds as string[]), ...(decision.approvedIdentityCandidateIds as string[]), ...(decision.approvedArchitectureFactRevisionIds as string[])]);
+      if ([...input.assetRevisionIds, ...input.relationshipRevisionIds, ...architectureFactRevisionIds].some((id) => !approvedIds.has(id))) throw new Error("CHANGESET_TARGET_NOT_APPROVED");
     }
     await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1))", `knowledge-changeset:${scope.applicationServiceId}:${scope.scopePath}:${input.streamId}`);
     const existing = await transaction.knowledgeChangeSet.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } } });
     if (existing) return existing;
     const previous = await transaction.knowledgeChangeSet.findFirst({ where: { ...scope, streamId: input.streamId }, orderBy: { sequence: "desc" } });
     const sequence = Number(previous?.sequence ?? 0n) + 1;
-    const digest = changeSetDigest({ architectureScope: scope, streamId: input.streamId, sequence, assetRevisionIds: input.assetRevisionIds, relationshipRevisionIds: input.relationshipRevisionIds, evidenceRefs: input.evidenceRefs });
+    const digest = changeSetDigest({ architectureScope: scope, streamId: input.streamId, sequence, assetRevisionIds: input.assetRevisionIds, relationshipRevisionIds: input.relationshipRevisionIds, architectureFactRevisionIds, evidenceRefs: input.evidenceRefs });
     const changeSet = await transaction.knowledgeChangeSet.upsert({
       where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } },
-      create: { ...scope, id: input.id, streamId: input.streamId, sequence, status: "COMMITTED", assetRevisionIds: input.assetRevisionIds, relationshipRevisionIds: input.relationshipRevisionIds, evidenceRefs: input.evidenceRefs, digest, promotionDecisionId: input.promotionDecisionId ?? null, committedAt: new Date() },
-      update: { status: "COMMITTED", sequence, assetRevisionIds: input.assetRevisionIds, relationshipRevisionIds: input.relationshipRevisionIds, evidenceRefs: input.evidenceRefs, digest, promotionDecisionId: input.promotionDecisionId ?? null, committedAt: new Date() }
+      create: { ...scope, id: input.id, streamId: input.streamId, sequence, status: "COMMITTED", assetRevisionIds: input.assetRevisionIds, relationshipRevisionIds: input.relationshipRevisionIds, architectureFactRevisionIds, evidenceRefs: input.evidenceRefs, digest, promotionDecisionId: input.promotionDecisionId ?? null, committedAt: new Date() },
+      update: { status: "COMMITTED", sequence, assetRevisionIds: input.assetRevisionIds, relationshipRevisionIds: input.relationshipRevisionIds, architectureFactRevisionIds, evidenceRefs: input.evidenceRefs, digest, promotionDecisionId: input.promotionDecisionId ?? null, committedAt: new Date() }
     });
     await transaction.workingStream.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.streamId } }, data: { headChangeSetId: input.id } });
     return changeSet;
@@ -265,12 +279,15 @@ export async function publishKnowledgeBaseline(input: BaselineInput) {
   const reconciliation = await loadConvergedReconciliation(scope, input.reconciliationReceiptId);
   if (reconciliation.changeSetId !== input.changeSetId) throw new Error("BASELINE_RECONCILIATION_CHANGESET_MISMATCH");
   if (!sameIds(reconciliation.assetRevisionIds, input.sourceRevisionIds)) throw new Error("BASELINE_RECONCILIATION_ASSET_MISMATCH");
+  const architectureFactRevisionIds = [...new Set(input.architectureFactRevisionIds ?? reconciliation.architectureFactRevisionIds ?? [])];
+  if (reconciliation.architectureFactRevisionIds.length > 0 && !sameIds(reconciliation.architectureFactRevisionIds, architectureFactRevisionIds)) throw new Error("BASELINE_RECONCILIATION_ARCHITECTURE_FACT_MISMATCH");
   if (reconciliation.relationshipVersion !== input.relationshipVersion) throw new Error("BASELINE_RECONCILIATION_RELATIONSHIP_VERSION_MISMATCH");
   const manifest: BaselineManifest = {
     architectureScope: scope,
     baselineId: input.id,
     changeSetId: input.changeSetId,
     sourceRevisionIds: input.sourceRevisionIds,
+    architectureFactRevisionIds,
     relationshipVersion: input.relationshipVersion,
     promotionReceiptId: reconciliation.promotionReceiptId,
     reconciliationReceiptId: reconciliation.id,
@@ -281,6 +298,7 @@ export async function publishKnowledgeBaseline(input: BaselineInput) {
   const row = await prisma.$transaction(async (transaction) => {
     const changeSet = await transaction.knowledgeChangeSet.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.changeSetId } } });
     if (!changeSet || changeSet.streamId !== input.streamId || changeSet.status !== "COMMITTED") throw new Error("CHANGESET_NOT_COMMITTED");
+    if (!sameIds(changeSet.architectureFactRevisionIds as string[], architectureFactRevisionIds)) throw new Error("BASELINE_CHANGESET_ARCHITECTURE_FACT_MISMATCH");
     await transaction.$executeRawUnsafe("SELECT pg_advisory_xact_lock(hashtext($1))", `knowledge-baseline:${scope.applicationServiceId}:${scope.scopePath}:${input.streamId}`);
     const existing = await transaction.knowledgeBaseline.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } } });
     if (existing) {
@@ -318,15 +336,15 @@ function assertionFromRow(row: any): KnowledgeAssertion {
 }
 
 function changeSetFromRow(row: any): ChangeSet {
-  return { id: row.id, streamId: row.streamId, sequence: Number(row.sequence), status: row.status, assetRevisionIds: row.assetRevisionIds as string[], relationshipRevisionIds: row.relationshipRevisionIds as string[], evidenceRefs: row.evidenceRefs as string[], digest: row.digest, ...(row.promotionDecisionId ? { promotionDecisionId: row.promotionDecisionId } : {}), architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }, createdAt: row.createdAt.toISOString(), committedAt: row.committedAt?.toISOString() };
+  return { id: row.id, streamId: row.streamId, sequence: Number(row.sequence), status: row.status, assetRevisionIds: row.assetRevisionIds as string[], relationshipRevisionIds: row.relationshipRevisionIds as string[], architectureFactRevisionIds: (row.architectureFactRevisionIds ?? []) as string[], evidenceRefs: row.evidenceRefs as string[], digest: row.digest, ...(row.promotionDecisionId ? { promotionDecisionId: row.promotionDecisionId } : {}), architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }, createdAt: row.createdAt.toISOString(), committedAt: row.committedAt?.toISOString() };
 }
 
 function reviewBundleFromRow(row: any): ReviewBundle {
-  return { id: row.id, designChangeSessionId: row.designChangeSessionId, status: row.status, riskTier: row.riskTier, assertionIds: row.assertionIds as string[], identityCandidateIds: row.identityCandidateIds as string[], evidenceRefs: row.evidenceRefs as string[], coverage: row.coverage as ReviewCoverage, blockingIssues: row.blockingIssues as string[], digest: row.digest, createdBy: row.createdBy, architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+  return { id: row.id, designChangeSessionId: row.designChangeSessionId, status: row.status, riskTier: row.riskTier, assertionIds: row.assertionIds as string[], identityCandidateIds: row.identityCandidateIds as string[], architectureFactRevisionIds: (row.architectureFactRevisionIds ?? []) as string[], evidenceRefs: row.evidenceRefs as string[], coverage: row.coverage as ReviewCoverage, blockingIssues: row.blockingIssues as string[], digest: row.digest, createdBy: row.createdBy, architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
 }
 
 function promotionDecisionFromRow(row: any): KnowledgePromotionDecision {
-  return { id: row.id, reviewBundleId: row.reviewBundleId, designChangeSessionId: row.designChangeSessionId, decision: row.decision, approvedAssertionIds: row.approvedAssertionIds as string[], approvedIdentityCandidateIds: row.approvedIdentityCandidateIds as string[], evidenceRefs: row.evidenceRefs as string[], reason: row.reason, actorId: row.actorId, architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }, createdAt: row.createdAt.toISOString() };
+  return { id: row.id, reviewBundleId: row.reviewBundleId, designChangeSessionId: row.designChangeSessionId, decision: row.decision, approvedAssertionIds: row.approvedAssertionIds as string[], approvedIdentityCandidateIds: row.approvedIdentityCandidateIds as string[], approvedArchitectureFactRevisionIds: (row.approvedArchitectureFactRevisionIds ?? []) as string[], evidenceRefs: row.evidenceRefs as string[], reason: row.reason, actorId: row.actorId, architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }, createdAt: row.createdAt.toISOString() };
 }
 
 async function appendGovernanceEvent(transaction: any, scope: ArchitectureScopeRef, designChangeSessionId: string, eventType: string, idempotencyKey: string, payload: Record<string, unknown>): Promise<void> {

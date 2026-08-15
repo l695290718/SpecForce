@@ -1519,7 +1519,7 @@
                               "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
                           },
                           "proposalId": "proposal-readable-3a-architecture-mapping",
-                          "proposalStatus": "reviewing",
+                          "proposalStatus": "implemented",
                           "contextPackId": "ctx-readable-3a-architecture-mapping",
                           "relatedAssetIds": [
                               "api-specforge-3a-architecture-query",
@@ -1617,7 +1617,23 @@
                               },
                               {
                                   "command": "pnpm design-context:close -- --session design-change-session:efd5df8b-492f-4e8c-949f-94f66b541cc7 --status CONVERGED --evidence written-spec,generic-plan,onboarding-plan,manifest-tests,json-validation,mcp-sync,reconciliation,diff-check",
-                                  "result": "Closed the exact-Scope governed 3A authoring written-design session as CONVERGED with all recorded evidence; code and Designer fact onboarding remain pending explicit implementation approval."
+                                  "result": "Closed the exact-Scope governed 3A authoring written-design session as CONVERGED with all recorded evidence."
+                              },
+                              {
+                                  "command": "pnpm db:push; pnpm --filter @specforge/core typecheck; pnpm --filter @specforge/mcp-server typecheck; pnpm --filter @specforge/knowledge-projector typecheck; pnpm --filter @specforge/web typecheck; pnpm exec prisma validate",
+                                  "result": "Docker PostgreSQL schema synchronized and all four TypeScript checks plus Prisma validation exited 0."
+                              },
+                              {
+                                  "command": "pnpm exec tsx scripts/bootstrap-designer-3a.ts",
+                                  "result": "Exact-Scope MCP batch, bilingual Review Bundle, approval, promotion, converged reconciliation, Baseline publication, and idempotent retry read-back completed."
+                              },
+                              {
+                                  "command": "pnpm exec tsx scripts/process-designer-3a-projection.ts",
+                                  "result": "Projection reached READY; Manifest published; derived analysis PUBLISHED; PostgreSQL read-back contains 4 units, 7 members, and 3 mappings."
+                              },
+                              {
+                                  "command": "pnpm design-context:close -- --session design-change-session:fa68fdd5-8d04-4e64-a111-8e4c71f69a54 --status CONVERGED --evidence db-push,typechecks,prisma-validate,mcp-batch-review-promotion,reconciliation-baseline,projection-ready,postgresql-readback",
+                                  "result": "Closed the exact-Scope implementation session as CONVERGED after the governed Designer 3A slice and projection read-back."
                               }
                           ]
                       }

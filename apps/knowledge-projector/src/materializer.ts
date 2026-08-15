@@ -72,6 +72,7 @@ export class ProjectionMaterializer {
       return { status: "READY", manifestId: manifest.id, resumed: Boolean(job.checkpoint.assertionSortKey), derivedAnalysis };
     } catch (error) {
       const code = error instanceof ProjectionBuildError ? error.code : error instanceof Error && /^[A-Z0-9_]+$/u.test(error.message) ? error.message : "PROJECTION_BUILD_FAILED";
+      console.error(`[knowledge-projector] build failed id=${job.id} code=${code}`, error);
       await this.repository.fail(job, owner, code, `projection-build:${job.id}:${code}`);
       return { status: "FAILED", errorCode: code };
     }

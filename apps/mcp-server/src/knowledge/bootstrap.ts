@@ -106,6 +106,7 @@ export async function bootstrapThreeAFromDesignAssets(input: BootstrapThreeAInpu
     sequence: 1,
     assetRevisionIds: sourceRevisionIds,
     relationshipRevisionIds,
+    architectureFactRevisionIds: [],
     evidenceRefs
   });
   const reconciliation = {

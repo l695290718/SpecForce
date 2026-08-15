@@ -1,5 +1,9 @@
 # Governed 3A Architecture Fact Authoring Implementation Plan
 
+> **Execution status (2026-08-15): COMPLETE for the generic capability and the first Designer Scope slice.** The implementation session `design-change-session:fa68fdd5-8d04-4e64-a111-8e4c71f69a54` covered the additive Prisma models, bounded bilingual validators, MCP batch/review/promotion/reconciliation tools, Baseline references, deterministic projector loader, and focused verification. Enterprise-wide connector, continuous synchronization, and production-scale graph work remains in `docs/TODO.md`.
+
+Evidence: `docs/evidence/designer-3a-onboarding-evidence.md`, `docs/evidence/designer-3a-candidate-review.md`, ADR-0025, `pnpm db:push`, the typechecks, `pnpm exec prisma validate`, `pnpm exec tsx scripts/bootstrap-designer-3a.ts`, and `pnpm exec tsx scripts/process-designer-3a-projection.ts`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add an exact-Scope, bilingual, idempotent MCP authoring path for governed architecture units, memberships, and mappings, then publish them through the existing review, ChangeSet, Baseline, and deterministic projection lifecycle.

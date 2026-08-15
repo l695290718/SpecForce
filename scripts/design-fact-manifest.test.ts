@@ -162,7 +162,7 @@ it("includes the single-host Docker deployment decision in the baseline", () => 
 it("records the proposed readable 3A architecture map separately from advanced network exploration", () => {
   const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-readable-3a-architecture-mapping");
   expect(decision?.proposalId).toBe("proposal-readable-3a-architecture-mapping");
-  expect(decision?.proposalStatus).toBe("reviewing");
+  expect(decision?.proposalStatus).toBe("implemented");
   expect(decision?.contextPackId).toBe("ctx-readable-3a-architecture-mapping");
   expect(decision?.status).toBe("Read-only Map and Network implementation complete; governed 3A architecture-fact authoring and Designer fact onboarding are designed and pending explicit implementation approval");
   expect(decision?.relatedAssetIds).toEqual([

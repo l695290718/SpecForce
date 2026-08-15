@@ -89,7 +89,7 @@ export async function generateKnowledgeCandidates(input: GenerateKnowledgeCandid
     complete: issues.length === 0
   };
   const status = evaluateReviewBundle(coverage, issues);
-  const digest = reviewBundleDigest({ architectureScope: scope, designChangeSessionId: report.designChangeSessionId, riskTier, assertionIds, identityCandidateIds: [], evidenceRefs, coverage, blockingIssues: issues });
+  const digest = reviewBundleDigest({ architectureScope: scope, designChangeSessionId: report.designChangeSessionId, riskTier, assertionIds, identityCandidateIds: [], architectureFactRevisionIds: [], evidenceRefs, coverage, blockingIssues: issues });
 
   const bundle = await prisma.$transaction(async (transaction) => {
     const session = await transaction.designChangeSession.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: report.designChangeSessionId } } });
@@ -188,7 +188,7 @@ function assertionScope(assertion: KnowledgeAssertion) {
 }
 
 function reviewBundleFromRow(row: any): ReviewBundle {
-  return { id: row.id, designChangeSessionId: row.designChangeSessionId, status: row.status, riskTier: row.riskTier, assertionIds: row.assertionIds as string[], identityCandidateIds: row.identityCandidateIds as string[], evidenceRefs: row.evidenceRefs as string[], coverage: row.coverage as ReviewBundle["coverage"], blockingIssues: row.blockingIssues as string[], digest: row.digest, createdBy: row.createdBy, architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+  return { id: row.id, designChangeSessionId: row.designChangeSessionId, status: row.status, riskTier: row.riskTier, assertionIds: row.assertionIds as string[], identityCandidateIds: row.identityCandidateIds as string[], architectureFactRevisionIds: (row.architectureFactRevisionIds ?? []) as string[], evidenceRefs: row.evidenceRefs as string[], coverage: row.coverage as ReviewBundle["coverage"], blockingIssues: row.blockingIssues as string[], digest: row.digest, createdBy: row.createdBy, architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
 }
 
 function isSemanticCandidateDraft(value: SemanticCandidateDraft, observationIds: Set<string>): boolean {

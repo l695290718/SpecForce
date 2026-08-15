@@ -271,16 +271,16 @@ export async function promoteKnowledgeCandidates(input: PromoteKnowledgeCandidat
       const previous = await tx.knowledgeChangeSet.findFirst({ where: { ...scope, streamId: input.streamId }, orderBy: { sequence: "desc" } });
       const sequence = Number(previous?.sequence ?? 0n) + 1;
       const changeSetId = `knowledge-changeset:${contentDigest({ promotionDecisionId: decision.id, sourceDigest })}`;
-      const digest = changeSetDigest({ architectureScope: scope, streamId: input.streamId, sequence, assetRevisionIds: uniqueAssetRevisionIds, relationshipRevisionIds: uniqueRelationshipRevisionIds, evidenceRefs });
+      const digest = changeSetDigest({ architectureScope: scope, streamId: input.streamId, sequence, assetRevisionIds: uniqueAssetRevisionIds, relationshipRevisionIds: uniqueRelationshipRevisionIds, architectureFactRevisionIds: [], evidenceRefs });
       await tx.knowledgeChangeSet.create({
-        data: { ...scope, id: changeSetId, streamId: input.streamId, sequence, status: "COMMITTED", assetRevisionIds: uniqueAssetRevisionIds, relationshipRevisionIds: uniqueRelationshipRevisionIds, evidenceRefs, digest, promotionDecisionId: decision.id, committedAt: new Date() }
+        data: { ...scope, id: changeSetId, streamId: input.streamId, sequence, status: "COMMITTED", assetRevisionIds: uniqueAssetRevisionIds, relationshipRevisionIds: uniqueRelationshipRevisionIds, architectureFactRevisionIds: [], evidenceRefs, digest, promotionDecisionId: decision.id, committedAt: new Date() }
       });
       await tx.workingStream.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.streamId } }, data: { headChangeSetId: changeSetId } });
       await tx.knowledgeAssertion.updateMany({ where: { ...scope, id: { in: assertionIds } }, data: { status: "ACCEPTED", changeSetId } });
 
       const relationshipVersion = (await repository.currentGraphVersion(relationshipScope)).toString();
       const receiptId = `knowledge-promotion:${decision.id}`;
-      const receiptRow = await tx.knowledgePromotionReceipt.create({ data: { ...scope, id: receiptId, promotionDecisionId: decision.id, sourceDigest, assetRevisionIds: uniqueAssetRevisionIds, relationshipRevisionIds: uniqueRelationshipRevisionIds } });
+      const receiptRow = await tx.knowledgePromotionReceipt.create({ data: { ...scope, id: receiptId, promotionDecisionId: decision.id, sourceDigest, assetRevisionIds: uniqueAssetRevisionIds, relationshipRevisionIds: uniqueRelationshipRevisionIds, architectureFactRevisionIds: [] } });
       const receipt: KnowledgePromotionReceipt = {
         id: receiptId,
         architectureScope: scope,
@@ -294,6 +294,7 @@ export async function promoteKnowledgeCandidates(input: PromoteKnowledgeCandidat
         changeSetSequence: sequence,
         assetRevisionIds: uniqueAssetRevisionIds,
         relationshipRevisionIds: uniqueRelationshipRevisionIds,
+        architectureFactRevisionIds: [],
         evidenceRefs,
         relationshipVersion,
         idempotent: false,
@@ -329,7 +330,7 @@ export async function reconcileKnowledgeBaseline(input: ReconcileKnowledgeBaseli
   if (!sameSet(events.map((event) => event.dbId), receipt.relationshipRevisionIds)) issues.push("RECONCILIATION_RELATIONSHIP_EVENTS_MISMATCH");
   if (!sameSet(links.map((link) => link.id), receipt.relationshipRevisionIds)) issues.push("RECONCILIATION_TYPED_LINKS_MISMATCH");
   if (!sameSet(outboxes.map((outbox) => outbox.relationshipEventId), receipt.relationshipRevisionIds)) issues.push("RECONCILIATION_RELATIONSHIP_OUTBOX_MISMATCH");
-  if (!changeSet || !sameSet(changeSet.assetRevisionIds as string[], receipt.assetRevisionIds) || !sameSet(changeSet.relationshipRevisionIds as string[], receipt.relationshipRevisionIds) || !sameSet(changeSet.evidenceRefs as string[], receipt.evidenceRefs)) issues.push("RECONCILIATION_CHANGESET_CONTENT_MISMATCH");
+  if (!changeSet || !sameSet(changeSet.assetRevisionIds as string[], receipt.assetRevisionIds) || !sameSet(changeSet.relationshipRevisionIds as string[], receipt.relationshipRevisionIds) || !sameSet(changeSet.architectureFactRevisionIds as string[], receipt.architectureFactRevisionIds) || !sameSet(changeSet.evidenceRefs as string[], receipt.evidenceRefs)) issues.push("RECONCILIATION_CHANGESET_CONTENT_MISMATCH");
   if (!scanSession || scanSession.finalizationDigest !== receipt.scanSessionDigest) issues.push("RECONCILIATION_SCAN_SESSION_DIGEST_MISMATCH");
   const relationshipVersion = currentGraphVersion.toString();
   if (relationshipVersion !== receipt.relationshipVersion) issues.push("RECONCILIATION_RELATIONSHIP_VERSION_MISMATCH");
@@ -348,6 +349,7 @@ export async function reconcileKnowledgeBaseline(input: ReconcileKnowledgeBaseli
     issues,
     assetRevisionIds: receipt.assetRevisionIds,
     relationshipRevisionIds: receipt.relationshipRevisionIds,
+    architectureFactRevisionIds: receipt.architectureFactRevisionIds,
     evidenceRefs: receipt.evidenceRefs,
     relationshipVersion: receipt.relationshipVersion,
     reconciledAt
@@ -509,19 +511,19 @@ function assertionFromRow(row: any): KnowledgeAssertion {
 }
 
 function reviewBundleFromRow(row: any): ReviewBundle {
-  return { id: row.id, designChangeSessionId: row.designChangeSessionId, status: row.status, riskTier: row.riskTier, assertionIds: row.assertionIds as string[], identityCandidateIds: row.identityCandidateIds as string[], evidenceRefs: row.evidenceRefs as string[], coverage: row.coverage as ReviewCoverage, blockingIssues: row.blockingIssues as string[], digest: row.digest, createdBy: row.createdBy, architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+  return { id: row.id, designChangeSessionId: row.designChangeSessionId, status: row.status, riskTier: row.riskTier, assertionIds: row.assertionIds as string[], identityCandidateIds: row.identityCandidateIds as string[], architectureFactRevisionIds: (row.architectureFactRevisionIds ?? []) as string[], evidenceRefs: row.evidenceRefs as string[], coverage: row.coverage as ReviewCoverage, blockingIssues: row.blockingIssues as string[], digest: row.digest, createdBy: row.createdBy, architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
 }
 
 function promotionReceiptFromPayload(value: Prisma.JsonValue): KnowledgePromotionReceipt | undefined {
   const payload = jsonRecord(value);
   const receipt = jsonRecord(payload.receipt);
-  return typeof receipt.id === "string" && typeof receipt.sourceDigest === "string" ? receipt as unknown as KnowledgePromotionReceipt : undefined;
+  return typeof receipt.id === "string" && typeof receipt.sourceDigest === "string" ? { ...receipt, architectureFactRevisionIds: Array.isArray(receipt.architectureFactRevisionIds) ? receipt.architectureFactRevisionIds : [] } as unknown as KnowledgePromotionReceipt : undefined;
 }
 
 function reconciliationFromPayload(value: Prisma.JsonValue): KnowledgeReconciliationResult | undefined {
   const payload = jsonRecord(value);
   const result = jsonRecord(payload.result);
-  return typeof result.id === "string" && typeof result.status === "string" ? result as unknown as KnowledgeReconciliationResult : undefined;
+  return typeof result.id === "string" && typeof result.status === "string" ? { ...result, architectureFactRevisionIds: Array.isArray(result.architectureFactRevisionIds) ? result.architectureFactRevisionIds : [] } as unknown as KnowledgeReconciliationResult : undefined;
 }
 
 function promotionEventKey(receiptId: string): string {

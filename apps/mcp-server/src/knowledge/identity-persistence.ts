@@ -81,7 +81,7 @@ export async function matchKnowledgeIdentities(input: MatchKnowledgeIdentitiesIn
   const evidenceRefs = [...new Set([...(bundle.evidenceRefs as string[]), `identity-matching:deterministic-v1`, `scan-report:${report.reportDigest}`])];
   const coverage = bundle.coverage as unknown as ReviewCoverage;
   const status = evaluateReviewBundle(coverage, blockingIssues);
-  const digest = reviewBundleDigest({ architectureScope: scope, designChangeSessionId: report.designChangeSessionId, riskTier: bundle.riskTier as ReviewBundle["riskTier"], assertionIds: bundle.assertionIds as string[], identityCandidateIds, evidenceRefs, coverage, blockingIssues });
+  const digest = reviewBundleDigest({ architectureScope: scope, designChangeSessionId: report.designChangeSessionId, riskTier: bundle.riskTier as ReviewBundle["riskTier"], assertionIds: bundle.assertionIds as string[], identityCandidateIds, architectureFactRevisionIds: [], evidenceRefs, coverage, blockingIssues });
   const now = new Date();
 
   const updatedBundle = await prisma.$transaction(async (transaction) => {
@@ -154,7 +154,7 @@ function candidateRowUpdate(candidate: IdentityCandidate, now: Date) {
 }
 
 function reviewBundleFromRow(row: any): ReviewBundle {
-  return { id: row.id, designChangeSessionId: row.designChangeSessionId, status: row.status, riskTier: row.riskTier, assertionIds: row.assertionIds as string[], identityCandidateIds: row.identityCandidateIds as string[], evidenceRefs: row.evidenceRefs as string[], coverage: row.coverage as ReviewCoverage, blockingIssues: row.blockingIssues as string[], digest: row.digest, createdBy: row.createdBy, architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+  return { id: row.id, designChangeSessionId: row.designChangeSessionId, status: row.status, riskTier: row.riskTier, assertionIds: row.assertionIds as string[], identityCandidateIds: row.identityCandidateIds as string[], architectureFactRevisionIds: (row.architectureFactRevisionIds ?? []) as string[], evidenceRefs: row.evidenceRefs as string[], coverage: row.coverage as ReviewCoverage, blockingIssues: row.blockingIssues as string[], digest: row.digest, createdBy: row.createdBy, architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
 }
 
 function parsePayload(payload: string): Record<string, unknown> {

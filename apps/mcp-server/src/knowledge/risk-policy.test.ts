@@ -44,6 +44,7 @@ function bundle(riskTier: ReviewBundle["riskTier"]): ReviewBundle {
     riskTier,
     assertionIds: ["assertion-1"],
     identityCandidateIds: [],
+    architectureFactRevisionIds: [],
     evidenceRefs: ["evidence:orders"],
     coverage: { totalSources: 1, processedSources: 1, supportedSources: 1, candidateCount: 1, complete: true },
     blockingIssues: [],

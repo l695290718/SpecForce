@@ -2,7 +2,7 @@
 
 ## Status
 
-**The read-only Map/Network experience is implemented. The governed architecture-fact authoring design is approved and documented; authoring code and Designer fact onboarding remain pending explicit implementation approval.**
+**Implemented for the governed first slice and a controlled Designer membership-coverage expansion. Read-only Map/Network, MCP-only architecture-fact authoring, review/promotion/reconciliation/Baseline governance, Designer onboarding, and deterministic projection read-back are implemented and verified. Enterprise-wide classification and continuous source synchronization remain deferred.**
 
 - Stable ID: `adr-readable-3a-architecture-mapping`
 - Owning application service: `com.huawei.celon.desiner`
@@ -12,6 +12,9 @@
 - Authoring Design Session: `design-change-session:efd5df8b-492f-4e8c-949f-94f66b541cc7`
 - Authoring Spec: `docs/superpowers/specs/2026-08-15-governed-3a-architecture-fact-authoring-design.md`
 - Authoring Plans: `docs/superpowers/plans/2026-08-15-governed-3a-architecture-fact-authoring.md` and `docs/superpowers/plans/2026-08-15-designer-3a-fact-onboarding.md`
+- Implementation Session: `design-change-session:fa68fdd5-8d04-4e64-a111-8e4c71f69a54`
+- Onboarding Evidence: `docs/evidence/designer-3a-onboarding-evidence.md` and `docs/evidence/designer-3a-candidate-review.md`
+- Coverage Evidence: `docs/evidence/designer-3a-coverage-expansion-evidence.md`
 - Parent decisions: `adr-3a-architecture-navigation-workspace`, `adr-scalable-3a-exploration`, `adr-webgl-3a-graph-exploration`
 
 ## Context
@@ -30,7 +33,7 @@ The overview shows only cross-layer mappings and must expose a readable BIZ-to-S
 
 Architecture-unit membership and mappings must come from explicit authored facts. The UI and projection pipeline may not invent canonical units through naming heuristics, community detection, or layout. Unclassified facts and incomplete mappings remain visible as quality signals.
 
-PostgreSQL remains authoritative for authored facts and relationship events. The implementation will add immutable derived `ArchitectureUnitProjection`, `ArchitectureUnitMemberProjection`, and `ArchitectureUnitMappingProjection` records behind the existing provider boundary. Additive `architectureMap` and `architectureUnitNeighborhood` query operations preserve the existing bounded network contracts.
+PostgreSQL remains authoritative for authored facts and relationship events. Immutable derived `ArchitectureUnitProjection`, `ArchitectureUnitMemberProjection`, and `ArchitectureUnitMappingProjection` records sit behind the existing provider boundary. Additive `architectureMap` and `architectureUnitNeighborhood` query operations preserve the existing bounded network contracts.
 
 ## Governed Authoring Addendum
 
@@ -57,7 +60,7 @@ The first Designer Scope data increment is a separate governed operation after t
 - Projection publication and query contracts gain additive semantic-unit records and bounded operations.
 - The UI needs representation switching, transition filtering, unit drill-down, breadcrumbs, inspectors, and explicit partial-result states.
 - Architecture quality becomes measurable through unclassified facts, missing mappings, evidence, and mapping-completeness indicators.
-- No current behavior is changed until a separately approved implementation plan is executed and verified.
+- The first governed Designer slice is published as `knowledge-baseline:designer:3a:v1`; projections remain rebuildable and later revisions must repeat the MCP review, promotion, reconciliation, and Baseline gates.
 
 ## Constraints
 
@@ -115,8 +118,22 @@ The first Designer Scope data increment is a separate governed operation after t
 - Matching Context Pack ID: `ctx-readable-3a-architecture-mapping`
 - Related assets: `api-specforge-3a-architecture-query`, `data-specforge-3a-projection-read-model`, and `adr-webgl-3a-graph-exploration`
 - Required links: Proposal `IMPLEMENTS_DECISION` ADR; Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal; ADR `DECIDES` the query API, projection read model, and relationship to the advanced WebGL decision; Proposal `IMPACTS` the query API and projection read model; Evidence `VALIDATES` ADR.
-- Synchronization state: the reviewing ADR, Proposal, Context Pack, Evidence, and typed links were synchronized and read back in the exact owning Scope. Tasks 1-5 and the read-only portion of Task 6 are implemented and locally verified. Governed architecture-unit authoring and a live classified-chain acceptance remain pending because the current published generation has zero semantic unit projections.
+- Synchronization state: the implemented ADR, Proposal, Context Pack, Evidence, and typed links are synchronized and read back in the exact owning Scope. The first governed Designer slice is implemented and locally verified; broader enterprise classification and live connectors remain deferred backlog work.
 - Session state: `design-change-session:34a1a99a-6026-4060-a858-46654b1630f3` is `CONVERGED` for the written-design increment.
+
+## Governed Authoring Implementation Evidence
+
+- `pnpm db:push` -> Docker PostgreSQL at `localhost:15433/specforge_canonical` synchronized with the additive architecture-fact schema and Prisma Client regenerated.
+- `pnpm --filter @specforge/core typecheck`, `pnpm --filter @specforge/mcp-server typecheck`, `pnpm --filter @specforge/knowledge-projector typecheck`, `pnpm --filter @specforge/web typecheck`, and `pnpm exec prisma validate` -> exited 0.
+- `pnpm exec tsx scripts/bootstrap-designer-3a.ts` -> exact-Scope MCP batch submission, Review Bundle, approval, dedicated promotion, converged reconciliation, Baseline publication, and idempotent retry read-back completed.
+- `pnpm exec tsx scripts/process-designer-3a-projection.ts` -> `READY`, published Manifest, and derived analysis `PUBLISHED`.
+- PostgreSQL read-back -> the published generation contains 4 architecture units, 7 members, and 3 mappings with no unresolved endpoint or Scope error.
+- Exact-Scope session `design-change-session:fa68fdd5-8d04-4e64-a111-8e4c71f69a54` is the generic authoring and initial onboarding session and is closed after final focused verification.
+- Exact-Scope preflight opened `design-change-session:776db08d-785e-457d-9111-a5efd80313ee` for the controlled Designer coverage expansion and read the current scoped catalog and relationship digest before any write.
+- `pnpm exec tsx scripts/expand-designer-3a-coverage.ts` -> MCP-only complete-snapshot submission of 4 unit revisions, 18 membership revisions, and 3 mapping revisions, with bilingual review metadata, approval, promotion, converged reconciliation, and publication of `knowledge-baseline:designer:3a:v3`.
+- `pnpm exec tsx scripts/process-designer-3a-projection.ts` -> v3 projection `READY`, published Manifest, and derived analysis `PUBLISHED`.
+- `pnpm exec tsx scripts/verify-designer-3a-coverage.ts` -> MCP read-back `status=READY`, 4 units, 18 members, 3 mappings, `unclassifiedCount=0`, and exact Scope match.
+- The v3 projection is a membership-coverage increment only. No new architecture unit or cross-layer mapping is inferred; enterprise-wide classification, source-owner review, and continuous synchronization remain deferred.
 
 ## 中文写入设计增量
 

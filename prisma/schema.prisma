@@ -671,6 +671,117 @@ model KnowledgeAssertion {
   @@index([applicationServiceId, scopePath, changeSetId], map: "KnowledgeAssertion_scope_changeset_idx")
 }
 
+model ArchitectureFactBatch {
+  dbId                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                      String
+  idempotencyKey          String
+  designChangeSessionId   String
+  status                  String
+  provenance              Json     @default("{}") @db.JsonB
+  evidenceRefs            Json     @default("[]") @db.JsonB
+  unitRevisionIds         Json     @default("[]") @db.JsonB
+  membershipRevisionIds   Json     @default("[]") @db.JsonB
+  mappingRevisionIds      Json     @default("[]") @db.JsonB
+  canonicalBytes          Int
+  contentDigest           String
+  applicationServiceId    String
+  scopePath               String
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "ArchitectureFactBatch_scope_id_key")
+  @@unique([applicationServiceId, scopePath, idempotencyKey], map: "ArchitectureFactBatch_scope_idempotency_key")
+  @@index([applicationServiceId, scopePath, designChangeSessionId, status], map: "ArchitectureFactBatch_scope_session_status_idx")
+  @@index([applicationServiceId, scopePath, contentDigest], map: "ArchitectureFactBatch_scope_digest_idx")
+}
+
+model ArchitectureUnitRevision {
+  dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                    String
+  unitIdentity          String
+  revision              Int
+  layer                 String
+  kind                  String
+  parentUnitIdentity    String?
+  canonicalName         String
+  canonicalDescription  String
+  localizedContent      Json     @default("{}") @db.JsonB
+  aliases               Json     @default("[]") @db.JsonB
+  criticality           Float
+  evidenceRefs          Json     @default("[]") @db.JsonB
+  status                String
+  batchId               String
+  changeSetId           String?
+  contentDigest         String
+  applicationServiceId  String
+  scopePath             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "ArchitectureUnitRevision_scope_id_key")
+  @@unique([applicationServiceId, scopePath, unitIdentity, revision], map: "ArchitectureUnitRevision_scope_identity_revision_key")
+  @@index([applicationServiceId, scopePath, batchId, status], map: "ArchitectureUnitRevision_scope_batch_status_idx")
+  @@index([applicationServiceId, scopePath, changeSetId, status], map: "ArchitectureUnitRevision_scope_changeset_status_idx")
+  @@index([applicationServiceId, scopePath, layer, kind, unitIdentity], map: "ArchitectureUnitRevision_scope_layer_kind_identity_idx")
+}
+
+model ArchitectureUnitMembershipRevision {
+  dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                    String
+  membershipIdentity    String
+  revision              Int
+  unitIdentity          String
+  assertionId           String?
+  assetType             String?
+  assetId               String?
+  semanticIdentity      String
+  confidence            Float
+  evidenceRefs          Json     @default("[]") @db.JsonB
+  status                String
+  batchId               String
+  changeSetId           String?
+  contentDigest         String
+  applicationServiceId  String
+  scopePath             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "ArchitectureUnitMembershipRevision_scope_id_key")
+  @@unique([applicationServiceId, scopePath, membershipIdentity, revision], map: "ArchitectureUnitMembershipRevision_scope_identity_revision_key")
+  @@index([applicationServiceId, scopePath, batchId, status], map: "ArchitectureUnitMembershipRevision_scope_batch_status_idx")
+  @@index([applicationServiceId, scopePath, unitIdentity, status], map: "ArchitectureUnitMembershipRevision_scope_unit_status_idx")
+  @@index([applicationServiceId, scopePath, assertionId, status], map: "ArchitectureUnitMembershipRevision_scope_assertion_status_idx")
+  @@index([applicationServiceId, scopePath, assetType, assetId, status], map: "ArchitectureUnitMembershipRevision_scope_asset_status_idx")
+}
+
+model ArchitectureUnitMappingRevision {
+  dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                    String
+  mappingIdentity       String
+  revision              Int
+  sourceUnitIdentity    String
+  targetUnitIdentity    String
+  mappingFamily         String
+  confidence            Float
+  relationshipIdentities Json    @default("[]") @db.JsonB
+  evidenceRefs          Json     @default("[]") @db.JsonB
+  status                String
+  batchId               String
+  changeSetId           String?
+  contentDigest         String
+  applicationServiceId  String
+  scopePath             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "ArchitectureUnitMappingRevision_scope_id_key")
+  @@unique([applicationServiceId, scopePath, mappingIdentity, revision], map: "ArchitectureUnitMappingRevision_scope_identity_revision_key")
+  @@index([applicationServiceId, scopePath, batchId, status], map: "ArchitectureUnitMappingRevision_scope_batch_status_idx")
+  @@index([applicationServiceId, scopePath, sourceUnitIdentity, status], map: "ArchitectureUnitMappingRevision_scope_source_status_idx")
+  @@index([applicationServiceId, scopePath, targetUnitIdentity, status], map: "ArchitectureUnitMappingRevision_scope_target_status_idx")
+  @@index([applicationServiceId, scopePath, mappingFamily, status], map: "ArchitectureUnitMappingRevision_scope_family_status_idx")
+}
+
 model IdentityCandidate {
   dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   id                    String
@@ -702,6 +813,7 @@ model KnowledgeChangeSet {
   status                  String
   assetRevisionIds        Json     @default("[]") @db.JsonB
   relationshipRevisionIds Json     @default("[]") @db.JsonB
+  architectureFactRevisionIds Json @default("[]") @db.JsonB
   evidenceRefs            Json     @default("[]") @db.JsonB
   digest                  String
   promotionDecisionId     String?
@@ -1036,6 +1148,7 @@ model KnowledgeReviewBundle {
   riskTier             String
   assertionIds         Json     @default("[]") @db.JsonB
   identityCandidateIds Json     @default("[]") @db.JsonB
+  architectureFactRevisionIds Json @default("[]") @db.JsonB
   evidenceRefs         Json     @default("[]") @db.JsonB
   coverage             Json     @default("{}") @db.JsonB
   blockingIssues       Json     @default("[]") @db.JsonB
@@ -1058,6 +1171,7 @@ model KnowledgePromotionDecision {
   decision                String
   approvedAssertionIds    Json     @default("[]") @db.JsonB
   approvedIdentityCandidateIds Json @default("[]") @db.JsonB
+  approvedArchitectureFactRevisionIds Json @default("[]") @db.JsonB
   evidenceRefs            Json     @default("[]") @db.JsonB
   reason                  String
   actorId                 String
@@ -1177,6 +1291,8 @@ model KnowledgePromotionReceipt {
   sourceDigest            String
   assetRevisionIds        Json     @default("[]") @db.JsonB
   relationshipRevisionIds Json     @default("[]") @db.JsonB
+  architectureFactRevisionIds Json @default("[]") @db.JsonB
+  architectureFactBatchId  String?
   applicationServiceId    String
   scopePath               String
   createdAt               DateTime @default(now())

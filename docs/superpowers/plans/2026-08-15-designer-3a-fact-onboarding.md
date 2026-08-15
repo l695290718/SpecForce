@@ -1,5 +1,9 @@
 # Designer 3A Fact Onboarding Implementation Plan
 
+> **Execution status (2026-08-15): COMPLETE for the initial slice and controlled membership expansion.** The exact Designer Scope was read through MCP, the initial bilingual batch of 4 units, 7 memberships, and 3 mappings was published as `knowledge-baseline:designer:3a:v1`, then a complete-snapshot coverage batch published `knowledge-baseline:designer:3a:v3` with 4 units, 18 memberships, and 3 mappings. Both paths were reviewed, promoted, reconciled as `CONVERGED`, and projected as `READY` Manifests. Unclassified enterprise semantics remain explicit follow-up work.
+
+Evidence: `docs/evidence/designer-3a-onboarding-evidence.md`, `docs/evidence/designer-3a-candidate-review.md`, and `docs/evidence/designer-3a-coverage-expansion-evidence.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Use the governed MCP authoring capability to publish an evidence-backed initial BIZ-to-SYS-to-TECH architecture map for `com.huawei.celon.desiner` without inventing semantics or bypassing review.

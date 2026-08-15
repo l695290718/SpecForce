@@ -23,8 +23,8 @@ export function validateKnowledgeAssertion(assertion: KnowledgeAssertion, profil
   }
 }
 
-export function changeSetDigest(input: Pick<ChangeSet, "architectureScope" | "streamId" | "sequence" | "assetRevisionIds" | "relationshipRevisionIds" | "evidenceRefs">): string {
-  return contentDigest(input);
+export function changeSetDigest(input: Pick<ChangeSet, "architectureScope" | "streamId" | "sequence" | "assetRevisionIds" | "relationshipRevisionIds" | "architectureFactRevisionIds" | "evidenceRefs">): string {
+  return contentDigest({ ...input, assetRevisionIds: [...input.assetRevisionIds].sort(), relationshipRevisionIds: [...input.relationshipRevisionIds].sort(), architectureFactRevisionIds: [...input.architectureFactRevisionIds].sort(), evidenceRefs: [...input.evidenceRefs].sort() });
 }
 
 export function projectionManifestDigest(input: Pick<ProjectionManifest, "architectureScope" | "baselineId" | "projectionType" | "projectionSchemaVersion" | "sourceRevisionIds" | "relationshipVersion" | "query">): string {
@@ -34,18 +34,19 @@ export function projectionManifestDigest(input: Pick<ProjectionManifest, "archit
 export function assertBaselinePublishable(baseline: Pick<Baseline, "status" | "manifest">, reconciliationStatus: "CONVERGED" | "DRIFTED" | "BLOCKED"): void {
   if (baseline.status !== "PUBLISHED") throw new Error("BASELINE_STATUS_INVALID");
   if (reconciliationStatus !== "CONVERGED") throw new Error(`BASELINE_RECONCILIATION_${reconciliationStatus}`);
-  if (!baseline.manifest.changeSetId || baseline.manifest.sourceRevisionIds.length === 0) {
+  if (!baseline.manifest.changeSetId || (baseline.manifest.sourceRevisionIds.length === 0 && baseline.manifest.architectureFactRevisionIds.length === 0)) {
     throw new Error("BASELINE_MANIFEST_INCOMPLETE");
   }
 }
 
-export function reviewBundleDigest(input: Pick<ReviewBundle, "architectureScope" | "designChangeSessionId" | "riskTier" | "assertionIds" | "identityCandidateIds" | "evidenceRefs" | "coverage" | "blockingIssues">): string {
+export function reviewBundleDigest(input: Pick<ReviewBundle, "architectureScope" | "designChangeSessionId" | "riskTier" | "assertionIds" | "identityCandidateIds" | "architectureFactRevisionIds" | "evidenceRefs" | "coverage" | "blockingIssues">): string {
   return contentDigest({
     architectureScope: input.architectureScope,
     designChangeSessionId: input.designChangeSessionId,
     riskTier: input.riskTier,
     assertionIds: [...input.assertionIds].sort(),
     identityCandidateIds: [...input.identityCandidateIds].sort(),
+    architectureFactRevisionIds: [...input.architectureFactRevisionIds].sort(),
     evidenceRefs: [...input.evidenceRefs].sort(),
     coverage: input.coverage,
     blockingIssues: [...input.blockingIssues].sort()
@@ -62,11 +63,12 @@ export function assertReviewBundleApprovable(bundle: Pick<ReviewBundle, "status"
   if (!bundle.coverage.complete || bundle.blockingIssues.length > 0) throw new Error("REVIEW_BUNDLE_BLOCKED");
 }
 
-export function assertPromotionDecisionValid(input: Pick<KnowledgePromotionDecision, "decision" | "reason" | "evidenceRefs" | "approvedAssertionIds" | "approvedIdentityCandidateIds">, bundle: Pick<ReviewBundle, "status" | "assertionIds" | "identityCandidateIds" | "coverage" | "blockingIssues">): void {
+export function assertPromotionDecisionValid(input: Pick<KnowledgePromotionDecision, "decision" | "reason" | "evidenceRefs" | "approvedAssertionIds" | "approvedIdentityCandidateIds" | "approvedArchitectureFactRevisionIds">, bundle: Pick<ReviewBundle, "status" | "assertionIds" | "identityCandidateIds" | "architectureFactRevisionIds" | "coverage" | "blockingIssues">): void {
   if (!input.reason.trim() || input.evidenceRefs.length === 0) throw new Error("PROMOTION_DECISION_EVIDENCE_REQUIRED");
   if (input.decision === "APPROVE") {
     assertReviewBundleApprovable(bundle);
-    if (input.approvedAssertionIds.length === 0 && input.approvedIdentityCandidateIds.length === 0) throw new Error("PROMOTION_TARGETS_REQUIRED");
+    if (input.approvedAssertionIds.length === 0 && input.approvedIdentityCandidateIds.length === 0 && input.approvedArchitectureFactRevisionIds.length === 0) throw new Error("PROMOTION_TARGETS_REQUIRED");
     if (input.approvedAssertionIds.some((id) => !bundle.assertionIds.includes(id)) || input.approvedIdentityCandidateIds.some((id) => !bundle.identityCandidateIds.includes(id))) throw new Error("PROMOTION_TARGET_OUTSIDE_REVIEW_BUNDLE");
+    if (input.approvedArchitectureFactRevisionIds.some((id) => !bundle.architectureFactRevisionIds.includes(id))) throw new Error("PROMOTION_TARGET_OUTSIDE_REVIEW_BUNDLE");
   }
 }

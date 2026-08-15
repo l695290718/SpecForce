@@ -6,7 +6,7 @@ const baseline = {
   id: "baseline-1",
   status: "PUBLISHED" as const,
   architectureScope: scope,
-  manifest: { architectureScope: scope, baselineId: "baseline-1", changeSetId: "changeset-1", sourceRevisionIds: ["biz-1", "sys-1", "tech-1"], relationshipVersion: "r1", publishedAt: "2026-08-03T00:00:00.000Z" }
+  manifest: { architectureScope: scope, baselineId: "baseline-1", changeSetId: "changeset-1", sourceRevisionIds: ["biz-1", "sys-1", "tech-1"], architectureFactRevisionIds: [], relationshipVersion: "r1", publishedAt: "2026-08-03T00:00:00.000Z" }
 };
 
 function assertion(id: string, layer: KnowledgeAssertion["layer"], semanticIdentity: string, revision = 1): KnowledgeAssertion {

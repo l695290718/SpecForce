@@ -183,6 +183,7 @@ export interface ChangeSet {
   status: ChangeSetStatus;
   assetRevisionIds: string[];
   relationshipRevisionIds: string[];
+  architectureFactRevisionIds: string[];
   evidenceRefs: string[];
   digest: string;
   promotionDecisionId?: string;
@@ -205,6 +206,7 @@ export interface BaselineManifest {
   baselineId: string;
   changeSetId: string;
   sourceRevisionIds: string[];
+  architectureFactRevisionIds: string[];
   relationshipVersion: string;
   promotionReceiptId?: string;
   reconciliationReceiptId?: string;
@@ -252,6 +254,7 @@ export interface ReviewBundle {
   riskTier: ReviewRiskTier;
   assertionIds: string[];
   identityCandidateIds: string[];
+  architectureFactRevisionIds: string[];
   evidenceRefs: string[];
   coverage: ReviewCoverage;
   blockingIssues: string[];
@@ -269,6 +272,7 @@ export interface KnowledgePromotionDecision {
   decision: PromotionDecision;
   approvedAssertionIds: string[];
   approvedIdentityCandidateIds: string[];
+  approvedArchitectureFactRevisionIds: string[];
   evidenceRefs: string[];
   reason: string;
   actorId: string;
@@ -288,6 +292,8 @@ export interface KnowledgePromotionReceipt {
   changeSetSequence: number;
   assetRevisionIds: string[];
   relationshipRevisionIds: string[];
+  architectureFactRevisionIds: string[];
+  architectureFactBatchId?: string;
   evidenceRefs: string[];
   relationshipVersion: string;
   idempotent: boolean;
@@ -308,6 +314,7 @@ export interface KnowledgeReconciliationResult {
   issues: string[];
   assetRevisionIds: string[];
   relationshipRevisionIds: string[];
+  architectureFactRevisionIds: string[];
   evidenceRefs: string[];
   relationshipVersion: string;
   reconciledAt: string;

@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved design direction, pending implementation approval. This document defines the authoring and onboarding increments and does not claim that either increment is implemented.
+Approved design direction; the generic authoring capability and first Designer onboarding slice are implemented. Enterprise-wide classification, continuous source synchronization, and cross-Scope authoring remain deferred.
 
 - Owning application service: `com.huawei.celon.desiner`
 - Owning Scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
@@ -14,7 +14,7 @@ Approved design direction, pending implementation approval. This document define
 
 ## Current State
 
-The read side is implemented. SpecForge can materialize and query `ArchitectureUnitProjection`, `ArchitectureUnitMemberProjection`, and `ArchitectureUnitMappingProjection`, and the Web can render a bounded Map or Network view. The current published Designer generation contains zero governed architecture-unit rows because the projector receives no canonical architecture-unit source facts.
+The read side and the governed write slice are implemented. SpecForge can materialize and query `ArchitectureUnitProjection`, `ArchitectureUnitMemberProjection`, and `ArchitectureUnitMappingProjection`, and the Web can render a bounded Map or Network view. The published Designer Baseline `knowledge-baseline:designer:3a:v3` contains 4 units, 18 members, and 3 mappings after a complete-snapshot membership-coverage expansion.
 
 The generic `KnowledgeAssertion` API is not a safe substitute. It accepts arbitrary `factType` values, but the current promotion mapper supports only established design-asset and typed-relationship fact types. Promotion also assumes a governed scan session and source observations. Treating authored architecture units as scanned assertions would either fail during promotion or create a false provenance chain.
 
@@ -348,4 +348,3 @@ PostgreSQL 适合保存事务型、版本化、需审核的权威事实。架构
 - Designer 首批事实来自实时精确 Scope 数据，至少形成一条真实 BIZ 到 SYS 到 TECH 链路。
 - MCP、PostgreSQL 投影和 Web Map 对 Baseline、代际、单元、成员和映射的读回一致。
 - 未分类内容显式计数并进入覆盖待办，不创建虚假的“其他”单元。
-

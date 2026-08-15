@@ -144,7 +144,31 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **设计引用：** ADR-0002、ADR-0004、ADR-0007、ADR-0016、ADR-0021；2026-08-09 隧道事件解决回执。
 
-## 7. Local Change-Attestation Hook Deployment And Signing Endpoint
+## 7. Enterprise-Wide 3A Coverage And Semantic Classification
+
+**Status:** Deferred after the initial governed Designer slice.
+
+**Owner:** SpecForge Architecture and Agent Integration.
+
+**Rationale:** The first MCP-governed Designer Baseline and one controlled coverage expansion now contain 4 evidence-backed architecture units, 18 memberships, and 3 mappings. Remaining APIs, events, rules, data models, runtime facts, source-owner decisions, and ambiguous semantics must not be mass-classified by naming heuristics or automatic promotion.
+
+**Trigger:** Start after the first slice is accepted and coverage gaps are prioritized with source owners. Each expansion must use a new exact-Scope batch, evidence matrix, bilingual review, converged reconciliation, and Baseline revision.
+
+**Completion evidence:** Every selected source has a stable evidence reference, complete English/Chinese human-facing content, a typed relationship or explicit review rationale, and a read-back projection. Unclassified and rejected facts have an owner, trigger, and rationale.
+
+**中文本地化：**
+
+**状态：** 首批受治理 Designer 切片完成后延期。
+
+**负责人：** SpecForge 架构与 Agent 集成团队。
+
+**理由：** 当前 Designer Baseline 已包含 4 个有证据支撑的架构单元、7 个成员归属和 3 条映射。其余 API、事件、规则、数据模型、运行时事实及含义不明确的内容不能通过命名启发式或自动提升批量分类。
+
+**启动条件：** 首批切片验收并按来源负责人排定覆盖缺口后启动。每次扩展必须使用新的精确 Scope 批次、证据矩阵、双语审核、收敛对账和 Baseline 版本。
+
+**完成证据：** 每个选中的来源都有稳定证据引用、完整中英文面向人内容、有类型关系或明确审核理由，并能在投影中回读。未分类和拒绝事实必须记录负责人、触发条件和理由。
+
+## 8. Local Change-Attestation Hook Deployment And Signing Endpoint
 
 **Status:** Implemented locally; CodeHub merge enforcement remains deferred.
 

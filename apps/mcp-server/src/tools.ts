@@ -6,6 +6,7 @@ import { auditToolCall } from "./audit";
 import { allowAllPolicy, getDefaultActor, principalFromAuthInfo, withRequestPrincipal, type McpAuthInfo } from "./auth";
 import { deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
 import { commitKnowledgeChangeSet, createIdentityCandidate, createKnowledgeAssertion, createKnowledgeReviewBundle, createProjectionManifest, createWorkingStream, decideKnowledgeReviewBundle, listKnowledgeAssertions, publishKnowledgeBaseline } from "./knowledge/persistence";
+import { promote3aArchitectureFacts, reconcile3aArchitectureFacts, submit3aArchitectureFactBatch } from "./knowledge/architecture-authoring";
 import { submitScanReport } from "./scanner/persistence";
 import { getScannerRelease } from "./scanner/release";
 import { finalizeKnowledgeScan, getScanCheckpoint, startKnowledgeScan } from "./scanner/session";
@@ -121,6 +122,16 @@ const assetLocaleSchema = z.enum(["zh", "en"]);
 const architectureScopeSchema = z.object({
   applicationServiceId: z.string().min(1),
   scopePath: z.string().min(1)
+});
+
+const architectureFactUnitSchema = z.object({
+  id: z.string().min(1), unitIdentity: z.string().min(1), revision: z.number().int().min(1), layer: z.enum(["BIZ", "SYS", "TECH"]), kind: z.string().min(1), parentUnitIdentity: z.string().min(1).optional(), canonicalName: z.string().min(1), canonicalDescription: z.string().min(1), localizedContent: z.object({ zh: z.object({ name: z.string().min(1), description: z.string().min(1) }) }), aliases: z.array(z.string()), criticality: z.number().min(0).max(1), evidenceRefs: z.array(z.string()).min(1)
+});
+const architectureFactMembershipSchema = z.object({
+  id: z.string().min(1), membershipIdentity: z.string().min(1), revision: z.number().int().min(1), unitIdentity: z.string().min(1), assertionId: z.string().min(1).optional(), assetType: z.string().min(1).optional(), assetId: z.string().min(1).optional(), semanticIdentity: z.string().min(1), confidence: z.number().min(0).max(1), evidenceRefs: z.array(z.string()).min(1)
+});
+const architectureFactMappingSchema = z.object({
+  id: z.string().min(1), mappingIdentity: z.string().min(1), revision: z.number().int().min(1), sourceUnitIdentity: z.string().min(1), targetUnitIdentity: z.string().min(1), mappingFamily: z.string().min(1), confidence: z.number().min(0).max(1), relationshipIdentities: z.array(z.string()).min(1), evidenceRefs: z.array(z.string()).min(1)
 });
 const semanticCandidateSchema = z.object({
   semanticIdentity: z.string().min(1),
@@ -588,7 +599,7 @@ export function registerTools(server: McpServer): void {
   registerJsonTool(server, "create_knowledge_review_bundle", {
     title: "Create knowledge ReviewBundle",
     description: "Builds a scoped T0-T3 review bundle from assertions, identity candidates, evidence, coverage, and blocking issues. Partial or blocked coverage cannot be approved.",
-    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), designChangeSessionId: z.string().min(1), riskTier: z.enum(["T0", "T1", "T2", "T3"]), assertionIds: z.array(z.string()), identityCandidateIds: z.array(z.string()), evidenceRefs: z.array(z.string()).min(1), coverage: z.object({ totalSources: z.number().int().min(0), processedSources: z.number().int().min(0), supportedSources: z.number().int().min(0), candidateCount: z.number().int().min(0), complete: z.boolean() }), blockingIssues: z.array(z.string()) },
+    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), designChangeSessionId: z.string().min(1), riskTier: z.enum(["T0", "T1", "T2", "T3"]), assertionIds: z.array(z.string()), identityCandidateIds: z.array(z.string()), architectureFactRevisionIds: z.array(z.string()).optional(), evidenceRefs: z.array(z.string()).min(1), coverage: z.object({ totalSources: z.number().int().min(0), processedSources: z.number().int().min(0), supportedSources: z.number().int().min(0), candidateCount: z.number().int().min(0), complete: z.boolean() }), blockingIssues: z.array(z.string()) },
     permissions: ["knowledge:write"],
     readOnly: false
   }, createKnowledgeReviewBundle);
@@ -596,10 +607,36 @@ export function registerTools(server: McpServer): void {
   registerJsonTool(server, "decide_knowledge_review_bundle", {
     title: "Decide knowledge ReviewBundle",
     description: "Records an auditable MCP-only promotion decision. Approval marks selected assertions and identity candidates accepted for a later ChangeSet.",
-    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), reviewBundleId: z.string().min(1), decision: z.enum(["APPROVE", "REJECT"]), approvedAssertionIds: z.array(z.string()), approvedIdentityCandidateIds: z.array(z.string()), evidenceRefs: z.array(z.string()).min(1), reason: z.string().min(1) },
+    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), reviewBundleId: z.string().min(1), decision: z.enum(["APPROVE", "REJECT"]), approvedAssertionIds: z.array(z.string()), approvedIdentityCandidateIds: z.array(z.string()), approvedArchitectureFactRevisionIds: z.array(z.string()).optional(), evidenceRefs: z.array(z.string()).min(1), reason: z.string().min(1) },
     permissions: ["knowledge:write", "governance:run"],
     readOnly: false
   }, decideKnowledgeReviewBundle);
+
+  registerJsonTool(server, "submit_3a_architecture_fact_batch", {
+    title: "Submit 3A architecture fact batch",
+    description: "Persists a bounded bilingual BIZ/SYS/TECH architecture-fact candidate batch in the exact owning Scope. It validates parentage, memberships, cross-layer mappings, evidence, references, limits, and idempotency before writing PostgreSQL.",
+    inputSchema: {
+      architectureScope: architectureScopeSchema,
+      id: z.string().min(1),
+      idempotencyKey: z.string().min(1),
+      designChangeSessionId: z.string().min(1),
+      provenance: z.object({ actor: z.string().min(1), model: z.string().min(1).optional(), tool: z.string().min(1).optional(), runId: z.string().min(1).optional() }),
+      evidenceRefs: z.array(z.string()).min(1),
+      units: z.array(architectureFactUnitSchema).max(100),
+      memberships: z.array(architectureFactMembershipSchema).max(1000),
+      mappings: z.array(architectureFactMappingSchema).max(500)
+    },
+    permissions: ["knowledge:write", "governance:run"],
+    readOnly: false
+  }, async (input) => submit3aArchitectureFactBatch(input as unknown as Parameters<typeof submit3aArchitectureFactBatch>[0]));
+
+  registerJsonTool(server, "promote_3a_architecture_facts", {
+    title: "Promote 3A architecture facts",
+    description: "Promotes reviewed 3A architecture facts into accepted scoped revisions and a monotonic ChangeSet. This path is separate from scan-derived semantic candidate promotion.",
+    inputSchema: { architectureScope: architectureScopeSchema, promotionDecisionId: z.string().min(1), streamId: z.string().min(1), evidenceRefs: z.array(z.string()).min(1) },
+    permissions: ["knowledge:write", "governance:run"],
+    readOnly: false
+  }, async (input) => promote3aArchitectureFacts(input as unknown as Parameters<typeof promote3aArchitectureFacts>[0]));
 
   registerJsonTool(server, "promote_knowledge_candidates", {
     title: "Promote reviewed knowledge candidates",
@@ -609,13 +646,21 @@ export function registerTools(server: McpServer): void {
     readOnly: false
   }, promoteKnowledgeCandidates);
 
-  registerJsonTool(server, "reconcile_knowledge_baseline", {
+    registerJsonTool(server, "reconcile_knowledge_baseline", {
     title: "Reconcile promoted knowledge",
     description: "Reconciles a promotion receipt against exact-Scope PostgreSQL state and durably records the governance receipt required for Baseline publication.",
     inputSchema: { architectureScope: architectureScopeSchema, promotionReceiptId: z.string().min(1) },
     permissions: ["knowledge:write", "governance:run"],
     readOnly: false
-  }, reconcileKnowledgeBaseline);
+    }, reconcileKnowledgeBaseline);
+
+    registerJsonTool(server, "reconcile_3a_architecture_facts", {
+      title: "Reconcile 3A architecture facts",
+      description: "Reconciles accepted 3A architecture-fact revisions against their exact-Scope ChangeSet and records the converged receipt required for Baseline publication.",
+      inputSchema: { architectureScope: architectureScopeSchema, promotionReceiptId: z.string().min(1) },
+      permissions: ["knowledge:write", "governance:run"],
+      readOnly: false
+    }, async (input) => reconcile3aArchitectureFacts(input as Parameters<typeof reconcile3aArchitectureFacts>[0]));
 
   registerJsonTool(server, "create_working_stream", {
     title: "Create working stream",
@@ -628,7 +673,7 @@ export function registerTools(server: McpServer): void {
   registerJsonTool(server, "commit_knowledge_changeset", {
     title: "Commit knowledge ChangeSet",
     description: "Commits asset revisions, relationship revisions, and Evidence references into one monotonic scoped ChangeSet.",
-    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), streamId: z.string().min(1), assetRevisionIds: z.array(z.string()), relationshipRevisionIds: z.array(z.string()), evidenceRefs: z.array(z.string()), promotionDecisionId: z.string().min(1) },
+    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), streamId: z.string().min(1), assetRevisionIds: z.array(z.string()), relationshipRevisionIds: z.array(z.string()), architectureFactRevisionIds: z.array(z.string()).optional(), evidenceRefs: z.array(z.string()), promotionDecisionId: z.string().min(1) },
     permissions: ["knowledge:write", "governance:run"],
     readOnly: false
   }, commitKnowledgeChangeSet);
@@ -636,7 +681,7 @@ export function registerTools(server: McpServer): void {
   registerJsonTool(server, "publish_knowledge_baseline", {
     title: "Publish knowledge baseline",
     description: "Publishes an immutable scoped Baseline only after a converged reconciliation result.",
-    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), streamId: z.string().min(1), changeSetId: z.string().min(1), sourceRevisionIds: z.array(z.string()).min(1), relationshipVersion: z.string().min(1), reconciliationReceiptId: z.string().min(1) },
+    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), streamId: z.string().min(1), changeSetId: z.string().min(1), sourceRevisionIds: z.array(z.string()), architectureFactRevisionIds: z.array(z.string()).optional(), relationshipVersion: z.string().min(1), reconciliationReceiptId: z.string().min(1) },
     permissions: ["knowledge:write"],
     readOnly: false
   }, publishKnowledgeBaseline);
