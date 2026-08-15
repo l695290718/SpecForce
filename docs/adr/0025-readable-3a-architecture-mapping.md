@@ -285,3 +285,16 @@ PostgreSQL 继续作为已编写事实和关系事件的权威来源。后续实
 - 必需关系：Proposal `IMPLEMENTS_DECISION` ADR；Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal；ADR `DECIDES` 查询 API、投影读取模型以及与高级 WebGL 决策的关系；Proposal `IMPACTS` 查询 API 和投影读取模型；Evidence `VALIDATES` ADR。
 - 同步状态：评审中的 ADR、Proposal、Context Pack、Evidence 和有类型关系已在精确所属 Scope 中同步并回读。Task 1-5 及 Task 6 的只读部分已实施并完成本地验证。由于当前发布代际没有语义单元投影，治理架构单元编写和已分类链路验收仍待完成。
 - 会话状态：`design-change-session:34a1a99a-6026-4060-a858-46654b1630f3` 已针对书面设计增量收敛为 `CONVERGED`。
+
+
+## 3A Neighborhood Query Identity Repair
+
+Implementation preflight opened \`design-change-session:0b9f92e9-2a22-48e3-a058-104a67017590\` in the exact Designer Scope before code changes. It read 298 scoped assets and returned design-context digest \`b3022bb4167b88291985082aacef9aa7ebbb7127992b05f852ea2431b46c5bf7\`, relationship digest \`86f22fca81d050efd28827d54545df5cff3ce91fab549aa25445963fbefc6a37\`, and reconciliation status \`UNVERIFIED\` without a blocking status. Receipt: \`.specforge/design-context/design-change-session_0b9f92e9-2a22-48e3-a058-104a67017590.json\`.
+
+The approved implementation repairs table-specific identity filters for both public neighborhood MCP paths. Architecture unit, member, and mapping projection queries retain \`projectionManifestId\`; manifest queries use \`id\`; generation-bound edge queries use Scope, generation, and Baseline without \`projectionManifestId\`. No schema migration or data rewrite is authorized.
+
+### 3A 邻域查询身份过滤修复
+
+在修改代码前，已在精确 Designer Scope 中打开实现前置会话 \`design-change-session:0b9f92e9-2a22-48e3-a058-104a67017590\`。会话读取 298 条 Scope 内资产，设计上下文摘要为 \`b3022bb4167b88291985082aacef9aa7ebbb7127992b05f852ea2431b46c5bf7\`，关系摘要为 \`86f22fca81d050efd28827d54545df5cff3ce91fab549aa25445963fbefc6a37\`，对账状态为 \`UNVERIFIED\` 且未阻塞。回执路径为 \`.specforge/design-context/design-change-session_0b9f92e9-2a22-48e3-a058-104a67017590.json\`。
+
+已批准的实现将修复两个公开邻域 MCP 路径的表级身份过滤。架构单元、成员和映射投影查询继续保留 \`projectionManifestId\`；Manifest 查询使用 \`id\`；按 generation 绑定的边查询只使用 Scope、generation 和 Baseline，不发送 \`projectionManifestId\`。本次不允许 Schema 迁移或数据重写。
