@@ -17,9 +17,9 @@ const scope = {
   applicationServiceId: "com.huawei.celon.desiner",
   scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
 };
-const sessionId = "design-change-session:776db08d-785e-457d-9111-a5efd80313ee";
+const sessionId = "design-change-session:8caa26ac-7f8b-477a-bce8-a44ea0e3990c";
 const evidenceRefs = [
-  "evidence:designer-3a-coverage-expansion",
+  "evidence:designer-3a-coverage-expansion-v4",
   "adr-readable-3a-architecture-mapping",
   "domain-specforge-platform",
   "api-specforge-mcp-tools",
@@ -37,7 +37,17 @@ const evidenceRefs = [
   "rule-specforge-3a-projection-publication",
   "rule-specforge-knowledge-promotion-transaction",
   "rule-specforge-knowledge-risk-policy",
-  "rule-specforge-core-service-reuse"
+  "rule-specforge-core-service-reuse",
+  "api-specforge-asset-upsert",
+  "api-specforge-proposal-upsert",
+  "api-specforge-context-pack-upsert",
+  "data-specforge-audit",
+  "data-specforge-mcp-registry",
+  "data-specforge-ai-generation",
+  "data-specforge-web-workspace",
+  "event-specforge-governance-check-completed",
+  "event-specforge-context-pack-generated",
+  "rule-bilingual-asset-completeness"
 ];
 
 const units = [
@@ -92,6 +102,32 @@ const memberships = [
   };
 });
 
+const nextUnits = units.map((unit) => ({ ...unit, id: unit.id.replace(":v2", ":v3"), revision: 3 }));
+const nextPreviousMemberships = previousMemberships.map((membership) => ({
+  ...membership,
+  id: membership.id.replace(/:v[23]$/u, ":v4"),
+  revision: 4
+}));
+const nextMemberships = [
+  ...memberships.map((membership) => ({ ...membership, id: membership.id.replace(":v3", ":v4"), revision: 4 })),
+  ...[
+    ["sys", "api-specforge-asset-upsert", "api", "api-specforge-asset-upsert", "The MCP gateway accepts the governed asset upsert contract."],
+    ["sys", "api-specforge-proposal-upsert", "api", "api-specforge-proposal-upsert", "The MCP gateway accepts the governed Proposal upsert contract."],
+    ["sys", "api-specforge-context-pack-upsert", "api", "api-specforge-context-pack-upsert", "The MCP gateway accepts the governed Context Pack upsert contract."],
+    ["sys", "event-specforge-governance-check-completed", "event", "event-specforge-governance-check-completed", "The MCP gateway emits durable governance completion events."],
+    ["sys", "event-specforge-context-pack-generated", "event", "event-specforge-context-pack-generated", "The MCP gateway tracks Context Pack generation events."],
+    ["sys", "rule-bilingual-asset-completeness", "businessRule", "rule-bilingual-asset-completeness", "Bilingual completeness governs human-facing assets at the MCP boundary."],
+    ["tech", "data-specforge-audit", "dataModel", "data-specforge-audit", "The authoritative PostgreSQL store records MCP audit history."],
+    ["tech", "data-specforge-mcp-registry", "dataModel", "data-specforge-mcp-registry", "The authoritative PostgreSQL store records the MCP registry model."],
+    ["tech", "data-specforge-ai-generation", "dataModel", "data-specforge-ai-generation", "The authoritative PostgreSQL store records AI generation requests and outputs."],
+    ["tech", "data-specforge-web-workspace", "dataModel", "data-specforge-web-workspace", "The authoritative PostgreSQL store records Web workspace state."],
+  ].map(([layer, key, assetType, assetId, description], index) => {
+    const unitIdentity = layer === "sys" ? "unit:sys:specforge-mcp-governance-gateway" : "unit:tech:specforge-postgresql-authority";
+    return { id: `architecture-membership-revision:designer:coverage:${key}:v4`, membershipIdentity: `membership:${unitIdentity}:${assetId}`, revision: 4, unitIdentity, assetType, assetId, semanticIdentity: `${assetType}:${assetId}`, confidence: 1, evidenceRefs: ["evidence:designer-3a-coverage-expansion-v4", assetId], description, index };
+  })
+];
+const nextMappings = previousMappings.map((mapping) => ({ ...mapping, id: mapping.id.replace(":v2", ":v3"), revision: 3 }));
+
 function text(result: { content?: Array<{ type?: string; text?: string }> }): string {
   return result.content?.map((item) => item.type === "text" ? item.text ?? "" : "").join("") ?? "";
 }
@@ -114,19 +150,19 @@ async function main(): Promise<void> {
   try {
     const batch = await call("submit_3a_architecture_fact_batch", {
       architectureScope: scope,
-      id: "architecture-fact-batch:designer:3a:coverage:v3",
-      idempotencyKey: "architecture-fact-batch:designer:3a:coverage:v3",
+      id: "architecture-fact-batch:designer:3a:coverage:v4",
+      idempotencyKey: "architecture-fact-batch:designer:3a:coverage:v4",
       designChangeSessionId: sessionId,
-      provenance: { actor: "codex", tool: "expand-designer-3a-coverage", runId: "designer-3a-coverage-v3" },
+      provenance: { actor: "codex", tool: "expand-designer-3a-coverage", runId: "designer-3a-coverage-v4" },
       evidenceRefs,
-      units,
-      memberships: [...previousMemberships, ...memberships.map(({ description: _description, index: _index, ...membership }) => membership)],
-      mappings: previousMappings
+      units: nextUnits,
+      memberships: [...nextPreviousMemberships, ...nextMemberships.map(({ description: _description, index: _index, ...membership }) => membership)],
+      mappings: nextMappings
     });
     const revisionIds = [batch.unitRevisionIds, batch.membershipRevisionIds, batch.mappingRevisionIds].flat() as string[];
     const review = await call("create_knowledge_review_bundle", {
       architectureScope: scope,
-      id: "knowledge-review-bundle:designer:3a:coverage:v3",
+      id: "knowledge-review-bundle:designer:3a:coverage:v4",
       designChangeSessionId: sessionId,
       riskTier: "T1",
       assertionIds: [],
@@ -138,7 +174,7 @@ async function main(): Promise<void> {
     });
     const decision = await call("decide_knowledge_review_bundle", {
       architectureScope: scope,
-      id: "knowledge-promotion-decision:designer:3a:coverage:v3",
+      id: "knowledge-promotion-decision:designer:3a:coverage:v4",
       reviewBundleId: String(review.id),
       decision: "APPROVE",
       approvedAssertionIds: [],
@@ -150,9 +186,9 @@ async function main(): Promise<void> {
     const stream = await call("create_working_stream", { architectureScope: scope, id: "working-stream:designer:3a", name: "Designer governed 3A architecture" });
     const promotion = await call("promote_3a_architecture_facts", { architectureScope: scope, promotionDecisionId: String(decision.id), streamId: String(stream.id), evidenceRefs });
     const reconciliation = await call("reconcile_3a_architecture_facts", { architectureScope: scope, promotionReceiptId: String(promotion.id) });
-    const baseline = await call("publish_knowledge_baseline", { architectureScope: scope, id: "knowledge-baseline:designer:3a:v3", streamId: String(stream.id), changeSetId: String(promotion.changeSetId), sourceRevisionIds: [], architectureFactRevisionIds: revisionIds, relationshipVersion: String(reconciliation.relationshipVersion), reconciliationReceiptId: String(reconciliation.id) });
+    const baseline = await call("publish_knowledge_baseline", { architectureScope: scope, id: "knowledge-baseline:designer:3a:v4", streamId: String(stream.id), changeSetId: String(promotion.changeSetId), sourceRevisionIds: [], architectureFactRevisionIds: revisionIds, relationshipVersion: String(reconciliation.relationshipVersion), reconciliationReceiptId: String(reconciliation.id) });
     const projection = await call("request_3a_projection_build", { architectureScope: scope, baselineId: String(baseline.id), profileId: "generic-system", profileVersion: "1", projectionSchemaVersion: "3a.v2", query: { layers: ["BIZ", "SYS", "TECH"] } });
-    console.log(JSON.stringify({ batch, review, decision, stream, promotion, reconciliation, baseline, projection, membershipCount: memberships.length }, null, 2));
+    console.log(JSON.stringify({ batch, review, decision, stream, promotion, reconciliation, baseline, projection, membershipCount: nextPreviousMemberships.length + nextMemberships.length, unitCount: nextUnits.length, mappingCount: nextMappings.length }, null, 2));
   } finally {
     await client.close();
     await transport.close();

@@ -14,7 +14,7 @@ Approved design direction; the generic authoring capability and first Designer o
 
 ## Current State
 
-The read side and the governed write slice are implemented. SpecForge can materialize and query `ArchitectureUnitProjection`, `ArchitectureUnitMemberProjection`, and `ArchitectureUnitMappingProjection`, and the Web can render a bounded Map or Network view. The published Designer Baseline `knowledge-baseline:designer:3a:v3` contains 4 units, 18 members, and 3 mappings after a complete-snapshot membership-coverage expansion.
+The read side and the governed write slice are implemented. SpecForge can materialize and query `ArchitectureUnitProjection`, `ArchitectureUnitMemberProjection`, and `ArchitectureUnitMappingProjection`, and the Web can render a bounded Map or Network view. The published Designer Baseline `knowledge-baseline:designer:3a:v4` contains 4 units, 28 members, and 3 mappings after controlled complete-snapshot membership-coverage expansions.
 
 The generic `KnowledgeAssertion` API is not a safe substitute. It accepts arbitrary `factType` values, but the current promotion mapper supports only established design-asset and typed-relationship fact types. Promotion also assumes a governed scan session and source observations. Treating authored architecture units as scanned assertions would either fail during promotion or create a false provenance chain.
 

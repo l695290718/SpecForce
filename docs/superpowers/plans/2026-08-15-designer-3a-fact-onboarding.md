@@ -1,6 +1,6 @@
 # Designer 3A Fact Onboarding Implementation Plan
 
-> **Execution status (2026-08-15): COMPLETE for the initial slice and controlled membership expansion.** The exact Designer Scope was read through MCP, the initial bilingual batch of 4 units, 7 memberships, and 3 mappings was published as `knowledge-baseline:designer:3a:v1`, then a complete-snapshot coverage batch published `knowledge-baseline:designer:3a:v3` with 4 units, 18 memberships, and 3 mappings. Both paths were reviewed, promoted, reconciled as `CONVERGED`, and projected as `READY` Manifests. Unclassified enterprise semantics remain explicit follow-up work.
+> **Execution status (2026-08-15): COMPLETE for the initial slice and controlled membership expansions.** The exact Designer Scope was read through MCP, the initial bilingual batch of 4 units, 7 memberships, and 3 mappings was published as `knowledge-baseline:designer:3a:v1`, then complete-snapshot coverage batches published v3 and `knowledge-baseline:designer:3a:v4` with 4 units, 28 memberships, and 3 mappings. The v4 path was reviewed, promoted, reconciled as `CONVERGED`, and projected as a `READY` Manifest. Unclassified enterprise semantics remain explicit follow-up work.
 
 Evidence: `docs/evidence/designer-3a-onboarding-evidence.md`, `docs/evidence/designer-3a-candidate-review.md`, and `docs/evidence/designer-3a-coverage-expansion-evidence.md`.
 

@@ -19,7 +19,7 @@ const scope = {
   applicationServiceId: "com.huawei.celon.desiner",
   scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
 };
-const baselineId = "knowledge-baseline:designer:3a:v3";
+const baselineId = "knowledge-baseline:designer:3a:v4";
 
 async function main(): Promise<void> {
   const prisma = new PrismaClient();

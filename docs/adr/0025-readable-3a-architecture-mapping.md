@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implemented for the governed first slice and a controlled Designer membership-coverage expansion. Read-only Map/Network, MCP-only architecture-fact authoring, review/promotion/reconciliation/Baseline governance, Designer onboarding, and deterministic projection read-back are implemented and verified. Enterprise-wide classification and continuous source synchronization remain deferred.**
+**Implemented for the governed first slice and controlled Designer membership-coverage expansions. Read-only Map/Network, MCP-only architecture-fact authoring, review/promotion/reconciliation/Baseline governance, Designer onboarding, and deterministic projection read-back are implemented and verified. Enterprise-wide classification and continuous source synchronization remain deferred.**
 
 - Stable ID: `adr-readable-3a-architecture-mapping`
 - Owning application service: `com.huawei.celon.desiner`
@@ -129,11 +129,11 @@ The first Designer Scope data increment is a separate governed operation after t
 - `pnpm exec tsx scripts/process-designer-3a-projection.ts` -> `READY`, published Manifest, and derived analysis `PUBLISHED`.
 - PostgreSQL read-back -> the published generation contains 4 architecture units, 7 members, and 3 mappings with no unresolved endpoint or Scope error.
 - Exact-Scope session `design-change-session:fa68fdd5-8d04-4e64-a111-8e4c71f69a54` is the generic authoring and initial onboarding session and is closed after final focused verification.
-- Exact-Scope preflight opened `design-change-session:776db08d-785e-457d-9111-a5efd80313ee` for the controlled Designer coverage expansion and read the current scoped catalog and relationship digest before any write.
-- `pnpm exec tsx scripts/expand-designer-3a-coverage.ts` -> MCP-only complete-snapshot submission of 4 unit revisions, 18 membership revisions, and 3 mapping revisions, with bilingual review metadata, approval, promotion, converged reconciliation, and publication of `knowledge-baseline:designer:3a:v3`.
-- `pnpm exec tsx scripts/process-designer-3a-projection.ts` -> v3 projection `READY`, published Manifest, and derived analysis `PUBLISHED`.
-- `pnpm exec tsx scripts/verify-designer-3a-coverage.ts` -> MCP read-back `status=READY`, 4 units, 18 members, 3 mappings, `unclassifiedCount=0`, and exact Scope match.
-- The v3 projection is a membership-coverage increment only. No new architecture unit or cross-layer mapping is inferred; enterprise-wide classification, source-owner review, and continuous synchronization remain deferred.
+- Exact-Scope preflight opened `design-change-session:8caa26ac-7f8b-477a-bce8-a44ea0e3990c` for the next controlled Designer coverage expansion and read the current scoped catalog and relationship digest before any write.
+- `pnpm exec tsx scripts/expand-designer-3a-coverage.ts` -> MCP-only complete-snapshot submission of 4 unit revisions, 28 membership revisions, and 3 mapping revisions, with bilingual review metadata, approval, promotion, converged reconciliation, and publication of `knowledge-baseline:designer:3a:v4`.
+- `pnpm exec tsx scripts/process-designer-3a-projection.ts` -> v4 projection `READY`, published Manifest, and derived analysis `PUBLISHED`.
+- `pnpm exec tsx scripts/verify-designer-3a-coverage.ts` -> MCP read-back `status=READY`, 4 units, 28 members, 3 mappings, `unclassifiedCount=0`, and exact Scope match.
+- The v4 projection is still a membership-coverage increment only. No new architecture unit or cross-layer mapping is inferred; enterprise-wide classification, source-owner review, and continuous synchronization remain deferred.
 
 ## 中文写入设计增量
 

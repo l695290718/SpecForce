@@ -19,7 +19,12 @@ async function main(): Promise<void> {
   await client.connect(transport);
   try {
     const result: Record<string, unknown> = {};
-    const selected = new Set(["api-specforge-mcp-tools", "api-specforge-3a-architecture-query", "api-specforge-3a-projection-build", "data-specforge-assets", "data-specforge-3a-projection-read-model", "domain-specforge-platform", "adr-3a-architecture-navigation-workspace", "adr-postgresql-authoritative-design-store"]);
+    const selected = new Set([
+      "api-specforge-mcp-tools", "api-specforge-3a-architecture-query", "api-specforge-3a-projection-build", "api-specforge-knowledge-baseline-publication", "api-specforge-scanner-release-contract", "api-specforge-asset-upsert", "api-specforge-proposal-upsert", "api-specforge-context-pack-upsert",
+      "data-specforge-assets", "data-specforge-3a-projection-read-model", "data-specforge-asset-graph", "data-specforge-audit", "data-specforge-mcp-registry", "data-specforge-ai-generation", "data-specforge-web-workspace", "data-specforge-i18n", "data-specforge-scan-session", "data-specforge-scan-batch", "data-specforge-source-observation-v2",
+      "event-specforge-governance-check-completed", "event-specforge-context-pack-generated", "rule-specforge-3a-projection-publication", "rule-specforge-knowledge-promotion-transaction", "rule-specforge-knowledge-risk-policy", "rule-specforge-core-service-reuse", "rule-bilingual-asset-completeness",
+      "domain-specforge-platform", "adr-3a-architecture-navigation-workspace", "adr-postgresql-authoritative-design-store"
+    ]);
     for (const assetType of ["domain", "api", "event", "dataModel", "businessRule", "stateMachine", "adr", "proposal"]) {
       const response = await client.callTool({ name: "search_design_assets", arguments: { ...scope, query: "", assetTypes: [assetType], limit: 50, locale: "en" } });
       const catalog = JSON.parse(text(response)) as { results?: Array<Record<string, unknown>> };
@@ -39,7 +44,12 @@ async function main(): Promise<void> {
         targetType: link.targetType,
         sourceReference: link.sourceReference
       }));
-    console.log(JSON.stringify(result, null, 2));
+    const compact = Object.fromEntries(Object.entries(result).map(([key, value]) => {
+      if (key === "links") return [key, value];
+      const rows = (value as { results?: Array<Record<string, unknown>> }).results ?? [];
+      return [key, rows.map((row) => ({ id: row.id, name: row.name, summary: row.summary }))];
+    }));
+    console.log(JSON.stringify(compact, null, 2));
   } finally {
     await client.close();
     await transport.close();
