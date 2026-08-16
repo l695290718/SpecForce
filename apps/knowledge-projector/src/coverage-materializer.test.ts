@@ -35,4 +35,9 @@ describe("deterministic coverage materializer", () => {
   it("rejects a cross-Scope snapshot", () => {
     expect(() => materializeCoverageBatch(job, { ...snapshot(), scopePath: "other/service" })).toThrow("COVERAGE_SNAPSHOT_SCOPE_MISMATCH");
   });
+
+  it("does not treat unrelated direct members as ambiguous", () => {
+    const result = materializeCoverageBatch(job, { ...snapshot(), directMemberIds: ["api-1", "api-2"], directMemberships: [{ assetType: "api", assetId: "api-1" }] }, undefined, 10);
+    expect(result.rows.find((row) => row.assetId === "api-1")).toMatchObject({ status: "COVERED", role: "MEMBERSHIP" });
+  });
 });

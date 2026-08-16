@@ -1,4 +1,4 @@
-import { contentDigest, evaluateCoverageCandidate, genericSystemCoverageProfile, type ArchitectureScopeRef, type CoveragePathEvidence, type CoverageResult } from "@specforge/core";
+import { contentDigest, evaluateCoverageCandidate, genericSystemCoverageProfile, type ArchitectureScopeRef, type CoverageMembershipCandidate, type CoveragePathEvidence, type CoverageResult } from "@specforge/core";
 import type { CoverageBuildJob, CoverageBuildRepository, CoverageProjectionRow } from "./coverage-repository.js";
 
 export interface AuthoredCoverageRevision extends ArchitectureScopeRef {
@@ -27,6 +27,7 @@ export interface CoverageSnapshot extends ArchitectureScopeRef {
   revisions: readonly AuthoredCoverageRevision[];
   relationships: readonly CoverageRelationship[];
   directMemberIds: readonly string[];
+  directMemberships?: readonly CoverageMembershipCandidate[];
   baselineId: string;
   generationId: string;
 }
@@ -91,7 +92,7 @@ export function createCoverageProjectorRuntime(options: {
         const counts = countRows(allRows);
         await options.repository.publish(job, options.owner, {
           inputDigest: job.inputDigest,
-          contentDigest: contentDigest({ scope: snapshot, generationId: job.generationId, inputDigest: job.inputDigest, rows: allRows.map(rowDigestInput) }),
+          contentDigest: contentDigest({ scope: { applicationServiceId: snapshot.applicationServiceId, scopePath: snapshot.scopePath }, generationId: job.generationId, inputDigest: job.inputDigest, rows: allRows.map(rowDigestInput) }),
           ...counts
         });
         return { status: "published" as const, jobId: job.id };
@@ -111,6 +112,7 @@ function toCoverageRow(job: CoverageBuildJob, snapshot: CoverageSnapshot, asset:
     sourceDigest: asset.contentDigest,
     paths: enumeratePaths(asset.assetType, asset.assetId, snapshot.relationships),
     directMemberIds: [...snapshot.directMemberIds],
+    ...(snapshot.directMemberships ? { directMemberships: [...snapshot.directMemberships] } : {}),
     knownAssetIds: [...new Set([...latestAssetIds(snapshot.revisions), ...snapshot.relationships.flatMap((edge) => [edge.sourceId, edge.targetId])])],
     knownRelationshipIdentities: snapshot.relationships.map((relationship) => relationship.relationshipIdentity),
     localization: asset.payload.localizedContent as { en?: unknown; zh?: unknown } | undefined,
@@ -153,7 +155,17 @@ function enumeratePaths(sourceType: string, sourceId: string, relationships: rea
   const walk = (currentType: string, currentId: string, path: CoveragePathEvidence) => {
     if (path.length >= genericSystemCoverageProfile.maxPathLength) return;
     for (const edge of edges.filter((candidate) => candidate.sourceType === currentType && candidate.sourceId === currentId)) {
-      const next: CoveragePathEvidence = [...path, { relationshipIdentity: edge.relationshipIdentity, relationCode: edge.relationCode, sourceType: edge.sourceType, sourceId: edge.sourceId, targetType: edge.targetType, targetId: edge.targetId, architectureScope: { applicationServiceId: edge.applicationServiceId, scopePath: edge.scopePath }, sourceExists: edge.sourceExists, targetExists: edge.targetExists }];
+      const next: CoveragePathEvidence = [...path, {
+        relationshipIdentity: edge.relationshipIdentity,
+        relationCode: edge.relationCode,
+        sourceType: edge.sourceType,
+        sourceId: edge.sourceId,
+        targetType: edge.targetType,
+        targetId: edge.targetId,
+        architectureScope: { applicationServiceId: edge.applicationServiceId, scopePath: edge.scopePath },
+        ...(edge.sourceExists === undefined ? {} : { sourceExists: edge.sourceExists }),
+        ...(edge.targetExists === undefined ? {} : { targetExists: edge.targetExists })
+      }];
       paths.push(next);
       walk(edge.targetType, edge.targetId, next);
     }

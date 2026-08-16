@@ -1,7 +1,8 @@
 import { ensureMcpPersistenceSchema, prisma, readableScope } from "../persistence";
 import type { ArchitectureScopeRef, CoverageRole, CoverageStatus } from "@specforge/core";
 
-export interface Get3aCoverageReportInput extends ArchitectureScopeRef {
+export interface Get3aCoverageReportInput {
+  architectureScope: ArchitectureScopeRef;
   generationId?: string;
   role?: CoverageRole;
   status?: CoverageStatus;
@@ -19,8 +20,8 @@ export interface Get3aCoverageReportResult extends ArchitectureScopeRef {
 }
 
 export async function get3aCoverageReport(input: Get3aCoverageReportInput, client: typeof prisma = prisma, ensureSchema: () => Promise<unknown> = ensureMcpPersistenceSchema): Promise<Get3aCoverageReportResult> {
-  const scope = readableScope(input.applicationServiceId);
-  if (scope.scopePath !== input.scopePath) throw new Error("Scope read is not authorized.");
+  const scope = readableScope(input.architectureScope.applicationServiceId);
+  if (scope.scopePath !== input.architectureScope.scopePath) throw new Error("Scope read is not authorized.");
   const limit = input.limit ?? 50;
   if (!Number.isInteger(limit) || limit < 1 || limit > 200) throw new Error("COVERAGE_REPORT_LIMIT_INVALID");
   await ensureSchema();

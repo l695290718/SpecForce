@@ -2,7 +2,7 @@
 
 ## Status
 
-- Design approved for specification; implementation has not started.
+- Design implemented for the exact Designer application-service Scope; the current v8 coverage generation is published and verified. Continuous legacy scanning, external synchronization, cross-Scope comparison, and external `APPLY` remain deferred.
 - Owning application service: `com.huawei.celon.desiner`.
 - Owning Scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`.
 - Design Change Session: `design-change-session:3f60911b-4a6e-49d8-977d-0391dcea39f3`.

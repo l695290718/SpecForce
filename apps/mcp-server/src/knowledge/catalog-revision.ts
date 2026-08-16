@@ -112,6 +112,36 @@ export async function appendAuthoredAssetRevision(
   }
 }
 
+export async function bootstrapAuthoredCatalog(
+  architectureScope: ArchitectureScopeRef,
+  actor: { actorType: string; actorId: string } = { actorType: "system", actorId: "specforge-catalog-bootstrap" }
+): Promise<{ architectureScope: ArchitectureScopeRef; appended: number; catalogVersion: bigint }> {
+  const scope = exactScope(architectureScope);
+  await ensureMcpPersistenceSchema();
+  let appended = 0;
+  await prisma.$transaction(async (transaction) => {
+    const [assets, proposals, contextPacks] = await Promise.all([
+      transaction.designAsset.findMany({ where: scope, select: { id: true, type: true, payload: true } }),
+      transaction.proposal.findMany({ where: scope, select: { id: true, payload: true } }),
+      transaction.contextPack.findMany({ where: scope, select: { id: true, payload: true } })
+    ]);
+    for (const row of assets) {
+      const result = await appendAuthoredAssetRevision(transaction, { architectureScope: scope, assetType: row.type, assetId: row.id, operation: "UPSERT", payload: parsePayload(row.payload, row.id), actorType: actor.actorType, actorId: actor.actorId, channel: "bootstrap", correlationId: `catalog-bootstrap:${row.type}:${row.id}`, idempotencyKey: `catalog-bootstrap:${row.type}:${row.id}` });
+      if (!result.idempotent) appended++;
+    }
+    for (const row of proposals) {
+      const result = await appendAuthoredAssetRevision(transaction, { architectureScope: scope, assetType: "proposal", assetId: row.id, operation: "UPSERT", payload: parsePayload(row.payload, row.id), actorType: actor.actorType, actorId: actor.actorId, channel: "bootstrap", correlationId: `catalog-bootstrap:proposal:${row.id}`, idempotencyKey: `catalog-bootstrap:proposal:${row.id}` });
+      if (!result.idempotent) appended++;
+    }
+    for (const row of contextPacks) {
+      const result = await appendAuthoredAssetRevision(transaction, { architectureScope: scope, assetType: "contextPack", assetId: row.id, operation: "UPSERT", payload: parsePayload(row.payload, row.id), actorType: actor.actorType, actorId: actor.actorId, channel: "bootstrap", correlationId: `catalog-bootstrap:contextPack:${row.id}`, idempotencyKey: `catalog-bootstrap:contextPack:${row.id}` });
+      if (!result.idempotent) appended++;
+    }
+  });
+  const cursor = await prisma.authoredCatalogCursor.findUnique({ where: { applicationServiceId_scopePath: scope } });
+  return { architectureScope: scope, appended, catalogVersion: cursor?.nextVersion ?? 0n };
+}
+
 export async function getAuthoredCatalogWatermark(scopeInput: ArchitectureScopeRef): Promise<{ architectureScope: ArchitectureScopeRef; catalogVersion: bigint; digest: string }> {
   const scope = readableScope(scopeInput.applicationServiceId);
   assertExactScope(scope, scopeInput);
@@ -169,6 +199,11 @@ async function catalogDigest(scope: ArchitectureScopeRef, catalogVersion: bigint
 function exactScope(input: ArchitectureScopeRef): ArchitectureScopeRef {
   if (!input.applicationServiceId?.trim() || !input.scopePath?.trim()) throw new Error("Architecture scope is required.");
   return { applicationServiceId: input.applicationServiceId, scopePath: input.scopePath };
+}
+
+function parsePayload(value: string | null, id: string): unknown {
+  if (!value) return { id };
+  try { return JSON.parse(value); } catch { return { id, rawPayload: value }; }
 }
 
 function assertExactScope(left: ArchitectureScopeRef, right: ArchitectureScopeRef): void {

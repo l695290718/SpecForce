@@ -10,6 +10,10 @@
 
 ## Global Constraints
 
+## Implementation Status (2026-08-16)
+
+Tasks 1-8 are implemented for the exact Designer Scope. The final v10 coverage generation is `CURRENT` with `297/297 COVERED`, while the accepted v6 architecture baseline remains `8/42/6`. Continuous legacy scanning, external synchronization, cross-Scope comparison, and external `APPLY` remain deferred by design.
+
 - Owning Scope is exactly `com.huawei.celon.desiner` with path `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`.
 - Published v6 remains `8` units, `42` direct memberships, and `6` mappings; no artificial v7 is created.
 - The immutable coverage profile is `generic-system@2`.
