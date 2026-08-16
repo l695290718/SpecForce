@@ -49,7 +49,7 @@ export async function get3aCoverageReport(input: Get3aCoverageReportInput, clien
   const current = await currentWaterlines(scope, client);
   return {
     ...scope,
-    freshness: current.catalogVersion === manifest.catalogVersion.toString() && current.relationshipVersion === manifest.relationshipVersion ? "CURRENT" : "STALE",
+    freshness: current.catalogVersion === manifest.catalogVersion.toString() && current.relationshipVersion === manifest.relationshipVersion.toString() ? "CURRENT" : "STALE",
     manifest: { id: manifest.id, generationId: manifest.generationId, inputDigest: manifest.inputDigest, contentDigest: manifest.contentDigest, catalogVersion: manifest.catalogVersion.toString(), relationshipVersion: manifest.relationshipVersion.toString(), rowCount: manifest.rowCount, coveredCount: manifest.coveredCount, blockedCount: manifest.blockedCount, notEvaluatedCount: manifest.notEvaluatedCount },
     rows: selected.map((row) => ({ assetType: row.assetType, assetId: row.assetId, role: row.role, status: row.status, terminalMemberId: row.terminalMemberId, pathEvidence: row.pathEvidence, reasonCode: row.reasonCode, diagnosticRef: row.diagnosticRef, sourceDigest: row.sourceDigest, rowDigest: row.rowDigest })),
     ...(cursorValue ? { nextCursor: cursorValue } : {})
