@@ -955,6 +955,102 @@ model ProjectionBuildJob {
   @@index([applicationServiceId, scopePath, baselineId, profileId, profileVersion], map: "ProjectionBuildJob_scope_baseline_profile_idx")
 }
 
+model ArchitectureCoverageBuildJob {
+  dbId                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                     String
+  buildKey               String
+  baselineId             String
+  generationId           String
+  profileId              String
+  profileVersion         String
+  coverageSchemaVersion  String
+  catalogVersion         BigInt
+  catalogDigest          String
+  relationshipVersion    String
+  relationshipDigest     String
+  query                  Json     @default("{}") @db.JsonB
+  inputDigest            String
+  status                 String
+  attempt                Int      @default(1)
+  leaseOwner             String?
+  leaseExpiresAt         DateTime?
+  checkpoint             Json     @default("{}") @db.JsonB
+  rowCount               Int      @default(0)
+  coveredCount           Int      @default(0)
+  blockedCount           Int      @default(0)
+  notEvaluatedCount      Int      @default(0)
+  errorCode              String?
+  diagnosticRef          String?
+  availableAt            DateTime @default(now())
+  completedAt            DateTime?
+  applicationServiceId   String
+  scopePath              String
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "ArchitectureCoverageBuildJob_scope_id_key")
+  @@unique([applicationServiceId, scopePath, buildKey], map: "ArchitectureCoverageBuildJob_scope_build_key")
+  @@index([status, availableAt, leaseExpiresAt, createdAt], map: "ArchitectureCoverageBuildJob_claim_idx")
+  @@index([applicationServiceId, scopePath, status, availableAt, createdAt], map: "ArchitectureCoverageBuildJob_scope_claim_idx")
+}
+
+model ArchitectureCoverageManifest {
+  dbId                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                     String
+  buildJobId             String
+  buildKey               String
+  baselineId             String
+  generationId           String
+  profileId              String
+  profileVersion         String
+  coverageSchemaVersion  String
+  catalogVersion         BigInt
+  catalogDigest          String
+  relationshipVersion    String
+  relationshipDigest     String
+  query                  Json     @default("{}") @db.JsonB
+  inputDigest            String
+  contentDigest          String
+  publicationState       String
+  rowCount               Int
+  coveredCount           Int
+  blockedCount           Int
+  notEvaluatedCount      Int
+  publishedAt            DateTime?
+  applicationServiceId   String
+  scopePath              String
+  createdAt              DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, id], map: "ArchitectureCoverageManifest_scope_id_key")
+  @@unique([applicationServiceId, scopePath, buildJobId], map: "ArchitectureCoverageManifest_scope_job_key")
+  @@index([applicationServiceId, scopePath, generationId, publicationState], map: "ArchitectureCoverageManifest_scope_generation_state_idx")
+  @@index([applicationServiceId, scopePath, inputDigest, publicationState], map: "ArchitectureCoverageManifest_scope_input_state_idx")
+}
+
+model ArchitectureAssetCoverageProjection {
+  dbId                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  generationId           String
+  baselineId             String
+  manifestId             String
+  assetType              String
+  assetId                String
+  role                   String
+  status                 String
+  terminalMemberId       String?
+  pathEvidence           Json     @default("[]") @db.JsonB
+  reasonCode             String?
+  diagnosticRef          String?
+  sourceDigest           String?
+  rowDigest              String
+  applicationServiceId   String
+  scopePath              String
+  createdAt              DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, generationId, assetType, assetId], map: "ArchitectureAssetCoverageProjection_scope_generation_asset_key")
+  @@index([applicationServiceId, scopePath, generationId, role, status, assetType, assetId], map: "ArchitectureAssetCoverageProjection_scope_status_idx")
+  @@index([applicationServiceId, scopePath, manifestId, assetType, assetId], map: "ArchitectureAssetCoverageProjection_scope_manifest_asset_idx")
+}
+
 model KnowledgeProjectionNode {
   dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   generationId         String
