@@ -29,3 +29,4 @@ export * from "./federation";
 export * from "./knowledge";
 export * from "./scanner";
 export * from "./connectors";
+export * from "./coverage";
