@@ -42,7 +42,7 @@ function input(idempotencyKey: string) {
 
 describe("authored catalog revisions", () => {
   it("increments the exact-Scope catalog version and is idempotent", async () => {
-    const transaction = createTransaction();
+    const transaction = createTransaction() as unknown as Parameters<typeof appendAuthoredAssetRevision>[0] & { revisions: Array<Record<string, unknown>> };
     const first = await appendAuthoredAssetRevision(transaction, input("asset-1"));
     const replay = await appendAuthoredAssetRevision(transaction, input("asset-1"));
     const second = await appendAuthoredAssetRevision(transaction, input("asset-2"));
@@ -54,7 +54,7 @@ describe("authored catalog revisions", () => {
   });
 
   it("requires both Scope dimensions", async () => {
-    const transaction = createTransaction();
+    const transaction = createTransaction() as unknown as Parameters<typeof appendAuthoredAssetRevision>[0] & { revisions: Array<Record<string, unknown>> };
     await expect(appendAuthoredAssetRevision(transaction, { ...input("missing-scope"), architectureScope: { applicationServiceId: "com.example.orders", scopePath: "" } })).rejects.toThrow("Architecture scope is required.");
   });
 });
