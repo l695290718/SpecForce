@@ -8,6 +8,7 @@ import { parseThreeAUrlState, type ThreeAUrlState } from "../../../lib/3a/url-st
 import { scopeById } from "@specforge/core";
 import { ThreeAWorkspace } from "../../../components/three-a/three-a-workspace";
 import { loadThreeAWorkspaceData, type ThreeAWorkspaceData } from "../../../lib/3a/workspace-loader";
+import { loadThreeACoverageReport } from "../../../lib/3a/coverage-loader";
 
 export default async function ThreeAArchitecturePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const state = parseThreeAUrlState(await awaitSearchParams(searchParams));
@@ -20,6 +21,7 @@ export default async function ThreeAArchitecturePage({ searchParams }: { searchP
     const request = await resolveThreeARequest({ architectureScope: scopeRef, authMode: resolveWebAuthMode(), headers: await headers(), cookies: await cookies() });
     const service = createWebThreeAQueryService();
     const data = await loadThreeAWorkspaceData(service, request, state);
+    data.coverage = await loadThreeACoverageReport(scopeRef);
     return <ThreeAFrame><ThreeAWorkspace data={data} /></ThreeAFrame>;
   } catch (error) {
     return <ThreeAFrame><ThreeAWorkspace data={{ ...base, errorCode: safeErrorCode(error) }} /></ThreeAFrame>;

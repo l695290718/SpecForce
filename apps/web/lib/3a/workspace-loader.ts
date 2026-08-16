@@ -48,6 +48,13 @@ export interface ThreeAWorkspaceData {
   /** Transitional fields retained for consumers migrating to view-owned data. */
   nodes?: SearchArchitectureFactsResult["nodes"];
   edges?: KnowledgeProjectionEdge[];
+  coverage?: ThreeACoverageReport;
+}
+
+export interface ThreeACoverageReport {
+  freshness: "CURRENT" | "STALE";
+  manifest?: { id: string; generationId: string; inputDigest: string; contentDigest: string; catalogVersion: string; relationshipVersion: string; rowCount: number; coveredCount: number; blockedCount: number; notEvaluatedCount: number };
+  rows: Array<{ assetType: string; assetId: string; role: string; status: string; terminalMemberId?: string | null; pathEvidence?: unknown; reasonCode?: string | null; diagnosticRef?: string | null; sourceDigest?: string | null; rowDigest: string }>;
 }
 
 export async function loadThreeAWorkspaceData(

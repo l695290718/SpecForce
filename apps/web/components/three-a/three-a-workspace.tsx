@@ -16,6 +16,8 @@ import { ArchitecturePathList } from "./architecture-path-list";
 import { BaselineToolbar, type BaselineOption, type ManifestOption } from "./baseline-toolbar";
 import { PublishedBaselineDriftView } from "./published-baseline-drift-view";
 import { ProjectionStateBanner } from "./projection-state-banner";
+import { CoverageSummary } from "./coverage-summary";
+import { CoverageDetail } from "./coverage-detail";
 import type { ThreeAWorkspaceData } from "../../lib/3a/workspace-loader";
 import type { ThreeAQueryIdentity } from "./catalog-state";
 export type { ThreeAWorkspaceData } from "../../lib/3a/workspace-loader";
@@ -43,6 +45,7 @@ export function ThreeAWorkspace({ data }: { data: ThreeAWorkspaceData }) {
   return <div className="space-y-4 pb-8" data-testid="three-a-workspace">
     <BaselineToolbar state={data.state} baselines={data.baselines} manifests={data.manifests} />
     <ProjectionStateBanner code={data.errorCode} hasManifest={hasManifest} />
+    {data.coverage ? <div className="space-y-3"><CoverageSummary report={data.coverage} /><CoverageDetail rows={data.coverage.rows} /></div> : null}
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-white p-4 shadow-panel"><div><p className="font-mono text-[11px] font-semibold uppercase text-rule"><T k="threeA.publishedCatalog" /></p><p className="mt-1 text-sm text-muted"><T k="threeA.catalogDescription" /></p></div></div>
     <div className="flex flex-wrap items-center gap-2 border-b border-border" role="tablist" aria-label="3A views"><ViewTab active={data.state.tab === "architecture"} href={tabHref(data.state, "architecture")} labelKey="threeA.architecture" /><ViewTab active={data.state.tab === "alignment"} href={tabHref(data.state, "alignment")} labelKey="threeA.alignment" /><ViewTab active={data.state.tab === "drift"} href={tabHref(data.state, "drift")} labelKey="threeA.drift" /></div>
     {data.state.tab === "alignment" ? <AlignmentView edges={alignmentEdges} /> : data.state.tab === "drift" ? <PublishedBaselineDriftView drift={data.drift} /> : data.state.mode === "graph" ? (data.state.graphRepresentation === "map" && catalogIdentity && data.manifests.find((manifest) => manifest.id === data.state.projection)?.generationId ? <ArchitectureMapWorkspace state={data.state} identity={catalogIdentity} generationId={data.manifests.find((manifest) => manifest.id === data.state.projection)!.generationId!} initialMap={data.initialArchitectureMap} initialNeighborhood={data.initialArchitectureUnitNeighborhood} /> : catalogIdentity ? <ArchitectureGraphWorkspace state={data.state} identity={catalogIdentity} initialGraph={data.initialGraph} fallbackNodes={nodes} fallbackEdges={data.initialGraphEdges ?? edges} onFocus={focusNode} /> : <section className="rounded-lg border border-border bg-white p-8 text-center shadow-panel"><p className="text-sm font-semibold text-ink"><T k={data.state.graphRepresentation === "map" ? "threeA.noProjection" : "threeA.selectGraphFocus"} /></p><a className="mt-3 inline-flex text-sm font-semibold text-accent underline" href={tabHref({ ...data.state, mode: "lanes" }, "architecture")}><T k="threeA.lanes" /></a></section>) : <>
