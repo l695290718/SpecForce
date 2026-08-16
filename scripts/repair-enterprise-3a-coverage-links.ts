@@ -76,7 +76,8 @@ function parseToolPayload(result: RepairCallResult): Record<string, unknown> {
 
 async function connect(): Promise<{ client: RepairClient & { close(): Promise<void> }; transport: { close(): Promise<void> } }> {
   const requireFromMcp = createRequire(resolve(process.cwd(), "apps/mcp-server/package.json"));
-  const { Client, StdioClientTransport } = requireFromMcp("@modelcontextprotocol/sdk/client/index.js") as typeof import("@modelcontextprotocol/sdk/client/index.js") & { StdioClientTransport: typeof import("@modelcontextprotocol/sdk/client/stdio.js").StdioClientTransport };
+  const { Client } = requireFromMcp("@modelcontextprotocol/sdk/client/index.js");
+  const { StdioClientTransport } = requireFromMcp("@modelcontextprotocol/sdk/client/stdio.js");
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [resolve(process.cwd(), "apps/mcp-server/node_modules/tsx/dist/cli.mjs"), resolve(process.cwd(), "apps/mcp-server/src/index.ts")],
@@ -89,7 +90,7 @@ async function connect(): Promise<{ client: RepairClient & { close(): Promise<vo
   return { client, transport };
 }
 
-if (import.meta.url === `file://${process.argv[1]?.replaceAll("\\", "/")}`) {
+if (process.argv[1]?.endsWith("repair-enterprise-3a-coverage-links.ts") || process.argv[1]?.endsWith("repair-enterprise-3a-coverage-links.js")) {
   connect().then(async ({ client, transport }) => {
     try {
       console.log(JSON.stringify(await repairEnterprise3aCoverageLinks(client), null, 2));
