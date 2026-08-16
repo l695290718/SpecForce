@@ -318,6 +318,9 @@ describe("scoped seed cleanup", () => {
   it("deletes matching ids only inside the authorized application service scope", async () => {
     process.env.SPECFORGE_MCP_SEED = "1";
     mockSchemaSetup();
+    vi.spyOn(prisma.designAsset, "findMany").mockResolvedValue([] as never);
+    vi.spyOn(prisma.proposal, "findMany").mockResolvedValue([] as never);
+    vi.spyOn(prisma.contextPack, "findMany").mockResolvedValue([] as never);
     const contextDelete = vi.spyOn(prisma.contextPack, "deleteMany").mockResolvedValue({ count: 1 });
     const proposalDelete = vi.spyOn(prisma.proposal, "deleteMany").mockResolvedValue({ count: 1 });
     const assetDelete = vi.spyOn(prisma.designAsset, "deleteMany").mockResolvedValue({ count: 1 });
@@ -357,8 +360,8 @@ describe("scoped seed cleanup", () => {
     mockSchemaSetup();
     const harness = installLegacyLedgerHarness();
     const assetUpsert = harness.transaction.designAsset.upsert;
-    const proposalUpsert = vi.spyOn(prisma.proposal, "upsert").mockResolvedValue({} as never);
-    const contextPackUpsert = vi.spyOn(prisma.contextPack, "upsert").mockResolvedValue({} as never);
+    const proposalUpsert = harness.transaction.proposal.upsert;
+    const contextPackUpsert = harness.transaction.contextPack.upsert;
 
     await upsertDesignAsset({ assetType: "api", asset: bilingualApi });
     await upsertProposal({ proposal: bilingualProposal });
@@ -635,6 +638,8 @@ function installLegacyLedgerHarness(options: { failOnEvent?: boolean } = {}) {
     events: [] as Array<Record<string, unknown>>,
     outbox: [] as Array<Record<string, unknown>>,
     receipts: [] as Array<Record<string, unknown>>,
+    authoredRevisions: [] as Array<Record<string, unknown>>,
+    catalogVersion: 0n,
     calls: [] as string[]
   };
   const scopeMatches = (row: Record<string, unknown>, where: Record<string, unknown>) => (
@@ -667,8 +672,16 @@ function installLegacyLedgerHarness(options: { failOnEvent?: boolean } = {}) {
         return { count: removed.length };
       })
     },
-    contextPack: { deleteMany: vi.fn(async () => ({ count: 0 })) },
-    proposal: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    contextPack: {
+      upsert: vi.fn(async () => ({})),
+      findMany: vi.fn(async () => []),
+      deleteMany: vi.fn(async () => ({ count: 0 }))
+    },
+    proposal: {
+      upsert: vi.fn(async () => ({})),
+      findMany: vi.fn(async () => []),
+      deleteMany: vi.fn(async () => ({ count: 0 }))
+    },
     designAsset: {
       upsert: vi.fn(async ({ where, create, update }) => {
         const identity = where.applicationServiceId_scopePath_id;
@@ -677,7 +690,22 @@ function installLegacyLedgerHarness(options: { failOnEvent?: boolean } = {}) {
         else state.designAssets.push({ ...create, createdAt: create.createdAt ?? new Date(), updatedAt: create.updatedAt ?? new Date() });
         return existing ?? state.designAssets.at(-1);
       }),
+      findMany: vi.fn(async ({ where }) => state.designAssets.filter((row) => row.applicationServiceId === where.applicationServiceId && row.scopePath === where.scopePath && (where.id?.in ?? []).includes(row.id))),
       deleteMany: vi.fn(async () => ({ count: 0 }))
+    },
+    authoredCatalogCursor: {
+      upsert: vi.fn(async ({ create, update }) => {
+        state.catalogVersion = state.authoredRevisions.length === 0 ? create.nextVersion : state.catalogVersion + BigInt(update.nextVersion.increment);
+        return { nextVersion: state.catalogVersion };
+      })
+    },
+    authoredAssetRevision: {
+      findUnique: vi.fn(async ({ where }) => state.authoredRevisions.find((row) => row.applicationServiceId === where.applicationServiceId_scopePath_idempotencyKey.applicationServiceId && row.scopePath === where.applicationServiceId_scopePath_idempotencyKey.scopePath && row.idempotencyKey === where.applicationServiceId_scopePath_idempotencyKey.idempotencyKey) ?? null),
+      create: vi.fn(async ({ data }) => {
+        const row = { ...data, dbId: `authored-revision-${state.authoredRevisions.length + 1}`, createdAt: new Date() };
+        state.authoredRevisions.push(row);
+        return row;
+      })
     },
     assetNode: {
       findUnique: vi.fn(async ({ where }) => state.nodes.find((row) => {
@@ -773,6 +801,8 @@ function installLegacyLedgerHarness(options: { failOnEvent?: boolean } = {}) {
       state.events.splice(0, state.events.length, ...snapshot.events);
       state.outbox.splice(0, state.outbox.length, ...snapshot.outbox);
       state.receipts.splice(0, state.receipts.length, ...snapshot.receipts);
+      state.authoredRevisions.splice(0, state.authoredRevisions.length, ...snapshot.authoredRevisions);
+      state.catalogVersion = snapshot.catalogVersion;
       throw error;
     }
   });
@@ -831,7 +861,7 @@ describe("Task 2 MCP bilingual enforcement", () => {
     mockSchemaSetup();
     const harness = installLegacyLedgerHarness();
     const assetUpsertSpy = harness.transaction.designAsset.upsert;
-    const proposalUpsertSpy = vi.spyOn(prisma.proposal, "upsert").mockResolvedValue({} as never);
+    const proposalUpsertSpy = harness.transaction.proposal.upsert;
 
     await expect(upsertDesignAsset({ assetType: "api", asset: bilingualApi })).resolves.toEqual({
       id: "api-upsert-design-asset",
@@ -871,7 +901,8 @@ describe("Task 2 MCP bilingual enforcement", () => {
 
   it("stores and reads complete context pack payloads before falling back to legacy columns", async () => {
     mockSchemaSetup();
-    const upsertSpy = vi.spyOn(prisma.contextPack, "upsert").mockResolvedValue({} as never);
+    const harness = installLegacyLedgerHarness();
+    const upsertSpy = harness.transaction.contextPack.upsert;
     vi.spyOn(prisma.designAsset, "findMany").mockResolvedValue([] as never);
     vi.spyOn(prisma.proposal, "findMany").mockResolvedValue([] as never);
     vi.spyOn(prisma.contextPack, "findMany").mockResolvedValue([
@@ -918,7 +949,8 @@ describe("Task 2 MCP bilingual enforcement", () => {
 
   it("updates every persisted Context Pack projection when the canonical proposal changes", async () => {
     mockSchemaSetup();
-    const upsertSpy = vi.spyOn(prisma.contextPack, "upsert").mockResolvedValue({} as never);
+    const harness = installLegacyLedgerHarness();
+    const upsertSpy = harness.transaction.contextPack.upsert;
     const changedPack: ContextPack = {
       ...bilingualContextPack,
       proposalId: "proposal-bilingual-assets-v2",

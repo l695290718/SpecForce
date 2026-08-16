@@ -68,6 +68,44 @@ model ContextPack {
   @@unique([applicationServiceId, scopePath, id])
 }
 
+model AuthoredCatalogCursor {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationServiceId String
+  scopePath            String
+  nextVersion          BigInt   @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  revisions AuthoredAssetRevision[]
+
+  @@unique([applicationServiceId, scopePath])
+  @@index([applicationServiceId, scopePath, nextVersion])
+}
+
+model AuthoredAssetRevision {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationServiceId String
+  scopePath            String
+  catalogVersion       BigInt
+  assetType            String
+  assetId              String
+  operation            String
+  payload              Json     @db.JsonB
+  contentDigest        String
+  actorType            String
+  actorId              String
+  channel              String
+  correlationId        String
+  idempotencyKey       String
+  createdAt            DateTime @default(now())
+
+  cursor AuthoredCatalogCursor @relation(fields: [applicationServiceId, scopePath], references: [applicationServiceId, scopePath])
+
+  @@unique([applicationServiceId, scopePath, idempotencyKey])
+  @@index([applicationServiceId, scopePath, catalogVersion])
+  @@index([applicationServiceId, scopePath, assetType, assetId, catalogVersion])
+}
+
 model GovernanceCheckSnapshot {
   id                   String   @id @default(cuid())
   assetType            String

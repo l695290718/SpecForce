@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { createTrustedRelationshipExecutionContext, RelationshipCommandService, type DeleteLegacyRelationshipCommand, type UpsertRelationshipCommand } from "./relationships/command-service";
 import { PrismaRelationshipRepository, type RelationshipScope } from "./relationships/repository";
 import { currentRequestPrincipal } from "./auth";
+import { appendAuthoredAssetRevision } from "./knowledge/catalog-revision";
 
 const globalForPrisma = globalThis as unknown as { specforgeMcpPrisma?: PrismaClient };
 const legacyContextPackFallbackSymbol = Symbol("legacyContextPackFallback");
@@ -812,6 +813,7 @@ function scopedIdentityConstraintUpgradeSql(table: string): string {
 export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
   const asset = input.asset as unknown as Record<string, unknown>;
   const scope = resolveWritableScope(writableActor(), asset.architectureScope as ArchitectureScopeRef | undefined);
+  const actor = writableActor();
   const localizedAsset = { ...asset, architectureScope: scope } as Asset;
   validateAssetLocalization(input.assetType, localizedAsset);
   const canonicalAsset = localizeAsset(input.assetType, localizedAsset, "en") as unknown as Record<string, unknown>;
@@ -853,6 +855,18 @@ export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
         updatedAt: optionalDate(canonicalAsset.updatedAt)
       }
     });
+    await appendAuthoredAssetRevision(transaction, {
+      architectureScope: scope,
+      assetType: input.assetType,
+      assetId: String(canonicalAsset.id),
+      operation: "UPSERT",
+      payload: localizedAsset,
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      channel: "mcp",
+      correlationId: `design-asset-revision:${input.assetType}:${canonicalAsset.id}`,
+      idempotencyKey: authoredRevisionIdempotencyKey(input.assetType, canonicalAsset)
+    });
     const graphIdempotencyKey = designAssetGraphIdempotencyKey(input.assetType, canonicalAsset);
     await relationshipService(transaction, configuredRelationshipScope(scope)).upsertAssetGraph({
       channel: "mcp",
@@ -869,6 +883,7 @@ export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
 export async function upsertProposal(input: UpsertProposalInput) {
   const proposal = input.proposal as Proposal;
   const scope = resolveWritableScope(writableActor(), proposal.architectureScope);
+  const actor = writableActor();
   const localizedProposal = { ...proposal, architectureScope: scope } as Proposal;
   validateAssetLocalization("proposal", localizedProposal);
   const canonicalProposal = localizeAsset("proposal", localizedProposal, "en");
@@ -876,36 +891,50 @@ export async function upsertProposal(input: UpsertProposalInput) {
   assertString(canonicalProposal.title, "proposal.title");
   await ensureMcpPersistenceSchema();
 
-  await prisma.proposal.upsert({
-    where: {
-      applicationServiceId_scopePath_id: {
+  await prisma.$transaction(async (transaction) => {
+    await transaction.proposal.upsert({
+      where: {
+        applicationServiceId_scopePath_id: {
+          applicationServiceId: scope.applicationServiceId,
+          scopePath: scope.scopePath,
+          id: canonicalProposal.id
+        }
+      },
+      create: {
+        id: canonicalProposal.id,
+        title: canonicalProposal.title,
+        description: canonicalProposal.description,
+        status: canonicalProposal.status,
+        domainId: canonicalProposal.domainId,
         applicationServiceId: scope.applicationServiceId,
         scopePath: scope.scopePath,
-        id: canonicalProposal.id
+        payload: JSON.stringify(canonicalProposal),
+        createdAt: new Date(canonicalProposal.createdAt),
+        updatedAt: new Date(canonicalProposal.updatedAt)
+      },
+      update: {
+        title: canonicalProposal.title,
+        description: canonicalProposal.description,
+        status: canonicalProposal.status,
+        domainId: canonicalProposal.domainId,
+        applicationServiceId: scope.applicationServiceId,
+        scopePath: scope.scopePath,
+        payload: JSON.stringify(canonicalProposal),
+        updatedAt: new Date(canonicalProposal.updatedAt)
       }
-    },
-    create: {
-      id: canonicalProposal.id,
-      title: canonicalProposal.title,
-      description: canonicalProposal.description,
-      status: canonicalProposal.status,
-      domainId: canonicalProposal.domainId,
-      applicationServiceId: scope.applicationServiceId,
-      scopePath: scope.scopePath,
-      payload: JSON.stringify(canonicalProposal),
-      createdAt: new Date(canonicalProposal.createdAt),
-      updatedAt: new Date(canonicalProposal.updatedAt)
-    },
-    update: {
-      title: canonicalProposal.title,
-      description: canonicalProposal.description,
-      status: canonicalProposal.status,
-      domainId: canonicalProposal.domainId,
-      applicationServiceId: scope.applicationServiceId,
-      scopePath: scope.scopePath,
-      payload: JSON.stringify(canonicalProposal),
-      updatedAt: new Date(canonicalProposal.updatedAt)
-    }
+    });
+    await appendAuthoredAssetRevision(transaction, {
+      architectureScope: scope,
+      assetType: "proposal",
+      assetId: canonicalProposal.id,
+      operation: "UPSERT",
+      payload: localizedProposal,
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      channel: "mcp",
+      correlationId: `proposal-revision:${canonicalProposal.id}`,
+      idempotencyKey: authoredRevisionIdempotencyKey("proposal", localizedProposal as unknown as Record<string, unknown>)
+    });
   });
 
   return { id: canonicalProposal.id, status: "upserted" };
@@ -915,48 +944,63 @@ export async function upsertContextPack(input: UpsertContextPackInput) {
   const pack = input.contextPack;
   validateAssetLocalization("contextPack", pack);
   const scope = resolveWritableScope(writableActor(), pack.architectureScope);
+  const actor = writableActor();
   const localizedPack = { ...pack, architectureScope: scope };
   const canonicalPack = localizeAsset("contextPack", localizedPack, "en") as ContextPack;
   assertString(pack.id, "contextPack.id");
   assertString(pack.proposalId, "contextPack.proposalId");
   await ensureMcpPersistenceSchema();
 
-  await prisma.contextPack.upsert({
-    where: {
-      applicationServiceId_scopePath_id: {
+  await prisma.$transaction(async (transaction) => {
+    await transaction.contextPack.upsert({
+      where: {
+        applicationServiceId_scopePath_id: {
+          applicationServiceId: scope.applicationServiceId,
+          scopePath: scope.scopePath,
+          id: canonicalPack.id
+        }
+      },
+      create: {
+        id: canonicalPack.id,
+        name: canonicalPack.name,
+        proposalId: canonicalPack.proposalId,
+        targetAgent: canonicalPack.targetAgent,
+        summary: canonicalPack.summary,
+        includedAssets: JSON.stringify(canonicalPack.includedAssets),
+        constraints: JSON.stringify(canonicalPack.constraints),
+        instructions: JSON.stringify(canonicalPack.instructions),
+        generatedMarkdown: canonicalPack.generatedMarkdown,
+        payload: JSON.stringify(canonicalPack),
         applicationServiceId: scope.applicationServiceId,
         scopePath: scope.scopePath,
-        id: canonicalPack.id
+        createdAt: new Date(canonicalPack.createdAt)
+      },
+      update: {
+        proposalId: canonicalPack.proposalId,
+        name: canonicalPack.name,
+        targetAgent: canonicalPack.targetAgent,
+        summary: canonicalPack.summary,
+        includedAssets: JSON.stringify(canonicalPack.includedAssets),
+        constraints: JSON.stringify(canonicalPack.constraints),
+        instructions: JSON.stringify(canonicalPack.instructions),
+        generatedMarkdown: canonicalPack.generatedMarkdown,
+        payload: JSON.stringify(canonicalPack),
+        applicationServiceId: scope.applicationServiceId,
+        scopePath: scope.scopePath
       }
-    },
-    create: {
-      id: canonicalPack.id,
-      name: canonicalPack.name,
-      proposalId: canonicalPack.proposalId,
-      targetAgent: canonicalPack.targetAgent,
-      summary: canonicalPack.summary,
-      includedAssets: JSON.stringify(canonicalPack.includedAssets),
-      constraints: JSON.stringify(canonicalPack.constraints),
-      instructions: JSON.stringify(canonicalPack.instructions),
-      generatedMarkdown: canonicalPack.generatedMarkdown,
-      payload: JSON.stringify(canonicalPack),
-      applicationServiceId: scope.applicationServiceId,
-      scopePath: scope.scopePath,
-      createdAt: new Date(canonicalPack.createdAt)
-    },
-    update: {
-      proposalId: canonicalPack.proposalId,
-      name: canonicalPack.name,
-      targetAgent: canonicalPack.targetAgent,
-      summary: canonicalPack.summary,
-      includedAssets: JSON.stringify(canonicalPack.includedAssets),
-      constraints: JSON.stringify(canonicalPack.constraints),
-      instructions: JSON.stringify(canonicalPack.instructions),
-      generatedMarkdown: canonicalPack.generatedMarkdown,
-      payload: JSON.stringify(canonicalPack),
-      applicationServiceId: scope.applicationServiceId,
-      scopePath: scope.scopePath
-    }
+    });
+    await appendAuthoredAssetRevision(transaction, {
+      architectureScope: scope,
+      assetType: "contextPack",
+      assetId: canonicalPack.id,
+      operation: "UPSERT",
+      payload: localizedPack,
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      channel: "mcp",
+      correlationId: `context-pack-revision:${canonicalPack.id}`,
+      idempotencyKey: authoredRevisionIdempotencyKey("contextPack", localizedPack)
+    });
   });
 
   return { id: canonicalPack.id, proposalId: canonicalPack.proposalId, status: "upserted" };
@@ -974,6 +1018,7 @@ export async function deletePersistedDesignData(input: DeletePersistedDesignData
     applicationServiceId: scope.applicationServiceId,
     scopePath: scope.scopePath
   };
+  const actor = writableActor();
   const ids = [...assetIds, ...proposalIds, ...contextPackIds];
   await prisma.$transaction(async (transaction) => {
     await lockRelationshipScope(transaction, configuredRelationshipScope(scope));
@@ -988,6 +1033,53 @@ export async function deletePersistedDesignData(input: DeletePersistedDesignData
     for (const link of links) {
       const relationshipScope = await resolveLegacyRelationshipScope(transaction, scope, `legacy-asset-link:${link.id}`);
       await synchronizeLegacyAssetLinkDelete(transaction, link, relationshipScope);
+    }
+    const [assets, proposals, contextPacks] = await Promise.all([
+      transaction.designAsset.findMany({ where: { ...scopedWhere, id: { in: assetIds } }, select: { id: true, type: true, payload: true } }),
+      transaction.proposal.findMany({ where: { ...scopedWhere, id: { in: proposalIds } }, select: { id: true, payload: true } }),
+      transaction.contextPack.findMany({ where: { ...scopedWhere, id: { in: contextPackIds } }, select: { id: true, payload: true } })
+    ]);
+    for (const row of assets) {
+      await appendAuthoredAssetRevision(transaction, {
+        architectureScope: scope,
+        assetType: row.type,
+        assetId: row.id,
+        operation: "DELETE",
+        payload: row.payload ? JSON.parse(row.payload) : { id: row.id, architectureScope: scope },
+        actorType: actor.actorType,
+        actorId: actor.actorId,
+        channel: "mcp",
+        correlationId: `design-asset-delete:${row.type}:${row.id}`,
+        idempotencyKey: `authored-delete:${row.type}:${row.id}`
+      });
+    }
+    for (const row of proposals) {
+      await appendAuthoredAssetRevision(transaction, {
+        architectureScope: scope,
+        assetType: "proposal",
+        assetId: row.id,
+        operation: "DELETE",
+        payload: row.payload ? JSON.parse(row.payload) : { id: row.id, architectureScope: scope },
+        actorType: actor.actorType,
+        actorId: actor.actorId,
+        channel: "mcp",
+        correlationId: `proposal-delete:${row.id}`,
+        idempotencyKey: `authored-delete:proposal:${row.id}`
+      });
+    }
+    for (const row of contextPacks) {
+      await appendAuthoredAssetRevision(transaction, {
+        architectureScope: scope,
+        assetType: "contextPack",
+        assetId: row.id,
+        operation: "DELETE",
+        payload: row.payload ? JSON.parse(row.payload) : { id: row.id, architectureScope: scope },
+        actorType: actor.actorType,
+        actorId: actor.actorId,
+        channel: "mcp",
+        correlationId: `context-pack-delete:${row.id}`,
+        idempotencyKey: `authored-delete:contextPack:${row.id}`
+      });
     }
     await transaction.contextPack.deleteMany({ where: { ...scopedWhere, id: { in: contextPackIds } } });
     await transaction.proposal.deleteMany({ where: { ...scopedWhere, id: { in: proposalIds } } });
@@ -1362,6 +1454,11 @@ function assetLinkId(input: Pick<AssetLinkInput, "sourceType" | "sourceId" | "ta
 function designAssetGraphIdempotencyKey(assetType: AssetType, canonicalAsset: Record<string, unknown>): string {
   const contentHash = createHash("sha256").update(stableJson(canonicalAsset)).digest("hex");
   return `design-asset:${assetType}:${String(canonicalAsset.id)}:${contentHash}`;
+}
+
+function authoredRevisionIdempotencyKey(assetType: string, payload: Record<string, unknown>): string {
+  const contentHash = createHash("sha256").update(stableJson(payload)).digest("hex");
+  return `authored-revision:${assetType}:${String(payload.id)}:${contentHash}`;
 }
 
 function stableJson(value: unknown): string {
