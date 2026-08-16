@@ -18,6 +18,8 @@ import { promoteKnowledgeCandidates, reconcileKnowledgeBaseline } from "./knowle
 import { bootstrapThreeAFromDesignAssets } from "./knowledge/bootstrap";
 import { deriveScopedKnowledgeProjection } from "./knowledge/projection";
 import { getProjectionBuild, requestProjectionBuild } from "./knowledge/projection-build";
+import { getCoverageBuild, requestCoverageBuild } from "./knowledge/coverage-build";
+import { get3aCoverageReport } from "./knowledge/coverage-report";
 import { compare3aPublishedBaselines, get3aAlignment, get3aArchitectureFact, list3aProjectionManifests, list3aPublishedBaselines, query3aArchitectureMap, query3aArchitectureUnitNeighborhood, search3aArchitectureFacts, trace3aArchitecturePath } from "./knowledge/query-adapter";
 import { get3aArchitectureUnitNeighborhood, search3aArchitectureMap } from "./knowledge/architecture-map-adapter";
 import {
@@ -716,6 +718,30 @@ export function registerTools(server: McpServer): void {
     permissions: ["knowledge:read"],
     readOnly: true
   }, getProjectionBuild);
+
+  registerJsonTool(server, "request_3a_coverage_build", {
+    title: "Request 3A coverage build",
+    description: "Creates or returns an idempotent exact-Scope immutable 3A semantic-coverage build pinned to catalog and relationship waterlines.",
+    inputSchema: { architectureScope: architectureScopeSchema, baselineId: z.string().min(1), generationId: z.string().min(1), profileId: z.string().min(1), profileVersion: z.string().min(1), coverageSchemaVersion: z.string().min(1), query: z.record(z.unknown()) },
+    permissions: ["knowledge:write"],
+    readOnly: false
+  }, async (input) => requestCoverageBuild(input as Parameters<typeof requestCoverageBuild>[0]));
+
+  registerJsonTool(server, "get_3a_coverage_build", {
+    title: "Get 3A coverage build",
+    description: "Returns bounded exact-Scope 3A semantic-coverage build status and immutable waterline diagnostics.",
+    inputSchema: { architectureScope: architectureScopeSchema, jobId: z.string().min(1).optional(), buildKey: z.string().min(1).optional() },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, async (input) => getCoverageBuild(input as unknown as Parameters<typeof getCoverageBuild>[0]));
+
+  registerJsonTool(server, "get_3a_coverage_report", {
+    title: "Get 3A coverage report",
+    description: "Reads bounded exact-Scope immutable 3A coverage rows with role, status, reason, path evidence, and freshness.",
+    inputSchema: { architectureScope: architectureScopeSchema, generationId: z.string().min(1).optional(), role: z.enum(["MEMBERSHIP", "TRACEABILITY", "EXEMPTION"]).optional(), status: z.enum(["COVERED", "BLOCKED", "NOT_EVALUATED"]).optional(), assetType: z.string().min(1).optional(), reasonCode: z.string().min(1).optional(), limit: z.number().int().min(1).max(200).optional(), cursor: z.string().min(1).optional() },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, async (input) => get3aCoverageReport(input as unknown as Parameters<typeof get3aCoverageReport>[0]));
 
   registerJsonTool(server, "list_3a_published_baselines", {
     title: "List 3A published baselines",

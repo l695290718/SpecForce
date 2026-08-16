@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const persistence = vi.hoisted(() => ({
   isSeedMode: vi.fn(() => process.env.SPECFORGE_MCP_SEED === "1"),
+  ensureMcpPersistenceSchema: vi.fn().mockResolvedValue(undefined),
   readableScope: vi.fn((applicationServiceId: string) => ({ applicationServiceId, scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner" })),
   prisma: {
     projectionManifest: {
