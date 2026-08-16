@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { genericSystemAnalysisProfile, optionalAnalysisProfiles, projectionBuildKey, isOfficialBaseline, type AnalysisProfile, type ArchitectureScopeRef, type ProjectionBuildJob, type ProjectionManifestV2, type ProjectionBuildStatus, THREE_A_PROJECTION_SCHEMA_VERSION } from "@specforge/core";
+import { genericSystemAnalysisProfile, optionalAnalysisProfiles, projectionBuildKey, isOfficialBaseline, type AnalysisProfile, type ArchitectureScopeRef, type ProjectionBuildJob, type ProjectionBuildStatus, THREE_A_PROJECTION_SCHEMA_VERSION } from "@specforge/core";
 import { ensureMcpPersistenceSchema, prisma, readableScope, resolveWritableScope, writableActor } from "../persistence";
 
 export interface ProjectionBuildRequest {
@@ -48,10 +48,10 @@ export async function requestProjectionBuild(input: ProjectionBuildRequest): Pro
 
   return prisma.$transaction(async (transaction) => {
     const published = await transaction.projectionManifest.findFirst({
-      where: { ...scope, baselineId: baseline.id, projectionSchemaVersion: input.projectionSchemaVersion, profileId: profile.id, profileVersion: profile.version, publishedAt: { not: null } },
+      where: { ...scope, baselineId: baseline.id, projectionSchemaVersion: input.projectionSchemaVersion, profileId: profile.id, profileVersion: profile.version, inputDigest: buildKey, publishedAt: { not: null } },
       orderBy: [{ publishedAt: "desc" }, { id: "asc" }]
     });
-    if (published && published.generationId && published.inputDigest && published.contentDigest) {
+    if (published && isReusablePublishedProjection(published, buildKey)) {
       return submissionFromManifest(published, scope);
     }
 
@@ -95,6 +95,13 @@ export function requireAnalysisProfile(profileId: string, profileVersion: string
   const profile = [genericSystemAnalysisProfile, ...optionalAnalysisProfiles].find((candidate) => candidate.id === profileId && candidate.version === profileVersion);
   if (!profile) throw new Error("ANALYSIS_PROFILE_NOT_FOUND");
   return profile;
+}
+
+export function isReusablePublishedProjection(
+  manifest: { generationId: string | null; inputDigest: string | null; contentDigest: string | null } | null | undefined,
+  requestedInputDigest: string
+): boolean {
+  return Boolean(manifest?.generationId && manifest.inputDigest === requestedInputDigest && manifest.contentDigest);
 }
 
 function submissionFromJob(row: any, scope: ArchitectureScopeRef): ProjectionBuildSubmission {
