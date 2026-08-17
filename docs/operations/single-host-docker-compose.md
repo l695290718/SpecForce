@@ -16,7 +16,7 @@ pwsh -File deploy/scripts/start.ps1
 pwsh -File deploy/scripts/status.ps1
 ```
 
-On Windows, run the same scripts in PowerShell as `./deploy/scripts/start.ps1` and `./deploy/scripts/status.ps1`.
+On Windows, start Docker Desktop and wait until the Docker Engine is ready, then run the same scripts in PowerShell as `./deploy/scripts/start.ps1` and `./deploy/scripts/status.ps1`. The scripts validate Docker readiness but intentionally do not launch Docker Desktop. The Docker deployment Web uses port `3010`; local development on port `3000` is separate.
 
 The bundled PostgreSQL service is private to the Compose network. Do not add a host port mapping merely to let the Web container connect; Web uses `postgres:5432` internally.
 

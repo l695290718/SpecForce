@@ -255,11 +255,14 @@ See [Legacy Baseline Discovery Operations](docs/operations/legacy-baseline-disco
 Deploy the Web console, PostgreSQL, direct first-startup Bootstrap, Knowledge Projector, and governed 3A Bootstrap on one host with Docker. On a fresh empty database, direct Bootstrap applies the versioned initial catalog and canonical relationship events once; the governed 3A Bootstrap then invokes MCP to create and publish the exact-Scope baseline projection before Web starts. After that, business design changes still use MCP. PostgreSQL remains private to the Compose network; MCP stays a client-side stdio process and is not deployed as a network container.
 
 ```powershell
+# Windows: start Docker Desktop first and wait until the Docker Engine is ready.
 Copy-Item deploy/.env.example deploy/.env
 # Set a strong POSTGRES_PASSWORD and deployment-only 3A cursor secret in deploy/.env.
 .\deploy\scripts\start.ps1
 .\deploy\scripts\status.ps1
 ```
+
+`start.ps1` is the supported deployment entrypoint. It validates Docker readiness, starts the Web, PostgreSQL, Bootstrap, 3A Bootstrap, and Knowledge Projector services, and waits for health checks. It does not start Docker Desktop itself. On Linux, start the Docker daemon before running it. The script-managed Docker Web uses port `3010`; `pnpm dev` on port `3000` is a separate local development process.
 
 The default Docker Web port is `3010`; local development remains on `3000`. Stop the deployment with `.\deploy\scripts\stop.ps1`; the PostgreSQL volume is preserved. See [Single-Host Docker Compose Operations](docs/operations/single-host-docker-compose.md) and [deployment operations](deploy/README.md) for external PostgreSQL mode, configuration checks, and recovery.
 

@@ -9,12 +9,13 @@ PostgreSQL is authoritative for authored design facts and relationship events. O
 Run these commands from the repository root in PowerShell:
 
 ```powershell
+# Windows: start Docker Desktop and wait for the Docker Engine before continuing.
 Copy-Item deploy/.env.example deploy/.env
 # Edit deploy/.env. Set a strong unique POSTGRES_PASSWORD.
 .\deploy\scripts\start.ps1
 ```
 
-The first run validates Docker, the PostgreSQL password, the 3A cursor key JSON, and the active key ID. It then starts PostgreSQL, runs the direct Bootstrap only when the database is empty, builds the governed 3A baseline and PostgreSQL projection, waits for `/healthz`, and prints the Web URL.
+`start.ps1` does not start Docker Desktop or the Docker daemon. It fails fast with a clear readiness error when Docker is unavailable. The first run validates Docker, the PostgreSQL password, the 3A cursor key JSON, and the active key ID. It then starts PostgreSQL, runs the direct Bootstrap only when the database is empty, builds the governed 3A baseline and PostgreSQL projection, waits for `/healthz`, and prints the Web URL.
 
 If either one-shot initializer fails, the command prints the failure and keeps the PostgreSQL volume intact. Inspect `docker compose --env-file deploy/.env -f deploy/compose.yaml logs bootstrap` or `... logs three-a-bootstrap`; do not delete the volume unless the database is intentionally being retired.
 
