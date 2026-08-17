@@ -2,6 +2,7 @@
 
 - Status: Accepted for continuous observation v2
 - Date: 2026-08-17
+- Stable ID: `adr-delta-connector-run-completion`
 - Scope: `com.huawei.celon.desiner`
 - Preflight session: `design-change-session:cafe8dd0-3acd-4e02-8e5e-1a26c4291964`
 
