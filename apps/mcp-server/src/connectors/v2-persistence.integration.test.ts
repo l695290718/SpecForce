@@ -15,16 +15,16 @@ const sourceNamespace = `${prefix}-source`;
 const boundary = `${prefix}-boundary`;
 const mappingDigest = `${prefix}-mapping`;
 
-function batch(input: { runId: string; fencingToken: number; sequence: number; previousBatchDigest: string | null; snapshotId: string; externalId: string; sourceVersion: string; inventoryBoundaryDigest?: string; isLastPage?: boolean }): ContinuousObservationBatchV2 {
+function batch(input: { runId: string; fencingToken: number; sequence: number; previousBatchDigest: string | null; snapshotId?: string | null; externalId: string; sourceVersion: string; inventoryBoundaryDigest?: string; isLastPage?: boolean; mode?: "FULL_SNAPSHOT" | "DELTA"; sourceNamespace?: string; observations?: ContinuousObservationBatchV2["observations"] }): ContinuousObservationBatchV2 {
   const base = {
     contractVersion: CONTINUOUS_OBSERVATION_V2_CONTRACT_VERSION,
     architectureScope: scope,
     connectorId,
-    sourceNamespace,
+    sourceNamespace: input.sourceNamespace ?? sourceNamespace,
     runId: input.runId,
     fencingToken: String(input.fencingToken),
-    mode: "FULL_SNAPSHOT" as const,
-    snapshotId: input.snapshotId,
+    mode: input.mode ?? "FULL_SNAPSHOT",
+    snapshotId: input.snapshotId === undefined ? "snapshot-1" : input.snapshotId,
     mappingVersion: "mapping-v1",
     mappingDigest,
     inventoryBoundaryDigest: input.inventoryBoundaryDigest ?? boundary,
@@ -36,7 +36,7 @@ function batch(input: { runId: string; fencingToken: number; sequence: number; p
     sourceHighWaterMark: input.sourceVersion,
     observedAt: "2026-08-17T00:00:00.000Z",
     coverage: { complete: input.isLastPage ?? true },
-    observations: [{ id: `${input.runId}-${input.externalId}`, operation: "UPSERT" as const, externalAssetType: "table", externalId: input.externalId, payload: { sourceVersion: input.sourceVersion }, sourceVersion: input.sourceVersion }],
+    observations: input.observations ?? [{ id: `${input.runId}-${input.externalId}`, operation: "UPSERT" as const, externalAssetType: "table", externalId: input.externalId, payload: { sourceVersion: input.sourceVersion }, sourceVersion: input.sourceVersion }],
     payloadDigest: "",
     batchDigest: ""
   } satisfies ContinuousObservationBatchV2;
@@ -56,9 +56,9 @@ describe.runIf(integrationEnabled)("continuous observation v2 PostgreSQL persist
     await prisma.connectorSnapshotIdentity.deleteMany({ where: { ...scope, runId: { startsWith: prefix } } });
     await prisma.connectorLease.deleteMany({ where: { ...scope, connectorId } });
     await prisma.connectorRun.deleteMany({ where: { ...scope, id: { startsWith: prefix } } });
-    await prisma.sourceObservation.deleteMany({ where: { ...scope, connectorId, sourceNamespace } });
-    await prisma.federationObservationBatch.deleteMany({ where: { ...scope, connectorId, sourceNamespace } });
-    await prisma.federationObservationCursor.deleteMany({ where: { ...scope, connectorId, sourceNamespace } });
+    await prisma.sourceObservation.deleteMany({ where: { ...scope, connectorId, sourceNamespace: { startsWith: prefix } } });
+    await prisma.federationObservationBatch.deleteMany({ where: { ...scope, connectorId, sourceNamespace: { startsWith: prefix } } });
+    await prisma.federationObservationCursor.deleteMany({ where: { ...scope, connectorId, sourceNamespace: { startsWith: prefix } } });
     await prisma.federationOutbox.deleteMany({ where: { ...scope, idempotencyKey: { contains: prefix } } });
     await prisma.connectorInstance.deleteMany({ where: { ...scope, id: connectorId } });
     delete process.env.SPECFORGE_MCP_SEED;
@@ -96,5 +96,42 @@ describe.runIf(integrationEnabled)("continuous observation v2 PostgreSQL persist
     await submitContinuousObservationBatchV2({ architectureScope: scope, batch: current });
     const result = await finalizeContinuousSnapshot({ architectureScope: scope, runId, fencingToken: lease.fencingToken, snapshotId: "snapshot-3", inventoryBoundaryDigest: `${boundary}-changed`, sourceVersion: "source-3", observedAt: "2026-08-17T00:02:00.000Z" });
     expect(result.tombstoneCount).toBe(0);
+  }, 30_000);
+
+  it("does not finalize an incomplete snapshot or infer deletion", async () => {
+    const runId = `${prefix}-run-incomplete`;
+    const currentCursor = await prisma.federationObservationCursor.findUnique({ where: { applicationServiceId_scopePath_connectorId_sourceNamespace: { ...scope, connectorId, sourceNamespace } } });
+    const incompleteBoundary = `${boundary}-changed`;
+    await createConnectorRun({ architectureScope: scope, id: runId, connectorId, sourceNamespace, mode: "FULL_SNAPSHOT", snapshotId: "snapshot-incomplete", mappingVersion: "mapping-v1", mappingDigest, inventoryBoundaryDigest: incompleteBoundary });
+    const lease = await claimConnectorRun({ architectureScope: scope, runId, owner: "worker-incomplete" });
+    const partial = batch({ runId, fencingToken: lease.fencingToken, sequence: (currentCursor?.acceptedSequence ?? -1) + 1, previousBatchDigest: currentCursor?.acceptedBatchDigest ?? null, snapshotId: "snapshot-incomplete", externalId: "public.partial", sourceVersion: "source-incomplete", inventoryBoundaryDigest: incompleteBoundary, isLastPage: false });
+    await submitContinuousObservationBatchV2({ architectureScope: scope, batch: partial });
+    await expect(finalizeContinuousSnapshot({ architectureScope: scope, runId, fencingToken: lease.fencingToken, snapshotId: "snapshot-incomplete", inventoryBoundaryDigest: incompleteBoundary, sourceVersion: "source-incomplete", observedAt: "2026-08-17T00:03:00.000Z" })).rejects.toThrow("SNAPSHOT_NOT_COMPLETE");
+    const current = await prisma.connectorRun.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: runId } } });
+    expect(current?.status).toBe("RUNNING");
+    expect(await prisma.sourceObservation.count({ where: { ...scope, connectorId, sourceNamespace, runId, operation: "TOMBSTONE" } })).toBe(0);
+  }, 30_000);
+
+  it("completes DELTA runs and persists explicit updates and tombstones", async () => {
+    const deltaSourceNamespace = `${prefix}-delta-source`;
+    const deltaBoundary = `${prefix}-delta-boundary`;
+    const firstRunId = `${prefix}-delta-run-1`;
+    await createConnectorRun({ architectureScope: scope, id: firstRunId, connectorId, sourceNamespace: deltaSourceNamespace, mode: "DELTA", snapshotId: null, mappingVersion: "mapping-v1", mappingDigest, inventoryBoundaryDigest: deltaBoundary });
+    const firstLease = await claimConnectorRun({ architectureScope: scope, runId: firstRunId, owner: "worker-delta" });
+    const first = batch({ runId: firstRunId, fencingToken: firstLease.fencingToken, sequence: 0, previousBatchDigest: null, snapshotId: null, externalId: "public.changed", sourceVersion: "source-delta-1", inventoryBoundaryDigest: deltaBoundary, mode: "DELTA", sourceNamespace: deltaSourceNamespace });
+    await submitContinuousObservationBatchV2({ architectureScope: scope, batch: first });
+    expect((await prisma.connectorRun.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: firstRunId } } }))?.status).toBe("SUCCEEDED");
+
+    const secondRunId = `${prefix}-delta-run-2`;
+    await createConnectorRun({ architectureScope: scope, id: secondRunId, connectorId, sourceNamespace: deltaSourceNamespace, mode: "DELTA", snapshotId: null, mappingVersion: "mapping-v1", mappingDigest, inventoryBoundaryDigest: deltaBoundary });
+    const secondLease = await claimConnectorRun({ architectureScope: scope, runId: secondRunId, owner: "worker-delta" });
+    const second = batch({ runId: secondRunId, fencingToken: secondLease.fencingToken, sequence: 1, previousBatchDigest: first.batchDigest, snapshotId: null, externalId: "public.changed", sourceVersion: "source-delta-2", inventoryBoundaryDigest: deltaBoundary, mode: "DELTA", sourceNamespace: deltaSourceNamespace, observations: [
+      { id: `${secondRunId}-changed`, operation: "UPSERT", externalAssetType: "table", externalId: "public.changed", payload: { sourceVersion: "source-delta-2", version: 2 }, sourceVersion: "source-delta-2" },
+      { id: `${secondRunId}-deleted`, operation: "TOMBSTONE", externalAssetType: "table", externalId: "public.deleted", deletionReason: "source-deleted", sourceVersion: "source-delta-2" }
+    ] });
+    await submitContinuousObservationBatchV2({ architectureScope: scope, batch: second });
+    expect((await prisma.connectorRun.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: secondRunId } } }))?.status).toBe("SUCCEEDED");
+    expect(await prisma.sourceObservation.count({ where: { ...scope, connectorId, sourceNamespace: deltaSourceNamespace, externalId: "public.changed", sourceVersion: "source-delta-2", operation: "UPSERT" } })).toBe(1);
+    expect(await prisma.sourceObservation.count({ where: { ...scope, connectorId, sourceNamespace: deltaSourceNamespace, externalId: "public.deleted", operation: "TOMBSTONE" } })).toBe(1);
   }, 30_000);
 });
