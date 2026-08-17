@@ -259,6 +259,21 @@ export async function getConnectorHealth(architectureScope: ArchitectureScopeRef
   return { architectureScope: scope, connectorId, sourceNamespace, cursor, latestRun: run, deadLetterCount };
 }
 
+export async function getConnectorRun(architectureScope: ArchitectureScopeRef, runId: string) {
+  const scope = readableScope(architectureScope.applicationServiceId);
+  if (scope.scopePath !== architectureScope.scopePath) throw new Error("SCOPE_MISMATCH");
+  return prisma.connectorRun.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: runId } } });
+}
+
+export async function setConnectorRunStatus(input: { architectureScope: ArchitectureScopeRef; runId: string; status: "PAUSED" | "QUEUED" }) {
+  const scope = resolveWritableScope(writableActor(), input.architectureScope);
+  await ensureMcpPersistenceSchema();
+  const run = await prisma.connectorRun.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.runId } } });
+  if (!run) throw new Error("CONNECTOR_RUN_NOT_FOUND");
+  if (!["QUEUED", "RUNNING", "PAUSED"].includes(run.status)) throw new Error("CONNECTOR_RUN_NOT_PAUSABLE");
+  return prisma.connectorRun.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.runId } }, data: { status: input.status } });
+}
+
 function requireIdenticalRetry(existing: { sequence: number; batchDigest: string; payloadDigest: string; canonicalBytes: number; observationCount: number; previousBatchDigest: string | null }, batch: ContinuousObservationBatchV2, integrity: { payloadDigest: string; canonicalBytes: number }) {
   if (existing.previousBatchDigest !== batch.previousBatchDigest || existing.batchDigest !== batch.batchDigest || existing.payloadDigest !== integrity.payloadDigest || existing.canonicalBytes !== integrity.canonicalBytes || existing.observationCount !== batch.observations.length) throw new Error("OBSERVATION_BATCH_SEQUENCE_CONFLICT");
   return { sequence: existing.sequence, batchDigest: existing.batchDigest, idempotent: true, status: "ACCEPTED" as const };

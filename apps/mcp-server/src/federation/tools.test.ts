@@ -3,6 +3,7 @@ import { computeContinuousBatchIntegrity, contentDigest, CONTINUOUS_OBSERVATION_
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const federationPersistence = vi.hoisted(() => ({
+  createOutbox: vi.fn(),
   registerConnector: vi.fn(),
   recordObservation: vi.fn(),
   promoteCandidate: vi.fn(),
@@ -18,6 +19,9 @@ const continuousPersistence = vi.hoisted(() => ({
 }));
 
 const persistence = vi.hoisted(() => ({
+  ensureMcpPersistenceSchema: vi.fn(),
+  readableScope: vi.fn((applicationServiceId: string) => applicationServiceId === "com.huawei.celon.desiner" ? designerScope : siblingScope),
+  writableActor: vi.fn(() => ({ actorType: "agent", actorId: "test-agent" })),
   isSeedMode: vi.fn(() => false),
   deletePersistedDesignData: vi.fn(),
   searchPersistedDesignAssets: vi.fn(),

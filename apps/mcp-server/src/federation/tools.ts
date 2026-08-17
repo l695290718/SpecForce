@@ -16,6 +16,7 @@ import {
   type PromoteCandidateInput
 } from "./persistence";
 import { getContinuousObservationCursor, submitContinuousObservationBatch } from "./continuous-persistence";
+import { createConnectorRun, getConnectorHealth, getConnectorRun, setConnectorRunStatus, submitContinuousObservationBatchV2 } from "../connectors/v2-persistence";
 import { issueChangeAttestation } from "./attestation";
 import { verifyPersistedChangeAttestation } from "./attestation-verification";
 import { principalFromAuthInfo, withRequestPrincipal, type McpAuthInfo } from "../auth";
@@ -729,6 +730,42 @@ export function registerFederationTools(server: McpServer): void {
     permissions: ["asset:read"],
     readOnly: true
   }, async (input, caller) => getContinuousObservationCursor(assertReadableExactScope(input.architectureScope, caller), input.connectorId, input.sourceNamespace));
+
+  registerFederationJsonTool(server, "create_connector_run", {
+    title: "Create connector run",
+    description: "Queues one exact-Scope connector run for a full snapshot or delta observation.",
+    inputSchema: {
+      id: z.string().min(1), connectorId: z.string().min(1), sourceNamespace: z.string().min(1),
+      mode: z.enum(["FULL_SNAPSHOT", "DELTA"]), snapshotId: z.string().min(1).nullable(), mappingVersion: z.string().min(1), mappingDigest: z.string().length(64), inventoryBoundaryDigest: z.string().length(64), coverage: z.record(z.unknown()).optional(), architectureScope: architectureScopeSchema
+    }, permissions: ["asset:write"], readOnly: false
+  }, async (input, caller) => createConnectorRun({ ...input, architectureScope: assertWritableExactScope(input.architectureScope, caller) }));
+
+  registerFederationJsonTool(server, "submit_continuous_observation_batch_v2", {
+    title: "Submit continuous observation batch v2",
+    description: "Accepts one bounded, fenced, exact-Scope v2 observation batch.",
+    inputSchema: {
+      contractVersion: z.literal("continuous-observation/v2"), architectureScope: architectureScopeSchema, connectorId: z.string().min(1), sourceNamespace: z.string().min(1), runId: z.string().min(1), fencingToken: z.string().min(1), mode: z.enum(["FULL_SNAPSHOT", "DELTA"]), snapshotId: z.string().min(1).nullable(), mappingVersion: z.string().min(1), mappingDigest: z.string().length(64), inventoryBoundaryDigest: z.string().length(64), sequence: z.number().int().min(0), previousBatchDigest: z.string().length(64).nullable(), pageIndex: z.number().int().min(0), isLastPage: z.boolean(), sourceCursor: z.string().nullable(), sourceHighWaterMark: z.string().nullable(), observedAt: z.string().datetime(), coverage: z.record(z.unknown()), observations: z.array(z.object({ id: z.string().min(1), operation: z.enum(["UPSERT", "TOMBSTONE"]), externalAssetType: z.string().min(1), externalId: z.string().min(1), payload: z.record(z.unknown()).optional(), deletionReason: z.string().min(1).optional(), sourceVersion: z.string().min(1), observedAt: z.string().datetime().optional() })).max(500), payloadDigest: z.string().length(64), batchDigest: z.string().length(64)
+    }, permissions: ["asset:write"], readOnly: false
+  }, async (input, caller) => {
+    const architectureScope = assertWritableExactScope(input.architectureScope, caller);
+    return submitContinuousObservationBatchV2({ architectureScope, batch: { ...input, architectureScope } });
+  });
+
+  registerFederationJsonTool(server, "get_connector_run", {
+    title: "Get connector run", description: "Returns one read-only connector run in the exact authorized Scope.", inputSchema: { runId: z.string().min(1), architectureScope: architectureScopeSchema }, permissions: ["asset:read"], readOnly: true
+  }, async (input, caller) => getConnectorRun(assertReadableExactScope(input.architectureScope, caller), input.runId));
+
+  registerFederationJsonTool(server, "pause_connector_run", {
+    title: "Pause connector run", description: "Pauses one exact-Scope queued or active connector run.", inputSchema: { runId: z.string().min(1), architectureScope: architectureScopeSchema }, permissions: ["asset:write"], readOnly: false
+  }, async (input, caller) => setConnectorRunStatus({ runId: input.runId, status: "PAUSED", architectureScope: assertWritableExactScope(input.architectureScope, caller) }));
+
+  registerFederationJsonTool(server, "resume_connector_run", {
+    title: "Resume connector run", description: "Resumes one exact-Scope paused connector run.", inputSchema: { runId: z.string().min(1), architectureScope: architectureScopeSchema }, permissions: ["asset:write"], readOnly: false
+  }, async (input, caller) => setConnectorRunStatus({ runId: input.runId, status: "QUEUED", architectureScope: assertWritableExactScope(input.architectureScope, caller) }));
+
+  registerFederationJsonTool(server, "get_connector_health", {
+    title: "Get connector health", description: "Returns read-only freshness, cursor, latest run, and dead-letter status for one exact Scope.", inputSchema: { connectorId: z.string().min(1), sourceNamespace: z.string().min(1), architectureScope: architectureScopeSchema }, permissions: ["asset:read"], readOnly: true
+  }, async (input, caller) => getConnectorHealth(assertReadableExactScope(input.architectureScope, caller), input.connectorId, input.sourceNamespace));
 
   registerFederationJsonTool(server, "close_design_change_session", {
     title: "Close design change session",
