@@ -248,6 +248,13 @@ export async function recordConnectorDeadLetter(input: { architectureScope: Arch
   });
 }
 
+export async function recordConnectorRunFailure(input: { architectureScope: ArchitectureScopeRef; runId: string; code: string; message: string; now?: Date }) {
+  const scope = resolveWritableScope(writableActor(), input.architectureScope);
+  const run = await prisma.connectorRun.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.runId } } });
+  if (!run) throw new Error("CONNECTOR_RUN_NOT_FOUND");
+  return prisma.connectorRun.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.runId } }, data: { status: "FAILED", failureCode: input.code, failureMessage: redactError(input.message), finishedAt: input.now ?? new Date() } });
+}
+
 export async function getConnectorHealth(architectureScope: ArchitectureScopeRef, connectorId: string, sourceNamespace: string) {
   const scope = readableScope(architectureScope.applicationServiceId);
   if (scope.scopePath !== architectureScope.scopePath) throw new Error("SCOPE_MISMATCH");

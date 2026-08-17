@@ -76,6 +76,27 @@ services:
       retries: 12
       start_period: 20s
 
+  connector-worker:
+    build:
+      context: ..
+      dockerfile: deploy/connector-worker.Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in deploy/.env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in deploy/.env}?schema=public
+      SPECFORGE_CONNECTOR_WORKER_APPLICATION_SERVICE_ID: ${SPECFORGE_CONNECTOR_WORKER_APPLICATION_SERVICE_ID:-com.huawei.celon.desiner}
+      SPECFORGE_CONNECTOR_WORKER_SCOPE_PATH: ${SPECFORGE_CONNECTOR_WORKER_SCOPE_PATH:-pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner}
+      SPECFORGE_CONNECTOR_WORKER_INTERVAL_MS: ${SPECFORGE_CONNECTOR_WORKER_INTERVAL_MS:-5000}
+      SPECFORGE_CONNECTOR_WORKER_BATCH_LIMIT: ${SPECFORGE_CONNECTOR_WORKER_BATCH_LIMIT:-10}
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:8092/healthz', response => process.exit(response.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
   bootstrap:
     build:
       context: ..

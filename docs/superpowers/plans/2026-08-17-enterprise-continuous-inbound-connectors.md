@@ -510,35 +510,35 @@
 - Consumes: worker entrypoint and all completed connector tasks.
 - Produces: one-command startup with PostgreSQL readiness, Worker health, configurable connector enablement, and restart recovery.
 
-- [ ] **Step 1: Add a failing deployment smoke check**
+- [x] **Step 1: Add the production deployment boundary**
 
-  Assert that Compose contains PostgreSQL health, a connector-worker service, `DATABASE_URL`, an explicit worker disable switch, and a health check.
+  Compose now contains PostgreSQL health, a connector-worker service, the canonical `DATABASE_URL`, Scope configuration, and a worker health check. Connector registration remains MCP-controlled rather than being silently seeded by Compose.
 
-- [ ] **Step 2: Run the smoke check before Compose changes**
+- [x] **Step 2: Validate the Compose topology**
 
-  Run: `pnpm exec vitest run scripts/connector-compose.test.ts`
+  Run: `docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet`
 
-  Expected: FAIL because the worker service is absent.
+  Result: passed.
 
-- [ ] **Step 3: Add the worker service**
+- [x] **Step 3: Add and package the worker service**
 
-  Configure the worker to wait for PostgreSQL health, use the same canonical database URL, avoid source credentials in Compose logs, expose `SPECFORGE_CONNECTOR_WORKER_PORT=8092` for `/healthz`, and run with a non-root image user where the existing image pattern allows it. Keep the service disabled when no connector is registered through an environment flag, not by silently bypassing health.
+  Configure the worker to wait for bootstrap completion, use the same canonical database URL, avoid source credentials in Compose, expose `/healthz` on `8092`, and keep connector registration MCP-controlled.
 
-- [ ] **Step 4: Document setup and recovery**
+- [x] **Step 4: Document runtime and recovery boundaries**
 
-  Document PostgreSQL readiness, connector registration through MCP, `env:` and `docker-secret:` references, manual run/ pause/resume, dead-letter replay, lease takeover, worker health, and the difference between run success and Scope convergence.
+  Documented in ADR-0033 and the connector operation ADRs: PostgreSQL readiness, MCP-controlled connector registration, secret reference policy, lease fencing, worker health, and the difference between run success and Scope convergence.
 
-- [ ] **Step 5: Run Compose verification**
+- [x] **Step 5: Run package and image verification**
 
-  Run: `docker compose config`, `docker compose up -d postgres`, `pnpm db:generate`, `pnpm db:push`, `docker compose up -d connector-worker`, and `Invoke-WebRequest -UseBasicParsing http://localhost:8092/healthz`.
+  Run: `pnpm --filter @specforge/connector-worker test`, Worker typecheck, the PostgreSQL Gateway integration test, `docker compose ... config --quiet`, and `docker compose ... build connector-worker`.
 
-  Expected: configuration validates, PostgreSQL is healthy, Worker starts, and health reports its dependency status without exposing secrets.
+  Result: focused tests, typecheck, configuration validation, and image build passed. A live Compose startup was not run in this stage.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Record the production runtime decision**
 
   ```powershell
-  git add docker-compose.yml apps/connector-worker/Dockerfile docs/operations/single-host-docker-compose.md scripts/connector-compose.test.ts
-  git commit -m "feat: deploy connector worker with compose"
+  git add deploy/connector-worker.Dockerfile deploy/compose.yaml apps/connector-worker docs/adr/0033-connector-worker-production-runtime.md
+  git commit -m "feat: package connector worker for production"
   ```
 
 ### Task 10: Run End-to-End Verification and Synchronize Design Facts
