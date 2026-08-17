@@ -39,6 +39,9 @@ importers:
       '@specforge/core':
         specifier: workspace:*
         version: link:../../packages/core
+      js-yaml:
+        specifier: ^4.1.0
+        version: 4.3.0
     devDependencies:
       tsx:
         specifier: ^4.19.2

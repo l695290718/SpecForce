@@ -20,7 +20,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@specforge/core": "workspace:*"
+    "@specforge/core": "workspace:*",
+    "js-yaml": "^4.1.0"
   },
   "devDependencies": {
     "tsx": "^4.19.2",
