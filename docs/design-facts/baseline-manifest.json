@@ -258,6 +258,14 @@
                                            {
                                                "command":  "powershell -ExecutionPolicy Bypass -File deploy/scripts/stop.ps1; powershell -ExecutionPolicy Bypass -File deploy/scripts/start.ps1",
                                                "result":  "The persistent PostgreSQL volume survived a full stack stop and restart; bootstrap and 3A bootstrap exited successfully, the published 3A baseline was reused idempotently, the READY projection contained 261 nodes and 156 edges, and both Web and Knowledge Projector health checks passed."
+                                           },
+                                           {
+                                               "command":  "powershell -ExecutionPolicy Bypass -File deploy/scripts/status.ps1; powershell -ExecutionPolicy Bypass -File deploy/scripts/bootstrap-status.ps1",
+                                               "result":  "Before the fix, Windows PowerShell reported a false missing DeploymentBootstrap table because native Docker Compose argument quoting removed SQL identifier quotes; the scripts now pipe SQL through psql -f - and report COMPLETED with the persisted inventory."
+                                           },
+                                           {
+                                               "command":  "powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -ConfigurationOnly; powershell -ExecutionPolicy Bypass -File deploy/scripts/status.ps1; powershell -ExecutionPolicy Bypass -File deploy/scripts/bootstrap-status.ps1; git diff --check",
+                                               "result":  "Compose configuration, deployment status, Bootstrap status, and diff checks passed after the PowerShell SQL transport fix in design-change-session:09033091-9bf3-454b-bb19-466c9e26973c."
                                            }
                                        ]
                       },

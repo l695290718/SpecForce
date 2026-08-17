@@ -87,12 +87,15 @@ function Assert-WebHealth([string]$Stage) {
 }
 
 Assert-WebHealth "initial startup"
-$before = (& docker compose --env-file $deploymentEnvironmentFile -f $composeFile exec -T postgres psql -U $databaseUser -d $databaseName -tAc 'SELECT count(*) FROM \"DesignAsset\"') | Select-Object -Last 1
+$countSql = @'
+SELECT count(*) FROM "DesignAsset";
+'@
+$before = ($countSql | & docker compose --env-file $deploymentEnvironmentFile -f $composeFile exec -T postgres psql -U $databaseUser -d $databaseName -At -f -) | Select-Object -Last 1
 if ($LASTEXITCODE -ne 0) { throw "Unable to read DesignAsset count before restart." }
 
 Invoke-Compose @("restart", "web")
 Assert-WebHealth "web restart"
-$after = (& docker compose --env-file $deploymentEnvironmentFile -f $composeFile exec -T postgres psql -U $databaseUser -d $databaseName -tAc 'SELECT count(*) FROM \"DesignAsset\"') | Select-Object -Last 1
+$after = ($countSql | & docker compose --env-file $deploymentEnvironmentFile -f $composeFile exec -T postgres psql -U $databaseUser -d $databaseName -At -f -) | Select-Object -Last 1
 if ($LASTEXITCODE -ne 0) { throw "Unable to read DesignAsset count after restart." }
 if ($before.Trim() -ne $after.Trim()) { throw "DesignAsset count changed across Web restart: $before -> $after" }
 

@@ -63,6 +63,7 @@ Existing SpecForge databases are adopted only through the explicit `SPECFORGE_BO
 - **Verified:** `docker build -f deploy/three-a-bootstrap.Dockerfile -t specforge-three-a-bootstrap:local .` and `docker build -f deploy/bootstrap.Dockerfile -t specforge-bootstrap:local .` completed successfully.
 - **Verified:** The governed 3A Bootstrap client now waits for `get_3a_projection_build=READY` and closes the same MCP design-change session as `CONVERGED`; failure closes it as `BLOCKED` with a retry reason.
 - **Verified:** Full `deploy/scripts/stop.ps1` followed by `deploy/scripts/start.ps1` preserved the PostgreSQL volume; the restart reused the published exact-Scope baseline, completed 3A bootstrap with `idempotent=true`, returned the existing `READY` projection with 261 nodes and 156 edges, and started Web on port 3010 with `/healthz=200`.
+- **Verified:** Implementation session `design-change-session:09033091-9bf3-454b-bb19-466c9e26973c` fixed Windows PowerShell native-argument quoting in `status.ps1`, `bootstrap-status.ps1`, and `verify-compose.ps1` by piping SQL through `psql -f -`; the Bootstrap status now reads `COMPLETED` instead of reporting a false missing-table error.
 
 ## 中文本地化 / Chinese Localization
 
@@ -114,3 +115,4 @@ SpecForge 需要一个可重复的首个部署形态，在单台 Linux 主机运
 - **已验证：** `docker compose --env-file deploy/.env.example -f deploy/compose.yaml build web` 已生成独立输出 Web 镜像。
 - **已验证：** `powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -Live` 在端口 3010 的隔离栈通过；Web 重启前后 `/healthz` 均通过。
 - **已验证：** 完整执行 `deploy/scripts/stop.ps1` 后再执行 `deploy/scripts/start.ps1`，PostgreSQL 数据卷保持不变；重启复用了精确 Scope 的已发布 baseline，3A Bootstrap 返回 `idempotent=true`，复用 `READY` 投影（261 个节点、156 条关系），Web 在 3010 端口启动且 `/healthz=200`。
+- **已验证：** 实现会话 `design-change-session:09033091-9bf3-454b-bb19-466c9e26973c` 修复了 `status.ps1`、`bootstrap-status.ps1` 与 `verify-compose.ps1` 在 Windows PowerShell 原生参数传递中的 SQL 引号问题，改为通过 `psql -f -` 管道传入 SQL；Bootstrap 状态现在正确读取为 `COMPLETED`，不再误报表缺失。

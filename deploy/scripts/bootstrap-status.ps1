@@ -13,6 +13,11 @@ if ($ExternalPostgres) {
   exit 0
 }
 
-$compose = @(Get-ComposeArguments) + @("exec", "-T", "postgres", "psql", "-U", $environment.POSTGRES_USER, "-d", $environment.POSTGRES_DB, "-At", "-c", 'SELECT "status" || ''|version='' || "version" || ''|attempts='' || "attemptCount" || ''|counts='' || "counts" || COALESCE(''|error='' || "errorMessage", '''') FROM "DeploymentBootstrap" WHERE "bootstrapKey" = ''specforge-default-bootstrap''')
-& docker @compose
+$bootstrapSql = @'
+SELECT "status" || '|version=' || "version" || '|attempts=' || "attemptCount" || '|counts=' || "counts" || COALESCE('|error=' || "errorMessage", '')
+FROM "DeploymentBootstrap"
+WHERE "bootstrapKey" = 'specforge-default-bootstrap';
+'@
+$compose = @(Get-ComposeArguments) + @("exec", "-T", "postgres", "psql", "-U", $environment.POSTGRES_USER, "-d", $environment.POSTGRES_DB, "-At", "-f", "-")
+$bootstrapSql | & docker @compose
 if ($LASTEXITCODE -ne 0) { throw "Unable to read DeploymentBootstrap state." }

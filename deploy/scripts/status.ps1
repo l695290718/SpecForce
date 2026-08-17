@@ -30,8 +30,13 @@ if (-not $ExternalPostgres) {
 
 Write-Output "--- Bootstrap state ---"
 if (-not $ExternalPostgres) {
-  $bootstrap = @(Get-ComposeArguments) + @("exec", "-T", "postgres", "psql", "-U", $environment.POSTGRES_USER, "-d", $environment.POSTGRES_DB, "-At", "-c", 'SELECT "status" || ''|version='' || "version" || ''|counts='' || "counts" || COALESCE(''|error='' || "errorMessage", '''') FROM "DeploymentBootstrap" WHERE "bootstrapKey" = ''specforge-default-bootstrap''')
-  & docker @bootstrap
+  $bootstrapSql = @'
+SELECT "status" || '|version=' || "version" || '|counts=' || "counts" || COALESCE('|error=' || "errorMessage", '')
+FROM "DeploymentBootstrap"
+WHERE "bootstrapKey" = 'specforge-default-bootstrap';
+'@
+  $bootstrap = @(Get-ComposeArguments) + @("exec", "-T", "postgres", "psql", "-U", $environment.POSTGRES_USER, "-d", $environment.POSTGRES_DB, "-At", "-f", "-")
+  $bootstrapSql | & docker @bootstrap
   if ($LASTEXITCODE -ne 0) { Write-Output "bootstrap=UNAVAILABLE" }
 } else {
   Write-Output "bootstrap=inspect external DATABASE_URL with psql or the Web health endpoint"
