@@ -72,14 +72,14 @@ describe.runIf(integrationEnabled)("continuous observation v2 PostgreSQL persist
     const first = batch({ runId: firstRunId, fencingToken: firstLease.fencingToken, sequence: 0, previousBatchDigest: null, snapshotId: "snapshot-1", externalId: "public.old", sourceVersion: "source-1" });
     await expect(submitContinuousObservationBatchV2({ architectureScope: scope, batch: first })).resolves.toMatchObject({ status: "ACCEPTED", idempotent: false });
     await expect(submitContinuousObservationBatchV2({ architectureScope: scope, batch: first })).resolves.toMatchObject({ status: "ACCEPTED", idempotent: true });
-    await finalizeContinuousSnapshot({ architectureScope: scope, runId: firstRunId, snapshotId: "snapshot-1", inventoryBoundaryDigest: boundary, sourceVersion: "source-1", observedAt: "2026-08-17T00:00:00.000Z" });
+    await finalizeContinuousSnapshot({ architectureScope: scope, runId: firstRunId, fencingToken: firstLease.fencingToken, snapshotId: "snapshot-1", inventoryBoundaryDigest: boundary, sourceVersion: "source-1", observedAt: "2026-08-17T00:00:00.000Z" });
 
     const secondRunId = `${prefix}-run-2`;
     await createConnectorRun({ architectureScope: scope, id: secondRunId, connectorId, sourceNamespace, mode: "FULL_SNAPSHOT", snapshotId: "snapshot-2", mappingVersion: "mapping-v1", mappingDigest, inventoryBoundaryDigest: boundary });
     const secondLease = await claimConnectorRun({ architectureScope: scope, runId: secondRunId, owner: "worker-a" });
     const second = batch({ runId: secondRunId, fencingToken: secondLease.fencingToken, sequence: 1, previousBatchDigest: first.batchDigest, snapshotId: "snapshot-2", externalId: "public.new", sourceVersion: "source-2" });
     await submitContinuousObservationBatchV2({ architectureScope: scope, batch: second });
-    const finalized = await finalizeContinuousSnapshot({ architectureScope: scope, runId: secondRunId, snapshotId: "snapshot-2", inventoryBoundaryDigest: boundary, sourceVersion: "source-2", observedAt: "2026-08-17T00:01:00.000Z" });
+    const finalized = await finalizeContinuousSnapshot({ architectureScope: scope, runId: secondRunId, fencingToken: secondLease.fencingToken, snapshotId: "snapshot-2", inventoryBoundaryDigest: boundary, sourceVersion: "source-2", observedAt: "2026-08-17T00:01:00.000Z" });
 
     expect(finalized).toMatchObject({ status: "SUCCEEDED", tombstoneCount: 1 });
     expect(await prisma.sourceObservation.findFirst({ where: { ...scope, connectorId, sourceNamespace, externalId: "public.old", operation: "TOMBSTONE" } })).toBeTruthy();
@@ -94,7 +94,7 @@ describe.runIf(integrationEnabled)("continuous observation v2 PostgreSQL persist
     const stale = { ...current, fencingToken: String(lease.fencingToken - 1), payloadDigest: "", batchDigest: "" };
     await expect(submitContinuousObservationBatchV2({ architectureScope: scope, batch: { ...stale, ...computeContinuousObservationBatchV2Integrity(stale) } })).rejects.toThrow("CONNECTOR_FENCING_TOKEN_INVALID");
     await submitContinuousObservationBatchV2({ architectureScope: scope, batch: current });
-    const result = await finalizeContinuousSnapshot({ architectureScope: scope, runId, snapshotId: "snapshot-3", inventoryBoundaryDigest: `${boundary}-changed`, sourceVersion: "source-3", observedAt: "2026-08-17T00:02:00.000Z" });
+    const result = await finalizeContinuousSnapshot({ architectureScope: scope, runId, fencingToken: lease.fencingToken, snapshotId: "snapshot-3", inventoryBoundaryDigest: `${boundary}-changed`, sourceVersion: "source-3", observedAt: "2026-08-17T00:02:00.000Z" });
     expect(result.tombstoneCount).toBe(0);
   }, 30_000);
 });

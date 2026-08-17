@@ -42,6 +42,7 @@ export interface ClaimConnectorRunInput {
 export interface FinalizeContinuousSnapshotInput {
   architectureScope: ArchitectureScopeRef;
   runId: string;
+  fencingToken: number;
   snapshotId: string;
   inventoryBoundaryDigest: string;
   sourceVersion: string;
@@ -207,6 +208,7 @@ export async function finalizeContinuousSnapshot(input: FinalizeContinuousSnapsh
     const tx = transaction as FederationTransaction;
     const run = await tx.connectorRun.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.runId } } });
     if (!run || run.mode !== "FULL_SNAPSHOT" || run.snapshotId !== input.snapshotId) throw new Error("CONNECTOR_RUN_NOT_FOUND");
+    if (run.fencingToken !== input.fencingToken) throw new Error("CONNECTOR_FENCING_TOKEN_INVALID");
     const lastBatch = await tx.federationObservationBatch.findFirst({ where: { ...scope, runId: input.runId }, orderBy: { sequence: "desc" } });
     assertSnapshotFinalizationInput({ mode: run.mode as "FULL_SNAPSHOT", snapshotId: run.snapshotId, inventoryBoundaryDigest: input.inventoryBoundaryDigest, complete: run.status === "FINALIZING", isLastPage: lastBatch?.isLastPage === true });
     if (run.inventoryBoundaryDigest !== input.inventoryBoundaryDigest) throw new Error("SNAPSHOT_BOUNDARY_MISMATCH");
