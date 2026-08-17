@@ -60,9 +60,11 @@ Each submitted page includes:
 - exact `architectureScope`;
 - `connectorId` and versioned `sourceNamespace`;
 - stable `runId`;
+- the active lease fencing token;
 - `mode`: `FULL_SNAPSHOT` or `DELTA`;
 - `snapshotId` for full snapshots;
 - `mappingVersion` and mapping digest;
+- an inventory-boundary digest covering source selection, exclusions, and visibility policy;
 - monotonically increasing stream sequence and previous-batch digest;
 - page index, source cursor, source high-water mark, and `isLastPage`;
 - source version, observation time, coverage metadata, payload digest, and batch digest.
@@ -78,7 +80,7 @@ Each observation includes:
 
 ### Snapshot safety
 
-A full snapshot is `COMPLETE` only after every page is accepted in order and the terminal page is committed. The server records identities seen by the run. Only successful finalization may compare that complete identity set with the previous complete snapshot and create tombstone candidates for missing identities.
+A full snapshot is `COMPLETE` only after every page is accepted in order and the terminal page is committed. The server records identities seen by the run. Only successful finalization may compare that complete identity set with the previous complete snapshot for the same inventory-boundary digest and create tombstone candidates for missing identities. A changed selection, exclusion, or visibility boundary requires a rebuild and review; it cannot infer deletion from the prior boundary.
 
 A failed, cancelled, expired, incomplete, or coverage-limited snapshot cannot infer deletion. A delta stream must send an explicit tombstone event; temporary absence is not deletion.
 
@@ -100,7 +102,7 @@ Run states are `QUEUED`, `LEASED`, `RUNNING`, `FINALIZING`, `SUCCEEDED`, `FAILED
 
 Add a dedicated `connector-worker` process and Docker Compose service. It shares the application packages and PostgreSQL authority but is independently deployable and scalable.
 
-- Workers claim due runs through PostgreSQL leases with fencing tokens.
+- Workers claim due runs through PostgreSQL leases with fencing tokens. Every submitted page carries the current token, and the receiving transaction rejects a stale or non-owning token.
 - One stream has at most one effective writer.
 - Heartbeats renew ownership; an expired lease may be recovered by another worker.
 - Checkpoints advance only with accepted batches.
@@ -152,7 +154,7 @@ This adapter proves a published API contract. It does not claim API-gateway depl
 
 Provide a versioned REST/JSON mapping adapter for CMDB-style inventories and aggregated runtime service catalogs.
 
-A mapping profile declares:
+A mapping profile is data, not executable code. It uses a bounded schema of JSON Pointer selectors, typed transforms, and stable-ID templates; arbitrary JavaScript, shell commands, and dynamic module loading are forbidden. A profile declares:
 
 - endpoint and pagination strategy;
 - full-snapshot or delta semantics;
@@ -221,15 +223,17 @@ Docker Compose starts Web, MCP Server, connector worker, and PostgreSQL as one p
 
 Operational metrics include run duration, lease age, observation lag, source freshness, page and byte counts, candidate volume, conflict age, dead-letter count, Outbox lag, reconciliation state, and per-Scope convergence. Metrics and dashboards cannot aggregate unauthorized Scope data.
 
+Run identity sets and immutable observations are append-oriented and partitionable by Scope, connector, and time. Completed-run staging identities have a bounded retention policy after tombstone derivation and audit sealing. Retention may compact operational payloads but cannot remove promotion evidence, batch receipts, reconciliation receipts, or audit digests required to reproduce a governed decision.
+
 ## Testing Strategy
 
 - Contract tests cover v1 compatibility, v2 full and delta modes, page ordering, digests, budgets, and tombstones.
 - Property tests cover idempotency, stable identity, cursor monotonicity, and snapshot finalization.
 - PostgreSQL integration tests cover atomic receipt, cursor, observations, run state, identity set, Outbox, and rollback.
-- Failure-injection tests cover process loss, lease takeover, transient source failure, credential revocation, dead letters, and replay.
+- Failure-injection tests cover process loss, lease takeover, stale fencing-token rejection, transient source failure, credential revocation, dead letters, and replay.
 - Security tests cover exact-Scope isolation, sibling denial, secret redaction, HTTPS policy, SSRF, redirects, decompression, and size limits.
 - Adapter golden tests cover PostgreSQL catalogs, OpenAPI 3.0/3.1, references, declarative mappings, pagination, and mapping upgrades.
-- Deletion tests prove incomplete snapshots never infer tombstones and complete snapshots do.
+- Deletion tests prove incomplete snapshots and changed inventory boundaries never infer tombstones, while a complete same-boundary snapshot does.
 - Governance tests cover identity ambiguity, authority conflicts, localization gates, Review Bundles, promotion, reconciliation, and impact triggers.
 - End-to-end tests perform initial discovery, unchanged retry, delta change, source deletion, review, MCP promotion, PostgreSQL read-back, and convergence.
 - Docker smoke tests prove one-command startup, schema creation, worker health, and restart recovery.
@@ -296,11 +300,11 @@ PostgreSQL 对连接器定义、实例、调度、运行、租约、批次收据
 
 新增 `continuous-observation/v2`，同时保留已有流的 v1 兼容性。流不能原地切换契约版本；升级后的连接器必须使用新的版本化来源命名空间，或通过具有审计记录的显式迁移完成切换。
 
-每个页面携带精确 Scope、连接器与来源命名空间、稳定 `runId`、`FULL_SNAPSHOT` 或 `DELTA` 模式、快照 ID、映射版本与摘要、流序号和前批摘要、页序号、来源游标、水位、末页标记、来源版本、观察时间、覆盖信息及内容摘要。
+每个页面携带精确 Scope、连接器与来源命名空间、稳定 `runId`、当前租约围栏令牌、`FULL_SNAPSHOT` 或 `DELTA` 模式、快照 ID、映射版本与摘要、覆盖来源选择/排除/可见性策略的清单边界摘要、流序号和前批摘要、页序号、来源游标、水位、末页标记、来源版本、观察时间、覆盖信息及内容摘要。
 
 每条观察携带 `UPSERT` 或 `TOMBSTONE` 操作、稳定外部类型和 ID、来源版本和时间、更新负载或删除原因，以及符合来源最小化政策的证据与出处。
 
-完整快照只有在全部页面按序接收且末页提交后才进入 `COMPLETE`。服务端记录本次运行已出现的身份，只有成功完成后才能与上一完整快照比较，并为缺失身份生成 Tombstone 候选。失败、取消、超时、分页缺失或覆盖不完整的快照禁止推断删除。增量流必须显式发送 Tombstone，暂时未观察到不能解释为删除。
+完整快照只有在全部页面按序接收且末页提交后才进入 `COMPLETE`。服务端记录本次运行已出现的身份，只有成功完成后才能与具有相同清单边界摘要的上一完整快照比较，并为缺失身份生成 Tombstone 候选。来源选择、排除或可见性边界变化必须重建并评审，不能根据旧边界推断删除。失败、取消、超时、分页缺失或覆盖不完整的快照禁止推断删除。增量流必须显式发送 Tombstone，暂时未观察到不能解释为删除。
 
 映射版本变化必须发起重建运行。不同映射版本的结果不能混入同一个完整快照；替代快照完成并评审前，原有观察和身份映射继续保留。
 
@@ -308,7 +312,7 @@ PostgreSQL 对连接器定义、实例、调度、运行、租约、批次收据
 
 在保留现有 `ConnectorInstance` 的基础上，新增等价于 Connector Definition、Connector Run、Connector Lease、Connector Dead Letter 和 Connector Health Snapshot 的持久记录。运行状态包括 `QUEUED`、`LEASED`、`RUNNING`、`FINALIZING`、`SUCCEEDED`、`FAILED`、`CANCELLED` 和 `QUARANTINED`。
 
-新增独立 `connector-worker` 进程和 Docker Compose 服务。Worker 使用带围栏令牌的 PostgreSQL 租约领取任务；一条流最多只有一个有效写入者。心跳续租，租约过期后其他实例可以接管；检查点只随已接收批次推进。临时错误使用带抖动的有界指数退避，Scope、权限、契约、映射和凭据错误则暂停或隔离运行。
+新增独立 `connector-worker` 进程和 Docker Compose 服务。Worker 使用带围栏令牌的 PostgreSQL 租约领取任务；一条流最多只有一个有效写入者。每个提交页面必须携带当前围栏令牌，接收事务拒绝过期令牌或非持有者令牌。心跳续租，租约过期后其他实例可以接管；检查点只随已接收批次推进。临时错误使用带抖动的有界指数退避，Scope、权限、契约、映射和凭据错误则暂停或隔离运行。
 
 Dead Letter 可通过 MCP 查看和重放，重放仍执行原始 Scope 和摘要检查。手工触发、暂停、恢复、状态查看和重放均通过 MCP。页面只读展示当前主体有权 Scope 的健康度和新鲜度。
 
@@ -336,7 +340,7 @@ HTTP 适配器默认要求 HTTPS，并实施主机白名单、重定向限制、
 
 ### 声明式目录适配器
 
-提供版本化 REST/JSON 映射适配器，用于 CMDB 类清单和聚合运行时服务目录。映射 Profile 声明端点、分页、全量或增量语义、来源游标和水位、数据路径、稳定外部 ID、资产类型、字段和关系映射、删除事件、运行时证据窗口、Schema 版本、Profile 版本及摘要。
+提供版本化 REST/JSON 映射适配器，用于 CMDB 类清单和聚合运行时服务目录。映射 Profile 是数据而不是可执行代码，只允许受约束的 JSON Pointer、类型化转换和稳定 ID 模板；禁止任意 JavaScript、Shell 命令和动态模块加载。Profile 声明端点、分页、全量或增量语义、来源游标和水位、数据路径、稳定外部 ID、资产类型、字段和关系映射、删除事件、运行时证据窗口、Schema 版本、Profile 版本及摘要。
 
 缺少稳定外部身份的 Profile 必须拒绝启动。映射变化要求重建快照。只有完整全量结果可以推断 Tombstone，增量结果必须显式包含删除事件。
 
@@ -371,6 +375,8 @@ Tombstone 默认形成弃用建议并保留历史；连接器处理不执行物�
 Docker Compose 将 Web、MCP Server、Connector Worker 和 PostgreSQL 作为一个产品部署启动。Worker 拥有独立健康检查；没有配置持续连接器时可以禁用。生产环境可以通过连接配置使用外部 PostgreSQL 和密钥服务。
 
 运维指标包括运行耗时、租约年龄、观察延迟、来源新鲜度、页数和字节数、候选数量、冲突时长、Dead Letter 数、Outbox 延迟、对账状态和每 Scope 收敛状态。指标和仪表盘不得聚合无权 Scope 的数据。
+
+运行身份集合和不可变观察采用可按 Scope、连接器和时间分区的追加模型。完成 Tombstone 推导和审计封存后，运行期暂存身份执行有界保留策略。保留策略可以压缩运维负载，但不得删除重放治理决策所需的提升证据、批次收据、对账收据或审计摘要。
 
 ### 测试与验收
 
