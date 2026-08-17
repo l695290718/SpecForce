@@ -3,6 +3,9 @@ import type { ArchitectureScopeRef } from "../architecture/types";
 
 export type ConnectorCapability = "DISCOVER" | "OBSERVE" | "PROPOSE" | "APPLY";
 export type ConnectorStatus = "ACTIVE" | "SUSPENDED" | "REVOKED";
+export type ConnectorRunStatus = "QUEUED" | "LEASED" | "RUNNING" | "FINALIZING" | "SUCCEEDED" | "FAILED" | "CANCELLED" | "QUARANTINED";
+export type ConnectorDeadLetterStatus = "OPEN" | "REPLAYING" | "REPLAYED" | "DISCARDED";
+export type ConnectorHealthStatus = "HEALTHY" | "DEGRADED" | "BLOCKED" | "STALE";
 export type CandidateFactStatus = "CANDIDATE" | "PROMOTED" | "REJECTED" | "CONFLICTED" | "TOMBSTONED";
 export type FactAuthority = "EXTERNAL" | "SPECFORGE" | "SHARED";
 export type DesignChangeSessionStatus =
