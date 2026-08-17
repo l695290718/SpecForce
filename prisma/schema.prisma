@@ -227,8 +227,10 @@ model AuditLog {
 model ConnectorInstance {
   dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   id                   String
+  definitionId         String?
   kind                 String
   capabilities         Json     @default("[]") @db.JsonB
+  configuration        Json     @default("{}") @db.JsonB
   status               String
   secretReference      String?
   applicationServiceId String
@@ -238,6 +240,23 @@ model ConnectorInstance {
 
   @@unique([applicationServiceId, scopePath, id], map: "ConnectorInstance_scope_id_key")
   @@index([applicationServiceId, scopePath, status], map: "ConnectorInstance_scope_status_idx")
+}
+
+model ConnectorDefinition {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  kind                 String
+  contractVersion      String
+  capabilities         Json     @default("[]") @db.JsonB
+  configurationSchema  Json     @default("{}") @db.JsonB
+  status               String
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "ConnectorDefinition_scope_id_key")
+  @@index([applicationServiceId, scopePath, kind, status], map: "ConnectorDefinition_scope_kind_status_idx")
 }
 
 model FederationObservationCursor {
@@ -251,6 +270,9 @@ model FederationObservationCursor {
   status               String
   lastObservedAt       DateTime?
   lastError            String?
+  lastCompletedSnapshotId String?
+  lastCompletedBoundaryDigest String?
+  lastCompletedMappingVersion String?
   applicationServiceId String
   scopePath            String
   createdAt            DateTime @default(now())
@@ -264,12 +286,24 @@ model FederationObservationBatch {
   dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   connectorId          String
   sourceNamespace      String
+  runId                String
+  fencingToken         Int
+  mode                 String
+  snapshotId           String?
+  mappingVersion       String
+  mappingDigest        String
+  inventoryBoundaryDigest String
   sequence             Int
   previousBatchDigest  String?
   batchDigest          String
   payloadDigest        String
   observationCount     Int
   canonicalBytes       Int
+  pageIndex            Int
+  isLastPage           Boolean
+  sourceCursor         String?
+  sourceHighWaterMark  String?
+  observedAt           DateTime
   status               String
   acceptanceReceipt    Json     @default("{}") @db.JsonB
   applicationServiceId String
@@ -289,9 +323,14 @@ model SourceObservation {
   sourceNamespace      String
   externalAssetType    String
   externalId           String
+  operation            String   @default("UPSERT")
   payload              Json     @default("{}") @db.JsonB
+  deletionReason       String?
   normalizedDigest     String
   sourceVersion        String
+  runId                String?
+  snapshotId           String?
+  inventoryBoundaryDigest String?
   observedAt           DateTime
   status               String
   provenance           Json     @default("{}") @db.JsonB
@@ -305,6 +344,114 @@ model SourceObservation {
   @@unique([applicationServiceId, scopePath, idempotencyKey], map: "SourceObservation_scope_idempotency_key")
   @@unique([applicationServiceId, scopePath, connectorId, sourceNamespace, externalAssetType, externalId, sourceVersion], map: "SourceObservation_scope_external_identity_key")
   @@index([applicationServiceId, scopePath, connectorId, observedAt], map: "SourceObservation_scope_connector_observed_idx")
+}
+
+model ConnectorRun {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  connectorId          String
+  sourceNamespace      String
+  mode                 String
+  snapshotId           String?
+  mappingVersion       String
+  mappingDigest        String
+  inventoryBoundaryDigest String
+  status               String
+  sourceCursor         String?
+  sourceHighWaterMark  String?
+  acceptedSequence     Int      @default(-1)
+  acceptedBatchDigest  String?
+  fencingToken         Int      @default(0)
+  coverage             Json     @default("{}") @db.JsonB
+  failureCode          String?
+  failureMessage       String?
+  queuedAt             DateTime @default(now())
+  startedAt            DateTime?
+  finishedAt           DateTime?
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "ConnectorRun_scope_id_key")
+  @@index([applicationServiceId, scopePath, connectorId, sourceNamespace, status], map: "ConnectorRun_scope_stream_status_idx")
+  @@index([applicationServiceId, scopePath, queuedAt], map: "ConnectorRun_scope_queued_idx")
+}
+
+model ConnectorLease {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  connectorId          String
+  sourceNamespace      String
+  runId                String
+  owner                String
+  fencingToken         Int
+  heartbeatAt          DateTime
+  leaseExpiresAt       DateTime
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, connectorId, sourceNamespace], map: "ConnectorLease_scope_stream_key")
+  @@index([applicationServiceId, scopePath, leaseExpiresAt], map: "ConnectorLease_scope_expiry_idx")
+}
+
+model ConnectorSnapshotIdentity {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId                String
+  snapshotId           String
+  externalAssetType    String
+  externalId           String
+  sourceVersion        String
+  normalizedDigest     String
+  observedAt           DateTime
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, runId, externalAssetType, externalId], map: "ConnectorSnapshotIdentity_scope_run_identity_key")
+  @@index([applicationServiceId, scopePath, snapshotId, externalAssetType, externalId], map: "ConnectorSnapshotIdentity_scope_snapshot_identity_idx")
+}
+
+model ConnectorDeadLetter {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  runId                String
+  connectorId          String
+  sourceNamespace      String
+  sequence             Int?
+  pageIndex            Int?
+  errorCode            String
+  errorMessage         String
+  payload              Json     @default("{}") @db.JsonB
+  status               String
+  attemptCount         Int      @default(0)
+  lastAttemptAt        DateTime?
+  replayedAt           DateTime?
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "ConnectorDeadLetter_scope_id_key")
+  @@index([applicationServiceId, scopePath, status, createdAt], map: "ConnectorDeadLetter_scope_status_idx")
+}
+
+model ConnectorHealthSnapshot {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  connectorId          String
+  sourceNamespace      String
+  status               String
+  metrics              Json     @default("{}") @db.JsonB
+  capturedAt           DateTime
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, connectorId, sourceNamespace], map: "ConnectorHealthSnapshot_scope_stream_key")
+  @@index([applicationServiceId, scopePath, status, capturedAt], map: "ConnectorHealthSnapshot_scope_status_idx")
 }
 
 model ExternalIdentityMapping {
