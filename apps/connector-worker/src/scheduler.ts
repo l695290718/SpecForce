@@ -53,6 +53,7 @@ export class ConnectorScheduler {
         const claimed = await this.gateway.claimRun({ runId: run.id, owner: this.owner, now: this.now() });
         result.claimed += 1;
         const adapter = this.registry.create({ kind: claimed.run.kind, contractVersion: CONTINUOUS_OBSERVATION_V2_CONTRACT_VERSION, mappingVersion: claimed.run.mappingVersion, configuration: claimed.run.configuration, secrets: this.secrets });
+        if (adapter.sourceNamespace !== claimed.run.sourceNamespace) throw new Error("CONNECTOR_SOURCE_NAMESPACE_MISMATCH");
         const page = await adapter.poll({ run: claimed.run, fencingToken: claimed.fencingToken });
         const batch = this.createBatch(claimed.run, claimed.fencingToken, page);
         await this.gateway.submitBatch({ run: claimed.run, fencingToken: claimed.fencingToken, batch });

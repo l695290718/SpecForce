@@ -61,4 +61,16 @@ describe("connector worker", () => {
     expect(failures[0]).toContain("authorization=[REDACTED]");
     expect(failures[0]).not.toContain("bearer-secret");
   });
+
+  it("rejects a run whose source namespace differs from the registered adapter", async () => {
+    const failures: string[] = [];
+    const gateway: ConnectorV2WorkerGateway = {
+      listDueRuns: async () => [run()], claimRun: async () => ({ run: { ...run(), sourceNamespace: "wrong-source" }, fencingToken: 1 }), heartbeat: async () => undefined, submitBatch: async () => ({ batchDigest: "", idempotent: false }), finalize: async () => undefined,
+      recordFailure: async ({ code }) => { failures.push(code); }
+    };
+    const registry = new ConnectorAdapterRegistry();
+    registry.register({ kind: "postgres-schema", contractVersion: "continuous-observation/v2", mappingVersions: ["mapping-v1"], factory: () => ({ kind: "postgres-schema", sourceNamespace: "postgres", poll: async () => page() }) });
+    await new ConnectorScheduler({ gateway, registry, owner: "worker-a" }).runOnce();
+    expect(failures).toEqual(["CONNECTOR_SOURCE_NAMESPACE_MISMATCH"]);
+  });
 });
