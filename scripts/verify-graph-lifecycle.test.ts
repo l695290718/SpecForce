@@ -11,6 +11,8 @@ describe("managed graph verification lifecycle", () => {
     expect(script).toContain('(@("up", "-d", "--build") + $managedGraphServices)');
     expect(script).toContain('(@("stop") + $managedGraphServices)');
     expect(script).toContain('(@("rm", "--force", "--stop") + $managedGraphServices)');
+    expect(script).toContain('@("down", "--volumes", "--remove-orphans")');
+    expect(script).toContain('GRAPH_LIVE_COMPOSE_DOWN_FAILED');
     expect(script).not.toContain('docker ps --filter "label=com.docker.compose.service=graph-projector"');
   });
 

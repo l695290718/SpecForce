@@ -275,6 +275,7 @@ try {
         try { Invoke-LiveCheck $repositoryRoot "cleanup" } catch { $cleanupErrors += $_ }
         try { Invoke-ManagedCompose $composeArgs ((@("stop") + $managedGraphServices)) "GRAPH_LIVE_COMPOSE_STOP_FAILED" } catch { $cleanupErrors += $_ }
         try { Invoke-ManagedCompose $composeArgs ((@("rm", "--force", "--stop") + $managedGraphServices)) "GRAPH_LIVE_COMPOSE_REMOVE_FAILED" } catch { $cleanupErrors += $_ }
+        try { Invoke-ManagedCompose $composeArgs @("down", "--volumes", "--remove-orphans") "GRAPH_LIVE_COMPOSE_DOWN_FAILED" } catch { $cleanupErrors += $_ }
       }
       if ($null -ne $previousDatabaseUrl) { $env:DATABASE_URL = $previousDatabaseUrl } else { Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue }
       if ($null -ne $previousHostDatabaseUrl) { $env:SPECFORGE_GRAPH_HEALTH_DATABASE_URL = $previousHostDatabaseUrl } else { Remove-Item Env:SPECFORGE_GRAPH_HEALTH_DATABASE_URL -ErrorAction SilentlyContinue }

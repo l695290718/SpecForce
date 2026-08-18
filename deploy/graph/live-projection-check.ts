@@ -21,6 +21,12 @@ type FixtureRow = {
   event_count: bigint | number;
 };
 
+type FixtureWatermark = {
+  relationships: [FixtureRow, FixtureRow];
+  graphVersion: bigint;
+  checkpointVersion: bigint;
+};
+
 type HealthResponse = {
   status?: string;
   code?: string;
@@ -54,9 +60,8 @@ async function main(): Promise<void> {
     await assertProjectorReachable();
     if (phase === "prepare") await authorFixtureThroughMcp();
 
-    const row = await waitForCheckpoint(prisma);
-    const traversal = await traverse(row.graph_version!);
-    assertTraversal(traversal, row.graph_version!);
+    const watermark = await waitForCheckpoint(prisma);
+    const traversal = await waitForTraversalConvergence(watermark.graphVersion);
     if (phase === "verify") assertFixtureEdgeIsSingular(traversal);
 
     const health = await readProjectorHealth();
@@ -68,12 +73,12 @@ async function main(): Promise<void> {
     console.log(JSON.stringify({
       phase,
       architectureScope: { enterpriseId, applicationServiceId, scopePath },
-      relationshipId: row.relationship_id,
-      eventId: row.event_id,
-      graphVersion: row.graph_version?.toString(),
-      checkpoint: row.checkpoint_version?.toString(),
-      outboxStatus: row.status,
-      eventCount: Number(row.event_count),
+      relationshipIds: watermark.relationships.map((row) => row.relationship_id),
+      eventIds: watermark.relationships.map((row) => row.event_id),
+      graphVersion: watermark.graphVersion.toString(),
+      checkpoint: watermark.checkpointVersion.toString(),
+      outboxStatuses: watermark.relationships.map((row) => row.status),
+      eventCounts: watermark.relationships.map((row) => Number(row.event_count)),
       traversalNodes: traversal.nodes?.length ?? 0,
       traversalEdges: traversal.edges?.length ?? 0,
       projectorHealth: health
@@ -192,13 +197,22 @@ async function callMcp(client: { callTool(input: { name: string; arguments: Reco
   }
 }
 
-async function waitForCheckpoint(prisma: PrismaClient): Promise<FixtureRow> {
-  let lastReason = "no authoritative RelationshipOutbox row found";
+async function waitForCheckpoint(prisma: PrismaClient): Promise<FixtureWatermark> {
+  let lastReason = "no authoritative fixture RelationshipOutbox rows found";
   for (let attempt = 0; attempt < 90; attempt += 1) {
-    const row = await readFixtureState(fixtureLinkId());
-    if (row.status === "DEAD_LETTER") throw new Error("GRAPH_LIVE_DEAD_LETTER: exact-Scope fixture reached DEAD_LETTER; retry after resolving Gateway delivery diagnostics.");
-    if (row.graph_version !== null && row.status === "COMPLETED" && row.checkpoint_version !== null && row.checkpoint_version >= row.graph_version) return row;
-    lastReason = `status=${row.status ?? "missing"}, graphVersion=${row.graph_version?.toString() ?? "missing"}, checkpoint=${row.checkpoint_version?.toString() ?? "missing"}`;
+    const rows = await Promise.all([
+      readFixtureStateWithClient(prisma, fixtureLinkId(fixture.firstApiId, fixture.secondApiId)),
+      readFixtureStateWithClient(prisma, fixtureLinkId(fixture.secondApiId, fixture.thirdApiId))
+    ]) as [FixtureRow, FixtureRow];
+    if (rows.some((row) => row.status === "DEAD_LETTER")) throw new Error("GRAPH_LIVE_DEAD_LETTER: exact-Scope fixture reached DEAD_LETTER; retry after resolving Gateway delivery diagnostics.");
+    const graphVersions = rows.map((row) => row.graph_version);
+    const checkpointVersions = rows.map((row) => row.checkpoint_version);
+    if (rows.every((row) => row.status === "COMPLETED") && graphVersions.every((version): version is bigint => version !== null) && checkpointVersions.every((version): version is bigint => version !== null)) {
+      const graphVersion = graphVersions.reduce((latest, version) => version > latest ? version : latest, 0n);
+      const checkpointVersion = checkpointVersions.reduce((latest, version) => version < latest ? version : latest);
+      if (checkpointVersion >= graphVersion) return { relationships: rows, graphVersion, checkpointVersion };
+    }
+    lastReason = rows.map((row) => `status=${row.status ?? "missing"}, graphVersion=${row.graph_version?.toString() ?? "missing"}, checkpoint=${row.checkpoint_version?.toString() ?? "missing"}`).join("; ");
     await delay(1_000);
   }
   throw new Error(`GRAPH_LIVE_CHECKPOINT_TIMEOUT: ${lastReason}; retry after the exact-Scope Projector drains the canonical RelationshipOutbox.`);
@@ -207,6 +221,13 @@ async function waitForCheckpoint(prisma: PrismaClient): Promise<FixtureRow> {
 async function readFixtureState(linkId: string): Promise<FixtureRow> {
   const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl! } } });
   try {
+    return await readFixtureStateWithClient(prisma, linkId);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+async function readFixtureStateWithClient(prisma: PrismaClient, linkId: string): Promise<FixtureRow> {
     const rows = await prisma.$queryRawUnsafe<FixtureRow[]>(`
       SELECT current."dbId"::text AS relationship_id,
              event."dbId"::text AS event_id,
@@ -245,13 +266,10 @@ async function readFixtureState(linkId: string): Promise<FixtureRow> {
     const row = rows[0];
     if (!row) throw new Error("GRAPH_LIVE_RELATIONSHIP_MISSING: MCP did not produce the exact-Scope RelationshipCurrent row.");
     return row;
-  } finally {
-    await prisma.$disconnect();
-  }
 }
 
-function fixtureLinkId(): string {
-  return `api:${fixture.firstApiId}:calls:api:${fixture.secondApiId}`;
+function fixtureLinkId(sourceId: string, targetId: string): string {
+  return `api:${sourceId}:calls:api:${targetId}`;
 }
 
 async function assertGatewayHealth(): Promise<void> {
@@ -298,13 +316,39 @@ async function traverse(graphVersion: bigint): Promise<GatewayTraversal> {
   return await response.json() as GatewayTraversal;
 }
 
+async function waitForTraversalConvergence(graphVersion: bigint): Promise<GatewayTraversal> {
+  const deadline = Date.now() + 15_000;
+  let lastShapeError = "no traversal response";
+  while (Date.now() < deadline) {
+    try {
+      const result = await traverse(graphVersion);
+      assertTraversal(result, graphVersion);
+      return result;
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.startsWith("NEBULA_LIVE_TRAVERSAL_SHAPE_INVALID:")) throw error;
+      lastShapeError = error.message;
+      await delay(500);
+    }
+  }
+  throw new Error(`NEBULA_LIVE_TRAVERSAL_CONVERGENCE_TIMEOUT: ${lastShapeError}; retry after the graph projection becomes readable at checkpoint ${graphVersion}.`);
+}
+
 function assertTraversal(result: GatewayTraversal, graphVersion: bigint): void {
   if (result.status !== "COMPLETE") throw new Error(`NEBULA_LIVE_TRAVERSAL_INCOMPLETE: status=${result.status ?? "missing"}; retry after graph checkpoint ${graphVersion} is available.`);
   if (result.graphVersion !== graphVersion.toString()) throw new Error("NEBULA_LIVE_TRAVERSAL_VERSION_MISMATCH: Gateway returned a different graph version than the authoritative checkpoint.");
   if ((result.truncationReasons ?? []).length > 0) throw new Error("NEBULA_LIVE_TRAVERSAL_TRUNCATED: exact-Scope verification traversal was truncated.");
   const nodes = result.nodes ?? [];
   const edges = result.edges ?? [];
-  if (nodes.length < 3 || edges.length < 2) throw new Error(`NEBULA_LIVE_TRAVERSAL_SHAPE_INVALID: expected a two-hop path, got nodes=${nodes.length}, edges=${edges.length}.`);
+  const expectedNodes = new Set([fixture.firstApiId, fixture.secondApiId, fixture.thirdApiId]);
+  const actualNodes = new Set(nodes.map((node) => node.logicalId));
+  const expectedEdges = [
+    [fixture.firstApiId, fixture.secondApiId],
+    [fixture.secondApiId, fixture.thirdApiId]
+  ];
+  const hasExpectedEdges = edges.length === expectedEdges.length && expectedEdges.every(([source, target]) => edges.some((edge) => edge.code === "CALLS" && directedEndpointPair(edge, source, target)));
+  if (nodes.length !== expectedNodes.size || actualNodes.size !== expectedNodes.size || [...expectedNodes].some((id) => !actualNodes.has(id)) || !hasExpectedEdges) {
+    throw new Error(`NEBULA_LIVE_TRAVERSAL_SHAPE_INVALID: expected fixture nodes=${expectedNodes.size}, edges=${expectedEdges.length}, got nodes=${nodes.length}, edges=${edges.length}.`);
+  }
   if (nodes.some((node) => node.enterpriseId !== enterpriseId || node.applicationServiceId !== applicationServiceId || node.scopePath !== scopePath)) {
     throw new Error("NEBULA_LIVE_SCOPE_LEAK: traversal returned a node outside the exact Designer Scope.");
   }
@@ -313,6 +357,12 @@ function assertTraversal(result: GatewayTraversal, graphVersion: bigint): void {
 function assertFixtureEdgeIsSingular(result: GatewayTraversal): void {
   const matching = (result.edges ?? []).filter((edge) => edge.code === "CALLS" && sameEndpointPair(edge, fixture.firstApiId, fixture.secondApiId));
   if (matching.length !== 1) throw new Error(`NEBULA_LIVE_DUPLICATE_EDGE: expected one logical first-hop edge after Projector restart, got ${matching.length}.`);
+}
+
+function directedEndpointPair(edge: Record<string, unknown>, sourceId: string, targetId: string): boolean {
+  const source = edge.source as Record<string, unknown> | undefined;
+  const target = edge.target as Record<string, unknown> | undefined;
+  return source?.logicalId === sourceId && target?.logicalId === targetId;
 }
 
 function sameEndpointPair(edge: Record<string, unknown>, first: string, second: string): boolean {
