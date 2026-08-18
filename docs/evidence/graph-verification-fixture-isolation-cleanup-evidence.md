@@ -14,7 +14,7 @@ English is canonical. Chinese is the human-facing localization.
 
 ## Implemented behavior
 
-The verification Scope has purpose `verification`, exact read/write grants, and no inheritance from the product Scope. Normal Web Scope selection excludes it. Fixture creation and cleanup use the MCP boundary and explicit run IDs. Historical cleanup validates nine exact fixture fingerprints before deleting them.
+The verification Scope has purpose `verification`, exact read/write grants, and no inheritance from the product Scope. Normal Web Scope selection excludes it. Fixture creation and cleanup use the MCP boundary and explicit run IDs. Historical cleanup validates nine exact fixture fingerprints before deleting them. The live gate now manages a unique Compose project containing only the six graph verification services, uses Docker-assigned loopback ports, separates host and container PostgreSQL URLs, and cleans the run in an outer failure-safe path.
 
 ## Exact evidence
 
@@ -27,10 +27,13 @@ The verification Scope has purpose `verification`, exact read/write grants, and 
 | historical cleanup dry-run before delete | 9 fingerprint matches, 0 already absent |
 | historical cleanup delete | exactly 9 validated records deleted through MCP |
 | historical cleanup dry-run after delete | 0 fingerprint matches, 9 already absent |
-| live projection `--phase prepare`, run `p1-cleanup-check` | blocked before writes: `NEBULA_LIVE_GATEWAY_UNAVAILABLE` at `http://127.0.0.1:18088/health` |
-| live projection `--phase cleanup`, run `p1-cleanup-check` | exact verification Scope; `assetIds=3`, `status=deleted`, `remainingLinks=0` |
+| `powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -ConfigurationOnly` | passed; local/external topology and loopback port assertions passed |
+| `pnpm exec vitest run scripts/verify-graph-lifecycle.test.ts scripts/cleanup-graph-verification-fixtures.test.ts deploy/graph/live-projection-config.test.ts` | 3 files; 10 tests passed |
+| managed live gate build | blocked while Docker Hub failed to fetch the pinned Go base image with `failed to fetch anonymous token` / `unexpected EOF`; no managed containers remained |
+| managed live gate failure cleanup | run-scoped MCP cleanup executed after Compose failure; `assetIds=3`, `status=deleted`, `remainingLinks=0`; no stopped containers remained |
+| live projection `--phase cleanup`, run `lifecycle-cleanup-check` | exact verification Scope; `assetIds=3`, `status=deleted`, `remainingLinks=0` |
 
-The implementation is complete locally. Live Nebula readiness remains an external blocked capability and must be retried after the Gateway/Nebula profile is running.
+The lifecycle implementation is complete locally. The live end-to-end gate remains externally blocked by Docker Hub image retrieval, not by an application or Scope error. Retry the same managed command after the pinned base images are available locally or the configured registry mirror is reachable.
 
 ## 证据：图验证夹具隔离与清理
 
@@ -47,6 +50,6 @@ The implementation is complete locally. Live Nebula readiness remains an externa
 
 ### 已实现行为与边界
 
-验证 Scope 的用途是 `verification`，只授予精确读写权限，不继承产品 Scope；普通 Web Scope 选择器会排除它。夹具创建和清理均通过 MCP 边界并绑定显式运行 ID。历史清理在删除前校验 9 条精确夹具指纹。
+验证 Scope 的用途是 `verification`，只授予精确读写权限，不继承产品 Scope；普通 Web Scope 选择器会排除它。夹具创建和清理均通过 MCP 边界并绑定显式运行 ID。历史清理在删除前校验 9 条精确夹具指纹。实时门禁现在使用独立 Compose 项目，仅管理 6 个图验证服务，使用 Docker 动态回环端口，分离主机和容器 PostgreSQL 连接，并在失败外层 finally 中清理。
 
-实时 Nebula 就绪仍受外部网关阻塞；网关启动后必须重跑相同的 `--phase prepare` 命令。恢复清理已验证成功，结果为 3 个资产被删除、状态 `deleted`、剩余关系 `0`。
+实时端到端门禁目前受 Docker Hub 基础镜像拉取阻塞，错误为 `failed to fetch anonymous token` / `unexpected EOF`，不是应用或 Scope 错误。配置门禁和静态回归已通过；失败清理已验证成功，结果为 3 个资产被删除、状态 `deleted`、剩余关系 `0`。镜像可用或配置镜像代理后，必须重跑同一个托管 Live 命令。

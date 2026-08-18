@@ -3,8 +3,8 @@
 services:
   graph-gateway:
     ports:
-      - "127.0.0.1:18088:8088"
+      - "127.0.0.1:${SPECFORGE_GRAPH_GATEWAY_HOST_PORT:-18088}:8088"
 
   graph-projector:
     ports:
-      - "127.0.0.1:18090:8090"
+      - "127.0.0.1:${SPECFORGE_GRAPH_PROJECTOR_HOST_PORT:-18090}:8090"

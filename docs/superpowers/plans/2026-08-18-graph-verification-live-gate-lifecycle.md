@@ -25,11 +25,12 @@
 
 **Files:**
 - Modify: `deploy/graph/verify-projection.ps1`
-- Create: `deploy/graph/verify-projection.lifecycle.test.ts`
+- Create: `scripts/verify-graph-lifecycle.test.ts`
 
 **Interfaces:**
 - Produce `New-ManagedComposeInvocation` behavior that always carries `-p <validated-project-name>`, the three Compose files, both environment files, and the six-service allow-list.
 - Produce a deterministic project name `specforge-graph-verify-<runId>` where `runId` is limited to `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`.
+- Produce Docker-assigned loopback ports for live runs and preserve `18088`/`18090` defaults for configuration-only assertions.
 - Produce separate host and container database URL values without logging passwords.
 
 - [ ] **Step 1: Write failing tests for project and service isolation.**
@@ -39,7 +40,7 @@ Assert that a generated invocation contains the dedicated project flag and exact
 Run:
 
 ```powershell
-pnpm exec vitest run deploy/graph/verify-projection.lifecycle.test.ts --testTimeout=30000
+pnpm exec vitest run scripts/verify-graph-lifecycle.test.ts --testTimeout=30000
 ```
 
 Expected: FAIL because the lifecycle helpers and test seams do not exist.
@@ -110,7 +111,7 @@ Stop and remove only the six services through the same project-scoped invocation
 Verify project-scoped restart, service allow-listing, temporary env cleanup, and no production service in any destructive command. Run:
 
 ```powershell
-pnpm exec vitest run deploy/graph/verify-projection.lifecycle.test.ts --testTimeout=30000
+pnpm exec vitest run scripts/verify-graph-lifecycle.test.ts --testTimeout=30000
 ```
 
 ### Task 3: Make Fixture Cleanup Failure-Safe
@@ -140,7 +141,7 @@ Ensure `--phase cleanup` remains idempotent and can run after partial preparatio
 - [ ] **Step 4: Run focused cleanup tests.**
 
 ```powershell
-pnpm exec vitest run scripts/cleanup-graph-verification-fixtures.test.ts deploy/graph/verify-projection.lifecycle.test.ts --testTimeout=30000
+pnpm exec vitest run scripts/cleanup-graph-verification-fixtures.test.ts scripts/verify-graph-lifecycle.test.ts --testTimeout=30000
 ```
 
 Expected: all cleanup and lifecycle cases pass.
@@ -161,7 +162,7 @@ Expected: all cleanup and lifecycle cases pass.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -ConfigurationOnly
-pnpm exec vitest run deploy/graph/verify-projection.lifecycle.test.ts scripts/cleanup-graph-verification-fixtures.test.ts --testTimeout=30000
+pnpm exec vitest run scripts/verify-graph-lifecycle.test.ts scripts/cleanup-graph-verification-fixtures.test.ts --testTimeout=30000
 git diff --check
 ```
 
@@ -186,6 +187,6 @@ pnpm design-context:close -- --application-service com.huawei.celon.desiner.grap
 - [ ] **Step 5: Commit tracked changes only.**
 
 ```powershell
-git add deploy/graph/verify-projection.ps1 deploy/graph/verify-projection.lifecycle.test.ts scripts/cleanup-graph-verification-fixtures.ts scripts/cleanup-graph-verification-fixtures.test.ts docs/evidence/graph-verification-fixture-isolation-cleanup-evidence.md docs/TODO.md docs/superpowers/specs/2026-08-15-graph-verification-fixture-isolation-cleanup-design.md docs/superpowers/specs/2026-08-18-graph-verification-live-gate-design.md docs/superpowers/plans/2026-08-18-graph-verification-live-gate-lifecycle.md
+git add deploy/graph/verify-projection.ps1 deploy/compose.graph-verify.yaml scripts/verify-graph-lifecycle.test.ts scripts/cleanup-graph-verification-fixtures.ts scripts/cleanup-graph-verification-fixtures.test.ts docs/evidence/graph-verification-fixture-isolation-cleanup-evidence.md docs/TODO.md docs/superpowers/specs/2026-08-15-graph-verification-fixture-isolation-cleanup-design.md docs/superpowers/specs/2026-08-18-graph-verification-live-gate-design.md docs/superpowers/plans/2026-08-18-graph-verification-live-gate-lifecycle.md
 git commit -m "test: isolate graph verification lifecycle"
 ```

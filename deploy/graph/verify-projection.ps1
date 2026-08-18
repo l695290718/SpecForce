@@ -27,6 +27,61 @@ function Get-Service($Configuration, [string]$Name) {
   return $Configuration.services.$Name
 }
 
+$managedGraphServices = @(
+  "nebula-metad",
+  "nebula-storaged",
+  "nebula-graphd",
+  "nebula-bootstrap",
+  "graph-gateway",
+  "graph-projector"
+)
+
+function Assert-RunId([string]$RunId) {
+  if ([string]::IsNullOrWhiteSpace($RunId) -or $RunId -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$' -or $RunId.ToLowerInvariant() -eq "manual") {
+    throw "GRAPH_LIVE_RUN_ID_INVALID: use a generated or explicit non-manual run id."
+  }
+}
+
+function Get-ManagedComposeProject([string]$RunId) {
+  Assert-RunId $RunId
+  return "specforge-graph-verify-$RunId"
+}
+
+function Get-DotEnvValue([string]$Path, [string]$Name) {
+  if (-not (Test-Path -LiteralPath $Path)) { return $null }
+  $line = Get-Content -LiteralPath $Path | Where-Object { $_ -match "^$([regex]::Escape($Name))=" } | Select-Object -First 1
+  if ($null -eq $line) { return $null }
+  return (($line -replace "^$([regex]::Escape($Name))=", "").Trim().Trim('"').Trim("'"))
+}
+
+function Assert-CanonicalDatabaseUrl([string]$DatabaseUrl, [string]$Code) {
+  if ([string]::IsNullOrWhiteSpace($DatabaseUrl)) { throw "$Code`: database URL is required." }
+  if ($DatabaseUrl -match "specforge-graph-verify" -or $DatabaseUrl -notmatch "/specforge_canonical(?:\?|$)") {
+    throw "$Code`: database URL must target the canonical specforge_canonical database."
+  }
+}
+
+function Get-ManagedComposeArgs([string]$ProjectName, [string]$RootEnvFile, [string]$GraphEnvFile, [string]$BaseCompose, [string]$LocalCompose, [string]$VerificationCompose) {
+  return @(
+    "-p", $ProjectName,
+    "--env-file", $RootEnvFile,
+    "--env-file", $GraphEnvFile,
+    "-f", $BaseCompose,
+    "-f", $LocalCompose,
+    "-f", $VerificationCompose
+  )
+}
+
+function Invoke-ManagedCompose([string[]]$ComposeArgs, [string[]]$CommandArgs, [string]$FailureCode) {
+  & docker compose @ComposeArgs @CommandArgs
+  if ($LASTEXITCODE -ne 0) { throw "$FailureCode`: docker compose command failed for the managed graph verification project." }
+}
+
+function Invoke-LiveCheck([string]$RepositoryRoot, [string]$Phase) {
+  & node (Join-Path $RepositoryRoot "node_modules\tsx\dist\cli.mjs") (Join-Path $RepositoryRoot "deploy\graph\live-projection-check.ts") --phase $Phase
+  if ($LASTEXITCODE -ne 0) { throw "NEBULA_LIVE_GATE_FAILED: $Phase phase failed; inspect the run-scoped diagnostic above." }
+}
+
 $repositoryRoot = Resolve-Path (Join-Path $PSScriptRoot "..\\..")
 $baseCompose = Join-Path $repositoryRoot "deploy\\compose.yaml"
 $localCompose = Join-Path $repositoryRoot "deploy\\compose.graph-local.yaml"
@@ -150,48 +205,89 @@ try {
 
   Write-Host "NebulaGraph projection configuration assertions passed."
   if ($Live) {
-    if ([string]::IsNullOrWhiteSpace($env:DATABASE_URL)) {
-      $rootDotEnv = Join-Path $repositoryRoot ".env"
-      if (Test-Path -LiteralPath $rootDotEnv) {
-        $databaseLine = Get-Content -LiteralPath $rootDotEnv | Where-Object { $_ -match '^DATABASE_URL=' } | Select-Object -First 1
-        if ($null -ne $databaseLine) { $env:DATABASE_URL = ($databaseLine -replace '^DATABASE_URL=', '').Trim().Trim('"') }
+    $rootEnvFile = Join-Path $repositoryRoot "deploy\.env"
+    $graphEnvFile = Join-Path $repositoryRoot "deploy\graph\.env"
+    if (-not (Test-Path -LiteralPath $rootEnvFile)) { throw "GRAPH_LIVE_DEPLOY_ENV_REQUIRED: copy deploy/.env.example to deploy/.env and configure the canonical PostgreSQL deployment." }
+    if (-not (Test-Path -LiteralPath $graphEnvFile)) { throw "GRAPH_LIVE_GRAPH_ENV_REQUIRED: copy deploy/graph/.env.example to deploy/graph/.env and configure Nebula credentials." }
+
+    $rootDotEnv = Join-Path $repositoryRoot ".env"
+    $hostDatabaseUrl = $env:SPECFORGE_GRAPH_HEALTH_DATABASE_URL
+    if ([string]::IsNullOrWhiteSpace($hostDatabaseUrl)) { $hostDatabaseUrl = $env:DATABASE_URL }
+    if ([string]::IsNullOrWhiteSpace($hostDatabaseUrl)) { $hostDatabaseUrl = Get-DotEnvValue $rootDotEnv "DATABASE_URL" }
+    Assert-CanonicalDatabaseUrl $hostDatabaseUrl "GRAPH_LIVE_DATABASE_NOT_CANONICAL"
+
+    $containerDatabaseUrl = Get-DotEnvValue $graphEnvFile "DATABASE_URL"
+    if ([string]::IsNullOrWhiteSpace($containerDatabaseUrl) -or $containerDatabaseUrl -notmatch "@deploy-postgres-1:5432/specforge_canonical(?:\?|$)") {
+      throw "GRAPH_LIVE_CONTAINER_DATABASE_NOT_CANONICAL: deploy/graph/.env must use deploy-postgres-1:5432/specforge_canonical for the Projector container."
+    }
+    $verificationApplicationServiceId = Get-DotEnvValue $graphEnvFile "SPECFORGE_GRAPH_HEALTH_APPLICATION_SERVICE_ID"
+    $verificationScopePath = Get-DotEnvValue $graphEnvFile "SPECFORGE_GRAPH_HEALTH_SCOPE_PATH"
+    $verificationEnterpriseId = Get-DotEnvValue $graphEnvFile "SPECFORGE_GRAPH_HEALTH_ENTERPRISE_ID"
+    if ([string]::IsNullOrWhiteSpace($verificationApplicationServiceId) -or [string]::IsNullOrWhiteSpace($verificationScopePath) -or [string]::IsNullOrWhiteSpace($verificationEnterpriseId)) {
+      throw "GRAPH_LIVE_SCOPE_CONFIG_REQUIRED: deploy/graph/.env must define the exact verification Scope and enterprise id."
+    }
+
+    & docker version --format "{{.Server.Version}}" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "GRAPH_LIVE_DOCKER_UNAVAILABLE: Docker Engine is not reachable." }
+    & docker network inspect deploy_default | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "GRAPH_LIVE_NETWORK_REQUIRED: external Docker network deploy_default is not available." }
+
+    if ([string]::IsNullOrWhiteSpace($env:SPECFORGE_GRAPH_LIVE_RUN_ID)) { $env:SPECFORGE_GRAPH_LIVE_RUN_ID = [guid]::NewGuid().ToString("N") }
+    $runId = $env:SPECFORGE_GRAPH_LIVE_RUN_ID
+    $composeProjectName = Get-ManagedComposeProject $runId
+    $composeArgs = Get-ManagedComposeArgs $composeProjectName $rootEnvFile $graphEnvFile $baseCompose $localCompose $verificationCompose
+    $managedStarted = $false
+    $primaryError = $null
+    $cleanupErrors = @()
+    $previousDatabaseUrl = $env:DATABASE_URL
+    $previousHostDatabaseUrl = $env:SPECFORGE_GRAPH_HEALTH_DATABASE_URL
+    $previousGatewayUrl = $env:SPECFORGE_GRAPH_GATEWAY_URL
+    $previousProjectorUrl = $env:SPECFORGE_PROJECTOR_HEALTH_URL
+    $previousHealthApplicationServiceId = $env:SPECFORGE_GRAPH_HEALTH_APPLICATION_SERVICE_ID
+    $previousHealthScopePath = $env:SPECFORGE_GRAPH_HEALTH_SCOPE_PATH
+    $previousHealthEnterpriseId = $env:SPECFORGE_GRAPH_HEALTH_ENTERPRISE_ID
+    $previousGatewayPort = $env:SPECFORGE_GRAPH_GATEWAY_HOST_PORT
+    $previousProjectorPort = $env:SPECFORGE_GRAPH_PROJECTOR_HOST_PORT
+    try {
+      $env:DATABASE_URL = $containerDatabaseUrl
+      $env:SPECFORGE_GRAPH_HEALTH_DATABASE_URL = $hostDatabaseUrl
+      $env:SPECFORGE_GRAPH_HEALTH_APPLICATION_SERVICE_ID = $verificationApplicationServiceId
+      $env:SPECFORGE_GRAPH_HEALTH_SCOPE_PATH = $verificationScopePath
+      $env:SPECFORGE_GRAPH_HEALTH_ENTERPRISE_ID = $verificationEnterpriseId
+      $env:SPECFORGE_GRAPH_GATEWAY_HOST_PORT = "0"
+      $env:SPECFORGE_GRAPH_PROJECTOR_HOST_PORT = "0"
+      $managedStarted = $true
+      Invoke-ManagedCompose $composeArgs (@("up", "-d", "--build") + $managedGraphServices) "GRAPH_LIVE_COMPOSE_START_FAILED"
+
+      $gatewayBinding = (& docker compose @composeArgs port graph-gateway 8088 | Select-Object -Last 1).Trim()
+      $projectorBinding = (& docker compose @composeArgs port graph-projector 8090 | Select-Object -Last 1).Trim()
+      if ($gatewayBinding -notmatch ":(?<port>\d+)$" -or $projectorBinding -notmatch ":(?<port>\d+)$") { throw "GRAPH_LIVE_PORT_DISCOVERY_FAILED: managed graph services did not publish loopback ports." }
+      $env:SPECFORGE_GRAPH_GATEWAY_URL = "http://127.0.0.1:$($gatewayBinding -replace '^.*:', '')"
+      $env:SPECFORGE_PROJECTOR_HEALTH_URL = "http://127.0.0.1:$($projectorBinding -replace '^.*:', '')"
+      Invoke-LiveCheck $repositoryRoot "prepare"
+      Invoke-ManagedCompose $composeArgs @("restart", "graph-projector") "PROJECTOR_RESTART_BLOCKED"
+      Invoke-LiveCheck $repositoryRoot "verify"
+      Write-Host "NebulaGraph live outbox, checkpoint, traversal, restart, and idempotency assertions passed."
+    } catch {
+      $primaryError = $_
+    } finally {
+      if ($managedStarted) {
+        try { Invoke-LiveCheck $repositoryRoot "cleanup" } catch { $cleanupErrors += $_ }
+        try { Invoke-ManagedCompose $composeArgs ((@("stop") + $managedGraphServices)) "GRAPH_LIVE_COMPOSE_STOP_FAILED" } catch { $cleanupErrors += $_ }
+        try { Invoke-ManagedCompose $composeArgs ((@("rm", "--force", "--stop") + $managedGraphServices)) "GRAPH_LIVE_COMPOSE_REMOVE_FAILED" } catch { $cleanupErrors += $_ }
       }
+      if ($null -ne $previousDatabaseUrl) { $env:DATABASE_URL = $previousDatabaseUrl } else { Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue }
+      if ($null -ne $previousHostDatabaseUrl) { $env:SPECFORGE_GRAPH_HEALTH_DATABASE_URL = $previousHostDatabaseUrl } else { Remove-Item Env:SPECFORGE_GRAPH_HEALTH_DATABASE_URL -ErrorAction SilentlyContinue }
+      if ($null -ne $previousGatewayUrl) { $env:SPECFORGE_GRAPH_GATEWAY_URL = $previousGatewayUrl } else { Remove-Item Env:SPECFORGE_GRAPH_GATEWAY_URL -ErrorAction SilentlyContinue }
+      if ($null -ne $previousProjectorUrl) { $env:SPECFORGE_PROJECTOR_HEALTH_URL = $previousProjectorUrl } else { Remove-Item Env:SPECFORGE_PROJECTOR_HEALTH_URL -ErrorAction SilentlyContinue }
+      if ($null -ne $previousHealthApplicationServiceId) { $env:SPECFORGE_GRAPH_HEALTH_APPLICATION_SERVICE_ID = $previousHealthApplicationServiceId } else { Remove-Item Env:SPECFORGE_GRAPH_HEALTH_APPLICATION_SERVICE_ID -ErrorAction SilentlyContinue }
+      if ($null -ne $previousHealthScopePath) { $env:SPECFORGE_GRAPH_HEALTH_SCOPE_PATH = $previousHealthScopePath } else { Remove-Item Env:SPECFORGE_GRAPH_HEALTH_SCOPE_PATH -ErrorAction SilentlyContinue }
+      if ($null -ne $previousHealthEnterpriseId) { $env:SPECFORGE_GRAPH_HEALTH_ENTERPRISE_ID = $previousHealthEnterpriseId } else { Remove-Item Env:SPECFORGE_GRAPH_HEALTH_ENTERPRISE_ID -ErrorAction SilentlyContinue }
+      if ($null -ne $previousGatewayPort) { $env:SPECFORGE_GRAPH_GATEWAY_HOST_PORT = $previousGatewayPort } else { Remove-Item Env:SPECFORGE_GRAPH_GATEWAY_HOST_PORT -ErrorAction SilentlyContinue }
+      if ($null -ne $previousProjectorPort) { $env:SPECFORGE_GRAPH_PROJECTOR_HOST_PORT = $previousProjectorPort } else { Remove-Item Env:SPECFORGE_GRAPH_PROJECTOR_HOST_PORT -ErrorAction SilentlyContinue }
     }
-    if ([string]::IsNullOrWhiteSpace($env:DATABASE_URL)) {
-      throw "GRAPH_LIVE_DATABASE_REQUIRED: set DATABASE_URL to the canonical PostgreSQL authority before running -Live."
-    }
-    if ($env:DATABASE_URL -match "specforge-graph-verify" -or $env:DATABASE_URL -notmatch "/specforge_canonical(?:\?|$)") {
-      throw "GRAPH_LIVE_DATABASE_NOT_CANONICAL: host-side live verification must use the canonical specforge_canonical database."
-    }
-    $gatewayUrl = $env:SPECFORGE_GRAPH_GATEWAY_URL
-    if ([string]::IsNullOrWhiteSpace($gatewayUrl)) { $gatewayUrl = "http://127.0.0.1:18088" }
-    $projectorUrl = $env:SPECFORGE_PROJECTOR_HEALTH_URL
-    if ([string]::IsNullOrWhiteSpace($projectorUrl)) { $projectorUrl = "http://127.0.0.1:18090" }
-    $env:SPECFORGE_GRAPH_GATEWAY_URL = $gatewayUrl
-    $env:SPECFORGE_PROJECTOR_HEALTH_URL = $projectorUrl
-    if ([string]::IsNullOrWhiteSpace($env:SPECFORGE_GRAPH_LIVE_RUN_ID)) {
-      $env:SPECFORGE_GRAPH_LIVE_RUN_ID = [guid]::NewGuid().ToString("N")
-    }
-
-    & node (Join-Path $repositoryRoot "node_modules\\tsx\\dist\\cli.mjs") (Join-Path $repositoryRoot "deploy\\graph\\live-projection-check.ts") --phase prepare
-    if ($LASTEXITCODE -ne 0) {
-      throw "NEBULA_LIVE_GATE_FAILED: prepare phase failed; retry after Gateway, Projector, and canonical PostgreSQL are reachable."
-    }
-
-    $projectorIds = @(docker ps --filter "label=com.docker.compose.service=graph-projector" --filter "status=running" --format "{{.ID}}")
-    if ($projectorIds.Count -ne 1) {
-      throw "PROJECTOR_RESTART_BLOCKED: expected exactly one running graph-projector container; start the local graph profile with deploy/compose.graph-verify.yaml and retry."
-    }
-    docker restart $projectorIds[0] | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-      throw "PROJECTOR_RESTART_BLOCKED: Docker could not restart the running graph-projector container; retry after Docker and the local graph profile are healthy."
-    }
-
-    & node (Join-Path $repositoryRoot "node_modules\\tsx\\dist\\cli.mjs") (Join-Path $repositoryRoot "deploy\\graph\\live-projection-check.ts") --phase verify
-    if ($LASTEXITCODE -ne 0) {
-      throw "NEBULA_LIVE_GATE_FAILED: verification after Projector restart failed; inspect the precise retry reason above."
-    }
-    Write-Host "NebulaGraph live outbox, checkpoint, traversal, restart, and idempotency assertions passed."
+    if ($null -ne $primaryError) { throw $primaryError }
+    if ($cleanupErrors.Count -gt 0) { throw "GRAPH_LIVE_CLEANUP_FAILED: run $runId completed with cleanup errors; inspect the preceding diagnostics." }
   }
 } finally {
   Remove-Item -LiteralPath $environmentFile -Force -ErrorAction SilentlyContinue

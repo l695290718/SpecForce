@@ -39,7 +39,7 @@ The live gate must become repeatable without changing the production topology or
 
 `nebula-metad`, `nebula-storaged`, `nebula-graphd`, `nebula-bootstrap`, `graph-gateway`, and `graph-projector`.
 
-The command will use a dedicated Compose project name derived from the verification run ID and a validated character set. The existing `deploy_default` network remains an explicit external network so the containerized Projector can reach the already-running canonical PostgreSQL service. The script will use project-scoped Compose commands for health, restart, and stop operations. It will never call an unscoped `docker compose down`.
+The command will use a dedicated Compose project name derived from the verification run ID and a validated character set. Live host ports are assigned by Docker and discovered after startup, so concurrent verification runs cannot collide on `18088` or `18090`; configuration-only mode retains those deterministic default ports. The existing `deploy_default` network remains an explicit external network so the containerized Projector can reach the already-running canonical PostgreSQL service. The script will use project-scoped Compose commands for health, restart, and stop operations. It will never call an unscoped `docker compose down`.
 
 ### Database connection split
 
@@ -56,7 +56,7 @@ The host-side TypeScript gate receives `SPECFORGE_GRAPH_HEALTH_DATABASE_URL`, or
 7. Run the existing `verify` phase, which validates the graph version, two-hop traversal, Scope isolation, idempotent replay, and dead-letter state.
 8. In an outer `finally` path, run MCP cleanup for the run ID while the services are still reachable, then stop and remove only the six project-scoped verification containers. Verification volumes are removed only when explicitly marked ephemeral by the managed run.
 
-If preparation or verification fails, the script reports the primary failure, attempts cleanup, preserves the run ID and cleanup failure in the diagnostic output, and exits non-zero. Cleanup failure never becomes a silent success.
+If preparation, image build, or verification fails, the script reports the primary failure, attempts cleanup with the Scope variables already loaded, preserves the run ID and cleanup failure in the diagnostic output, and exits non-zero. Cleanup failure never becomes a silent success.
 
 ### Safety boundaries
 

@@ -16,13 +16,13 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 ### Graph Verification Fixture Isolation and Cleanup
 
-**Status:** Local implementation and PostgreSQL/MCP cleanup complete. Live Nebula prepare verification is externally blocked until the Gateway/Nebula profile is running.
+**Status:** Local lifecycle implementation and PostgreSQL/MCP cleanup complete. Managed live verification remains externally blocked by Docker Hub pinned-base-image retrieval.
 
 **Owner:** SpecForge Runtime and Test Infrastructure.
 
-**Trigger:** Start the configured Gateway/Nebula verification profile, then rerun `pnpm exec tsx deploy/graph/live-projection-check.ts --phase prepare` with the exact verification Scope and an explicit run ID.
+**Trigger:** Make the pinned Go/Node base images available locally or through the configured Docker registry mirror, then rerun `powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -Live`.
 
-**Evidence:** Historical dry-run/delete/post-delete completed with exact fingerprint validation; recovery cleanup returned `assetIds=3`, `status=deleted`, `remainingLinks=0`; current blocker is `NEBULA_LIVE_GATEWAY_UNAVAILABLE` at `http://127.0.0.1:18088/health`.
+**Evidence:** Historical dry-run/delete/post-delete completed with exact fingerprint validation; configuration-only assertions and 10 focused lifecycle/cleanup tests passed; managed startup reached Docker image retrieval but was blocked by `failed to fetch anonymous token` / `unexpected EOF`; failure cleanup returned `assetIds=3`, `status=deleted`, `remainingLinks=0`.
 
 ### 3A 语义单元扩充 v6
 
@@ -32,9 +32,9 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 ### 图验证夹具隔离与清理
 
-**状态：** 本地实现及 PostgreSQL/MCP 清理完成；实时 Nebula prepare 验证等待 Gateway/Nebula 配置启动。
+**状态：** 本地生命周期实现及 PostgreSQL/MCP 清理完成；托管实时验证受 Docker Hub 固定基础镜像拉取阻塞。
 
-**触发条件：** 启动配置好的 Gateway/Nebula 验证配置，并使用精确验证 Scope 和显式运行 ID 重跑 prepare 命令。
+**触发条件：** 让固定 Go/Node 基础镜像在本地可用或通过 Docker 镜像代理可达，然后执行 `powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -Live`。
 
 ## 2. CodeArts/CodeHub Protected-Branch Enforcement
 
