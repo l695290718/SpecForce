@@ -94,29 +94,33 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 ## 4. Live Enterprise Source Connectors And Continuous Synchronization
 
-**Status:** Deferred.
+**Status:** Connector governance foundation implemented and synchronized; live enterprise rollout remains deferred.
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
-**Rationale:** Phase 1 baseline discovery, Phase 2 deterministic 3A projections, Phase 3 continuous-observation governance core, and the provider-neutral local-repository connector are implemented. Enterprise systems still need concrete database, API-gateway, CMDB, and runtime adapters so existing product information can be discovered, represented as evidence-backed candidates, and kept current without weakening MCP authorization or human promotion boundaries.
+**Implemented foundation:** The v2 contract, exact-Scope PostgreSQL persistence, durable cursors and leases, Worker runtime, PostgreSQL Schema/OpenAPI/CMDB/runtime Catalog adapters, candidate classification, scoped MCP operations, Docker packaging, DELTA terminal completion, and design-fact synchronization are implemented and locally verified.
 
-**Trigger:** Start a concrete connector only after its source contract, dedicated ADR, implementation plan, exact-Scope preflight, source minimization policy, and acceptance evidence are approved. Polling, webhook, automatic candidate promotion, outbound proposals, and external `APPLY` require their own reviewed boundaries.
+**Remaining scope:** A real enterprise source still needs connector registration, source credentials, mapping approval, operational scheduling, retry/dead-letter replay, live acceptance, and source-owner review. Semantic promotion, outbound Proposals, and external `APPLY` remain separately governed capabilities.
 
-**Completion evidence:** Each adapter emits bounded, resumable, source-versioned MCP-ready pages; PostgreSQL persists durable cursors, hash-chained batch receipts, candidates, reconciliation state, and transactional outbox records. Focused tests prove idempotency, sequence-gap rejection, exact-Scope authorization, semantic review, promotion, retry recovery, and read-back from the authoritative store.
+**Trigger:** Select the first enterprise source and approve its source contract, dedicated ADR, implementation plan, exact-Scope preflight, source minimization policy, credentials, and acceptance evidence. Polling, webhook, automatic candidate promotion, outbound Proposals, and external `APPLY` require their own reviewed boundaries.
+
+**Completion evidence:** For the selected live source, the adapter emits bounded, resumable, source-versioned MCP-ready pages; PostgreSQL persists durable cursors, hash-chained batch receipts, candidates, reconciliation state, and transactional outbox records; operations prove retry recovery, dead-letter handling, exact-Scope authorization, source-owner review, and read-back from the authoritative store. Local foundation evidence is recorded in ADR-0027 through ADR-0034.
 
 **Design references:** ADR-0015, ADR-0018, ADR-0020, ADR-0021; `docs/superpowers/plans/2026-08-03-continuous-observation-governance.md`.
 
 **中文本地化：**
 
-**状态：** 延期。
+**状态：** 连接器治理基础已经实现并同步；企业真实数据源接入仍延期。
 
 **负责人：** SpecForge 架构与 Agent 集成团队。
 
-**理由：** 第一阶段存量基线发现、第二阶段确定性 3A 投影、第三阶段持续观测治理核心和与平台无关的本地仓库连接器已经实现。企业系统仍需要具体的数据库、API 网关、CMDB 和运行时适配器，以发现现有产品信息、形成有证据支撑的候选事实，并在不弱化 MCP 授权和人工提升边界的前提下保持更新。
+**已实现基础：** v2 契约、精确 Scope 的 PostgreSQL 持久化、可恢复游标和租约、Worker 运行时、PostgreSQL Schema/OpenAPI/CMDB/运行时 Catalog 适配器、候选分类、Scope 安全的 MCP 操作、Docker 部署、DELTA 终态闭环以及设计事实同步均已实现并完成本地验证。
 
-**启动条件：** 具体连接器的来源契约、独立 ADR、实施计划、精确 Scope 预检、来源最小化策略和验收证据获批后才能启动。轮询、Webhook、自动候选提升、出站 Proposal 和外部 `APPLY` 必须分别完成评审。
+**剩余范围：** 真实企业数据源仍需要连接器注册、来源凭据、映射审核、运维调度、重试/死信重放、现场验收和来源负责人审核。语义提升、出站 Proposal 和外部 `APPLY` 仍是独立治理能力。
 
-**完成证据：** 每个适配器都能输出有界、可恢复、带来源版本的 MCP 页面；PostgreSQL 持久化游标、哈希链批次收据、候选事实、对账状态和事务 Outbox 记录。聚焦测试必须证明幂等、序列缺口拒绝、精确 Scope 授权、语义评审、提升、重试恢复和权威存储回读。
+**启动条件：** 选定首个企业数据源，并完成来源契约、独立 ADR、实施计划、精确 Scope 预检、来源最小化策略、凭据和验收证据评审后启动。轮询、Webhook、自动候选提升、出站 Proposal 和外部 `APPLY` 必须分别完成评审。
+
+**完成证据：** 对选定的真实数据源，适配器能够输出有界、可恢复、带来源版本的 MCP 页面；PostgreSQL 持久化游标、哈希链批次收据、候选事实、对账状态和事务 Outbox 记录；运维验证重试恢复、死信处理、精确 Scope 授权、来源负责人审核和权威存储回读。基础能力证据记录在 ADR-0027 至 ADR-0034。
 
 **设计引用：** ADR-0015、ADR-0018、ADR-0020、ADR-0021；`docs/superpowers/plans/2026-08-03-continuous-observation-governance.md`。
 
@@ -182,7 +186,7 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
-**Rationale:** The MCP-governed Designer Baseline and controlled coverage expansions now contain 4 evidence-backed architecture units, 38 memberships, and 3 mappings. Both public neighborhood MCP paths are verified against the v5 projection; remaining APIs, events, rules, data models, runtime facts, source-owner decisions, and ambiguous semantics must not be mass-classified by naming heuristics or automatic promotion.
+**Rationale:** The MCP-governed Designer Baseline and controlled coverage expansions now contain 8 evidence-backed architecture units, 42 memberships, and 6 mappings. Both public neighborhood MCP paths are verified against the v5 projection; remaining APIs, events, rules, data models, runtime facts, source-owner decisions, and ambiguous semantics must not be mass-classified by naming heuristics or automatic promotion.
 
 **Trigger:** Start after the first slice is accepted and coverage gaps are prioritized with source owners. Each expansion must use a new exact-Scope batch, evidence matrix, bilingual review, converged reconciliation, and Baseline revision.
 
@@ -194,7 +198,7 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **负责人：** SpecForge 架构与 Agent 集成团队。
 
-**理由：** 当前 Designer Baseline 已包含 4 个有证据支撑的架构单元、28 个成员归属和 3 条映射。其余 API、事件、规则、数据模型、运行时事实及含义不明确的内容不能通过命名启发式或自动提升批量分类。
+**理由：** 当前 Designer Baseline 已包含 8 个有证据支撑的架构单元、42 个成员归属和 6 条映射。其余 API、事件、规则、数据模型、运行时事实及含义不明确的内容不能通过命名启发式或自动提升批量分类。
 
 **启动条件：** 首批切片验收并按来源负责人排定覆盖缺口后启动。每次扩展必须使用新的精确 Scope 批次、证据矩阵、双语审核、收敛对账和 Baseline 版本。
 
