@@ -54,7 +54,13 @@ The host-side TypeScript gate receives `SPECFORGE_GRAPH_HEALTH_DATABASE_URL`, or
 5. Run the existing MCP-backed `prepare` phase.
 6. Restart `graph-projector` through the dedicated Compose project.
 7. Run the existing `verify` phase, which validates the graph version, two-hop traversal, Scope isolation, idempotent replay, and dead-letter state.
-8. In an outer `finally` path, run MCP cleanup for the run ID while the services are still reachable, then stop and remove only the six project-scoped verification containers. Verification volumes are removed only when explicitly marked ephemeral by the managed run.
+8. In an outer `finally` path, run MCP cleanup for the run ID while the services are still reachable, then bring down only the six project-scoped verification services and their managed network and ephemeral volumes. The cleanup command must remain scoped to the generated Compose project.
+
+### Watermark and graph-read convergence
+
+The fixture contains two ordered `CALLS` relationships. The gate must not use the first relationship as its readiness signal. It will read both relationship outbox rows, reject `DEAD_LETTER`, require both rows to be `COMPLETED`, and select the greatest relationship `graphVersion` as the fixture watermark. The exact-Scope projection checkpoint must cover that watermark before traversal begins.
+
+Checkpoint coverage proves that the Gateway accepted the projection, but graph storage visibility can still lag behind the PostgreSQL watermark. The gate will therefore poll the exact two-hop traversal until it returns the three expected fixture nodes and two expected `CALLS` edges, or until the bounded convergence deadline expires. The same watermark and expected-shape checks are repeated after the Projector restart. This distinguishes projection lag from an incorrect graph result without weakening Scope isolation or edge identity assertions.
 
 If preparation, image build, or verification fails, the script reports the primary failure, attempts cleanup with the Scope variables already loaded, preserves the run ID and cleanup failure in the diagnostic output, and exits non-zero. Cleanup failure never becomes a silent success.
 

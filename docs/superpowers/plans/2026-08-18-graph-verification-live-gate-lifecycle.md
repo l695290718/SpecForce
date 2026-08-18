@@ -12,6 +12,48 @@
 
 - Owning Scope is exactly `com.huawei.celon.desiner.graph-verification` at `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner.graph-verification`.
 - Parent production Scope `com.huawei.celon.desiner` is read-only for this gate.
+
+## Correction Plan: Ordered Fixture Watermark and Ephemeral Volume Cleanup
+
+**Goal:** Make the live gate wait for the complete two-edge fixture, tolerate bounded graph-read visibility lag, and remove all resources owned by the generated Compose project.
+
+**Architecture:** The MCP relationship outbox remains the authoritative readiness source. The gate aggregates both fixture relationship states, selects the highest contiguous completed graph version, and polls the Gateway until the exact two-hop shape is visible at that watermark. Cleanup uses the same generated Compose project and removes only its services, network, and ephemeral graph volumes.
+
+**Files:**
+- Modify: `deploy/graph/live-projection-check.ts`
+- Modify: `deploy/graph/verify-projection.ps1`
+- Modify: `scripts/verify-graph-lifecycle.test.ts`
+- Modify: `docs/evidence/graph-verification-fixture-isolation-cleanup-evidence.md`
+- Modify: `docs/TODO.md`
+- Modify: `scripts/sync-p1-design-facts.ts`
+
+### Task 5: Wait for the complete ordered fixture
+
+- [ ] Add a second fixture relationship identity for `second -> third`.
+- [ ] Read both exact-Scope relationship states and reject missing, pending, or dead-lettered rows.
+- [ ] Return a fixture watermark containing the latest graph version and checkpoint version only when the checkpoint covers both completed rows.
+- [ ] Keep idempotency assertion scoped to the first relationship event count.
+
+### Task 6: Poll graph-read convergence
+
+- [ ] Extract exact traversal-shape validation into a reusable assertion that checks the three fixture node IDs and both ordered `CALLS` endpoint pairs.
+- [ ] Poll traversal at the fixture watermark with a bounded deadline and interval; retry only shape/read-visibility failures.
+- [ ] Preserve fail-closed status, graph-version, truncation, Scope-leak, and dead-letter checks.
+- [ ] Reuse the same convergence assertion before and after Projector restart.
+
+### Task 7: Remove all managed ephemeral resources
+
+- [ ] Keep MCP asset cleanup first while the graph services are reachable.
+- [ ] Stop and remove only the six managed services, then run project-scoped Compose `down --volumes --remove-orphans` for the generated project.
+- [ ] Ensure failure diagnostics retain the primary error and any cleanup error.
+- [ ] Add static tests proving the cleanup command is project-scoped and volume removal cannot target production projects.
+
+### Task 8: Verify and synchronize
+
+- [ ] Run the configuration check and focused lifecycle tests.
+- [ ] Run the complete Live gate and record both relationship watermarks, convergence result, restart result, `remainingLinks=0`, and zero managed resources.
+- [ ] Synchronize ADR, Proposal, Context Pack, and Evidence facts through MCP in the exact verification Scope.
+- [ ] Close the new design session as `CONVERGED` only after repository checks and MCP reconciliation pass.
 - Only `nebula-metad`, `nebula-storaged`, `nebula-graphd`, `nebula-bootstrap`, `graph-gateway`, and `graph-projector` may be lifecycle-managed.
 - Never call an unscoped `docker compose down`, `docker stop`, `docker rm`, or volume deletion.
 - Host verification uses the canonical `specforge_canonical` database URL; the Projector container uses `deploy-postgres-1:5432/specforge_canonical`.
