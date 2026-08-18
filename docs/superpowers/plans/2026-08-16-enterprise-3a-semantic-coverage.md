@@ -12,7 +12,7 @@
 
 ## Implementation Status (2026-08-16)
 
-Tasks 1-8 are implemented for the exact Designer Scope. The final v10 coverage generation is `CURRENT` with `297/297 COVERED`, while the accepted v6 architecture baseline remains `8/42/6`. Continuous legacy scanning, external synchronization, cross-Scope comparison, and external `APPLY` remain deferred by design.
+Tasks 1-8 are implemented for the exact Designer Scope. The final v11 coverage generation is `CURRENT` with `303/303 COVERED`, while the accepted v6 architecture baseline remains `8/42/6`. Continuous legacy scanning, external synchronization, cross-Scope comparison, and external `APPLY` remain deferred by design.
 
 - Owning Scope is exactly `com.huawei.celon.desiner` with path `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`.
 - Published v6 remains `8` units, `42` direct memberships, and `6` mappings; no artificial v7 is created.
@@ -25,7 +25,7 @@ Tasks 1-8 are implemented for the exact Designer Scope. The final v10 coverage g
 - English is canonical and Chinese human-facing localization is complete.
 - A failed MCP write or missing MCP closure is `MCP synchronization blocked` and cannot be reported as complete.
 - Preserve unrelated user files: `outputs/` and `scripts/build-design-code-challenge-workbook.mjs` remain untouched and untracked.
-- The open design session is `design-change-session:3f60911b-4a6e-49d8-977d-0391dcea39f3`; record this session in implementation evidence and close it only after implementation and MCP readback.
+- The open design session is `design-change-session:5410ed42-32a0-49e0-a9ac-1c9f25d42f09`; record this session in implementation evidence and close it only after implementation and MCP readback.
 
 ## File Map
 
@@ -488,7 +488,7 @@ Use MCP `upsert_proposal`, `upsert_design_asset` for ADR/Evidence where applicab
 Run:
 
 ```bash
-pnpm design-context:close -- --session design-change-session:3f60911b-4a6e-49d8-977d-0391dcea39f3 --status CONVERGED --evidence "pnpm exec tsx scripts/repair-enterprise-3a-coverage-links.ts=passed,pnpm exec tsx scripts/verify-enterprise-3a-coverage.ts=passed,pnpm exec vitest run=passed,git diff --check=passed"
+pnpm design-context:close -- --session design-change-session:5410ed42-32a0-49e0-a9ac-1c9f25d42f09 --status CONVERGED --evidence "pnpm enterprise-3a:build=published-v11,pnpm enterprise-3a:verify=303/303-CURRENT,pnpm exec tsx scripts/verify-designer-3a-v6.ts=READY-8/42/6,pnpm exec vitest run=16-passed,git diff --check=passed"
 ```
 
 Expected: MCP returns a `CONVERGED` closure for the exact Designer Scope. If any MCP write or verification fails, record `MCP synchronization blocked`, the failure reason, owner, and retry trigger; do not close as converged.

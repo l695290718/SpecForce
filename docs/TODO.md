@@ -8,11 +8,11 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 ### 3A Semantic Unit Expansion v6
 
-**Status:** Implemented and synchronized for the selected four-source slice. Enterprise-wide coverage remains deferred.
+**Status:** Implemented and synchronized for the exact Designer Scope. The full authored catalog has current coverage; structural 3A meaning remains governed by the published v6 baseline.
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
-**Evidence:** `knowledge-baseline:designer:3a:v6`, projection manifest `projection-manifest:projection-generation:a5f2d9f6895b032648c4cab7dff81462aa36e2e9a406fffdec94562f7bd092ac:1`, 8 units, 42 memberships, 6 mappings, `unclassifiedCount=0`, v5 regression READY.
+**Evidence:** `coverage-generation:designer:3a:v11` is `CURRENT` with `303/303 COVERED`, `0 BLOCKED`, `0 NOT_EVALUATED`, maximum path `3`; `knowledge-baseline:designer:3a:v6` remains `READY` with 8 units, 42 memberships, 6 mappings, and the v5 regression is READY.
 
 ### Graph Verification Fixture Isolation and Cleanup
 
@@ -26,9 +26,9 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 ### 3A 语义单元扩充 v6
 
-**状态：** 选定的 4 个来源切片已经实现并通过 MCP 同步；企业级全量覆盖延期。
+**状态：** 精确 Designer Scope 的全量已实现并通过 MCP 同步；覆盖投影与结构化 3A 语义保持分层治理。
 
-**证据：** 已发布 8 个单元、42 个成员、6 个映射，未分类数为 0，v5 回归 READY。
+**证据：** `coverage-generation:designer:3a:v11` 为 `CURRENT`，303/303 条记录 `COVERED`，0 条 `BLOCKED`，0 条 `NOT_EVALUATED`，最大路径 3 跳；v6 结构基线仍为 8 个单元、42 个成员、6 个映射，v5 回归 READY。
 
 ### 图验证夹具隔离与清理
 
@@ -182,27 +182,27 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 ## 7. Enterprise-Wide 3A Coverage And Semantic Classification
 
-**Status:** Deferred after the initial governed Designer slice.
+**Status:** Exact-Scope authored-record coverage implemented and synchronized. Further structural semantic expansion remains governed and deferred.
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
-**Rationale:** The MCP-governed Designer Baseline and controlled coverage expansions now contain 8 evidence-backed architecture units, 42 memberships, and 6 mappings. Both public neighborhood MCP paths are verified against the v5 projection; remaining APIs, events, rules, data models, runtime facts, source-owner decisions, and ambiguous semantics must not be mass-classified by naming heuristics or automatic promotion.
+**Rationale:** The exact Designer Scope now has an immutable, reproducible coverage row for every authored record: v11 is `CURRENT` with `303/303 COVERED`, `0 BLOCKED`, `0 NOT_EVALUATED`, and maximum path `3`. This is coverage of authored facts and traceability, not automatic promotion of every record into a new architecture unit. The accepted structural baseline remains 8 units, 42 memberships, and 6 mappings; ambiguous business meaning must still be governed explicitly.
 
-**Trigger:** Start after the first slice is accepted and coverage gaps are prioritized with source owners. Each expansion must use a new exact-Scope batch, evidence matrix, bilingual review, converged reconciliation, and Baseline revision.
+**Trigger:** Start only when additional structural semantic units are prioritized with source owners. Each expansion must use a new exact-Scope batch, evidence matrix, bilingual review, converged reconciliation, and Baseline revision.
 
-**Completion evidence:** Every selected source has a stable evidence reference, complete English/Chinese human-facing content, a typed relationship or explicit review rationale, and a read-back projection. Unclassified and rejected facts have an owner, trigger, and rationale.
+**Completion evidence:** The current full-catalog coverage is evidenced by `coverage-generation:designer:3a:v11`, exact-Scope MCP read-back, and the v6 3A regression. Any future structural expansion must add stable evidence references, complete English/Chinese human-facing content, typed relationships or explicit review rationale, and a read-back projection. Unclassified and rejected facts must have an owner, trigger, and rationale.
 
 **中文本地化：**
 
-**状态：** 首批受治理 Designer 切片完成后延期。
+**状态：** 精确 Scope 的设计记录覆盖已实现并同步；进一步的结构化语义扩充继续受治理并延期。
 
 **负责人：** SpecForge 架构与 Agent 集成团队。
 
-**理由：** 当前 Designer Baseline 已包含 8 个有证据支撑的架构单元、42 个成员归属和 6 条映射。其余 API、事件、规则、数据模型、运行时事实及含义不明确的内容不能通过命名启发式或自动提升批量分类。
+**理由：** 当前精确 Designer Scope 已为每条设计记录生成不可变且可复现的覆盖行：v11 为 `CURRENT`，303/303 条记录 `COVERED`，0 条 `BLOCKED`，0 条 `NOT_EVALUATED`，最大路径为 3 跳。这表示设计事实和追溯关系已覆盖，不表示把每条记录通过自动推断提升为新的架构单元。已接受的结构基线仍为 8 个单元、42 个成员和 6 条映射，含义不明确的业务语义仍必须显式治理。
 
-**启动条件：** 首批切片验收并按来源负责人排定覆盖缺口后启动。每次扩展必须使用新的精确 Scope 批次、证据矩阵、双语审核、收敛对账和 Baseline 版本。
+**启动条件：** 只有在来源负责人排定新的结构化语义单元后启动。每次扩展必须使用新的精确 Scope 批次、证据矩阵、双语审核、收敛对账和 Baseline 版本。
 
-**完成证据：** 每个选中的来源都有稳定证据引用、完整中英文面向人内容、有类型关系或明确审核理由，并能在投影中回读。未分类和拒绝事实必须记录负责人、触发条件和理由。
+**完成证据：** 当前全目录覆盖由 `coverage-generation:designer:3a:v11`、精确 Scope 的 MCP 回读和 v6 3A 回归共同证明。未来结构化扩充仍必须提供稳定证据引用、完整中英文面向人内容、有类型关系或明确审核理由，并能在投影中回读；未分类和拒绝事实必须记录负责人、触发条件和理由。
 
 ## 8. Local Change-Attestation Hook Deployment And Signing Endpoint
 

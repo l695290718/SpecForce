@@ -20,7 +20,7 @@ const adr = {
   name: "Enterprise 3A semantic coverage projection",
   title: "Enterprise 3A semantic coverage projection",
   description: "Preserve the reviewed v6 architecture baseline and materialize an immutable exact-Scope coverage projection for every authored record.",
-  context: "The Designer Scope contains 297 authored records while the reviewed v6 structural baseline contains 8 units, 42 memberships, and 6 mappings. Architecture structure and governance traceability must remain distinct.",
+  context: "The Designer Scope contains 303 authored records while the reviewed v6 structural baseline contains 8 units, 42 memberships, and 6 mappings. Architecture structure and governance traceability must remain distinct.",
   decision: "Use generic-system@2 with PostgreSQL-authoritative catalog and relationship waterlines, immutable coverage generations, role-specific directed path rules, and bounded MCP/workspace reads. Do not infer architecture meaning from names or graph proximity.",
   alternatives: ["Promote every authored record into a new architecture baseline", "Compute coverage through live graph traversal"],
   consequences: ["Coverage answers are reproducible and historical", "Blocked records remain explicit instead of being silently classified", "Graph stores remain derived and are not required for correctness"],
@@ -34,7 +34,7 @@ const adr = {
       name: "企业级 3A 语义覆盖投影",
       title: "企业级 3A 语义覆盖投影",
       description: "保留经过评审的 v6 架构基线，并为每条已编写设计记录生成不可变、精确 Scope 的覆盖投影。",
-      context: "Designer Scope 有 297 条设计记录，而经过评审的 v6 结构基线包含 8 个单元、42 个成员关系和 6 个映射。架构结构与治理追溯必须保持区分。",
+      context: "Designer Scope 有 303 条设计记录，而经过评审的 v6 结构基线包含 8 个单元、42 个成员关系和 6 个映射。架构结构与治理追溯必须保持区分。",
       decision: "采用 generic-system@2，以 PostgreSQL 权威目录和关系水位线为输入，生成不可变覆盖代次，使用按角色限定的有向路径规则，并通过 MCP 和工作区提供有界读取。不根据名称或图邻近关系推断架构语义。",
       alternatives: ["把所有设计记录提升为新的架构基线", "通过实时图遍历计算覆盖"],
       consequences: ["覆盖结果可重现且可保留历史", "阻塞记录显式保留，不静默分类", "图数据库保持派生性质，不作为正确性的必要依赖"],
@@ -49,7 +49,7 @@ const proposal = {
   title: "Implement enterprise 3A semantic coverage",
   description: "Add deterministic semantic coverage without changing the accepted v6 architecture meaning.",
   background: "The authored catalog is larger than the structural architecture map and needs complete, explainable coverage.",
-  goal: "Expose current, immutable, exact-Scope coverage for all 297 Designer records while preserving v6 8/42/6.",
+  goal: "Expose current, immutable, exact-Scope coverage for all 303 Designer records while preserving v6 8/42/6.",
   nonGoal: "This increment does not deliver legacy scanners, continuous external synchronization, cross-Scope comparison, or external APPLY.",
   scope: "com.huawei.celon.desiner and its exact application-service Scope path.",
   impactedAssets: ["data-specforge-assets", "data-specforge-3a-projection-read-model", "api-specforge-3a-projection-build"],
@@ -67,7 +67,7 @@ const proposal = {
       title: "实施企业级 3A 语义覆盖",
       description: "在不改变已接受 v6 架构语义的前提下，增加确定性的语义覆盖能力。",
       background: "已编写目录大于结构化架构图，需要完整且可解释的覆盖结果。",
-      goal: "在保持 v6 为 8/42/6 的同时，为 Designer 的 297 条记录提供当前、不可变、精确 Scope 的覆盖结果。",
+      goal: "在保持 v6 为 8/42/6 的同时，为 Designer 的 303 条记录提供当前、不可变、精确 Scope 的覆盖结果。",
       nonGoal: "本增量不交付存量扫描器、持续外部同步、跨 Scope 比较或外部 APPLY。",
       scope: "com.huawei.celon.desiner 及其精确应用服务 Scope 路径。",
       specChanges: ["增加 generic-system@2 覆盖策略", "增加不可变覆盖构建、清单和行存储", "通过 MCP 和工作区提供分页覆盖摘要与详情"],
@@ -107,7 +107,7 @@ const evidence = {
   description: "Exact commands and MCP readback for the immutable Designer Scope coverage generation.",
   decisionId: adrId,
   command: "pnpm exec tsx scripts/repair-enterprise-3a-coverage-links.ts; pnpm enterprise-3a:build; pnpm enterprise-3a:verify; pnpm exec tsx scripts/verify-designer-3a-v6.ts",
-  result: "MCP repair created 11 typed links; after design-fact synchronization, coverage generation v10 is READY and CURRENT with 297/297 COVERED, 0 BLOCKED, 0 NOT_EVALUATED, max path 3; v6 regression is READY with 8 units, 42 memberships, and 6 mappings.",
+  result: "MCP repair created 11 typed links; coverage generation v11 is READY and CURRENT with 303/303 COVERED, 0 BLOCKED, 0 NOT_EVALUATED, max path 3; v6 regression is READY with 8 units, 42 memberships, and 6 mappings.",
   status: "passed",
   recordedAt: now,
   createdAt: now,
@@ -117,7 +117,7 @@ const evidence = {
       name: "企业级 3A 语义覆盖验证证据",
       description: "Designer Scope 不可变覆盖代次的精确命令和 MCP 读回证据。",
       command: "pnpm exec tsx scripts/repair-enterprise-3a-coverage-links.ts；pnpm enterprise-3a:build；pnpm enterprise-3a:verify；pnpm exec tsx scripts/verify-designer-3a-v6.ts",
-      result: "MCP 修复创建 11 条类型关系；设计事实同步后，覆盖代次 v10 为 READY 且 CURRENT，297/297 COVERED、0 BLOCKED、0 NOT_EVALUATED，最大路径 3 跳；v6 回归为 READY，包含 8 个单元、42 个成员和 6 个映射。"
+      result: "MCP 修复创建 11 条类型关系；覆盖代次 v11 为 READY 且 CURRENT，303/303 COVERED、0 BLOCKED、0 NOT_EVALUATED，最大路径 3 跳；v6 回归为 READY，包含 8 个单元、42 个成员和 6 个映射。"
     }
   }
 };
