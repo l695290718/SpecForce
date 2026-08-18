@@ -14,27 +14,11 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **Evidence:** `coverage-generation:designer:3a:v11` is `CURRENT` with `303/303 COVERED`, `0 BLOCKED`, `0 NOT_EVALUATED`, maximum path `3`; `knowledge-baseline:designer:3a:v6` remains `READY` with 8 units, 42 memberships, 6 mappings, and the v5 regression is READY.
 
-### Graph Verification Fixture Isolation and Cleanup
-
-**Status:** Local lifecycle implementation and PostgreSQL/MCP cleanup complete. Managed live verification remains externally blocked by Docker Hub pinned-base-image retrieval.
-
-**Owner:** SpecForge Runtime and Test Infrastructure.
-
-**Trigger:** Make the pinned Go/Node base images available locally or through the configured Docker registry mirror, then rerun `powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -Live`.
-
-**Evidence:** Historical dry-run/delete/post-delete completed with exact fingerprint validation; configuration-only assertions and 10 focused lifecycle/cleanup tests passed; managed startup reached Docker image retrieval but was blocked by `failed to fetch anonymous token` / `unexpected EOF`; failure cleanup returned `assetIds=3`, `status=deleted`, `remainingLinks=0`.
-
 ### 3A 语义单元扩充 v6
 
 **状态：** 精确 Designer Scope 的全量已实现并通过 MCP 同步；覆盖投影与结构化 3A 语义保持分层治理。
 
 **证据：** `coverage-generation:designer:3a:v11` 为 `CURRENT`，303/303 条记录 `COVERED`，0 条 `BLOCKED`，0 条 `NOT_EVALUATED`，最大路径 3 跳；v6 结构基线仍为 8 个单元、42 个成员、6 个映射，v5 回归 READY。
-
-### 图验证夹具隔离与清理
-
-**状态：** 本地生命周期实现及 PostgreSQL/MCP 清理完成；托管实时验证受 Docker Hub 固定基础镜像拉取阻塞。
-
-**触发条件：** 让固定 Go/Node 基础镜像在本地可用或通过 Docker 镜像代理可达，然后执行 `powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -Live`。
 
 ## 2. CodeArts/CodeHub Protected-Branch Enforcement
 

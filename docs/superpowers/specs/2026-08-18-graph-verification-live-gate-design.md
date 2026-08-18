@@ -6,7 +6,7 @@ Accepted for implementation in the exact verification Scope.
 
 - Owning application service: `com.huawei.celon.desiner.graph-verification`
 - Owning Scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner.graph-verification`
-- Design Change Session: `design-change-session:cf2480f7-cccd-4a6f-bf69-726a8fab2c49`
+- Design Change Session: `design-change-session:e84bb591-73dc-4b05-b30d-8c3175f01333`
 - Parent production Scope: `com.huawei.celon.desiner`
 
 ## Problem
@@ -52,7 +52,7 @@ The host-side TypeScript gate receives `SPECFORGE_GRAPH_HEALTH_DATABASE_URL`, or
 3. Build and start only the six graph verification services using the dedicated project name.
 4. Wait for Compose health and Nebula bootstrap completion.
 5. Run the existing MCP-backed `prepare` phase.
-6. Restart `graph-projector` through the dedicated Compose project.
+6. Recreate only `graph-projector` through the dedicated Compose project with `--force-recreate --no-deps`, then rediscover its loopback port.
 7. Run the existing `verify` phase, which validates the graph version, two-hop traversal, Scope isolation, idempotent replay, and dead-letter state.
 8. In an outer `finally` path, run MCP cleanup for the run ID while the services are still reachable, then bring down only the six project-scoped verification services and their managed network and ephemeral volumes. The cleanup command must remain scoped to the generated Compose project.
 
@@ -62,14 +62,21 @@ The fixture contains two ordered `CALLS` relationships. The gate must not use th
 
 Checkpoint coverage proves that the Gateway accepted the projection, but graph storage visibility can still lag behind the PostgreSQL watermark. The gate will therefore poll the exact two-hop traversal until it returns the three expected fixture nodes and two expected `CALLS` edges, or until the bounded convergence deadline expires. The same watermark and expected-shape checks are repeated after the Projector restart. This distinguishes projection lag from an incorrect graph result without weakening Scope isolation or edge identity assertions.
 
+### Stale verification outbox history
+
+The live gate may encounter historical `PENDING`, `DELIVERING`, or `DEAD_LETTER` rows left by an interrupted verification run. Because ordered claiming and contiguous checkpoints must fail closed on those statuses, the gate first invokes the seed-only MCP operation `archive_seed_graph_outbox` for the exact verification Scope. The operation keeps payloads, relationship events, and audit records, clears leases, sets `terminalAt`, and changes only that Scope's nonterminal rows to `ARCHIVED`.
+
+`ARCHIVED` is a terminal historical status for ordered graph projection: it cannot be claimed, and it does not block later `COMPLETED` rows from advancing the contiguous checkpoint. The operation is rejected for product Scopes and never performs direct SQL from the verification script. Cleanup invokes it before and after fixture deletion so both stale history and newly emitted deletion events cannot poison the next run.
+
 If preparation, image build, or verification fails, the script reports the primary failure, attempts cleanup with the Scope variables already loaded, preserves the run ID and cleanup failure in the diagnostic output, and exits non-zero. Cleanup failure never becomes a silent success.
 
 ### Safety boundaries
 
 - Compose project name, service names, and container labels are all restricted to the managed verification run.
-- Projector restart uses the dedicated project rather than a global service-label query.
+- Projector restart uses a project-scoped `up --force-recreate --no-deps` rather than a global service-label query, and rediscoveries the dynamic loopback port.
 - Production services are addressed only through the external network and are never lifecycle-managed by this script.
 - Fixture writes and deletes continue to use MCP and the exact verification Scope.
+- Verification outbox archival continues to use MCP and the exact verification Scope; it preserves history instead of deleting events.
 - The parent Designer Scope remains read-only for this gate.
 
 ## Error handling
@@ -92,6 +99,6 @@ The live gate becomes self-contained and repeatable for local development. It st
 
 ## 中文说明
 
-本设计在精确验证 Scope `com.huawei.celon.desiner.graph-verification` 内实现实时图验证门禁的自动生命周期管理。脚本只启动 6 个图验证服务，使用独立 Compose 项目名和明确的服务白名单；宿主机和容器使用不同的 PostgreSQL 连接串，生产 Web、PG、知识投影器和连接器不会被停止。`prepare -> Projector 重启 -> verify -> MCP 清理` 任何阶段失败都必须进入清理路径，并保留 run ID 和失败诊断。
+本设计在精确验证 Scope `com.huawei.celon.desiner.graph-verification` 内实现实时图验证门禁的自动生命周期管理。脚本只启动 6 个图验证服务，使用独立 Compose 项目名和明确的服务白名单；宿主机和容器使用不同的 PostgreSQL 连接串，生产 Web、PG、知识投影器和连接器不会被停止。`prepare -> Projector 重建 -> verify -> MCP 清理` 任何阶段失败都必须进入清理路径，并保留 run ID 和失败诊断。验证前通过 MCP 归档精确 Scope 的旧非终态 Outbox，`ARCHIVED` 保留历史且不阻塞后续 checkpoint；Projector 重建后重新发现动态端口。
 
 PostgreSQL 仍是权威存储，NebulaGraph 仍是派生投影；临时夹具继续通过 MCP 写入和清理，且只写入验证 Scope，不进入父 Designer Scope。只有新的实时运行完整通过，并确认 `remainingLinks=0` 后，才能将该待办从延期状态归档。

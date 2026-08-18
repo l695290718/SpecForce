@@ -265,7 +265,10 @@ try {
       $env:SPECFORGE_GRAPH_GATEWAY_URL = "http://127.0.0.1:$($gatewayBinding -replace '^.*:', '')"
       $env:SPECFORGE_PROJECTOR_HEALTH_URL = "http://127.0.0.1:$($projectorBinding -replace '^.*:', '')"
       Invoke-LiveCheck $repositoryRoot "prepare"
-      Invoke-ManagedCompose $composeArgs @("restart", "graph-projector") "PROJECTOR_RESTART_BLOCKED"
+      Invoke-ManagedCompose $composeArgs @("up", "-d", "--force-recreate", "--no-deps", "graph-projector") "PROJECTOR_RESTART_BLOCKED"
+      $projectorBinding = (& docker compose @composeArgs port graph-projector 8090 | Select-Object -Last 1).Trim()
+      if ($projectorBinding -notmatch ":(?<port>\d+)$") { throw "GRAPH_LIVE_PORT_DISCOVERY_FAILED: recreated Projector did not publish a loopback port." }
+      $env:SPECFORGE_PROJECTOR_HEALTH_URL = "http://127.0.0.1:$($projectorBinding -replace '^.*:', '')"
       Invoke-LiveCheck $repositoryRoot "verify"
       Write-Host "NebulaGraph live outbox, checkpoint, traversal, restart, and idempotency assertions passed."
     } catch {

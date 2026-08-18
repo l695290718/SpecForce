@@ -309,7 +309,7 @@ const CLAIM_SQL = `
           AND earlier."applicationServiceId" = "RelationshipOutbox"."applicationServiceId"
           AND earlier."scopePath" = "RelationshipOutbox"."scopePath"
           AND earlier."graphVersion" < "RelationshipOutbox"."graphVersion"
-          AND earlier.status <> 'COMPLETED'
+          AND earlier.status NOT IN ('COMPLETED', 'ARCHIVED')
       )
     ORDER BY "availableAt" ASC, "createdAt" ASC, "dbId" ASC
     FOR UPDATE SKIP LOCKED
@@ -340,7 +340,7 @@ const CONTIGUOUS_VERSION_SQL = `
         AND incomplete."applicationServiceId" = completed."applicationServiceId"
         AND incomplete."scopePath" = completed."scopePath"
         AND incomplete."graphVersion" <= completed."graphVersion"
-        AND incomplete.status <> 'COMPLETED'
+        AND incomplete.status NOT IN ('COMPLETED', 'ARCHIVED')
     );
 `;
 

@@ -4,7 +4,7 @@ import type { Permission } from "@specforge/core";
 import { z } from "zod";
 import { auditToolCall } from "./audit";
 import { allowAllPolicy, getDefaultActor, principalFromAuthInfo, withRequestPrincipal, type McpAuthInfo } from "./auth";
-import { deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
+import { archiveSeedGraphOutbox, deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
 import { commitKnowledgeChangeSet, createIdentityCandidate, createKnowledgeAssertion, createKnowledgeReviewBundle, createProjectionManifest, createWorkingStream, decideKnowledgeReviewBundle, listKnowledgeAssertions, publishKnowledgeBaseline } from "./knowledge/persistence";
 import { promote3aArchitectureFacts, reconcile3aArchitectureFacts, submit3aArchitectureFactBatch } from "./knowledge/architecture-authoring";
 import { submitScanReport } from "./scanner/persistence";
@@ -177,6 +177,21 @@ export function registerTools(server: McpServer): void {
       seedOnly: true
     },
     deletePersistedDesignData
+  );
+
+  if (isSeedMode()) registerJsonTool(
+    server,
+    "archive_seed_graph_outbox",
+    {
+      title: "Archive scoped seed graph outbox",
+      description: "Archives nonterminal graph outbox history in one exact verification Scope through the MCP write boundary. Payloads and audit history are preserved; production Scopes are rejected.",
+      inputSchema: { architectureScope: architectureScopeSchema },
+      permissions: ["asset:write"],
+      readOnly: false,
+      destructive: true,
+      seedOnly: true
+    },
+    archiveSeedGraphOutbox
   );
 
   registerJsonTool(

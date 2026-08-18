@@ -79,6 +79,17 @@ The archive is historical. An item listed here does not imply that related produ
 
 ## Completed Graph Increments
 
+### Graph verification fixture isolation and live lifecycle
+
+- **Outcome:** Completed exact verification-Scope fixture authoring and MCP cleanup, stale verification Outbox archival as `ARCHIVED`, ordered watermark/checkpoint convergence, exact two-hop traversal validation, Projector recreation/idempotency verification, and project-scoped ephemeral Docker teardown.
+- **Stable references:** `adr-graph-verification-fixture-isolation`, `proposal-graph-verification-fixture-isolation`, `ctx-graph-verification-fixture-isolation`, `evidence-graph-verification-fixture-isolation`, and design session `design-change-session:e84bb591-73dc-4b05-b30d-8c3175f01333`.
+- **Evidence:** Managed live gate passed with both fixture relationships `COMPLETED`, graphVersion/checkpoint `44/44`, 3 traversal nodes, 2 edges, zero dead letters, idempotent replay, MCP cleanup `remainingLinks=0`, and zero remaining managed containers, network, or ephemeral volumes. Fixed Go/Node images were available locally after the earlier registry retrieval blocker.
+
+### 图验证夹具隔离与实时生命周期
+
+- **结果：** 已完成精确验证 Scope 夹具写入与 MCP 清理、旧验证 Outbox 归档为 `ARCHIVED`、有序水位和 checkpoint 对齐、精确两跳遍历校验、Projector 重建/幂等验证，以及项目级临时 Docker 资源清理。
+- **证据：** 实时门禁两条关系均为 `COMPLETED`，图水位/checkpoint 为 `44/44`，遍历返回 3 个节点和 2 条边，死信为 0，幂等重放通过，MCP 清理 `remainingLinks=0`，托管容器、网络和临时卷均为 0。此前镜像仓库拉取阻塞已通过本地固定镜像解决。
+
 ### PostgreSQL graph traversal and transactional outbox regressions
 
 - **Outcome:** Completed the PostgreSQL-backed graph traversal contract and deterministic root-ordering regression. PostgreSQL remains authoritative for relationship history, outbox rows, checkpoints, and audit evidence; graph stores remain derived.

@@ -59,6 +59,7 @@ const persistence = vi.hoisted(() => ({
       findMany: vi.fn().mockResolvedValue([])
     }
   },
+  archiveSeedGraphOutbox: vi.fn().mockResolvedValue({ status: "archived", archivedCount: 0 }),
   deletePersistedDesignData: vi.fn().mockResolvedValue({ status: "deleted" }),
   getPersistedAsset: vi.fn(),
   listPersistedAssetLinks: vi.fn().mockResolvedValue([]),
@@ -171,6 +172,19 @@ afterEach(() => {
 describe("seed cleanup MCP boundary", () => {
   it("does not register the destructive cleanup tool for normal MCP servers", () => {
     expect(captureTools().has("delete_seed_design_data")).toBe(false);
+    expect(captureTools().has("archive_seed_graph_outbox")).toBe(false);
+  });
+
+  it("registers archival only in seed mode and keeps the exact Scope in the MCP call", async () => {
+    process.env.SPECFORGE_MCP_SEED = "1";
+    const archive = captureTools().get("archive_seed_graph_outbox");
+    expect(archive).toBeDefined();
+
+    const architectureScope = { applicationServiceId: "com.huawei.celon.desiner.graph-verification", scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner.graph-verification" };
+    const result = await archive!.handler({ architectureScope });
+
+    expect(result.isError).not.toBe(true);
+    expect(persistence.archiveSeedGraphOutbox).toHaveBeenCalledWith({ architectureScope });
   });
 
   it("rejects a captured cleanup handler when seed mode is no longer active", async () => {

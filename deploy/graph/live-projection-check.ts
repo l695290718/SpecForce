@@ -66,7 +66,7 @@ async function main(): Promise<void> {
 
     const health = await readProjectorHealth();
     if ((health.deadLetterCount ?? 0) > 0) throw new Error("GRAPH_LIVE_DEAD_LETTER: exact Scope has dead-lettered projection work; retry after resolving the Gateway/Projector failure.");
-    if (health.lastCheckpoint === null || health.lastCheckpoint === undefined || BigInt(health.lastCheckpoint) < row.graph_version!) {
+    if (health.lastCheckpoint === null || health.lastCheckpoint === undefined || BigInt(health.lastCheckpoint) < watermark.graphVersion) {
       throw new Error("GRAPH_LIVE_PROJECTOR_CHECKPOINT_STALE: Projector health checkpoint is behind the authoritative graph version; retry after the Projector catches up.");
     }
 
@@ -281,8 +281,20 @@ async function assertGatewayHealth(): Promise<void> {
 }
 
 async function assertProjectorReachable(): Promise<void> {
-  const health = await readProjectorHealth();
-  if (health.deadLetterCount === undefined) throw new Error("PROJECTOR_HEALTH_CONTRACT_INVALID: health response lacks deadLetterCount; deploy the current Projector image before retrying.");
+  const deadline = Date.now() + 30_000;
+  let lastError = "PROJECTOR_HEALTH_UNAVAILABLE: Projector health endpoint did not become reachable after restart.";
+  while (Date.now() < deadline) {
+    try {
+      const health = await readProjectorHealth();
+      if (health.deadLetterCount === undefined) throw new Error("PROJECTOR_HEALTH_CONTRACT_INVALID: health response lacks deadLetterCount; deploy the current Projector image before retrying.");
+      return;
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.startsWith("PROJECTOR_HEALTH_UNAVAILABLE:")) throw error;
+      lastError = error.message;
+      await delay(500);
+    }
+  }
+  throw new Error(`${lastError}; retry after the Projector health endpoint is running.`);
 }
 
 async function readProjectorHealth(): Promise<HealthResponse> {

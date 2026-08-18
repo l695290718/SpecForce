@@ -37,6 +37,10 @@ export interface DeletePersistedDesignDataInput {
   contextPackIds?: string[];
 }
 
+export interface ArchiveSeedGraphOutboxInput {
+  architectureScope: ArchitectureScopeRef;
+}
+
 export interface AssetLinkInput {
   sourceType: string;
   sourceId: string;
@@ -1105,6 +1109,42 @@ export async function deletePersistedDesignData(input: DeletePersistedDesignData
     deletedContextPackIds: contextPackIds,
     applicationServiceId: scope.applicationServiceId,
     status: "deleted"
+  };
+}
+
+export async function archiveSeedGraphOutbox(input: ArchiveSeedGraphOutboxInput) {
+  if (!isSeedMode()) throw new Error("Seed cleanup is not enabled.");
+  const scope = resolveWritableScope(writableActor(), input.architectureScope);
+  const scopeDefinition = scopeById(scope.applicationServiceId);
+  if (scopeDefinition?.purpose !== "verification") throw new Error("Graph outbox archival is restricted to verification scopes.");
+  await ensureMcpPersistenceSchema();
+
+  const relationshipScope = configuredRelationshipScope(scope);
+  const archivedAt = new Date();
+  const result = await prisma.$transaction(async (transaction) => {
+    await lockRelationshipScope(transaction, relationshipScope);
+    return transaction.relationshipOutbox.updateMany({
+      where: {
+        enterpriseId: relationshipScope.enterpriseId,
+        applicationServiceId: relationshipScope.applicationServiceId,
+        scopePath: relationshipScope.scopePath,
+        status: { in: ["PENDING", "DELIVERING", "DEAD_LETTER"] }
+      },
+      data: {
+        status: "ARCHIVED",
+        terminalAt: archivedAt,
+        leaseOwner: null,
+        leaseExpiresAt: null
+      }
+    });
+  });
+
+  return {
+    applicationServiceId: scope.applicationServiceId,
+    scopePath: scope.scopePath,
+    enterpriseId: relationshipScope.enterpriseId,
+    archivedCount: result.count,
+    status: "archived"
   };
 }
 

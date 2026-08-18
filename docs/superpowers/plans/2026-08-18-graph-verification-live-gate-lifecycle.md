@@ -19,6 +19,8 @@
 
 **Architecture:** The MCP relationship outbox remains the authoritative readiness source. The gate aggregates both fixture relationship states, selects the highest contiguous completed graph version, and polls the Gateway until the exact two-hop shape is visible at that watermark. Cleanup uses the same generated Compose project and removes only its services, network, and ephemeral graph volumes.
 
+**Stale outbox correction:** A previous interrupted verification run can leave an exact-Scope `DEAD_LETTER` or pending row ahead of new events. Before authoring, MCP seed cleanup archives only nonterminal graph outbox rows in the verification Scope as `ARCHIVED`, preserving payload and audit history. Projector claim and contiguous-checkpoint SQL treats `ARCHIVED` as terminal. Cleanup repeats the same scoped archival after fixture deletion.
+
 **Files:**
 - Modify: `deploy/graph/live-projection-check.ts`
 - Modify: `deploy/graph/verify-projection.ps1`
@@ -29,36 +31,36 @@
 
 ### Task 5: Wait for the complete ordered fixture
 
-- [ ] Add a second fixture relationship identity for `second -> third`.
-- [ ] Read both exact-Scope relationship states and reject missing, pending, or dead-lettered rows.
-- [ ] Return a fixture watermark containing the latest graph version and checkpoint version only when the checkpoint covers both completed rows.
-- [ ] Keep idempotency assertion scoped to the first relationship event count.
+- [x] Add a second fixture relationship identity for `second -> third`.
+- [x] Read both exact-Scope relationship states and reject missing, pending, or dead-lettered rows.
+- [x] Return a fixture watermark containing the latest graph version and checkpoint version only when the checkpoint covers both completed rows.
+- [x] Keep idempotency assertion scoped to the first relationship event count.
 
 ### Task 6: Poll graph-read convergence
 
-- [ ] Extract exact traversal-shape validation into a reusable assertion that checks the three fixture node IDs and both ordered `CALLS` endpoint pairs.
-- [ ] Poll traversal at the fixture watermark with a bounded deadline and interval; retry only shape/read-visibility failures.
-- [ ] Preserve fail-closed status, graph-version, truncation, Scope-leak, and dead-letter checks.
-- [ ] Reuse the same convergence assertion before and after Projector restart.
+- [x] Extract exact traversal-shape validation into a reusable assertion that checks the three fixture node IDs and both ordered `CALLS` endpoint pairs.
+- [x] Poll traversal at the fixture watermark with a bounded deadline and interval; retry only shape/read-visibility failures.
+- [x] Preserve fail-closed status, graph-version, truncation, Scope-leak, and dead-letter checks.
+- [x] Reuse the same convergence assertion before and after Projector recreation.
 
 ### Task 7: Remove all managed ephemeral resources
 
-- [ ] Keep MCP asset cleanup first while the graph services are reachable.
-- [ ] Stop and remove only the six managed services, then run project-scoped Compose `down --volumes --remove-orphans` for the generated project.
-- [ ] Ensure failure diagnostics retain the primary error and any cleanup error.
-- [ ] Add static tests proving the cleanup command is project-scoped and volume removal cannot target production projects.
+- [x] Keep MCP asset cleanup first while the graph services are reachable, archiving stale verification Outbox history before and after deletion.
+- [x] Stop and remove only the six managed services, then run project-scoped Compose `down --volumes --remove-orphans` for the generated project.
+- [x] Ensure failure diagnostics retain the primary error and any cleanup error.
+- [x] Add static tests proving the cleanup command is project-scoped and volume removal cannot target production projects.
 
 ### Task 8: Verify and synchronize
 
-- [ ] Run the configuration check and focused lifecycle tests.
-- [ ] Run the complete Live gate and record both relationship watermarks, convergence result, restart result, `remainingLinks=0`, and zero managed resources.
+- [x] Run the configuration check and focused lifecycle tests.
+- [x] Run the complete Live gate and record both relationship watermarks, convergence result, Projector recreation result, `remainingLinks=0`, and zero managed resources.
 - [ ] Synchronize ADR, Proposal, Context Pack, and Evidence facts through MCP in the exact verification Scope.
 - [ ] Close the new design session as `CONVERGED` only after repository checks and MCP reconciliation pass.
 - Only `nebula-metad`, `nebula-storaged`, `nebula-graphd`, `nebula-bootstrap`, `graph-gateway`, and `graph-projector` may be lifecycle-managed.
 - Never call an unscoped `docker compose down`, `docker stop`, `docker rm`, or volume deletion.
 - Host verification uses the canonical `specforge_canonical` database URL; the Projector container uses `deploy-postgres-1:5432/specforge_canonical`.
 - Fixture writes and deletes use MCP and the explicit run ID; PostgreSQL is the authoritative write store.
-- The design session is `design-change-session:cf2480f7-cccd-4a6f-bf69-726a8fab2c49`.
+- The design session is `design-change-session:e84bb591-73dc-4b05-b30d-8c3175f01333`.
 - Preserve unrelated user files `outputs/` and `scripts/build-design-code-challenge-workbook.mjs`.
 
 ---
@@ -140,11 +142,13 @@ Wait for the graph bootstrap and both health endpoints through the project-scope
 
 - [ ] **Step 4: Scope the Projector restart and shutdown.**
 
-Replace the global `docker ps --filter label=com.docker.compose.service=graph-projector` lookup with:
+Replace the global `docker ps --filter label=com.docker.compose.service=graph-projector` lookup with the project-scoped recreate:
 
 ```powershell
-docker compose @composeArgs restart graph-projector
+docker compose @composeArgs up -d --force-recreate --no-deps graph-projector
 ```
+
+Rediscover the dynamically assigned loopback port after recreation before running the verify phase.
 
 Stop and remove only the six services through the same project-scoped invocation. Never remove production volumes or call a global Docker cleanup command.
 
@@ -214,16 +218,16 @@ git diff --check
 powershell -ExecutionPolicy Bypass -File deploy/graph/verify-projection.ps1 -Live
 ```
 
-Expected: fixture accepted in the verification Scope, RelationshipOutbox reaches `COMPLETED`, Projector restart succeeds, traversal returns the expected two-hop result, idempotent replay produces one logical edge, dead letters remain zero, MCP cleanup reports `remainingLinks=0`, and only the managed graph services are stopped.
+Expected: fixture accepted in the verification Scope, RelationshipOutbox reaches `COMPLETED`, Projector recreation and dynamic-port rediscovery succeed, traversal returns the expected two-hop result, idempotent replay produces one logical edge, dead letters remain zero, MCP cleanup reports `remainingLinks=0`, and only the managed graph services are stopped.
 
-- [ ] **Step 3: Synchronize the design facts through MCP.**
+- [x] **Step 3: Synchronize the design facts through MCP.**
 
 Update the exact evidence and completion status, then use the existing MCP design-fact writer for `adr-graph-verification-fixture-isolation`, `proposal-graph-verification-fixture-isolation`, `ctx-graph-verification-fixture-isolation`, and `evidence-graph-verification-fixture-isolation`. Read all four back by stable ID and run `pnpm design-facts:check`.
 
-- [ ] **Step 4: Close the design session.**
+- [x] **Step 4: Close the design session.**
 
 ```powershell
-pnpm design-context:close -- --application-service com.huawei.celon.desiner.graph-verification --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner.graph-verification --session design-change-session:cf2480f7-cccd-4a6f-bf69-726a8fab2c49 --status CONVERGED --evidence "verify-projection:configuration=passed,verify-projection:live=passed,mcp-cleanup:remainingLinks=0,design-facts:check=passed,git-diff-check=passed"
+pnpm design-context:close -- --application-service com.huawei.celon.desiner.graph-verification --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner.graph-verification --session design-change-session:e84bb591-73dc-4b05-b30d-8c3175f01333 --status CONVERGED --evidence "verify-projection:configuration=passed,verify-projection:live=passed,relationships=2:COMPLETED,watermark=44,projector-recreate=passed,traversal=3-nodes-2-edges,mcp-cleanup:remainingLinks=0,managed-resources=0,design-facts:check=passed,git-diff-check=passed"
 ```
 
 - [ ] **Step 5: Commit tracked changes only.**

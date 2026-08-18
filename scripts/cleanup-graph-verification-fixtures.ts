@@ -16,14 +16,17 @@ export interface CleanupScope extends ArchitectureScopeRef { applicationServiceI
 
 export function fixtureIds(liveRunId: string): string[] { return ["a", "b", "c"].map((suffix) => `specforge-graph-verification-${liveRunId}-${suffix}`); }
 
-export async function cleanupRunFixtures(client: CleanupClient, config: Pick<GraphHealthConfig, "applicationServiceId" | "scopePath" | "liveRunId">): Promise<{ assetIds: string[]; status: string; remainingLinks: number }> {
+export async function cleanupRunFixtures(client: CleanupClient, config: Pick<GraphHealthConfig, "applicationServiceId" | "scopePath" | "liveRunId">): Promise<{ assetIds: string[]; status: string; remainingLinks: number; archivedOutboxCount: number }> {
   const assetIds = fixtureIds(config.liveRunId);
-  const result = await callMcp(client, "delete_seed_design_data", { architectureScope: { applicationServiceId: config.applicationServiceId, scopePath: config.scopePath }, assetIds, proposalIds: [], contextPackIds: [] });
+  const architectureScope = { applicationServiceId: config.applicationServiceId, scopePath: config.scopePath };
+  const beforeDelete = await callMcp(client, "archive_seed_graph_outbox", { architectureScope });
+  const result = await callMcp(client, "delete_seed_design_data", { architectureScope, assetIds, proposalIds: [], contextPackIds: [] });
+  const afterDelete = await callMcp(client, "archive_seed_graph_outbox", { architectureScope });
   const links = await callMcp(client, "list_asset_links", { applicationServiceId: config.applicationServiceId });
   const rows = Array.isArray(links) ? links : Array.isArray((links as Record<string, unknown>).links) ? (links as Record<string, unknown>).links : [];
   const remainingLinks = (rows as Array<Record<string, unknown>>).filter((link) => assetIds.includes(String(link.sourceId)) || assetIds.includes(String(link.targetId))).length;
   if (remainingLinks !== 0) throw new Error(`GRAPH_FIXTURE_CLEANUP_READBACK_FAILED:${remainingLinks}`);
-  return { assetIds, status: String((result as Record<string, unknown>).status ?? "deleted"), remainingLinks };
+  return { assetIds, status: String((result as Record<string, unknown>).status ?? "deleted"), remainingLinks, archivedOutboxCount: Number(beforeDelete.archivedCount ?? 0) + Number(afterDelete.archivedCount ?? 0) };
 }
 
 export function validateHistoricalFixture(asset: Record<string, unknown>, links: readonly Record<string, unknown>[]): void {
