@@ -1,4 +1,4 @@
-import { DEFAULT_ARCHITECTURE_MAP_BUDGET, validateArchitectureMapBudget, type ArchitectureLayer, type ArchitectureMapBudget, type ArchitectureScopeRef, type ArchitectureUnitFilter, type ArchitectureUnitKind } from "@specforge/core";
+import { DEFAULT_ARCHITECTURE_MAP_BUDGET, materializeAsset3AMappings, validateArchitectureMapBudget, type ArchitectureLayer, type ArchitectureMapBudget, type ArchitectureScopeRef, type ArchitectureUnitFilter, type ArchitectureUnitKind, type Asset3AMappingProjection } from "@specforge/core";
 import { prisma, readableScope } from "../persistence";
 
 export interface Search3aArchitectureMapInput {
@@ -13,10 +13,38 @@ export interface ArchitectureMapSearchResult {
   status: "READY" | "EMPTY" | "PARTIAL";
   identity: ArchitectureScopeRef & { generationId: string; baselineId: string; projectionManifestId: string };
   units: ArchitectureUnitRecord[];
+  realizations: ArchitectureMappingRecord[];
+  /** @deprecated Use realizations. */
   mappings: ArchitectureMappingRecord[];
   totalByLayer: Record<ArchitectureLayer, number>;
   returnedByLayer: Record<ArchitectureLayer, number>;
   unclassifiedCount: number;
+  partial?: { code: "RESULT_PARTIAL"; reasons: string[] };
+}
+
+export interface Search3aAssetMappingsInput {
+  architectureScope: ArchitectureScopeRef;
+  baselineId: string;
+  projectionManifestId: string;
+  filters?: { assetType?: string; assetId?: string; layer?: ArchitectureLayer; unitIdentity?: string; mappingMode?: Asset3AMappingProjection["mappingMode"]; query?: string };
+  limit?: number;
+  cursor?: string;
+}
+
+export interface Get3aAssetMappingInput {
+  architectureScope: ArchitectureScopeRef;
+  baselineId: string;
+  projectionManifestId: string;
+  assetType: string;
+  assetId: string;
+}
+
+export interface Asset3AMappingSearchResult extends ArchitectureScopeRef {
+  status: "READY" | "EMPTY" | "PARTIAL";
+  identity: ArchitectureScopeRef & { generationId: string; baselineId: string; projectionManifestId: string };
+  total: number;
+  rows: Asset3AMappingProjection[];
+  nextCursor?: string;
   partial?: { code: "RESULT_PARTIAL"; reasons: string[] };
 }
 
@@ -129,10 +157,68 @@ type ArchitectureMapReadClient = {
   architectureUnitMappingProjection: {
     findMany(args: { where: Record<string, unknown>; orderBy?: unknown; select?: Record<string, boolean>; take?: number }): Promise<unknown[]>;
   };
+  architectureAssetCoverageProjection: {
+    findMany(args: { where: Record<string, unknown>; orderBy: unknown; take: number }): Promise<unknown[]>;
+  };
+  architectureCoverageManifest: {
+    findFirst(args: { where: Record<string, unknown>; orderBy?: unknown }): Promise<{ generationId: string; id: string } | null>;
+  };
   knowledgeProjectionEdge: {
     findMany(args: { where: Record<string, unknown>; orderBy: unknown; take: number }): Promise<unknown[]>;
   };
 };
+
+export async function search3aAssetMappings(input: Search3aAssetMappingsInput): Promise<Asset3AMappingSearchResult> {
+  const scope = readableScope(input.architectureScope.applicationServiceId);
+  assertExactScope(scope, input.architectureScope);
+  assertRequiredText(input.baselineId, "ASSET_3A_MAPPING_BASELINE_REQUIRED");
+  assertRequiredText(input.projectionManifestId, "ASSET_3A_MAPPING_MANIFEST_REQUIRED");
+  const limit = input.limit ?? 50;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 200) throw new Error("ASSET_3A_MAPPING_LIMIT_INVALID");
+  const client = prisma as unknown as ArchitectureMapReadClient;
+  const manifest = await client.projectionManifest.findFirst({ where: { ...scope, id: input.projectionManifestId, baselineId: input.baselineId, publishedAt: { not: null } }, select: { id: true, baselineId: true, generationId: true, publishedAt: true } });
+  if (!manifest?.generationId) throw new Error("ASSET_3A_MAPPING_PROJECTION_NOT_FOUND");
+  const identity = { ...scope, generationId: manifest.generationId, baselineId: manifest.baselineId, projectionManifestId: manifest.id };
+  const coverageManifest = await client.architectureCoverageManifest.findFirst({ where: { ...scope, baselineId: identity.baselineId, publicationState: "PUBLISHED" }, orderBy: [{ publishedAt: "desc" }, { id: "asc" }] });
+  if (!coverageManifest) throw new Error("ASSET_3A_MAPPING_COVERAGE_NOT_FOUND");
+  const coverageRows = await client.architectureAssetCoverageProjection.findMany({ where: { ...scope, generationId: coverageManifest.generationId, baselineId: identity.baselineId }, orderBy: [{ assetType: "asc" }, { assetId: "asc" }], take: 1001 });
+  if (coverageRows.length > 1000) throw new Error("ASSET_3A_MAPPING_SOURCE_TOO_LARGE");
+  const memberRows = await client.architectureUnitMemberProjection.findMany({ where: identity, orderBy: [{ semanticIdentity: "asc" }, { assertionId: "asc" }], take: 10001 });
+  const unitRows = await client.architectureUnitProjection.findMany({ where: identity, orderBy: [{ unitIdentity: "asc" }], take: 1001 });
+  const rows = materializeAsset3AMappings({ ...identity, coverageGenerationId: coverageManifest.generationId, coverage: coverageRows.map(toCoverageSource), members: memberRows.map(toMember), units: unitRows.map(toUnit) }).filter((row) => {
+    const filters = input.filters ?? {};
+    return (!filters.assetType || row.assetType === filters.assetType)
+      && (!filters.assetId || row.assetId === filters.assetId)
+      && (!filters.layer || row.targetLayer === filters.layer)
+      && (!filters.unitIdentity || row.targetUnitIdentity === filters.unitIdentity)
+      && (!filters.mappingMode || row.mappingMode === filters.mappingMode)
+      && (!filters.query || `${row.assetId} ${row.semanticIdentity} ${row.targetUnitIdentity ?? ""}`.toLowerCase().includes(filters.query.toLowerCase()));
+  });
+  const after = input.cursor ? decodeAssetMappingCursor(input.cursor) : undefined;
+  const filtered = after ? rows.filter((row) => `${row.assetType}:${row.assetId}` > after) : rows;
+  const selected = filtered.slice(0, limit);
+  const hasMore = filtered.length > limit;
+  return { ...scope, status: selected.length ? (hasMore ? "PARTIAL" : "READY") : "EMPTY", identity, total: rows.length, rows: selected, ...(hasMore && selected.at(-1) ? { nextCursor: encodeAssetMappingCursor(selected.at(-1)!) } : {}), ...(hasMore ? { partial: { code: "RESULT_PARTIAL", reasons: ["CONTINUATION_REQUIRED"] } } : {}) };
+}
+
+export async function get3aAssetMapping(input: Get3aAssetMappingInput): Promise<Asset3AMappingProjection> {
+  assertRequiredText(input.assetType, "ASSET_3A_MAPPING_ASSET_TYPE_REQUIRED");
+  assertRequiredText(input.assetId, "ASSET_3A_MAPPING_ASSET_ID_REQUIRED");
+  const result = await search3aAssetMappings({
+    architectureScope: input.architectureScope,
+    baselineId: input.baselineId,
+    projectionManifestId: input.projectionManifestId,
+    filters: { assetType: input.assetType, assetId: input.assetId },
+    limit: 1
+  });
+  const row = result.rows[0];
+  if (!row || row.assetType !== input.assetType || row.assetId !== input.assetId) throw new Error("ASSET_3A_MAPPING_NOT_FOUND");
+  return row;
+}
+
+export async function search3aArchitectureRealizations(input: Search3aArchitectureMapInput): Promise<ArchitectureMapSearchResult> {
+  return search3aArchitectureMap(input);
+}
 
 export async function search3aArchitectureMap(input: Search3aArchitectureMapInput): Promise<ArchitectureMapSearchResult> {
   const scope = readableScope(input.architectureScope.applicationServiceId);
@@ -196,6 +282,7 @@ export async function search3aArchitectureMap(input: Search3aArchitectureMapInpu
     status: reasons.length ? "PARTIAL" : units.length || mappings.length ? "READY" : "EMPTY",
     identity,
     units,
+    realizations: mappings,
     mappings,
     totalByLayer,
     returnedByLayer,
@@ -479,6 +566,30 @@ function toDependency(row: unknown): ArchitectureDependencyRecord {
     contentDigest: String(value.contentDigest)
   };
 }
+
+function toCoverageSource(row: unknown) {
+  const value = row as Record<string, unknown>;
+  return {
+    applicationServiceId: String(value.applicationServiceId),
+    scopePath: String(value.scopePath),
+    generationId: String(value.generationId),
+    baselineId: String(value.baselineId),
+    manifestId: String(value.manifestId),
+    assetType: String(value.assetType),
+    assetId: String(value.assetId),
+    role: value.role as "MEMBERSHIP" | "TRACEABILITY" | "EXEMPTION",
+    status: value.status as "COVERED" | "BLOCKED" | "NOT_EVALUATED",
+    ...(typeof value.terminalMemberId === "string" ? { terminalMemberId: value.terminalMemberId } : {}),
+    pathEvidence: Array.isArray(value.pathEvidence) ? value.pathEvidence as never[] : [],
+    ...(typeof value.reasonCode === "string" ? { reasonCode: value.reasonCode } : {}),
+    ...(typeof value.diagnosticRef === "string" ? { diagnosticRef: value.diagnosticRef } : {}),
+    ...(typeof value.sourceDigest === "string" ? { sourceDigest: value.sourceDigest } : {}),
+    rowDigest: String(value.rowDigest)
+  };
+}
+
+function encodeAssetMappingCursor(row: Pick<Asset3AMappingProjection, "assetType" | "assetId">): string { return Buffer.from(`${row.assetType}\u0000${row.assetId}`, "utf8").toString("base64url"); }
+function decodeAssetMappingCursor(value: string): string { try { const decoded = Buffer.from(value, "base64url").toString("utf8"); if (!decoded.includes("\u0000")) throw new Error(); return decoded.replace("\u0000", ":"); } catch { throw new Error("ASSET_3A_MAPPING_CURSOR_INVALID"); } }
 
 function compareUnits(left: ArchitectureUnitRecord, right: ArchitectureUnitRecord): number {
   return (left.parentUnitIdentity ?? "").localeCompare(right.parentUnitIdentity ?? "", "en")

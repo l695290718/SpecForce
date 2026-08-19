@@ -55,6 +55,12 @@ const persistence = vi.hoisted(() => ({
     architectureUnitMemberProjection: {
       findMany: vi.fn().mockResolvedValue([])
     },
+    architectureAssetCoverageProjection: {
+      findMany: vi.fn().mockResolvedValue([])
+    },
+    architectureCoverageManifest: {
+      findFirst: vi.fn().mockResolvedValue({ generationId: "coverage-generation-1", id: "coverage-manifest-1" })
+    },
     knowledgeProjectionEdge: {
       findMany: vi.fn().mockResolvedValue([])
     }
@@ -389,6 +395,9 @@ describe("versioned 3A navigation MCP boundary", () => {
       "list_3a_projection_manifests",
       "search_3a_architecture_facts",
       "search_3a_architecture_map",
+      "search_3a_asset_mappings",
+      "get_3a_asset_mapping",
+      "search_3a_architecture_realizations",
       "get_3a_architecture_unit_neighborhood",
       "trace_3a_architecture_path",
       "get_3a_architecture_fact",
@@ -441,6 +450,34 @@ describe("versioned 3A navigation MCP boundary", () => {
         projectionManifestId: input.projectionManifestId
       })
     }));
+  });
+
+  it("registers asset-to-3A mapping separately from architecture realizations", async () => {
+    const tools = captureTools();
+    const assetTool = tools.get("search_3a_asset_mappings")!;
+    const realizationTool = tools.get("search_3a_architecture_realizations")!;
+    expect(assetTool).toBeDefined();
+    expect(realizationTool).toBeDefined();
+    expect((assetTool.config.annotations as { readOnlyHint?: boolean }).readOnlyHint).toBe(true);
+    expect(assetTool.config.description).toContain("design assets to governed");
+    expect(realizationTool.config.description).toContain("unit-to-unit");
+    const result = await assetTool.handler({
+      architectureScope: { applicationServiceId: "com.huawei.celon.desiner", scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner" },
+      baselineId: "baseline-1",
+      projectionManifestId: "manifest-1",
+      limit: 10
+    });
+    expect(result.isError).not.toBe(true);
+    expect(persistence.prisma.architectureCoverageManifest.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ baselineId: "baseline-1", publicationState: "PUBLISHED" }) }));
+    expect(persistence.prisma.architectureAssetCoverageProjection.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ generationId: "coverage-generation-1", baselineId: "baseline-1" }) }));
+  });
+
+  it("registers exact asset mapping detail as a read-only operation", () => {
+    const tool = captureTools().get("get_3a_asset_mapping")!;
+    expect(tool).toBeDefined();
+    expect((tool.config.annotations as { readOnlyHint?: boolean }).readOnlyHint).toBe(true);
+    expect((tool.config._meta as { permissions: string[] }).permissions).toEqual(["knowledge:read"]);
+    expect(tool.config.description).toContain("design-asset-to-3A mapping");
   });
 
   it("marks the current-set drift API as legacy compatibility", () => {

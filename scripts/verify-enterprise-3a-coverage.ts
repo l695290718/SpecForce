@@ -6,7 +6,7 @@ type McpResponse = { content?: Array<{ type?: string; text?: string }>; isError?
 
 const root = process.cwd();
 const scope = { applicationServiceId: "com.huawei.celon.desiner", scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner" };
-const generationId = "coverage-generation:designer:3a:v11";
+const generationId = "coverage-generation:designer:3a:v13";
 const requireFromMcp = createRequire(resolve(root, "apps/mcp-server/package.json"));
 const { Client } = requireFromMcp("@modelcontextprotocol/sdk/client/index.js");
 const { StdioClientTransport } = requireFromMcp("@modelcontextprotocol/sdk/client/stdio.js");

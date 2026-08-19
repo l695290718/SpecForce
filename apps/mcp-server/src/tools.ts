@@ -21,7 +21,7 @@ import { getProjectionBuild, requestProjectionBuild } from "./knowledge/projecti
 import { getCoverageBuild, requestCoverageBuild } from "./knowledge/coverage-build";
 import { get3aCoverageReport } from "./knowledge/coverage-report";
 import { compare3aPublishedBaselines, get3aAlignment, get3aArchitectureFact, list3aProjectionManifests, list3aPublishedBaselines, query3aArchitectureMap, query3aArchitectureUnitNeighborhood, search3aArchitectureFacts, trace3aArchitecturePath } from "./knowledge/query-adapter";
-import { get3aArchitectureUnitNeighborhood, search3aArchitectureMap } from "./knowledge/architecture-map-adapter";
+import { get3aArchitectureUnitNeighborhood, get3aAssetMapping, search3aArchitectureMap, search3aArchitectureRealizations, search3aAssetMappings } from "./knowledge/architecture-map-adapter";
 import {
   analyzeScopedProposalImpact,
   buildScopedAssetGraph,
@@ -816,6 +816,49 @@ export function registerTools(server: McpServer): void {
     permissions: ["knowledge:read"],
     readOnly: true
   }, search3aArchitectureMap);
+
+  registerJsonTool(server, "search_3a_asset_mappings", {
+    title: "Search 3A asset mappings",
+    description: "Reads bounded exact-Scope mappings from design assets to governed BIZ, SYS, or TECH architecture units. DIRECT is authored; TRACE is derived.",
+    inputSchema: {
+      architectureScope: architectureScopeSchema,
+      baselineId: z.string().min(1),
+      projectionManifestId: z.string().min(1),
+      filters: z.object({ assetType: z.string().min(1).max(64).optional(), assetId: z.string().min(1).max(256).optional(), layer: z.enum(["BIZ", "SYS", "TECH"]).optional(), unitIdentity: z.string().startsWith("unit:").max(256).optional(), mappingMode: z.enum(["DIRECT", "TRACE", "EXEMPT", "BLOCKED"]).optional(), query: z.string().max(200).optional() }).optional(),
+      limit: z.number().int().min(1).max(200).optional(),
+      cursor: z.string().min(1).optional()
+    },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, search3aAssetMappings);
+
+  registerJsonTool(server, "get_3a_asset_mapping", {
+    title: "Get 3A asset mapping",
+    description: "Returns one exact design-asset-to-3A mapping, including its target unit, mapping mode, evidence path, generation identity, and diagnostics.",
+    inputSchema: {
+      architectureScope: architectureScopeSchema,
+      baselineId: z.string().min(1),
+      projectionManifestId: z.string().min(1),
+      assetType: z.string().min(1).max(64),
+      assetId: z.string().min(1).max(256)
+    },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, get3aAssetMapping);
+
+  registerJsonTool(server, "search_3a_architecture_realizations", {
+    title: "Search 3A architecture realizations",
+    description: "Reads unit-to-unit BIZ-to-SYS and SYS-to-TECH realization relationships. This is separate from design-asset-to-3A mapping.",
+    inputSchema: {
+      architectureScope: architectureScopeSchema,
+      baselineId: z.string().min(1),
+      projectionManifestId: z.string().min(1),
+      filters: z.object({ layers: z.array(z.enum(["BIZ", "SYS", "TECH"])).optional(), kinds: z.array(z.enum(["CAPABILITY", "PROCESS", "BUSINESS_OBJECT", "APPLICATION", "SERVICE", "COMPONENT", "DATA_DOMAIN", "PLATFORM", "RUNTIME", "INFRASTRUCTURE", "TECHNOLOGY_SERVICE"])).optional(), mappingFamilies: z.array(z.string().min(1)).optional(), query: z.string().max(200).optional() }).optional(),
+      budget: z.object({ maxUnitsPerLayer: z.number().int().positive().optional(), maxMappings: z.number().int().positive().optional(), timeoutMs: z.number().int().positive().optional(), maxPayloadBytes: z.number().int().positive().optional() }).partial().optional()
+    },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, search3aArchitectureRealizations);
 
   registerJsonTool(server, "get_3a_architecture_unit_neighborhood", {
     title: "Get 3A architecture unit neighborhood",

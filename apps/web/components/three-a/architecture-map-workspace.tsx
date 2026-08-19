@@ -95,8 +95,8 @@ export function ArchitectureMapWorkspace({ state, identity, generationId, initia
 
   return <div className="space-y-3" data-testid="architecture-map-workspace">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <div><div className="flex items-center gap-2 text-sm font-semibold text-ink"><PanelsTopLeft className="text-accent" size={17} /><T k="threeA.map" /></div><p className="mt-1 text-xs text-muted"><T k="threeA.mapDescription" /></p></div>
-      <div className="flex items-center gap-1 rounded-md border border-border bg-chrome p-1"><a className="inline-flex h-8 items-center gap-1 rounded bg-white px-2 text-xs font-semibold text-ink shadow-sm" href={representationHref("map")}><PanelsTopLeft size={13} /><T k="threeA.map" /></a><a className="inline-flex h-8 items-center gap-1 rounded px-2 text-xs font-semibold text-muted hover:bg-white" href={representationHref("network")}><Network size={13} /><T k="threeA.network" /></a></div>
+      <div><div className="flex items-center gap-2 text-sm font-semibold text-ink"><PanelsTopLeft className="text-accent" size={17} /><T k="threeA.realization" /></div><p className="mt-1 text-xs text-muted"><T k="threeA.realizationDescription" /></p></div>
+      <div className="flex items-center gap-1 rounded-md border border-border bg-chrome p-1"><a className="inline-flex h-8 items-center gap-1 rounded bg-white px-2 text-xs font-semibold text-ink shadow-sm" href={representationHref("map")}><PanelsTopLeft size={13} /><T k="threeA.realization" /></a><a className="inline-flex h-8 items-center gap-1 rounded px-2 text-xs font-semibold text-muted hover:bg-white" href={representationHref("network")}><Network size={13} /><T k="threeA.network" /></a></div>
     </div>
     <ArchitectureMapFilterBar value={filters} onChange={onFilters} />
     {loading ? <p className="rounded-md border border-border bg-white p-3 text-xs text-muted"><T k="threeA.loading" /></p> : null}

@@ -7,7 +7,8 @@ import { createCoverageProjectorRuntime, type CoverageSnapshot } from "../apps/k
 
 const scope: ArchitectureScopeRef = { applicationServiceId: "com.huawei.celon.desiner", scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner" };
 const baselineId = "knowledge-baseline:designer:3a:v6";
-const generationId = "coverage-generation:designer:3a:v11";
+// Coverage generations are immutable. Increment this when the authored catalog waterline changes.
+const generationId = "coverage-generation:designer:3a:v13";
 
 type ToolResult = { isError?: boolean; content?: Array<{ type?: string; text?: string }> };
 

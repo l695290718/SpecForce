@@ -12,13 +12,13 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
-**Evidence:** `coverage-generation:designer:3a:v11` is `CURRENT` with `303/303 COVERED`, `0 BLOCKED`, `0 NOT_EVALUATED`, maximum path `3`; `knowledge-baseline:designer:3a:v6` remains `READY` with 8 units, 42 memberships, 6 mappings, and the v5 regression is READY.
+**Evidence:** `coverage-generation:designer:3a:v13` is `CURRENT` with `307/307 COVERED`, `0 BLOCKED`, `0 NOT_EVALUATED`, maximum path `3`; the asset-to-3A read-back is `DIRECT 38 / TRACE 255 / BLOCKED 14 / EXEMPT 0`; `knowledge-baseline:designer:3a:v6` remains `READY` with 8 units, 42 memberships, 6 mappings, and the v5 regression is READY.
 
 ### 3A 语义单元扩充 v6
 
 **状态：** 精确 Designer Scope 的全量已实现并通过 MCP 同步；覆盖投影与结构化 3A 语义保持分层治理。
 
-**证据：** `coverage-generation:designer:3a:v11` 为 `CURRENT`，303/303 条记录 `COVERED`，0 条 `BLOCKED`，0 条 `NOT_EVALUATED`，最大路径 3 跳；v6 结构基线仍为 8 个单元、42 个成员、6 个映射，v5 回归 READY。
+**证据：** `coverage-generation:designer:3a:v13` 为 `CURRENT`，307/307 条记录 `COVERED`，0 条 `BLOCKED`，0 条 `NOT_EVALUATED`，最大路径 3 跳；资产到 3A 回读为 `DIRECT 38 / TRACE 255 / BLOCKED 14 / EXEMPT 0`；v6 结构基线仍为 8 个单元、42 个成员、6 个映射，v5 回归 READY。
 
 ## 2. CodeArts/CodeHub Protected-Branch Enforcement
 
@@ -170,11 +170,11 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
-**Rationale:** The exact Designer Scope now has an immutable, reproducible coverage row for every authored record: v11 is `CURRENT` with `303/303 COVERED`, `0 BLOCKED`, `0 NOT_EVALUATED`, and maximum path `3`. This is coverage of authored facts and traceability, not automatic promotion of every record into a new architecture unit. The accepted structural baseline remains 8 units, 42 memberships, and 6 mappings; ambiguous business meaning must still be governed explicitly.
+**Rationale:** The exact Designer Scope now has an immutable, reproducible coverage row for every authored record: v13 is `CURRENT` with `307/307 COVERED`, `0 BLOCKED`, `0 NOT_EVALUATED`, and maximum path `3`. Asset-to-3A mapping is separately derived as 38 DIRECT, 255 TRACE, 14 BLOCKED, and 0 EXEMPT. This is coverage and classification of authored facts, not automatic promotion of every record into a new architecture unit. The accepted structural baseline remains 8 units, 42 memberships, and 6 mappings; ambiguous business meaning must still be governed explicitly.
 
 **Trigger:** Start only when additional structural semantic units are prioritized with source owners. Each expansion must use a new exact-Scope batch, evidence matrix, bilingual review, converged reconciliation, and Baseline revision.
 
-**Completion evidence:** The current full-catalog coverage is evidenced by `coverage-generation:designer:3a:v11`, exact-Scope MCP read-back, and the v6 3A regression. Any future structural expansion must add stable evidence references, complete English/Chinese human-facing content, typed relationships or explicit review rationale, and a read-back projection. Unclassified and rejected facts must have an owner, trigger, and rationale.
+**Completion evidence:** The current full-catalog coverage is evidenced by `coverage-generation:designer:3a:v13`, exact-Scope MCP read-back, the asset mapping mode counts, and the v6 3A regression. Any future structural expansion must add stable evidence references, complete English/Chinese human-facing content, typed relationships or explicit review rationale, and a read-back projection. Unclassified and rejected facts must have an owner, trigger, and rationale.
 
 **中文本地化：**
 
@@ -182,13 +182,37 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **负责人：** SpecForge 架构与 Agent 集成团队。
 
-**理由：** 当前精确 Designer Scope 已为每条设计记录生成不可变且可复现的覆盖行：v11 为 `CURRENT`，303/303 条记录 `COVERED`，0 条 `BLOCKED`，0 条 `NOT_EVALUATED`，最大路径为 3 跳。这表示设计事实和追溯关系已覆盖，不表示把每条记录通过自动推断提升为新的架构单元。已接受的结构基线仍为 8 个单元、42 个成员和 6 条映射，含义不明确的业务语义仍必须显式治理。
+**理由：** 当前精确 Designer Scope 已为每条设计记录生成不可变且可复现的覆盖行：v13 为 `CURRENT`，307/307 条记录 `COVERED`，0 条 `BLOCKED`，0 条 `NOT_EVALUATED`，最大路径为 3 跳。资产到 3A 的派生映射为 DIRECT 38、TRACE 255、BLOCKED 14、EXEMPT 0。这表示设计事实和追溯关系已覆盖，不表示把每条记录通过自动推断提升为新的架构单元。已接受的结构基线仍为 8 个单元、42 个成员和 6 条映射，含义不明确的业务语义仍必须显式治理。
 
 **启动条件：** 只有在来源负责人排定新的结构化语义单元后启动。每次扩展必须使用新的精确 Scope 批次、证据矩阵、双语审核、收敛对账和 Baseline 版本。
 
-**完成证据：** 当前全目录覆盖由 `coverage-generation:designer:3a:v11`、精确 Scope 的 MCP 回读和 v6 3A 回归共同证明。未来结构化扩充仍必须提供稳定证据引用、完整中英文面向人内容、有类型关系或明确审核理由，并能在投影中回读；未分类和拒绝事实必须记录负责人、触发条件和理由。
+**完成证据：** 当前全目录覆盖由 `coverage-generation:designer:3a:v13`、精确 Scope 的 MCP 回读、资产到 3A 映射模式统计和 v6 3A 回归共同证明。未来结构化扩充仍必须提供稳定证据引用、完整中英文面向人内容、有类型关系或明确审核理由，并能在投影中回读；未分类和拒绝事实必须记录负责人、触发条件和理由。
 
-## 8. Local Change-Attestation Hook Deployment And Signing Endpoint
+## 8. Persistent High-Volume Asset-to-3A Materializer
+
+**Status:** Deferred; the compatibility read path is bounded at 1,000 persisted coverage source rows and fails closed above that limit.
+
+**Owner:** SpecForge Architecture and Data Platform.
+
+**Rationale:** The current increment composes PostgreSQL-authoritative coverage, membership, and unit projections at read time. A dedicated immutable materialized mapping table, partitioning strategy, generation publication protocol, replay controls, and high-volume keyset indexes are intentionally not added until production catalog volume and query telemetry justify the extra storage lifecycle.
+
+**Trigger:** Start when an approved enterprise Scope exceeds 1,000 coverage source rows or mapping query latency/IO telemetry requires a durable materialized read model. Open a new exact-Scope Design Change Session and preserve the current read model as the compatibility oracle during migration.
+
+**Completion evidence:** Additive schema and migration reviewed; generation-bound rows are persisted transactionally with count/digest closure, exact-Scope indexes and keyset pagination are proven at target volume, replay and rollback are tested, PostgreSQL remains authoritative, and MCP read-back matches the compatibility oracle for DIRECT/TRACE/EXEMPT/BLOCKED outcomes.
+
+**中文本地化：**
+
+**状态：** 延期；当前兼容读取路径最多处理 1,000 条持久化覆盖源记录，超过后失败关闭。
+
+**负责人：** SpecForge 架构与数据平台团队。
+
+**理由：** 当前增量在读取时组合 PostgreSQL 权威覆盖、成员和单元投影。专用不可变映射表、分区策略、代次发布协议、重放控制和大规模 Keyset 索引暂不增加，等生产目录规模与查询遥测证明额外存储生命周期确有必要后再实施。
+
+**启动条件：** 某个获批企业 Scope 的覆盖源记录超过 1,000 条，或映射查询延迟/IO 遥测证明需要持久化读模型时启动。必须新建精确 Scope 设计变更会话，并在迁移期间保留当前读取模型作为兼容基准。
+
+**完成证据：** 完成增量 Schema 和迁移评审；绑定代次的行以事务方式持久化并具备数量/摘要闭包；目标规模下精确 Scope 索引和 Keyset 分页通过验证；重放和回滚通过测试；PostgreSQL 保持权威；MCP 回读与兼容模型在 DIRECT/TRACE/EXEMPT/BLOCKED 结果上保持一致。
+
+## 9. Local Change-Attestation Hook Deployment And Signing Endpoint
 
 **Status:** Implemented locally; CodeHub merge enforcement remains deferred.
 
@@ -216,7 +240,7 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **设计引用：** ADR-0017、ADR-0021、ADR-0007；`docs/operations/local-git-hook-attestation.md`；`apps/specforge-cli/`。
 
-## 9. Remove Persisted Graph Verification Fixtures From The Designer Catalog
+## 10. Remove Persisted Graph Verification Fixtures From The Designer Catalog
 
 **Status:** Deferred; explicitly excluded from Designer 3A v5.
 
