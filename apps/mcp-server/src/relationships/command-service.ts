@@ -125,9 +125,11 @@ export class RelationshipCommandService {
       const expectedParserKeys = new Set<string>();
       for (const relationship of graph.relationships) {
         const sourceNode = nodes.get(relationship.sourceLogicalId);
-        const targetNode = nodes.get(relationship.targetLogicalId);
+        const targetNode = nodes.get(relationship.targetLogicalId)
+          ?? await repository.findNode(scope, relationship.targetNode)
+          ?? (relationship.targetNode.external ? await repository.upsertNode(scope, nodeInput(relationship.targetNode)) : undefined);
         if (!sourceNode || !targetNode) throw new Error("GRAPH_NODE_MISSING");
-        const currentInput = { sourceNodeId: sourceNode.dbId, targetNodeId: targetNode.dbId, relationType: relationship.code, strength: relationshipOntology.get(relationship.code)!.strength, confidence: relationshipOntology.get(relationship.code)!.defaultConfidence, source: relationship.source, sourceReference: relationship.sourceReference, lifecycleStatus: "ACTIVE", validTo: null, metadata: {} } as const;
+        const currentInput = { sourceNodeId: sourceNode.dbId, targetNodeId: targetNode.dbId, relationType: relationship.code, strength: relationshipOntology.get(relationship.code)!.strength, confidence: relationshipOntology.get(relationship.code)!.defaultConfidence, source: relationship.source, sourceReference: relationship.sourceReference, lifecycleStatus: "ACTIVE", validTo: null, metadata: (relationship.metadata ?? {}) as Record<string, unknown> } as const;
         expectedParserKeys.add(currentKey(currentInput));
         const existing = await repository.findCurrent(scope, currentInput);
         const change: PendingRelationshipChange = { kind: "relationship", current: currentInput, existing, action: "UPSERT" };

@@ -4,7 +4,8 @@ import type { Permission } from "@specforge/core";
 import { z } from "zod";
 import { auditToolCall } from "./audit";
 import { allowAllPolicy, getDefaultActor, principalFromAuthInfo, withRequestPrincipal, type McpAuthInfo } from "./auth";
-import { archiveSeedGraphOutbox, deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
+import { archiveSeedGraphOutbox, deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, prepareDataModelUpgrade, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
+import { applyDataModelChangeSet } from "./data-models/change-set";
 import { commitKnowledgeChangeSet, createIdentityCandidate, createKnowledgeAssertion, createKnowledgeReviewBundle, createProjectionManifest, createWorkingStream, decideKnowledgeReviewBundle, listKnowledgeAssertions, publishKnowledgeBaseline } from "./knowledge/persistence";
 import { promote3aArchitectureFacts, reconcile3aArchitectureFacts, submit3aArchitectureFactBatch } from "./knowledge/architecture-authoring";
 import { submitScanReport } from "./scanner/persistence";
@@ -209,6 +210,49 @@ export function registerTools(server: McpServer): void {
       readOnly: false
     },
     async (input) => upsertDesignAsset({ ...input, asset: { ...input.asset, architectureScope: input.architectureScope } } as unknown as Parameters<typeof upsertDesignAsset>[0])
+  );
+
+  registerJsonTool(
+    server,
+    "apply_data_model_change_set",
+    {
+      title: "Apply data model change set",
+      description: "Atomically validates and persists structured Data Model v2 assets and their typed relationship projection in one exact Scope.",
+      inputSchema: {
+        architectureScope: architectureScopeSchema,
+        models: z.array(z.record(z.unknown())).optional(),
+        changes: z.array(z.object({ operation: z.enum(["UPSERT", "DELETE"]), asset: z.record(z.unknown()).optional(), assetId: z.string().min(1).optional() })).optional(),
+        idempotencyKey: z.string().min(1),
+        correlationId: z.string().min(1)
+      },
+      permissions: ["asset:write"],
+      readOnly: false
+    },
+    async (input) => applyDataModelChangeSet({
+      ...input,
+      models: input.models?.map((model) => ({ ...model, architectureScope: input.architectureScope })) as never,
+      changes: input.changes?.map((change) => ({ ...change, asset: change.asset ? { ...change.asset, architectureScope: input.architectureScope } as never : undefined })) as never
+    })
+  );
+
+  registerJsonTool(
+    server,
+    "upgrade_data_model",
+    {
+      title: "Prepare Data Model v2 upgrade",
+      description: "Reads a legacy Data Model and deterministically prepares a v2 payload without writing it.",
+      inputSchema: {
+        applicationServiceId: z.string().min(1),
+        architectureScope: architectureScopeSchema,
+        assetId: z.string().min(1)
+      },
+      permissions: ["asset:read"],
+      readOnly: true
+    },
+    async (input) => {
+      assertMatchingApplicationService(input);
+      return prepareDataModelUpgrade(input);
+    }
   );
 
   registerJsonTool(

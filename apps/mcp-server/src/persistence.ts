@@ -1,6 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { assertWritableApplicationService, assetLabel, authorizePrincipalScope, defaultHuaweiActor, hasScopeAccess, huaweiArchitectureScopes, localizeAsset, normalizeAssetType, relationshipOntology, scopeById, seedHuaweiActor, validateAssetLocalization } from "@specforge/core";
-import type { ArchitectureScopeRef, Asset, AssetLocale, AssetType, ContextPack, Proposal, RelationshipCode, ScopedActor, ScopedPrincipal } from "@specforge/core";
+import { assertWritableApplicationService, assetLabel, authorizePrincipalScope, defaultHuaweiActor, hasScopeAccess, huaweiArchitectureScopes, isStructuredDataModel, localizeAsset, normalizeAssetType, relationshipOntology, scopeById, seedHuaweiActor, upgradeLegacyDataModel, validateAssetLocalization, validateDataModelV2 } from "@specforge/core";
+import type { ArchitectureScopeRef, Asset, AssetLocale, AssetType, ContextPack, DataModel, Proposal, RelationshipCode, ScopedActor, ScopedPrincipal } from "@specforge/core";
 import { createHash } from "node:crypto";
 import { createTrustedRelationshipExecutionContext, RelationshipCommandService, type DeleteLegacyRelationshipCommand, type UpsertRelationshipCommand } from "./relationships/command-service";
 import { PrismaRelationshipRepository, type RelationshipScope } from "./relationships/repository";
@@ -825,6 +825,18 @@ export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
   assertString(canonicalAsset.name ?? canonicalAsset.title, "asset.name");
   await ensureMcpPersistenceSchema();
 
+  if (input.assetType === "dataModel") {
+    const dataModel = canonicalAsset as unknown as DataModel;
+    if (isStructuredDataModel(dataModel)) validateDataModelV2(dataModel);
+    const designAssetReader = (prisma.designAsset as unknown as { findUnique?: typeof prisma.designAsset.findUnique }).findUnique;
+    if (designAssetReader) {
+      const existing = await designAssetReader({ where: { applicationServiceId_scopePath_id: { ...scope, id: String(canonicalAsset.id) } }, select: { payload: true } });
+      if (existing && !isStructuredDataModel(parsePersistedDataModel(existing.payload)) && !isStructuredDataModel(dataModel)) {
+        throw new Error("DATA_MODEL_UPGRADE_REQUIRED");
+      }
+    }
+  }
+
   await prisma.$transaction(async (transaction) => {
     await transaction.designAsset.upsert({
       where: {
@@ -882,6 +894,22 @@ export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
   });
 
   return { id: canonicalAsset.id, type: input.assetType, status: "upserted" };
+}
+
+export interface DataModelUpgradeInput {
+  architectureScope: ArchitectureScopeRef;
+  assetId: string;
+}
+
+export async function prepareDataModelUpgrade(input: DataModelUpgradeInput) {
+  const readable = readableScope(input.architectureScope.applicationServiceId);
+  if (readable.scopePath !== input.architectureScope.scopePath) throw new Error("SCOPE_MISMATCH");
+  await ensureMcpPersistenceSchema();
+  const row = await prisma.designAsset.findUnique({ where: { applicationServiceId_scopePath_id: { ...readable, id: input.assetId } }, select: { type: true, payload: true } });
+  if (!row || row.type !== "dataModel") throw new Error("DATA_MODEL_NOT_FOUND");
+  const model = parsePersistedDataModel(row.payload);
+  if (isStructuredDataModel(model)) return { architectureScope: readable, dataModel: model, requiresWrite: false };
+  return { architectureScope: readable, dataModel: upgradeLegacyDataModel(model), requiresWrite: true };
 }
 
 export async function upsertProposal(input: UpsertProposalInput) {
@@ -1514,6 +1542,10 @@ function stableJsonValue(value: unknown): unknown {
       .map(([key, nested]) => [key, stableJsonValue(nested)]));
   }
   return value;
+}
+
+function parsePersistedDataModel(payload: string): DataModel {
+  try { return JSON.parse(payload) as DataModel; } catch { throw new Error("DATA_MODEL_PAYLOAD_INVALID"); }
 }
 
 type LegacyAssetLinkRow = {
