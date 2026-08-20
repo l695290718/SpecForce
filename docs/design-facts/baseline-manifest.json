@@ -1644,6 +1644,380 @@
                                   "result": "Closed the exact-Scope implementation session as CONVERGED after the governed Designer 3A slice and projection read-back."
                               }
                           ]
+                      },
+                      {
+                          "id": "adr-bounded-nebula-knowledge-projection-generations",
+                          "repositoryAdr": "docs/adr/0036-bounded-nebula-knowledge-projection-generations.md",
+                          "mcpAdrId": "adr-bounded-nebula-knowledge-projection-generations",
+                          "scope": {
+                              "applicationServiceId": "com.huawei.celon.desiner",
+                              "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                          },
+                          "proposalId": "proposal-bounded-nebula-knowledge-projection-generations",
+                          "proposalStatus": "approved",
+                          "proposalNonGoal": {
+                              "en": "This design does not make NebulaGraph authoritative, retain unlimited online history, expose ordinary historical-generation queries, or claim unverified multi-node and billion-scale production capability.",
+                              "zh": "本设计不把 NebulaGraph 变成权威库，不无限保留在线历史，不向普通调用方开放任意历史代次查询，也不宣称未经验证的多节点和十亿级生产能力。"
+                          },
+                          "contextPackId": "ctx-bounded-nebula-knowledge-projection-generations",
+                          "relatedAssetIds": [
+                              "api-specforge-nebula-generation-control",
+                              "data-specforge-nebula-generation-projection",
+                              "rule-specforge-nebula-bounded-generation-publication",
+                              "quality-specforge-nebula-scale-certification",
+                              "data-specforge-asset-graph",
+                              "api-specforge-3a-projection-build",
+                              "api-specforge-3a-architecture-query",
+                              "data-specforge-3a-projection-read-model"
+                          ],
+                          "managedAssets": [
+                              {
+                                  "assetType": "api",
+                                  "asset": {
+                                      "id": "api-specforge-nebula-generation-control",
+                                      "name": "Nebula Projection Generation Control Contract",
+                                      "description": "Controls exact-Scope generation build, validation, publication, rollback, retirement, and cleanup while PostgreSQL remains the authoritative control plane.",
+                                      "method": "POST",
+                                      "path": "/internal/graph/projection-generations/{operation}",
+                                      "domainId": "domain-specforge-platform",
+                                      "providerSystem": "SpecForge Graph Runtime",
+                                      "consumers": ["SpecForge Graph Projector", "SpecForge architecture operations"],
+                                      "requestSchema": {
+                                          "architectureScope": "ArchitectureScopeRef",
+                                          "operation": "BUILD|VALIDATE|PUBLISH|ROLLBACK|RETIRE|PURGE",
+                                          "manifestId": "string",
+                                          "expectedHeadVersion": "integer"
+                                      },
+                                      "responseSchema": {
+                                          "head": "NebulaProjectionHead",
+                                          "manifest": "NebulaProjectionManifest",
+                                          "operationReceipt": "GenerationOperationReceipt"
+                                      },
+                                      "errorCodes": [
+                                          "SCOPE_ACCESS_DENIED",
+                                          "GENERATION_CONFLICT",
+                                          "MANIFEST_NOT_FOUND",
+                                          "PROJECTION_PARITY_FAILED",
+                                          "ACTIVE_GENERATION_PROTECTED",
+                                          "GENERATION_CAPACITY_BLOCKED"
+                                      ],
+                                      "authType": "Exact application-service graph:operate grant",
+                                      "idempotency": "Every operation is bound to Scope, Manifest, operation type, and expected head version; retries return the durable receipt.",
+                                      "rateLimit": "One mutating generation operation per Scope; purge is separately rate-limited.",
+                                      "timeout": "10s control-plane timeout; build, validation, and purge execute asynchronously.",
+                                      "compatibilityPolicy": "Generation and graph schema versions are explicit; incompatible Manifests cannot publish or roll back.",
+                                      "openapiSpec": "Internal graph projection generation control contract v1",
+                                      "exposure": "internal",
+                                      "createdAt": "2026-08-20T00:00:00.000Z",
+                                      "updatedAt": "2026-08-20T00:00:00.000Z",
+                                      "localizedContent": {
+                                          "en": {
+                                              "name": "Nebula Projection Generation Control Contract",
+                                              "description": "Controls exact-Scope generation build, validation, publication, rollback, retirement, and cleanup while PostgreSQL remains the authoritative control plane.",
+                                              "authType": "Exact application-service graph:operate grant",
+                                              "idempotency": "Every operation is bound to Scope, Manifest, operation type, and expected head version; retries return the durable receipt.",
+                                              "rateLimit": "One mutating generation operation per Scope; purge is separately rate-limited.",
+                                              "timeout": "10s control-plane timeout; build, validation, and purge execute asynchronously.",
+                                              "compatibilityPolicy": "Generation and graph schema versions are explicit; incompatible Manifests cannot publish or roll back."
+                                          },
+                                          "zh": {
+                                              "name": "Nebula 投影代次控制契约",
+                                              "description": "在 PostgreSQL 保持权威控制面的前提下，控制精确 Scope 的代次构建、校验、发布、回滚、退役和清理。",
+                                              "authType": "精确应用服务 graph:operate 授权",
+                                              "idempotency": "每个操作绑定 Scope、Manifest、操作类型和预期 Head 版本；重试返回持久收据。",
+                                              "rateLimit": "每个 Scope 同时只允许一个代次变更操作；清理单独限速。",
+                                              "timeout": "控制面超时 10 秒；构建、校验和清理异步执行。",
+                                              "compatibilityPolicy": "代次和图 Schema 版本必须显式保存；不兼容 Manifest 禁止发布或回滚。"
+                                          }
+                                      }
+                                  }
+                              },
+                              {
+                                  "assetType": "dataModel",
+                                  "asset": {
+                                      "id": "data-specforge-nebula-generation-projection",
+                                      "name": "Nebula Bounded Generation Projection Model",
+                                      "description": "Authoritative PostgreSQL control model and rebuildable Nebula identities for BUILDING, ACTIVE, and PREVIOUS exact-Scope projection generations.",
+                                      "code": "NebulaBoundedGenerationProjection",
+                                      "modelType": "physical",
+                                      "domainId": "domain-specforge-platform",
+                                      "tables": [
+                                          "NebulaProjectionManifest",
+                                          "NebulaProjectionHead",
+                                          "NebulaProjectionCheckpoint",
+                                          "NebulaProjectionPurgeChunk",
+                                          "NebulaProjectionCertificationRun"
+                                      ],
+                                      "entities": [
+                                          "Immutable Projection Manifest",
+                                          "Scope Projection Head",
+                                          "Manifest Partition Checkpoint",
+                                          "Purge Chunk",
+                                          "Certification Run"
+                                      ],
+                                      "fields": [],
+                                      "relationships": [
+                                          "One exact Scope has one mutable Projection Head.",
+                                          "One Projection Head references at most one BUILDING, one ACTIVE, and one PREVIOUS immutable Manifest.",
+                                          "One Manifest owns generation-qualified vertices, edges, partition checkpoints, and cleanup chunks.",
+                                          "Knowledge Assertions connect Design Assets to BIZ, SYS, or TECH Architecture Units within one Manifest."
+                                      ],
+                                      "constraints": [
+                                          "PostgreSQL is authoritative for Manifests, head pointers, history, and source watermarks.",
+                                          "Every graph identity contains exact Scope and Manifest identity.",
+                                          "Cross-Scope and cross-Manifest edges are invalid.",
+                                          "Cleanup can never select the ACTIVE Manifest."
+                                      ],
+                                      "dataClassification": "internal architecture metadata",
+                                      "lifecycle": "A Manifest moves through BUILDING and VALIDATING before pointer-based activation; old ACTIVE becomes PREVIOUS, then RETIRED, PURGING, and PURGED or ARCHIVED.",
+                                      "lineage": "Authoritative PostgreSQL Design Assets, Knowledge Assertions, Evidence, Baselines, Profiles, Relationship Events, and transactional Outbox records.",
+                                      "createdAt": "2026-08-20T00:00:00.000Z",
+                                      "updatedAt": "2026-08-20T00:00:00.000Z",
+                                      "localizedContent": {
+                                          "en": {
+                                              "name": "Nebula Bounded Generation Projection Model",
+                                              "description": "Authoritative PostgreSQL control model and rebuildable Nebula identities for BUILDING, ACTIVE, and PREVIOUS exact-Scope projection generations.",
+                                              "relationships": [
+                                                  "One exact Scope has one mutable Projection Head.",
+                                                  "One Projection Head references at most one BUILDING, one ACTIVE, and one PREVIOUS immutable Manifest.",
+                                                  "One Manifest owns generation-qualified vertices, edges, partition checkpoints, and cleanup chunks.",
+                                                  "Knowledge Assertions connect Design Assets to BIZ, SYS, or TECH Architecture Units within one Manifest."
+                                              ],
+                                              "constraints": [
+                                                  "PostgreSQL is authoritative for Manifests, head pointers, history, and source watermarks.",
+                                                  "Every graph identity contains exact Scope and Manifest identity.",
+                                                  "Cross-Scope and cross-Manifest edges are invalid.",
+                                                  "Cleanup can never select the ACTIVE Manifest."
+                                              ],
+                                              "lifecycle": "A Manifest moves through BUILDING and VALIDATING before pointer-based activation; old ACTIVE becomes PREVIOUS, then RETIRED, PURGING, and PURGED or ARCHIVED.",
+                                              "lineage": "Authoritative PostgreSQL Design Assets, Knowledge Assertions, Evidence, Baselines, Profiles, Relationship Events, and transactional Outbox records.",
+                                              "fields": {}
+                                          },
+                                          "zh": {
+                                              "name": "Nebula 有界代次投影模型",
+                                              "description": "用于 BUILDING、ACTIVE、PREVIOUS 精确 Scope 投影代次的 PostgreSQL 权威控制模型和可重建 Nebula 身份。",
+                                              "relationships": [
+                                                  "一个精确 Scope 只有一个可变 Projection Head。",
+                                                  "一个 Projection Head 最多引用一个 BUILDING、一个 ACTIVE 和一个 PREVIOUS 不可变 Manifest。",
+                                                  "一个 Manifest 拥有带代次身份的顶点、关系、分区检查点和清理分块。",
+                                                  "Knowledge Assertion 在同一 Manifest 内把设计资产连接到 BIZ、SYS 或 TECH 架构单元。"
+                                              ],
+                                              "constraints": [
+                                                  "PostgreSQL 对 Manifest、Head 指针、历史和源水位保持权威。",
+                                                  "每个图身份都包含精确 Scope 和 Manifest 身份。",
+                                                  "跨 Scope 和跨 Manifest 关系无效。",
+                                                  "清理永远不能选择 ACTIVE Manifest。"
+                                              ],
+                                              "lifecycle": "Manifest 在指针激活前依次经过 BUILDING 和 VALIDATING；旧 ACTIVE 变为 PREVIOUS，随后进入 RETIRED、PURGING、PURGED 或 ARCHIVED。",
+                                              "lineage": "来自 PostgreSQL 权威设计资产、Knowledge Assertion、Evidence、Baseline、Profile、Relationship Event 和事务 Outbox 记录。",
+                                              "fields": {}
+                                          }
+                                      }
+                                  }
+                              },
+                              {
+                                  "assetType": "businessRule",
+                                  "asset": {
+                                      "id": "rule-specforge-nebula-bounded-generation-publication",
+                                      "name": "Nebula Bounded Generation Publication Rule",
+                                      "description": "Publishes or rolls back a graph generation only through an atomic PostgreSQL head-pointer transaction after exact-Scope parity and compatibility gates pass.",
+                                      "code": "SPECFORGE_NEBULA_BOUNDED_GENERATION_PUBLICATION",
+                                      "domainId": "domain-specforge-platform",
+                                      "ruleType": "validation",
+                                      "condition": "A validated exact-Scope Manifest requests publication or a compatible PREVIOUS Manifest requests rollback.",
+                                      "action": "Acquire the Scope lock, verify head version, complete checkpoints, zero unresolved dead letters, matching control totals, deterministic bucket digests, semantic probes, capacity policy, and schema compatibility, then atomically update BUILDING, ACTIVE, and PREVIOUS pointers.",
+                                      "exception": "Any Scope mismatch, cross-generation identity, incomplete checkpoint, dead letter, digest mismatch, semantic mismatch, stale head version, incompatible schema, or ACTIVE cleanup target fails closed.",
+                                      "examples": [
+                                          "A failed BUILDING Manifest leaves the current ACTIVE pointer unchanged.",
+                                          "A rollback atomically swaps ACTIVE and PREVIOUS after compatibility and online-retention checks."
+                                      ],
+                                      "relatedAssets": [
+                                          {
+                                              "type": "api",
+                                              "id": "api-specforge-nebula-generation-control",
+                                              "label": "Nebula Projection Generation Control Contract"
+                                          },
+                                          {
+                                              "type": "dataModel",
+                                              "id": "data-specforge-nebula-generation-projection",
+                                              "label": "Nebula Bounded Generation Projection Model"
+                                          }
+                                      ],
+                                      "severity": "critical",
+                                      "createdAt": "2026-08-20T00:00:00.000Z",
+                                      "updatedAt": "2026-08-20T00:00:00.000Z",
+                                      "localizedContent": {
+                                          "en": {
+                                              "name": "Nebula Bounded Generation Publication Rule",
+                                              "description": "Publishes or rolls back a graph generation only through an atomic PostgreSQL head-pointer transaction after exact-Scope parity and compatibility gates pass.",
+                                              "condition": "A validated exact-Scope Manifest requests publication or a compatible PREVIOUS Manifest requests rollback.",
+                                              "action": "Acquire the Scope lock, verify head version, complete checkpoints, zero unresolved dead letters, matching control totals, deterministic bucket digests, semantic probes, capacity policy, and schema compatibility, then atomically update BUILDING, ACTIVE, and PREVIOUS pointers.",
+                                              "exception": "Any Scope mismatch, cross-generation identity, incomplete checkpoint, dead letter, digest mismatch, semantic mismatch, stale head version, incompatible schema, or ACTIVE cleanup target fails closed.",
+                                              "examples": [
+                                                  "A failed BUILDING Manifest leaves the current ACTIVE pointer unchanged.",
+                                                  "A rollback atomically swaps ACTIVE and PREVIOUS after compatibility and online-retention checks."
+                                              ]
+                                          },
+                                          "zh": {
+                                              "name": "Nebula 有界代次发布规则",
+                                              "description": "只有精确 Scope 一致性和兼容性门禁通过后，才能通过 PostgreSQL 原子 Head 指针事务发布或回滚图代次。",
+                                              "condition": "已校验的精确 Scope Manifest 请求发布，或兼容的 PREVIOUS Manifest 请求回滚。",
+                                              "action": "取得 Scope 锁，校验 Head 版本、检查点完成、无未解决死信、数量一致、确定性桶摘要一致、语义探针一致、容量策略和 Schema 兼容性，然后原子更新 BUILDING、ACTIVE 和 PREVIOUS 指针。",
+                                              "exception": "Scope 不匹配、跨代身份、检查点未完成、死信、摘要或语义不一致、Head 版本过期、Schema 不兼容或清理选择 ACTIVE 时都必须失败关闭。",
+                                              "examples": [
+                                                  "BUILDING Manifest 失败时保持当前 ACTIVE 指针不变。",
+                                                  "回滚在兼容性和在线保留校验后原子交换 ACTIVE 与 PREVIOUS。"
+                                              ]
+                                          }
+                                      }
+                                  }
+                              },
+                              {
+                                  "assetType": "quality",
+                                  "asset": {
+                                      "id": "quality-specforge-nebula-scale-certification",
+                                      "name": "Nebula Production Scale Certification Requirement",
+                                      "description": "Prevents production-scale claims until exact-Scope correctness, failure recovery, and progressive 10M, 100M, and 1B relationship evidence are published.",
+                                      "assetType": "dataModel",
+                                      "assetId": "data-specforge-nebula-generation-projection",
+                                      "domainId": "domain-specforge-platform",
+                                      "category": "reliability",
+                                      "target": "Zero cross-Scope or cross-generation results, complete PostgreSQL/Nebula parity, and a passed immutable report for every claimed scale tier.",
+                                      "measurement": "Certification Report control totals, bucket digests, semantic probes, failure drills, throughput, P50/P95/P99 latency, disk amplification, compaction debt, cleanup duration, and recovery time.",
+                                      "priority": "critical",
+                                      "verificationMethod": "Run production-representative 10M, 100M, and 1B progressive certification without skipping a tier; publish exact topology, versions, configuration, workload, commands, and results.",
+                                      "createdAt": "2026-08-20T00:00:00.000Z",
+                                      "updatedAt": "2026-08-20T00:00:00.000Z",
+                                      "localizedContent": {
+                                          "en": {
+                                              "name": "Nebula Production Scale Certification Requirement",
+                                              "description": "Prevents production-scale claims until exact-Scope correctness, failure recovery, and progressive 10M, 100M, and 1B relationship evidence are published.",
+                                              "target": "Zero cross-Scope or cross-generation results, complete PostgreSQL/Nebula parity, and a passed immutable report for every claimed scale tier.",
+                                              "measurement": "Certification Report control totals, bucket digests, semantic probes, failure drills, throughput, P50/P95/P99 latency, disk amplification, compaction debt, cleanup duration, and recovery time.",
+                                              "verificationMethod": "Run production-representative 10M, 100M, and 1B progressive certification without skipping a tier; publish exact topology, versions, configuration, workload, commands, and results."
+                                          },
+                                          "zh": {
+                                              "name": "Nebula 生产规模认证要求",
+                                              "description": "在精确 Scope 正确性、故障恢复以及递进的 10M、100M、1B 关系证据发布前，禁止宣称相应生产规模能力。",
+                                              "target": "跨 Scope 或跨代结果为零，PostgreSQL/Nebula 完整一致，并且每个宣称级别都有通过的不可变报告。",
+                                              "measurement": "认证报告中的数量、桶摘要、语义探针、故障演练、吞吐、P50/P95/P99 延迟、磁盘放大、压缩债务、清理时间和恢复时间。",
+                                              "verificationMethod": "在生产代表性环境按 10M、100M、1B 递进认证，禁止跳级；发布精确拓扑、版本、配置、工作负载、命令和结果。"
+                                          }
+                                      }
+                                  }
+                              }
+                          ],
+                          "managedRelationships": [
+                              {
+                                  "sourceType": "api",
+                                  "sourceId": "api-specforge-nebula-generation-control",
+                                  "targetType": "dataModel",
+                                  "targetId": "data-specforge-nebula-generation-projection",
+                                  "relationType": "WRITES"
+                              },
+                              {
+                                  "sourceType": "businessRule",
+                                  "sourceId": "rule-specforge-nebula-bounded-generation-publication",
+                                  "targetType": "api",
+                                  "targetId": "api-specforge-nebula-generation-control",
+                                  "relationType": "GOVERNS"
+                              },
+                              {
+                                  "sourceType": "businessRule",
+                                  "sourceId": "rule-specforge-nebula-bounded-generation-publication",
+                                  "targetType": "dataModel",
+                                  "targetId": "data-specforge-nebula-generation-projection",
+                                  "relationType": "GOVERNS"
+                              },
+                              {
+                                  "sourceType": "quality",
+                                  "sourceId": "quality-specforge-nebula-scale-certification",
+                                  "targetType": "api",
+                                  "targetId": "api-specforge-nebula-generation-control",
+                                  "relationType": "VALIDATES"
+                              },
+                              {
+                                  "sourceType": "quality",
+                                  "sourceId": "quality-specforge-nebula-scale-certification",
+                                  "targetType": "dataModel",
+                                  "targetId": "data-specforge-nebula-generation-projection",
+                                  "relationType": "VALIDATES"
+                              },
+                              {
+                                  "sourceType": "proposal",
+                                  "sourceId": "proposal-bounded-nebula-knowledge-projection-generations",
+                                  "targetType": "api",
+                                  "targetId": "api-specforge-nebula-generation-control",
+                                  "relationType": "IMPACTS"
+                              },
+                              {
+                                  "sourceType": "proposal",
+                                  "sourceId": "proposal-bounded-nebula-knowledge-projection-generations",
+                                  "targetType": "dataModel",
+                                  "targetId": "data-specforge-nebula-generation-projection",
+                                  "relationType": "IMPACTS"
+                              },
+                              {
+                                  "sourceType": "proposal",
+                                  "sourceId": "proposal-bounded-nebula-knowledge-projection-generations",
+                                  "targetType": "businessRule",
+                                  "targetId": "rule-specforge-nebula-bounded-generation-publication",
+                                  "relationType": "IMPACTS"
+                              },
+                              {
+                                  "sourceType": "proposal",
+                                  "sourceId": "proposal-bounded-nebula-knowledge-projection-generations",
+                                  "targetType": "quality",
+                                  "targetId": "quality-specforge-nebula-scale-certification",
+                                  "relationType": "IMPACTS"
+                              }
+                          ],
+                          "owner": "SpecForge Runtime and SpecForge Architecture",
+                          "status": "Target design accepted; semantic projection, production operations, and scale certification are not implemented",
+                          "reason": "The online graph must preserve Baseline-bound Knowledge Assertion semantics and safe rollback without turning NebulaGraph into an unbounded historical warehouse or weakening PostgreSQL authority.",
+                          "retryTrigger": "Approve the Phase 1 implementation plan and open a new exact-Scope Design Change Session before code or schema changes.",
+                          "localizedContent": {
+                              "en": {
+                                  "decision": "Use exact-Scope Manifest-qualified graph identities and bounded BUILDING, ACTIVE, and PREVIOUS slots controlled atomically by PostgreSQL; retain complete history outside the online graph and certify production scale separately."
+                              },
+                              "zh": {
+                                  "decision": "采用精确 Scope、包含 Manifest 的图身份和由 PostgreSQL 原子控制的有界 BUILDING、ACTIVE、PREVIOUS 三槽模型；完整历史保留在在线图之外，并独立认证生产规模。"
+                              }
+                          },
+                          "evidence": [
+                              {
+                                  "command": "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Formalize-approved-bounded-Nebula-generation-design",
+                                  "result": "Opened design-change-session:f0da2e18-daed-4ab4-a211-0e3dabcd5c76, read 307 exact-Scope assets, and returned design-context digest c93f7c20d7660e52d93301efe0d215c8cdaa8248bf3ac676984c1e1c63b8353e."
+                              },
+                              {
+                                  "command": "Product-owner design review on 2026-08-20",
+                                  "result": "Accepted bounded BUILDING/ACTIVE/PREVIOUS slots, PostgreSQL pointer publication, Manifest-qualified identity, Knowledge-Assertion-aware 3A semantics, 72-hour default PREVIOUS retention, and three independent delivery phases."
+                              },
+                              {
+                                  "command": "node .\\node_modules\\vitest\\vitest.mjs run --root . --exclude .worktrees/** --exclude .pnpm-store/** scripts\\design-fact-manifest.test.ts scripts\\sync-design-facts.test.ts",
+                                  "result": "Passed 2 test files and 34 tests, including decision-specific bilingual Proposal non-goal enforcement."
+                              },
+                              {
+                                  "command": "git diff --check",
+                                  "result": "Returned no whitespace errors; only Windows line-ending conversion warnings were reported."
+                              },
+                              {
+                                  "command": "$env:SPECFORGE_DESIGN_FACT_IDS='adr-bounded-nebula-knowledge-projection-generations'; pnpm design-facts:sync",
+                                  "result": "Returned complete for the new ADR and persisted its approved Proposal, bilingual Context Pack, four managed assets, Evidence records, and directional typed relationships through MCP."
+                              },
+                              {
+                                  "command": "$env:SPECFORGE_DESIGN_FACT_IDS='adr-bounded-nebula-knowledge-projection-generations'; pnpm design-facts:check",
+                                  "result": "Verified the selected ADR with missing=[], mismatched=[], outOfScope=[], and blocked=[]."
+                              },
+                              {
+                                  "command": "$env:SPECFORGE_APPLICATION_SERVICE_ID='com.huawei.celon.desiner'; $env:SPECFORGE_SCOPE_PATH='pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner'; pnpm design-facts:federation:check",
+                                  "result": "Returned root f04e3ad0981d2ce6a2e40032e359ab06b07dc4ed2255774b6515ba8cd87987dd, empty issue counts, and blocking=false."
+                              },
+                              {
+                                  "command": "pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session design-change-session:f0da2e18-daed-4ab4-a211-0e3dabcd5c76 --status CONVERGED --evidence baseline-manifest-json=valid,design-fact-tests=2-files-34-tests-pass,git-diff-check=no-errors,mcp-sync=complete,mcp-readback=verified-no-issues,federation-check=blocking-false",
+                                  "result": "Closed the exact Designer-Scope written-design session as CONVERGED and preserved all evidence references."
+                              }
+                          ]
                       }
                   ]
 }

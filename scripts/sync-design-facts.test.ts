@@ -616,6 +616,50 @@ English canonical decision.
     }));
   });
 
+  it("enforces a decision-specific bilingual Proposal non-goal during backfill", async () => {
+    const callTool = vi.fn().mockResolvedValue({ ok: true });
+    await synchronizeDesignFacts({
+      callTool,
+      manifest: {
+        decisions: [{
+          id: "adr-scope",
+          repositoryAdr: "docs/adr/0001-scope.md",
+          mcpAdrId: "adr-scope",
+          scope,
+          proposalId: "proposal-scope",
+          contextPackId: "ctx-scope",
+          relatedAssetIds: ["api-specforge-mcp-tools"],
+          proposalNonGoal: {
+            en: "Do not make the graph authoritative.",
+            zh: "不把图数据库变成权威库。"
+          },
+          evidence: []
+        }]
+      },
+      readAdr: async () => ({ title: "Scope isolation", english: simpleEnglishAdr, chinese: simpleChineseAdr }),
+      readExisting: async (type) => type === "proposal"
+        ? {
+          id: "proposal-scope",
+          nonGoal: "Stale generic non-goal",
+          localizedContent: {
+            en: { nonGoal: "Stale generic non-goal" },
+            zh: { nonGoal: "过期通用非目标" }
+          }
+        }
+        : undefined
+    });
+
+    expect(callTool).toHaveBeenCalledWith("upsert_proposal", expect.objectContaining({
+      proposal: expect.objectContaining({
+        nonGoal: "Do not make the graph authoritative.",
+        localizedContent: expect.objectContaining({
+          en: expect.objectContaining({ nonGoal: "Do not make the graph authoritative." }),
+          zh: expect.objectContaining({ nonGoal: "不把图数据库变成权威库。" })
+        })
+      })
+    }));
+  });
+
   it("preserves an approved design as approved instead of claiming implementation", async () => {
     const callTool = vi.fn().mockResolvedValue({ ok: true });
     await synchronizeDesignFacts({

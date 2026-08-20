@@ -110,31 +110,31 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 ## 5. Knowledge-Assertion-Aware Nebula 3A And Production-Scale Certification
 
-**Status:** Deferred; not part of the PostgreSQL-first 3A browser increment.
+**Status:** Target design accepted on 2026-08-20; implementation has not started. Phase 1 semantic projection, Phase 2 production operations, and Phase 3 scale certification remain open.
 
 **Owner:** SpecForge Runtime for projection and Projector health; SpecForge Architecture for MCP synchronization.
 
-**Rationale:** The current NebulaGraph projection stores design-asset identities and current typed relationships. It is not semantically equivalent to Baseline-bound Knowledge Assertions, Profile-pinned projection generations, or historical relationship snapshots. Enterprise multi-node sizing, Kubernetes deployment, secret management, object storage, and billion-scale certification therefore require a separate production increment.
+**Rationale:** The current NebulaGraph projection stores design-asset identities and current typed relationships. The accepted target uses a shared Space with exact-Scope, Manifest-qualified identities and bounded BUILDING, ACTIVE, and PREVIOUS slots. PostgreSQL controls atomic publication and preserves complete history; NebulaGraph remains a rebuildable online projection. Enterprise multi-node operations and billion-scale certification remain separately evidenced phases.
 
-**Trigger:** Start only after the PostgreSQL 3A workspace passes acceptance and query telemetry demonstrates a traversal workload that needs graph acceleration. Open a separate ADR and exact-Scope Design Change Session before implementation.
+**Trigger:** Phase 1 may start after approval of its implementation plan and a new exact-Scope Design Change Session. The written-design session does not authorize code changes. Phase 2 starts after semantic parity and rollback pass; Phase 3 starts only on a production-representative topology with an approved workload and capacity plan.
 
-**Completion evidence:** Define Knowledge Assertion vertices, versioned relationship edges, Baseline membership or as-of semantics, outbox events, checkpoint namespace, rebuild and rollback behavior, PostgreSQL/Nebula result parity, multi-node sizing, Kubernetes and secret-management operations, production object storage, and billion-scale capacity certification. Synchronize the matching ADR, Proposal, Context Pack, Evidence, backlog state, and typed links through MCP.
+**Completion evidence:** Phase 1 must implement Knowledge Assertion vertices, Manifest-qualified identities, versioned relationship edges, generation-aware Outbox checkpoints, bounded publication/rollback/cleanup, and PostgreSQL/Nebula parity. Phase 2 must prove external multi-node configuration, Kubernetes, secrets, backup/restore, object storage, observability, and failure recovery. Phase 3 must publish auditable `10M`, `100M`, and `1B` certification reports before claiming each tier. Synchronize matching ADR, Proposal, Context Pack, Evidence, backlog state, and typed links through MCP for every phase.
 
-**Design references:** ADR-0005, ADR-0006, ADR-0012, ADR-0018, ADR-0019, ADR-0022; `deploy/graph/verify-projection.ps1`.
+**Design references:** ADR-0005, ADR-0006, ADR-0012, ADR-0018, ADR-0019, ADR-0022, ADR-0036; `docs/superpowers/specs/2026-08-20-bounded-nebula-knowledge-projection-generations-design.md`; `deploy/graph/verify-projection.ps1`.
 
 **中文本地化：**
 
-**状态：** 延期，不属于 PostgreSQL-first 3A 浏览器增量。
+**状态：** 目标设计已于 2026-08-20 接受，代码尚未开始。第一阶段语义投影、第二阶段生产运维和第三阶段规模认证仍待实施。
 
 **负责人：** SpecForge Runtime 负责投影和 Projector 健康；SpecForge Architecture 负责 MCP 同步。
 
-**理由：** 当前 NebulaGraph 投影保存设计资产身份和当前类型关系，与绑定 Baseline 的 Knowledge Assertion、固定 Profile 的投影代次以及历史关系快照并不语义等价。因此，企业多节点容量、Kubernetes 部署、密钥管理、对象存储和亿级规模认证必须作为独立生产增量处理。
+**理由：** 当前 NebulaGraph 投影保存设计资产身份和当前类型关系。已接受的目标是在共享 Space 中采用精确 Scope、包含 Manifest 的图身份以及有界 BUILDING、ACTIVE、PREVIOUS 三槽模型。PostgreSQL 控制原子发布并保存完整历史，NebulaGraph 保持可重建在线投影。企业多节点运维和十亿级规模认证仍作为独立取证阶段处理。
 
-**启动条件：** 只有在 PostgreSQL 3A 工作台通过验收，并且查询遥测证明需要图加速后才能启动。实现前必须创建独立 ADR 和精确 Scope 设计变更会话。
+**启动条件：** 第一阶段必须先批准实施计划并创建新的精确 Scope 设计变更会话；当前书面设计会话不能授权代码变更。第二阶段在语义一致性和回滚通过后启动；第三阶段只能在生产代表性拓扑、工作负载和容量计划获批后启动。
 
-**完成证据：** 必须定义 Knowledge Assertion 顶点、版本化关系边、Baseline 成员或 as-of 语义、Outbox 事件、检查点命名空间、重建与回滚行为、PostgreSQL/Nebula 结果一致性、多节点容量、Kubernetes 和密钥管理运维、生产对象存储及亿级容量认证，并通过 MCP 同步匹配的 ADR、Proposal、Context Pack、Evidence、待办状态和有类型关系。
+**完成证据：** 第一阶段必须实现 Knowledge Assertion 顶点、包含 Manifest 的身份、版本化关系边、代次感知 Outbox 检查点、有界发布/回滚/清理及 PostgreSQL/Nebula 一致性。第二阶段必须证明外部多节点配置、Kubernetes、密钥、备份恢复、对象存储、可观测性和故障恢复。第三阶段必须发布可审计的 `10M`、`100M`、`1B` 认证报告，未通过的级别不能对外宣称。每个阶段都必须通过 MCP 同步匹配的 ADR、Proposal、Context Pack、Evidence、待办状态和有类型关系。
 
-**设计引用：** ADR-0005、ADR-0006、ADR-0012、ADR-0018、ADR-0019、ADR-0022；`deploy/graph/verify-projection.ps1`。
+**设计引用：** ADR-0005、ADR-0006、ADR-0012、ADR-0018、ADR-0019、ADR-0022、ADR-0036；`docs/superpowers/specs/2026-08-20-bounded-nebula-knowledge-projection-generations-design.md`；`deploy/graph/verify-projection.ps1`。
 
 ## 6. PostgreSQL/MCP Synchronization Resilience
 

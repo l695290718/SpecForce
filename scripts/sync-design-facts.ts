@@ -15,6 +15,7 @@ export interface DesignFactManifestDecision {
   managedRelationships?: ManagedDesignRelationship[];
   evidence: Array<{ command: string; result: string }>;
   proposalStatus?: "draft" | "reviewing" | "approved" | "implemented" | "archived";
+  proposalNonGoal?: { en: string; zh: string };
   status?: string;
   owner?: string;
   reason?: string;
@@ -152,6 +153,8 @@ export async function synchronizeDesignFacts(input: {
 
 function buildProposal(decision: DesignFactManifestDecision, parsed: ParsedAdr) {
   const now = new Date().toISOString();
+  const nonGoal = decision.proposalNonGoal?.en ?? "Deferred connector delivery and external APPLY remain outside this increment.";
+  const localizedNonGoal = decision.proposalNonGoal?.zh ?? "连接器交付和外部 APPLY 在本增量之外延期。";
   return {
     id: decision.proposalId,
     name: parsed.en.title,
@@ -159,7 +162,7 @@ function buildProposal(decision: DesignFactManifestDecision, parsed: ParsedAdr) 
     description: parsed.en.description,
     background: parsed.en.context,
     goal: parsed.en.decision,
-    nonGoal: "Deferred connector delivery and external APPLY remain outside this increment.",
+    nonGoal,
     scope: parsed.en.constraints.join(" "),
     impactedAssets: decision.relatedAssetIds.map((id) => assetRefFor(id)),
     specChanges: [parsed.en.decision],
@@ -175,7 +178,7 @@ function buildProposal(decision: DesignFactManifestDecision, parsed: ParsedAdr) 
         description: parsed.en.description,
         background: parsed.en.context,
         goal: parsed.en.decision,
-        nonGoal: "Deferred connector delivery and external APPLY remain outside this increment.",
+        nonGoal,
         scope: parsed.en.constraints.join(" "),
         specChanges: [parsed.en.decision],
         risks: parsed.en.consequences,
@@ -187,7 +190,7 @@ function buildProposal(decision: DesignFactManifestDecision, parsed: ParsedAdr) 
         description: parsed.zh.description,
         background: parsed.zh.context,
         goal: parsed.zh.decision,
-        nonGoal: "连接器交付和外部 APPLY 在本增量之外延期。",
+        nonGoal: localizedNonGoal,
         scope: parsed.zh.constraints.join(" "),
         specChanges: [parsed.zh.decision],
         risks: parsed.zh.consequences,
@@ -216,28 +219,36 @@ function backfillProposal(
   canonical: ReturnType<typeof buildProposal>
 ) {
   if (!existing) return canonical;
+  const enforceManifestNonGoal = decision.proposalNonGoal !== undefined;
+  const localizedEnglish = completeLocalizedFields({
+    current: localeRecord(existing, "en"),
+    topLevel: existing,
+    fallback: canonical.localizedContent.en,
+    requiredStringFields: proposalLocalizedStringFields,
+    optionalStringFields: proposalLocalizedOptionalStringFields,
+    requiredArrayFields: proposalLocalizedArrayFields
+  });
+  const localizedChinese = completeLocalizedFields({
+    current: localeRecord(existing, "zh"),
+    fallback: canonical.localizedContent.zh,
+    requiredStringFields: proposalLocalizedStringFields,
+    optionalStringFields: proposalLocalizedOptionalStringFields,
+    requiredArrayFields: proposalLocalizedArrayFields
+  });
+  if (enforceManifestNonGoal) {
+    localizedEnglish.nonGoal = canonical.localizedContent.en.nonGoal;
+    localizedChinese.nonGoal = canonical.localizedContent.zh.nonGoal;
+  }
   const proposal = {
     ...canonical,
     ...existing,
     id: canonical.id,
     status: canonical.status,
+    ...(enforceManifestNonGoal ? { nonGoal: canonical.nonGoal } : {}),
     architectureScope: decision.scope,
     localizedContent: {
-      en: completeLocalizedFields({
-        current: localeRecord(existing, "en"),
-        topLevel: existing,
-        fallback: canonical.localizedContent.en,
-        requiredStringFields: proposalLocalizedStringFields,
-        optionalStringFields: proposalLocalizedOptionalStringFields,
-        requiredArrayFields: proposalLocalizedArrayFields
-      }),
-      zh: completeLocalizedFields({
-        current: localeRecord(existing, "zh"),
-        fallback: canonical.localizedContent.zh,
-        requiredStringFields: proposalLocalizedStringFields,
-        optionalStringFields: proposalLocalizedOptionalStringFields,
-        requiredArrayFields: proposalLocalizedArrayFields
-      })
+      en: localizedEnglish,
+      zh: localizedChinese
     }
   };
   return proposal;
