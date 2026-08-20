@@ -13,6 +13,13 @@ export {
 } from "./projector.js";
 export { PrismaProjectionRepository, checkpointPartitionIdForEvent } from "./repository.js";
 export {
+  compareGenerationParity,
+  type GenerationParityOptions,
+  type GenerationParityResult,
+  type ParitySnapshot,
+  type ParityTuple
+} from "./generation-parity.js";
+export {
   HttpGraphGateway,
   type HttpGraphGatewayOptions,
   type ProjectionPayload,

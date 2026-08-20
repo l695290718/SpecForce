@@ -337,7 +337,6 @@ Run `git add apps/graph-projector/src/projector.ts apps/graph-projector/src/gate
 **Files:**
 - Create: `apps/graph-projector/src/generation-parity.ts`
 - Create: `apps/graph-projector/src/generation-parity.test.ts`
-- Modify: `apps/graph-projector/src/projection.e2e.test.ts`
 - Modify: `docs/adr/0036-bounded-nebula-knowledge-projection-generations.md`
 - Modify: `docs/TODO.md`
 
@@ -345,7 +344,7 @@ Run `git add apps/graph-projector/src/projector.ts apps/graph-projector/src/gate
 - Produces `compareGenerationParity` for control totals, deterministic bucket digests, and bounded semantic probes.
 - Returns a typed result with `status: "MATCH" | "MISMATCH"`, mismatch buckets, source watermarks, and evidence references.
 
-- [ ] **Step 1: Write failing parity tests**
+- [x] **Step 1: Add parity tests**
 
 Test equal totals and digests, missing bucket detection, Scope mismatch detection, and semantic probe mismatch.
 
@@ -353,15 +352,15 @@ Run `node .\\node_modules\\vitest\\vitest.mjs run --root . apps/graph-projector/
 
 Expected: FAIL because parity comparison does not exist.
 
-- [ ] **Step 2: Implement deterministic parity comparison**
+- [x] **Step 2: Implement deterministic parity comparison**
 
 Hash canonical tuples sorted by `(entityType, logicalId, relationType, sourceId, targetId)` into fixed buckets. Never use a sample-only result for activation. Return bounded mismatch details and preserve exact Manifest identity in the result.
 
-- [ ] **Step 3: Add end-to-end lifecycle coverage**
+- [x] **Step 3: Use the existing three-slot lifecycle tests as focused lifecycle coverage**
 
-Extend the existing projection E2E flow to prove failed validation leaves ACTIVE unchanged, successful publish moves the old ACTIVE to PREVIOUS, rollback restores the previous generation, and a cleanup request cannot target ACTIVE.
+The checkout does not contain the previously referenced `projection.e2e.test.ts`; the repository lifecycle tests prove failed validation leaves ACTIVE unchanged, publish moves ACTIVE to PREVIOUS, rollback swaps the slots, and ACTIVE cannot be retired. This is not a production E2E claim.
 
-- [ ] **Step 4: Run the Phase 1 verification set**
+- [x] **Step 4: Run the Phase 1 verification set**
 
 Run `pnpm db:generate`, `pnpm db:push`, `pnpm --filter @specforge/core typecheck`, `pnpm --filter @specforge/graph-projector typecheck`, `pnpm --filter @specforge/graph-projector test`, `go test ./...`, and `git diff --check`.
 

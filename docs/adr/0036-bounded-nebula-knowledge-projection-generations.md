@@ -2,12 +2,13 @@
 
 ## Status
 
-Accepted design; implementation has not started.
+Accepted design; Phase 1 bounded-generation control and generation-qualified delivery primitives are implemented and locally verified. Full semantic Knowledge Assertion projection, production operations, and scale certification remain open.
 
 - Stable ID: `adr-bounded-nebula-knowledge-projection-generations`
 - Owning application service: `com.huawei.celon.desiner`
 - Owning Scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
-- Design Change Session: `design-change-session:f0da2e18-daed-4ab4-a211-0e3dabcd5c76`
+- Written-design Change Session: `design-change-session:f0da2e18-daed-4ab4-a211-0e3dabcd5c76`
+- Implementation Design Change Session: `design-change-session:2a49648a-2fa4-4631-9424-c0583dd6cc63`
 - Proposal: `proposal-bounded-nebula-knowledge-projection-generations`
 - Context Pack: `ctx-bounded-nebula-knowledge-projection-generations`
 - Spec: `docs/superpowers/specs/2026-08-20-bounded-nebula-knowledge-projection-generations-design.md`
@@ -59,7 +60,13 @@ Retain PREVIOUS for 72 hours by default, subject to stricter capacity watermarks
 - With `SPECFORGE_DESIGN_FACT_IDS=adr-bounded-nebula-knowledge-projection-generations`, `pnpm design-facts:sync` returned `complete`; `pnpm design-facts:check` returned the selected ADR in `verified` with empty missing, mismatched, out-of-Scope, and blocked lists.
 - Exact Designer-Scope `pnpm design-facts:federation:check` returned root `f04e3ad0981d2ce6a2e40032e359ab06b07dc4ed2255774b6515ba8cd87987dd`, no issue counts, and `blocking=false`.
 - `pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session design-change-session:f0da2e18-daed-4ab4-a211-0e3dabcd5c76 --status CONVERGED --evidence "baseline-manifest-json=valid,design-fact-tests=2-files-34-tests-pass,git-diff-check=no-errors,mcp-sync=complete,mcp-readback=verified-no-issues,federation-check=blocking-false"` closed the exact written-design session as `CONVERGED`.
-- Implementation evidence is intentionally absent because code has not started. A new exact-Scope Design Change Session is required before implementation.
+- Phase 1 implementation evidence: `79bff63` adds PostgreSQL generation control models; `4addcf9` adds stable generation identities; `432c890` adds Scope-safe BUILDING/ACTIVE/PREVIOUS lifecycle operations; `87167bd` adds generation-qualified Go Gateway validation, generation-qualified VIDs, and ordinal-based edge ranks; `a635baa` carries generation metadata through the Projector and namespaces checkpoints; the parity increment is recorded with the Phase 1 integration commit.
+- `pnpm db:generate`, `pnpm db:push`, and `pnpm exec prisma validate` passed against Docker PostgreSQL `localhost:15433/specforge_canonical`; the schema was already in sync after push.
+- `pnpm --filter @specforge/core typecheck` and `pnpm --filter @specforge/graph-projector typecheck` passed.
+- Root Vitest runner, excluding `.worktrees/**` and `.pnpm-store/**`, passed 4 focused files and 21 tests for generation parity, Gateway metadata, Projector checkpoint namespaces, and repository payload compatibility. The package-local `pnpm --filter @specforge/graph-projector test` command remains environment-blocked because its local `node_modules/vitest` link is absent; the repository-root runner is the successful verification path.
+- Go `go test ./...` passed for `cmd/server`, `internal/httpapi`, and `internal/nebula`.
+- `git diff --check` returned no errors. The existing projection E2E fixture referenced by the plan is absent from this checkout; the three-slot lifecycle repository tests are the available focused lifecycle evidence, not a production E2E claim.
+- MCP synchronization and implementation-session closure remain the final completion gate for this increment.
 
 ## MCP Record
 
@@ -68,7 +75,7 @@ Retain PREVIOUS for 72 hours by default, subject to stricter capacity watermarks
 - Context Pack: `ctx-bounded-nebula-knowledge-projection-generations`
 - Related assets: `api-specforge-nebula-generation-control`, `data-specforge-nebula-generation-projection`, `rule-specforge-nebula-bounded-generation-publication`, `quality-specforge-nebula-scale-certification`, `data-specforge-asset-graph`, `api-specforge-3a-projection-build`, `api-specforge-3a-architecture-query`, `data-specforge-3a-projection-read-model`
 - Required typed links: Proposal implements ADR; Context Pack implements Proposal context; ADR decides the managed assets; generation API writes the projection model; publication rule governs the API and model; certification quality validates the API and model.
-- MCP synchronization and exact-Scope read-back completed. The written-design session may close after final repository validation; implementation still requires a new session.
+- MCP synchronization and exact-Scope read-back for the written design completed. The implementation session is the exact session recorded above; its final closure is pending the implementation evidence synchronization.
 
 ## 中文本地化覆盖
 
@@ -78,7 +85,7 @@ Retain PREVIOUS for 72 hours by default, subject to stricter capacity watermarks
 
 ### 状态
 
-设计已接受，代码尚未开始。稳定 ID 为 `adr-bounded-nebula-knowledge-projection-generations`，所属应用服务为 `com.huawei.celon.desiner`，所属 Scope 路径为 `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`，设计变更会话为 `design-change-session:f0da2e18-daed-4ab4-a211-0e3dabcd5c76`。
+设计已接受；第一阶段有界代次控制和带代次投递基础能力已实现并完成本地验证。完整 Knowledge Assertion 语义投影、生产运维和规模认证仍未完成。稳定 ID 为 `adr-bounded-nebula-knowledge-projection-generations`，所属应用服务为 `com.huawei.celon.desiner`，所属 Scope 路径为 `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`，书面设计会话为 `design-change-session:f0da2e18-daed-4ab4-a211-0e3dabcd5c76`，实施会话为 `design-change-session:2a49648a-2fa4-4631-9424-c0583dd6cc63`。
 
 ### 背景
 
@@ -121,14 +128,18 @@ PREVIOUS 默认保留 72 小时，但更严格的容量水位可以优先。完�
 
 ### 证据
 
-- 精确 Scope 预检命令打开 `design-change-session:f0da2e18-daed-4ab4-a211-0e3dabcd5c76`，读取 307 条 Scope 资产，并返回设计上下文摘要 `c93f7c20d7660e52d93301efe0d215c8cdaa8248bf3ac676984c1e1c63b8353e`。
+- 实施增量分别由提交 `79bff63`、`4addcf9`、`432c890`、`87167bd` 和 `a635baa` 记录；最终 parity 增量将在本次 Phase 1 集成提交中记录。
+- `pnpm db:generate`、`pnpm db:push` 和 `pnpm exec prisma validate` 已针对 Docker PostgreSQL `localhost:15433/specforge_canonical` 通过，推送后 Schema 已同步。
+- `pnpm --filter @specforge/core typecheck`、`pnpm --filter @specforge/graph-projector typecheck` 通过；根 Vitest 聚焦运行通过 4 个文件、21 项测试；Go `go test ./...` 通过 3 个包。
+- `git diff --check` 无错误。当前检出没有计划中引用的投影 E2E fixture，因此三槽生命周期测试作为聚焦生命周期证据，不宣称生产 E2E 已完成。
+- `pnpm design-context:preflight` 已打开实施会话并返回摘要 `d393dda917db5ea6eb514189ba9ec4e5810845452bbdadefb8931de02bf3b602`；MCP 同步和同一实施会话关闭仍是本增量的最终完成门禁。
 - 2026-08-19 和 2026-08-20 的产品负责人设计评审确认了有界三槽模型、服务端解析代次、支持 Knowledge Assertion 的映射、PREVIOUS 默认保留 72 小时以及三个独立交付阶段。
 - 设计事实清单和 MCP 同步契约测试共 2 个文件、34 项测试通过，`git diff --check` 无错误。
 - 只选择本 ADR 的 `pnpm design-facts:sync` 返回 `complete`；`pnpm design-facts:check` 将该 ADR 列入 `verified`，缺失、差异、越界和阻塞列表均为空。
 - 精确 Designer Scope 的联邦对账返回根摘要 `f04e3ad0981d2ce6a2e40032e359ab06b07dc4ed2255774b6515ba8cd87987dd`，无问题计数，且 `blocking=false`。
 - `pnpm design-context:close` 携带清单、34 项测试、差异检查、MCP 同步与回读、联邦对账证据，将同一精确 Scope 书面设计会话关闭为 `CONVERGED`。
-- 代码尚未开始，因此有意不记录实施证据。开始实施前必须创建新的精确 Scope 设计变更会话。
+- 第一阶段实施证据已记录；第二阶段生产运维和第三阶段规模认证仍必须独立设计、取证、同步和对账。
 
 ### MCP 记录
 
-匹配 MCP ADR 为 `adr-bounded-nebula-knowledge-projection-generations`，Proposal 为 `proposal-bounded-nebula-knowledge-projection-generations`，Context Pack 为 `ctx-bounded-nebula-knowledge-projection-generations`。API、数据模型、发布规则、规模认证质量事实及其有类型关系已经通过 MCP 写入并完成精确 Scope 回读。本次书面设计会话已关闭为 `CONVERGED`；实施仍需新会话。
+匹配 MCP ADR 为 `adr-bounded-nebula-knowledge-projection-generations`，Proposal 为 `proposal-bounded-nebula-knowledge-projection-generations`，Context Pack 为 `ctx-bounded-nebula-knowledge-projection-generations`。API、数据模型、发布规则、规模认证质量事实及其有类型关系已经通过 MCP 写入并完成精确 Scope 回读。本次书面设计会话已关闭为 `CONVERGED`；实施会话已创建，正在等待最终证据同步和关闭。
