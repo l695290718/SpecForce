@@ -429,7 +429,10 @@ export class ErPixiRenderer {
 
   private selectionForId(id: string): ErRendererSelection {
     const field = this.projection?.entities.flatMap((entity) => entity.fields).find((candidate) => candidate.id === id);
-    return field ? { fieldId: id, entityId: field.entityId } : this.projection?.entities.some((entity) => entity.id === id) ? { entityId: id } : {};
+    if (field) return { fieldId: id, entityId: field.entityId };
+    if (this.projection?.entities.some((entity) => entity.id === id)) return { entityId: id };
+    if (this.projection?.relations.some((relation) => relation.id === id || relation.relationId === id)) return { relationId: id };
+    return {};
   }
 
   private buildPositionKey(projection: ErDiagramProjection): ErPositionKey { return { ...projection.identity, schemaVersion: ER_POSITION_SCHEMA_VERSION }; }

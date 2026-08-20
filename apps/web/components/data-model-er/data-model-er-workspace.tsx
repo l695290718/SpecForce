@@ -9,6 +9,7 @@ import { createErGraphState, deriveErLod, mergeErGraphResponses, selectErGraph, 
 import { projectErDiagram, type ErDiagramProjection } from "./er-diagram-projection";
 import { layoutErDiagramWithFallback, type ErLayoutResult } from "./er-layout";
 import { ErPixiRenderer, type ErRendererFailure, type ErRendererStatus } from "./er-pixi-renderer";
+import { ErInspector } from "./er-inspector";
 
 export interface DataModelErWorkspaceProps {
   responses: DataModelGraphResponse[];
@@ -168,5 +169,6 @@ export function DataModelErWorkspace({ responses, locale = "en", title }: DataMo
       <div className="px-4 py-3 text-xs font-semibold text-ink">{copy("er.fieldCatalog")}</div>
       {fieldRows.length ? <div className="max-h-64 overflow-auto"><table className="w-full text-left text-xs"><thead className="bg-slate-50 text-muted"><tr><th className="px-4 py-2">{copy("er.entity")}</th><th className="px-4 py-2">{copy("er.field")}</th><th className="px-4 py-2">{copy("er.type")}</th><th className="px-4 py-2">{copy("er.markers")}</th></tr></thead><tbody>{fieldRows.map((row) => <tr key={row.id} className="border-t border-border"><td className="px-4 py-2 text-muted">{row.entity}</td><td className="px-4 py-2 font-medium text-ink">{row.field}</td><td className="px-4 py-2 text-muted">{row.type}</td><td className="px-4 py-2 font-mono text-[10px] text-muted">{row.markers}</td></tr>)}</tbody></table></div> : <p className="px-4 pb-4 text-xs text-muted">{copy("er.empty")}</p>}
     </div>
+    <ErInspector response={responses[0]} locale={locale} />
   </section>;
 }
