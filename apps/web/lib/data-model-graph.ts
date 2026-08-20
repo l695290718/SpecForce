@@ -235,7 +235,37 @@ function graphNodeFromIdentity(node: AssetNodeIdentity, asset: DataModel, _local
   const definition = nodeType === "dataEntity" ? asset.entityDefinitions?.find((entity) => node.logicalId.endsWith(`.entity.${entity.id}`)) : undefined;
   const field = nodeType === "dataField" ? asset.fields.find((item) => node.logicalId.endsWith(`.field.${item.id}`)) : undefined;
   const displayName = nodeType === "dataModel" ? asset.name : definition?.name ?? field?.fieldName ?? node.logicalId;
-  return { id: nodeKey(node), nodeType, logicalId: node.logicalId, rootModelId: node.rootAssetId, displayName, description: definition?.description, external: node.external, scope: { applicationServiceId: node.applicationServiceId, scopePath: node.scopePath }, metadata: { ...(field ? { dataType: field.dataType, nullable: field.nullable, required: !field.nullable, primaryKey: field.primaryKey, unique: field.unique } : {}), ...(definition ? { ordinal: definition.ordinal } : {}) } };
+  return {
+    id: nodeKey(node),
+    nodeType,
+    logicalId: node.logicalId,
+    rootModelId: node.rootAssetId,
+    displayName,
+    description: definition?.description,
+    external: node.external,
+    scope: { applicationServiceId: node.applicationServiceId, scopePath: node.scopePath },
+    metadata: {
+      ...(definition ? {
+        ...(definition.physicalName ? { physicalName: definition.physicalName } : {}),
+        ordinal: definition.ordinal
+      } : {}),
+      ...(field ? {
+        ...(field.entityId ? { entityId: field.entityId } : {}),
+        displayName: field.displayName,
+        dataType: field.dataType,
+        ...(field.ordinal === undefined ? {} : { ordinal: field.ordinal }),
+        nullable: field.nullable,
+        required: !field.nullable,
+        ...(field.primaryKey === undefined ? {} : { primaryKey: field.primaryKey }),
+        ...(field.unique === undefined ? {} : { unique: field.unique }),
+        ...(field.generated === undefined ? {} : { generated: field.generated }),
+        ...(field.classification ? { classification: field.classification } : {}),
+        ...(field.sensitiveLevel ? { sensitiveLevel: field.sensitiveLevel } : {}),
+        ...(field.example ? { example: field.example } : {}),
+        owner: field.owner
+      } : {})
+    }
+  };
 }
 
 type DataModelGraphNodeNodeType = DataModelGraphNode["nodeType"];
