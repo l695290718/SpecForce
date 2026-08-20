@@ -148,14 +148,14 @@ Run `git add prisma/schema.prisma prisma/migrations prisma/three-a-schema.test.t
 - `generationQualifiedVertexId` returns a fixed-length digest that includes Scope, Manifest, entity type, and logical ID.
 - `generationQualifiedEdgeRank` accepts a persisted PostgreSQL `projectionOrdinal`; it never hashes a relationship ID for the rank.
 
-- [ ] **Step 1: Write failing identity tests**
+- [x] **Step 1: Write failing identity tests**
 
 ```ts
 it("changes the vertex identity when only the manifest changes", () => {
   const first = generationQualifiedVertexId(identity("manifest-a"), "asset", "api-1");
   const second = generationQualifiedVertexId(identity("manifest-b"), "asset", "api-1");
   expect(first).not.toBe(second);
-  expect(first).toHaveLength(67);
+  expect(first).toHaveLength(66);
 });
 
 it("rejects an edge identity that crosses Scope or Manifest", () => {
@@ -163,21 +163,21 @@ it("rejects an edge identity that crosses Scope or Manifest", () => {
 });
 
 it("uses the persisted ordinal as a safe signed Nebula rank", () => {
-  expect(generationQualifiedEdgeRank(42n)).toBe(42);
+  expect(generationQualifiedEdgeRank(42n)).toBe(42n);
 });
 ```
 
-- [ ] **Step 2: Run the focused test and confirm failure**
+- [x] **Step 2: Run the focused test and confirm failure**
 
 Run `node .\\node_modules\\vitest\\vitest.mjs run --root . packages/core/src/__tests__/projection-generation.test.ts`.
 
 Expected: FAIL because the module and functions do not exist.
 
-- [ ] **Step 3: Implement the identity module**
+- [x] **Step 3: Implement the identity module**
 
 Use a canonical `JSON.stringify` tuple and SHA-256. The VID format is `n:` plus 64 lowercase hex characters. Require all Scope and identity fields to be non-empty. Reject negative, unsafe, or zero ordinals.
 
-- [ ] **Step 4: Export and test**
+- [x] **Step 4: Export and test**
 
 Export the module from `packages/core/src/index.ts`, then run `pnpm --filter @specforge/core typecheck` and the focused Vitest test.
 
