@@ -65,7 +65,7 @@ function rotr(value: number, bits: number): number {
   return (value >>> bits) | (value << (32 - bits));
 }
 
-function sha256Hex(input: string): string {
+export function sha256Hex(input: string): string {
   const bytes = new TextEncoder().encode(input);
   const bitLength = bytes.length * 8;
   const blockLength = Math.ceil((bytes.length + 9) / 64) * 64;

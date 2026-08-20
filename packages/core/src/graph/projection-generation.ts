@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
 import type { ArchitectureScopeRef } from "../architecture/types";
+import { sha256Hex } from "../federation/digest";
 
 export interface ProjectionIdentity extends ArchitectureScopeRef {
   baselineId: string;
@@ -41,7 +41,7 @@ export function assertSameProjectionIdentity(left: ProjectionIdentity, right: Pr
 export function generationQualifiedVertexId(identity: ProjectionIdentity, entityType: string, logicalId: string): string {
   const normalized = createProjectionIdentity(identity);
   if (!entityType.trim() || !logicalId.trim()) throw new Error("PROJECTION_VERTEX_ID_REQUIRED");
-  return `n:${sha256(canonicalTuple([
+  return `n:${sha256Hex(canonicalTuple([
     "vertex",
     projectionIdentityKey(normalized),
     entityType.trim(),
@@ -92,8 +92,4 @@ function createProjectionIdentityWithoutRecursion(input: ProjectionIdentity): Pr
 
 function canonicalTuple(values: string[]): string {
   return values.map((value) => `${value.length}:${value}`).join("|");
-}
-
-function sha256(value: string): string {
-  return createHash("sha256").update(value, "utf8").digest("hex");
 }

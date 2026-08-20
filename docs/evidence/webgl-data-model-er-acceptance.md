@@ -12,8 +12,9 @@ The implementation turn produced the following local evidence:
 
 - `pnpm exec vitest run --exclude ".worktrees/**" --exclude ".pnpm-store/**" packages/core apps/web`: 76 tests passed across 21 files (including ER, graph query, and manifest coverage).
 - `pnpm --filter @specforge/web typecheck`: passed.
-- `pnpm --filter @specforge/web build`: blocked by the pre-existing webpack `UnhandledSchemeError` for `node:crypto`, imported through `packages/core/src/graph/projection-generation.ts` and the existing app shell; this Task 5 did not change that import chain.
-- `pnpm design-facts:check`: blocked with `Asset not found: adr/adr-webgl-data-model-er-workspace` because the new ADR has not yet been persisted through MCP.
+- `pnpm --filter @specforge/web build` with `SPECFORGE_NEXT_STANDALONE=0`: passed compilation, lint/type validation, static generation, and route optimization. The `node:crypto` import-chain error is resolved by reusing the pure TypeScript SHA-256 implementation.
+- `pnpm --filter @specforge/web build` with default standalone output: compilation and static generation passed, but final traced-file packaging was blocked by Windows/OneDrive `EPERM` symlink creation. Linux container builds remain a separate deployment verification.
+- `pnpm design-facts:check` for `adr-webgl-data-model-er-workspace`: passed after exact-Scope MCP synchronization and read-back.
 - `pnpm design-facts:federation:check` with the exact Designer Scope: passed with `blocking=false`.
 - `git diff --check`: passed with only Windows line-ending normalization warnings.
 
@@ -23,8 +24,9 @@ Browser acceptance is not claimed here until a fresh exact-Scope inspection is p
 
 - `pnpm exec vitest run --exclude ".worktrees/**" --exclude ".pnpm-store/**" packages/core apps/web`：21 个文件共 76 个测试通过（包括 ER、关系图查询和 manifest 覆盖）。
 - `pnpm --filter @specforge/web typecheck`：通过。
-- `pnpm --filter @specforge/web build`：被既有 webpack `UnhandledSchemeError` 阻塞，错误来自 `node:crypto`，导入链为 `packages/core/src/graph/projection-generation.ts` 到既有 app shell；本 Task 5 未修改该导入链。
-- `pnpm design-facts:check`：因新 ADR 尚未通过 MCP 持久化而阻塞，具体错误为 `Asset not found: adr/adr-webgl-data-model-er-workspace`。
+- 设置 `SPECFORGE_NEXT_STANDALONE=0` 执行 `pnpm --filter @specforge/web build`：编译、Lint/类型检查、静态生成和路由优化全部通过；通过复用纯 TypeScript SHA-256 实现，`node:crypto` 导入链问题已修复。
+- 默认 standalone 输出执行 `pnpm --filter @specforge/web build`：编译和静态生成通过，但最终 traced-file 打包因 Windows/OneDrive 创建符号链接返回 `EPERM`；Linux 容器构建仍需独立验证。
+- 针对 `adr-webgl-data-model-er-workspace` 执行 `pnpm design-facts:check`：精确 Scope MCP 同步和回读后通过。
 - 使用精确 Designer Scope 执行 `pnpm design-facts:federation:check`：通过，`blocking=false`。
 - `git diff --check`：通过，仅有 Windows 换行规范化警告。
 
