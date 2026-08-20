@@ -1,4 +1,5 @@
 import type { ArchitectureScopeRef } from "./architecture/types";
+import type { DataEntityDefinition, DataRelation } from "./data-model-v2";
 
 export type AssetType =
   | "domain"
@@ -48,11 +49,17 @@ export interface DataFieldLocalizedFields {
   example?: string;
 }
 
+export interface DataEntityLocalizedFields {
+  displayName: string;
+  description?: string;
+}
+
 export interface DataModelLocalizedFields extends BaseAssetLocalizedFields {
   relationships: string[];
   constraints: string[];
   lifecycle: string;
   lineage: string;
+  entities?: Record<string, DataEntityLocalizedFields>;
   fields: Record<string, DataFieldLocalizedFields>;
 }
 
@@ -208,11 +215,20 @@ export interface DomainModel extends BaseAsset<DomainModelLocalizedFields> {
 }
 
 export interface DataField {
+  /** Stable identity introduced by Data Model v2; absent on readable v1 records. */
+  id?: string;
+  /** Stable owning entity identity introduced by Data Model v2. */
+  entityId?: string;
+  /** Stable display order within the owning entity. */
+  ordinal?: number;
   fieldName: string;
   displayName: string;
   dataType: string;
   meaning?: string;
   nullable: boolean;
+  primaryKey?: boolean;
+  unique?: boolean;
+  generated?: boolean;
   defaultValue?: string;
   constraint?: string;
   sensitiveLevel?: "none" | "internal" | "confidential" | "restricted";
@@ -233,6 +249,12 @@ export interface DataModel extends BaseAsset<DataModelLocalizedFields> {
   dataClassification: string;
   lifecycle: string;
   lineage: string;
+  /** Optional v2 marker; v1 records remain readable without it. */
+  schemaVersion?: 2;
+  /** Stable entity definitions introduced by Data Model v2. */
+  entityDefinitions?: DataEntityDefinition[];
+  /** Structured relationships owned by this source model. */
+  dataRelations?: DataRelation[];
 }
 
 export interface ApiContract extends BaseAsset<ApiContractLocalizedFields> {

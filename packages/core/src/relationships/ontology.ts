@@ -99,7 +99,7 @@ const relationshipDefinitions = [
     strength: "medium",
     defaultConfidence: 0.8,
     terminal: false,
-    description: "Entity to Entity",
+    description: "Entity or field reference, including composite mappings",
     version: RELATIONSHIP_ONTOLOGY_VERSION
   },
   {

@@ -14,6 +14,7 @@ import type {
   ContextPackLocalizedFields,
   DataField,
   DataFieldLocalizedFields,
+  DataEntityLocalizedFields,
   DataModel,
   DataModelLocalizedFields,
   DomainModel,
@@ -34,6 +35,7 @@ import type {
   StateTransition,
   StateTransitionLocalizedFields
 } from "../types";
+import { isStructuredDataModel } from "../data-model-v2";
 
 export type LocalizationIssueCode =
   | "ASSET_TRANSLATION_REQUIRED"
@@ -104,7 +106,7 @@ const registry: DefinitionMap = {
   dataModel: {
     requiredStringFields: ["name", "description", "lifecycle", "lineage"],
     requiredArrayFields: ["relationships", "constraints"],
-    customFieldNames: ["fields"],
+    customFieldNames: ["entities", "fields"],
     technicalFieldNames: [
       "id",
       "code",
@@ -113,6 +115,9 @@ const registry: DefinitionMap = {
       "tables",
       "entities",
       "dataClassification",
+      "schemaVersion",
+      "entityDefinitions",
+      "dataRelations",
       "createdAt",
       "updatedAt",
       "architectureScope"
@@ -495,6 +500,11 @@ function createError(assetType: AssetType, assetId: string, path: string, code: 
 }
 
 function validateDataModelOverlay(assetType: AssetType, asset: DataModel, overlay: DataModelLocalizedFields): void {
+  if (isStructuredDataModel(asset)) {
+    validateStructuredDataModelOverlay(assetType, asset, overlay);
+    return;
+  }
+
   const translatedFields = overlay.fields;
   if (!translatedFields || typeof translatedFields !== "object" || Array.isArray(translatedFields)) {
     throw createError(assetType, asset.id, "localizedContent.zh.fields", "ASSET_TRANSLATION_REQUIRED");
@@ -518,23 +528,79 @@ function validateDataModelOverlay(assetType: AssetType, asset: DataModel, overla
   }
 }
 
+function validateStructuredDataModelOverlay(assetType: AssetType, asset: DataModel, overlay: DataModelLocalizedFields): void {
+  const entities = asset.entityDefinitions ?? [];
+  const translatedEntities = overlay.entities;
+  if (!translatedEntities || typeof translatedEntities !== "object" || Array.isArray(translatedEntities)) {
+    throw createError(assetType, asset.id, "localizedContent.zh.entities", "ASSET_TRANSLATION_REQUIRED");
+  }
+
+  for (const entityId of Object.keys(translatedEntities)) {
+    if (!entities.some((entity) => entity.id === entityId)) {
+      throw createError(assetType, asset.id, `localizedContent.zh.entities.${entityId}`, "TRANSLATION_STRUCTURE_MISMATCH");
+    }
+  }
+  for (const entity of entities) {
+    const translated = translatedEntities[entity.id];
+    if (!translated || typeof translated !== "object" || Array.isArray(translated)) {
+      throw createError(assetType, asset.id, `localizedContent.zh.entities.${entity.id}`, "ASSET_TRANSLATION_REQUIRED");
+    }
+    validateTranslatedDataEntity(assetType, asset.id, entity.id, translated);
+  }
+
+  const translatedFields = overlay.fields;
+  if (!translatedFields || typeof translatedFields !== "object" || Array.isArray(translatedFields)) {
+    throw createError(assetType, asset.id, "localizedContent.zh.fields", "ASSET_TRANSLATION_REQUIRED");
+  }
+  for (const fieldId of Object.keys(translatedFields)) {
+    if (!asset.fields.some((field) => field.id === fieldId)) {
+      throw createError(assetType, asset.id, `localizedContent.zh.fields.${fieldId}`, "TRANSLATION_STRUCTURE_MISMATCH");
+    }
+  }
+  for (const field of asset.fields) {
+    const translated = field.id ? translatedFields[field.id] : undefined;
+    if (!field.id || !translated || typeof translated !== "object" || Array.isArray(translated)) {
+      throw createError(assetType, asset.id, `localizedContent.zh.fields.${field.id ?? field.fieldName}`, "ASSET_TRANSLATION_REQUIRED");
+    }
+    validateTranslatedDataField(assetType, asset.id, field, translated, field.id);
+  }
+}
+
+function validateTranslatedDataEntity(
+  assetType: AssetType,
+  assetId: string,
+  entityId: string,
+  translated: DataEntityLocalizedFields
+): void {
+  for (const key of Object.keys(translated)) {
+    if (key !== "displayName" && key !== "description") {
+      throw createError(assetType, assetId, `localizedContent.zh.entities.${entityId}.${key}`, "TRANSLATION_FIELD_NOT_ALLOWED");
+    }
+  }
+  assertTranslatedString(assetType, assetId, translated.displayName, `localizedContent.zh.entities.${entityId}.displayName`);
+  if (translated.description !== undefined) {
+    assertTranslatedString(assetType, assetId, translated.description, `localizedContent.zh.entities.${entityId}.description`);
+  }
+}
+
 function validateTranslatedDataField(
   assetType: AssetType,
   assetId: string,
   field: DataField,
-  translated: DataFieldLocalizedFields
+  translated: DataFieldLocalizedFields,
+  identityKey = field.fieldName
 ): void {
   const allowedKeys = new Set(["displayName", "meaning", "constraint", "classification", "example"]);
-  const technicalKeys = new Set(["fieldName", "dataType", "nullable", "defaultValue", "sensitiveLevel", "owner"]);
+  const technicalKeys = new Set(["id", "entityId", "ordinal", "fieldName", "dataType", "nullable", "primaryKey", "unique", "generated", "defaultValue", "sensitiveLevel", "owner"]);
 
   for (const key of Object.keys(translated)) {
     if (!allowedKeys.has(key)) {
       const code = technicalKeys.has(key) ? "TRANSLATION_TECHNICAL_FIELD_MUTATION" : "TRANSLATION_FIELD_NOT_ALLOWED";
-      throw createError(assetType, assetId, `localizedContent.zh.fields.${field.fieldName}.${key}`, code);
+      throw createError(assetType, assetId, `localizedContent.zh.fields.${identityKey}.${key}`, code);
     }
   }
 
-  assertTranslatedString(assetType, assetId, translated.displayName, `localizedContent.zh.fields.${field.fieldName}.displayName`);
+  assertTranslatedString(assetType, assetId, translated.displayName, `localizedContent.zh.fields.${identityKey}.displayName`);
 
   for (const narrativeField of ["meaning", "constraint", "classification", "example"] as const) {
     if (isNonEmptyString(field[narrativeField]) || translated[narrativeField] !== undefined) {
@@ -542,13 +608,28 @@ function validateTranslatedDataField(
         assetType,
         assetId,
         translated[narrativeField],
-        `localizedContent.zh.fields.${field.fieldName}.${narrativeField}`
+        `localizedContent.zh.fields.${identityKey}.${narrativeField}`
       );
     }
   }
 }
 
 function applyDataModelOverlay(asset: DataModel, overlay: DataModelLocalizedFields): DataModel {
+  if (isStructuredDataModel(asset)) {
+    const translatedEntities = overlay.entities ?? {};
+    const entityDefinitions = asset.entityDefinitions?.map((entity) => ({
+      ...entity,
+      name: translatedEntities[entity.id]?.displayName ?? entity.name,
+      description: translatedEntities[entity.id]?.description ?? entity.description
+    }));
+    return {
+      ...asset,
+      entities: entityDefinitions?.map((entity) => entity.name) ?? asset.entities,
+      entityDefinitions,
+      fields: asset.fields.map((field) => applyTranslatedDataField(field, requireDataFieldOverlay(asset.id, overlay.fields[field.id ?? ""], field.id ?? field.fieldName)))
+    };
+  }
+
   return {
     ...asset,
     fields: asset.fields.map((field) => applyTranslatedDataField(field, requireDataFieldOverlay(asset.id, overlay.fields[field.fieldName], field.fieldName)))
