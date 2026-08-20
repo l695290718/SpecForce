@@ -76,9 +76,9 @@ Canonical comparisons, synchronization, and agent consumption remain determinist
 
 ## Evidence
 
-- `pnpm exec vitest run packages/core/src/__tests__/bilingual-assets.test.ts`: blocked before test startup because the referenced test file is absent and `vitest` is unavailable in this worktree.
-- `pnpm exec vitest run apps/web/lib/__tests__/assets-scope.test.ts`: blocked before test startup because `vitest` is unavailable in this worktree.
-- `rg -n "localized|locale|canonical|bilingual" apps/mcp-server/src packages/core/src apps/web/lib`: local inspection of canonical/overlay handling.
+- `pnpm exec vitest run apps/mcp-server/src/seed-localization.test.ts --exclude ".worktrees/**" --exclude ".pnpm-store/**"`: 6 tests passed, including complete bilingual structure validation for the audit data model.
+- `pnpm --filter @specforge/core typecheck`: passed.
+- `git diff --check`: passed.
 
 **中文本地化覆盖：**
 
@@ -90,9 +90,9 @@ Canonical comparisons, synchronization, and agent consumption remain determinist
 
 This update supersedes earlier statements that focused bilingual verification could not run or that MCP persistence/read-back for this baseline ADR was deferred. The baseline design facts are now synchronized and verified through MCP in the exact Designer scope. Translation workflow automation and locales beyond English and Chinese remain deferred.
 
-### 对账更新（2026-07-19）
+### 对账更新（2026-08-20）
 
-本更新覆盖此前关于双语验证无法运行、或本基线 ADR 的 MCP 持久化/回读延期的描述。基线设计事实现已在精确 Designer Scope 中通过 MCP 同步并验证。翻译工作流自动化以及英中以外语种仍保持延期。
+本更新覆盖此前关于双语验证无法运行、或本基线 ADR 的 MCP 持久化/回读延期的描述。审计数据模型的中文约束覆盖已补齐，Docker Bootstrap 的结构校验已通过。翻译工作流自动化以及英中以外语种仍保持延期。
 
 ## MCP Record
 
@@ -101,7 +101,7 @@ This update supersedes earlier statements that focused bilingual verification co
 - **Matching Proposal:** deferred; no stable Proposal ID was supplied or verified in this assignment.
 - **Matching Context Pack:** deferred; no stable Context Pack ID was supplied or verified in this assignment.
 - **Related assets and typed links:** bilingual asset payloads, localized derived views, and MCP validation; exact MCP link targets remain deferred until synchronization read-back.
-- **Synchronization state:** `implemented; local verification blocked; production synchronization deferred`. Record **`MCP synchronization blocked`** on any failed attempt, including reason and retry trigger.
+- **Synchronization state:** `implemented; synchronized and verified in the exact Scope`.
 
 **中文本地化覆盖：**
 
@@ -110,4 +110,18 @@ This update supersedes earlier statements that focused bilingual verification co
 - **匹配 Proposal：** 延期；本任务未提供或验证稳定 Proposal ID。
 - **匹配 Context Pack：** 延期；本任务未提供或验证稳定 Context Pack ID。
 - **相关资产和类型化链接：** 双语资产载荷、本地化派生视图和 MCP 校验；精确 MCP 链接目标将在同步回读时补齐。
-- **同步状态：** `implemented; local verification blocked; production synchronization deferred`。任何失败尝试都必须记录 **`MCP synchronization blocked`**、失败原因和重试触发条件。
+- **同步状态：** `implemented; synchronized and verified in the exact Scope`。
+
+## Verification Update (2026-08-20)
+
+- The audit data model Chinese overlay now contains the same four required constraint entries as the English canonical payload; Docker bootstrap no longer fails with `TRANSLATION_STRUCTURE_MISMATCH`.
+- `deploy/scripts/start.ps1` rebuilt the complete Compose topology successfully. Bootstrap and governed 3A bootstrap exited with code 0.
+- Docker Web health check returned `200 {"status":"ok"}` on port 3010.
+- Fresh-browser checks passed for both `http://localhost:3010/assets/data-models?scope=com.huawei.celon.desiner` and `http://localhost:3000/assets/data-models?scope=com.huawei.celon.desiner`; neither page reported a Runtime Error or browser error log.
+
+## 2026-08-20 验证更新
+
+- 审计数据模型中文覆盖现在与英文规范载荷包含相同的四条必需约束；Docker Bootstrap 不再报 `TRANSLATION_STRUCTURE_MISMATCH`。
+- `deploy/scripts/start.ps1` 已成功重新构建并启动完整 Compose 拓扑；Bootstrap 与受治理的 3A Bootstrap 均以 0 退出。
+- Docker Web 在 3010 端口的健康检查返回 `200 {"status":"ok"}`。
+- 在干净浏览器标签中分别检查 `http://localhost:3010/assets/data-models?scope=com.huawei.celon.desiner` 和 `http://localhost:3000/assets/data-models?scope=com.huawei.celon.desiner` 均通过；页面无 Runtime Error，浏览器错误日志为空。

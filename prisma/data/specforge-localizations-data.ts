@@ -51,7 +51,12 @@ export const dataModelZhById: Record<string, DataModelLocalizedFields> = {
     name: "SpecForge 审计日志数据模型",
     description: "用于记录 MCP 工具调用以及未来的 Web/API 操作，以支持可追踪性。",
     relationships: ["AuditLog 通过 targetType 和 targetId 引用目标，而不是使用硬数据库外键"],
-    constraints: ["所有 MCP 工具调用都必须生成审计日志", "数据库错误不得原样返回给 MCP 客户端"],
+    constraints: [
+      "所有 MCP 工具调用都必须生成审计日志",
+      "范围化审计记录必须同时持久化 application_service_id 和 scope_path",
+      "范围化审计读取必须同时按 application_service_id 和 scope_path 过滤",
+      "数据库错误不得原样返回给 MCP 客户端"
+    ],
     lifecycle: "MVP 阶段在内存中保留审计记录；下一阶段后端切片再通过 Prisma 持久化。",
     lineage: "MCP 工具包装层以及未来的 Web/API 中间件",
     fields: {

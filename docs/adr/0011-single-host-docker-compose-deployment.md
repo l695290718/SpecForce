@@ -64,6 +64,9 @@ Existing SpecForge databases are adopted only through the explicit `SPECFORGE_BO
 - **Verified:** The governed 3A Bootstrap client now waits for `get_3a_projection_build=READY` and closes the same MCP design-change session as `CONVERGED`; failure closes it as `BLOCKED` with a retry reason.
 - **Verified:** Full `deploy/scripts/stop.ps1` followed by `deploy/scripts/start.ps1` preserved the PostgreSQL volume; the restart reused the published exact-Scope baseline, completed 3A bootstrap with `idempotent=true`, returned the existing `READY` projection with 261 nodes and 156 edges, and started Web on port 3010 with `/healthz=200`.
 - **Verified:** Implementation session `design-change-session:09033091-9bf3-454b-bb19-466c9e26973c` fixed Windows PowerShell native-argument quoting in `status.ps1`, `bootstrap-status.ps1`, and `verify-compose.ps1` by piping SQL through `psql -f -`; the Bootstrap status now reads `COMPLETED` instead of reporting a false missing-table error.
+- **Verified:** `pnpm exec vitest run apps/mcp-server/src/seed-localization.test.ts --exclude ".worktrees/**" --exclude ".pnpm-store/**"` passed 6 tests after completing the audit data model Chinese constraint overlay; the Docker Bootstrap `TRANSLATION_STRUCTURE_MISMATCH` failure is resolved.
+- **Verified:** `deploy/scripts/start.ps1` rebuilt and started the complete Compose topology; `bootstrap` and `three-a-bootstrap` exited 0, PostgreSQL, Knowledge Projector, Connector Worker, and Web were healthy, and Web `/healthz` returned `200 {"status":"ok"}` on port 3010.
+- **Verified:** Fresh-browser checks passed for the data model page on both port 3010 (Docker) and port 3000 (local development); neither page reported a Runtime Error or browser error log.
 
 ## 中文本地化 / Chinese Localization
 
@@ -116,3 +119,6 @@ SpecForge 需要一个可重复的首个部署形态，在单台 Linux 主机运
 - **已验证：** `powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -Live` 在端口 3010 的隔离栈通过；Web 重启前后 `/healthz` 均通过。
 - **已验证：** 完整执行 `deploy/scripts/stop.ps1` 后再执行 `deploy/scripts/start.ps1`，PostgreSQL 数据卷保持不变；重启复用了精确 Scope 的已发布 baseline，3A Bootstrap 返回 `idempotent=true`，复用 `READY` 投影（261 个节点、156 条关系），Web 在 3010 端口启动且 `/healthz=200`。
 - **已验证：** 实现会话 `design-change-session:09033091-9bf3-454b-bb19-466c9e26973c` 修复了 `status.ps1`、`bootstrap-status.ps1` 与 `verify-compose.ps1` 在 Windows PowerShell 原生参数传递中的 SQL 引号问题，改为通过 `psql -f -` 管道传入 SQL；Bootstrap 状态现在正确读取为 `COMPLETED`，不再误报表缺失。
+- **已验证：** `pnpm exec vitest run apps/mcp-server/src/seed-localization.test.ts --exclude ".worktrees/**" --exclude ".pnpm-store/**"` 在补齐审计数据模型中文约束覆盖后通过 6 个测试；Docker Bootstrap 的 `TRANSLATION_STRUCTURE_MISMATCH` 失败已修复。
+- **已验证：** `deploy/scripts/start.ps1` 已成功重新构建并启动完整 Compose 拓扑；`bootstrap` 与 `three-a-bootstrap` 均以 0 退出，PostgreSQL、Knowledge Projector、Connector Worker 和 Web 均健康，Web 在 3010 端口的 `/healthz` 返回 `200 {"status":"ok"}`。
+- **已验证：** 在干净浏览器标签中检查 3010 端口 Docker 服务和 3000 端口本地开发服务的数据模型页面均通过；两者都没有 Runtime Error 或浏览器错误日志。

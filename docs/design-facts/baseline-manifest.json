@@ -235,9 +235,25 @@
                                                   "api-specforge-mcp-tools"
                                               ],
                           "evidence":  [
+                          {
+                                              "command":  "powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -ConfigurationOnly",
+                                              "result":  "Bundled and external PostgreSQL Compose topology checks passed."
+                                          },
                                            {
-                                               "command":  "powershell -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -ConfigurationOnly",
-                                               "result":  "Bundled and external PostgreSQL Compose topology checks passed."
+                                               "command":  "pnpm exec vitest run apps/mcp-server/src/seed-localization.test.ts --exclude .worktrees/** --exclude .pnpm-store/**",
+                                               "result":  "Six seed-localization tests passed after completing the audit data model Chinese constraint overlay."
+                                           },
+                                           {
+                                               "command":  "powershell -ExecutionPolicy Bypass -File deploy/scripts/start.ps1",
+                                               "result":  "Docker images rebuilt; bootstrap and three-a-bootstrap exited 0; PostgreSQL, Knowledge Projector, Connector Worker, and Web started successfully."
+                                           },
+                                           {
+                                               "command":  "Invoke-WebRequest -UseBasicParsing http://localhost:3010/healthz",
+                                               "result":  "HTTP 200 with {\"status\":\"ok\"}."
+                                           },
+                                           {
+                                               "command":  "Fresh browser checks for port 3010 and port 3000 data model pages",
+                                               "result":  "Both pages rendered without Runtime Error and browser error logs were empty."
                                            },
                                            {
                                                "command":  "docker compose --env-file deploy/.env.example -f deploy/compose.yaml build web",
