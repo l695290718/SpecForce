@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -120,11 +121,32 @@ func validateProjection(projection ProjectionRequest) error {
 		if !sameScope(projection.Scope, node.Scope) {
 			return contractError{code: "SCOPE_MISMATCH", status: http.StatusBadRequest}
 		}
+		if err := validateNodeProjection(projection.Projection, node.Projection); err != nil {
+			return err
+		}
 	}
 	for _, edge := range projection.Edges {
 		if !sameScope(projection.Scope, edge.Source.Scope) || !sameScope(projection.Scope, edge.Target.Scope) {
 			return contractError{code: "SCOPE_MISMATCH", status: http.StatusBadRequest}
 		}
+		if err := validateNodeProjection(projection.Projection, edge.Source.Projection); err != nil {
+			return err
+		}
+		if err := validateNodeProjection(projection.Projection, edge.Target.Projection); err != nil {
+			return err
+		}
+		if projection.Projection != nil && edge.ProjectionOrdinal == "" {
+			return contractError{code: "PROJECTION_ORDINAL_REQUIRED", status: http.StatusBadRequest}
+		}
+		if projection.Projection != nil {
+			ordinal, err := strconv.ParseInt(edge.ProjectionOrdinal, 10, 64)
+			if err != nil || ordinal <= 0 {
+				return contractError{code: "PROJECTION_ORDINAL_INVALID", status: http.StatusBadRequest}
+			}
+		}
+	}
+	if err := validateProjectionIdentity(projection.Projection); err != nil {
+		return err
 	}
 	return nil
 }
@@ -137,8 +159,44 @@ func validateTraversal(traversal TraversalRequest) error {
 		if !sameScope(traversal.Scope, node.Scope) {
 			return contractError{code: "SCOPE_MISMATCH", status: http.StatusBadRequest}
 		}
+		if err := validateNodeProjection(traversal.Projection, node.Projection); err != nil {
+			return err
+		}
+	}
+	if err := validateProjectionIdentity(traversal.Projection); err != nil {
+		return err
 	}
 	return nil
+}
+
+func validateNodeProjection(request, node *ProjectionIdentity) error {
+	if request == nil {
+		if node != nil {
+			return contractError{code: "PROJECTION_IDENTITY_MISMATCH", status: http.StatusBadRequest}
+		}
+		return nil
+	}
+	if node == nil {
+		return contractError{code: "PROJECTION_IDENTITY_REQUIRED", status: http.StatusBadRequest}
+	}
+	if !sameProjection(*request, *node) {
+		return contractError{code: "PROJECTION_IDENTITY_MISMATCH", status: http.StatusBadRequest}
+	}
+	return nil
+}
+
+func validateProjectionIdentity(identity *ProjectionIdentity) error {
+	if identity == nil {
+		return nil
+	}
+	if identity.BaselineID == "" || identity.ManifestID == "" || identity.GenerationID == "" || identity.SchemaVersion == "" {
+		return contractError{code: "PROJECTION_IDENTITY_REQUIRED", status: http.StatusBadRequest}
+	}
+	return nil
+}
+
+func sameProjection(left, right ProjectionIdentity) bool {
+	return left.BaselineID == right.BaselineID && left.ManifestID == right.ManifestID && left.GenerationID == right.GenerationID && left.SchemaVersion == right.SchemaVersion
 }
 
 func validateScope(scope Scope) error {
@@ -153,7 +211,7 @@ func sameScope(left, right Scope) bool {
 }
 
 type contractError struct {
-	code string
+	code   string
 	status int
 }
 

@@ -51,6 +51,75 @@ func TestProjectionRejectsRawNGQL(t *testing.T) {
 	assertErrorCode(t, response, "RAW_NGQL_FORBIDDEN")
 }
 
+func TestGenerationProjectionRequiresIdentityOnEveryNode(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(httpapi.NewHandler(fakeClient{}))
+	t.Cleanup(server.Close)
+
+	scope := map[string]any{
+		"enterpriseId":         "huawei",
+		"applicationServiceId": "com.huawei.celon.desiner",
+		"scopePath":            "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner",
+	}
+	body, err := json.Marshal(map[string]any{
+		"scope":        scope,
+		"graphVersion": "8",
+		"projection":   map[string]string{"baselineId": "b1", "manifestId": "m1", "generationId": "g1", "schemaVersion": "v1"},
+		"nodes": []any{map[string]any{
+			"enterpriseId": "huawei", "applicationServiceId": "com.huawei.celon.desiner", "scopePath": scope["scopePath"],
+			"nodeType": "api", "logicalId": "api-payment", "rootAssetType": "api", "rootAssetId": "api-payment",
+		}},
+		"edges": []any{},
+	})
+	if err != nil {
+		t.Fatalf("marshal body: %v", err)
+	}
+	response, err := http.Post(server.URL+"/v1/projections", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("post projection: %v", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", response.StatusCode)
+	}
+	assertErrorCode(t, response, "PROJECTION_IDENTITY_REQUIRED")
+}
+
+func TestGenerationProjectionRejectsMismatchedIdentity(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(httpapi.NewHandler(fakeClient{}))
+	t.Cleanup(server.Close)
+
+	identity := map[string]string{"baselineId": "b1", "manifestId": "m1", "generationId": "g1", "schemaVersion": "v1"}
+	nodeIdentity := map[string]string{"baselineId": "b1", "manifestId": "m1", "generationId": "g2", "schemaVersion": "v1"}
+	path := "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+	body, err := json.Marshal(map[string]any{
+		"scope":        map[string]string{"enterpriseId": "huawei", "applicationServiceId": "com.huawei.celon.desiner", "scopePath": path},
+		"graphVersion": "8", "projection": identity,
+		"nodes": []any{map[string]any{
+			"enterpriseId": "huawei", "applicationServiceId": "com.huawei.celon.desiner", "scopePath": path,
+			"projection": nodeIdentity, "nodeType": "api", "logicalId": "api-payment", "rootAssetType": "api", "rootAssetId": "api-payment",
+		}},
+		"edges": []any{},
+	})
+	if err != nil {
+		t.Fatalf("marshal body: %v", err)
+	}
+	response, err := http.Post(server.URL+"/v1/projections", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("post projection: %v", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", response.StatusCode)
+	}
+	assertErrorCode(t, response, "PROJECTION_IDENTITY_MISMATCH")
+}
+
 func TestHealthSanitizesNebulaFailure(t *testing.T) {
 	t.Parallel()
 
@@ -103,7 +172,7 @@ func projectionBody(t *testing.T, batchService, nodeService string) []byte {
 	t.Helper()
 	path := "pf-huawei/product-celon/subproduct-platform/module-celon-designer/"
 	body := map[string]any{
-		"scope": map[string]any{"enterpriseId": "huawei", "applicationServiceId": batchService, "scopePath": path + batchService},
+		"scope":        map[string]any{"enterpriseId": "huawei", "applicationServiceId": batchService, "scopePath": path + batchService},
 		"graphVersion": "7",
 		"nodes": []any{map[string]any{
 			"enterpriseId": "huawei", "applicationServiceId": nodeService, "scopePath": path + nodeService,

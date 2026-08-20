@@ -3,6 +3,7 @@ package nebula
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -80,14 +81,18 @@ func (c *OfficialClient) Project(ctx context.Context, projection httpapi.Project
 		}
 	}
 	for _, edge := range projection.Edges {
-		if err := c.execute(ctx, "edge_upsert", edgeStatement(edge)); err != nil {
+		statement, err := edgeStatement(edge)
+		if err != nil {
+			return httpapi.ProjectionReceipt{}, err
+		}
+		if err := c.execute(ctx, "edge_upsert", statement); err != nil {
 			return httpapi.ProjectionReceipt{}, err
 		}
 	}
 	if err := c.execute(ctx, "checkpoint_upsert", checkpointStatement(projection.Scope, projection.GraphVersion)); err != nil {
 		return httpapi.ProjectionReceipt{}, err
 	}
-	return httpapi.ProjectionReceipt{GraphVersion: projection.GraphVersion, ProjectedNodeCount: len(projection.Nodes), ProjectedEdgeCount: len(projection.Edges)}, nil
+	return httpapi.ProjectionReceipt{GraphVersion: projection.GraphVersion, Projection: projection.Projection, ProjectedNodeCount: len(projection.Nodes), ProjectedEdgeCount: len(projection.Edges)}, nil
 }
 
 func (c *OfficialClient) Traverse(ctx context.Context, traversal httpapi.TraversalRequest) (httpapi.TraversalResult, error) {
@@ -115,8 +120,8 @@ func (c *OfficialClient) Traverse(ctx context.Context, traversal httpapi.Travers
 		if len(columns) < 17 {
 			continue
 		}
-		source, sourceKey, sourceOK := traversalNode(traversal.Scope, columns, 0)
-		target, targetKey, targetOK := traversalNode(traversal.Scope, columns, 6)
+		source, sourceKey, sourceOK := traversalNode(traversal.Scope, traversal.Projection, columns, 0)
+		target, targetKey, targetOK := traversalNode(traversal.Scope, traversal.Projection, columns, 6)
 		if !sourceOK || !targetOK {
 			continue
 		}
@@ -151,7 +156,7 @@ func (c *OfficialClient) Traverse(ctx context.Context, traversal httpapi.Travers
 	for _, edgeID := range edgeIDs {
 		edges = append(edges, edgeByID[edgeID])
 	}
-	return httpapi.TraversalResult{Status: "COMPLETE", Nodes: nodes, Edges: edges, GraphVersion: traversal.GraphVersion, TruncationReasons: []string{}}, nil
+	return httpapi.TraversalResult{Status: "COMPLETE", Nodes: nodes, Edges: edges, GraphVersion: traversal.GraphVersion, Projection: traversal.Projection, TruncationReasons: []string{}}, nil
 }
 
 func (c *OfficialClient) Checkpoint(ctx context.Context, scope httpapi.Scope) (string, error) {
@@ -271,9 +276,13 @@ func nodeStatement(node httpapi.Node) string {
 		literal(vertexID(node)), literal(nodeKey(node)), literal(node.EnterpriseID), literal(node.ApplicationServiceID), literal(node.ScopePath), literal(node.NodeType), literal(node.LogicalID), literal(node.RootAssetType), literal(node.RootAssetID), literal(node.ParentLogicalID))
 }
 
-func edgeStatement(edge httpapi.Edge) string {
+func edgeStatement(edge httpapi.Edge) (string, error) {
+	rank := edgeRank(edge)
+	if rank <= 0 {
+		return "", errors.New("PROJECTION_ORDINAL_INVALID")
+	}
 	return fmt.Sprintf("INSERT EDGE specforge_relation(edge_id, code, strength, confidence, version) VALUES %s -> %s @ %d:(%s, %s, %s, %f, %s);",
-		literal(vertexID(edge.Source)), literal(vertexID(edge.Target)), edgeRank(edge.ID), literal(edge.ID), literal(edge.Code), literal(edge.Strength), edge.Confidence, literal(edge.Version))
+		literal(vertexID(edge.Source)), literal(vertexID(edge.Target)), rank, literal(edge.ID), literal(edge.Code), literal(edge.Strength), edge.Confidence, literal(edge.Version)), nil
 }
 
 func checkpointStatement(scope httpapi.Scope, graphVersion string) string {
@@ -282,7 +291,11 @@ func checkpointStatement(scope httpapi.Scope, graphVersion string) string {
 }
 
 func nodeKey(node httpapi.Node) string {
-	return httpapi.EncodeScopeKey(node.Scope) + ":" + node.NodeType + ":" + node.LogicalID
+	key := httpapi.EncodeScopeKey(node.Scope)
+	if node.Projection != nil {
+		key += ":generation:" + projectionKey(*node.Projection)
+	}
+	return key + ":" + node.NodeType + ":" + node.LogicalID
 }
 
 func vertexID(node httpapi.Node) string {
@@ -298,9 +311,21 @@ func stableID(kind, value string) string {
 	return kind + ":" + fmt.Sprintf("%x", digest)
 }
 
-func edgeRank(edgeID string) int64 {
-	digest := sha256.Sum256([]byte(edgeID))
+func edgeRank(edge httpapi.Edge) int64 {
+	if edge.Source.Projection != nil {
+		ordinal, err := strconv.ParseInt(edge.ProjectionOrdinal, 10, 64)
+		if err == nil && ordinal > 0 {
+			return ordinal
+		}
+		return 0
+	}
+	digest := sha256.Sum256([]byte(edge.ID))
 	return int64(binary.BigEndian.Uint64(digest[:8]) >> 1)
+}
+
+func projectionKey(identity httpapi.ProjectionIdentity) string {
+	encoded, _ := json.Marshal(identity)
+	return base64.RawURLEncoding.EncodeToString(encoded)
 }
 
 func identifier(value string) string {
@@ -319,13 +344,14 @@ func columnString(columns []*ngtypes.Value, index int) string {
 	return string(columns[index].GetSVal())
 }
 
-func traversalNode(scope httpapi.Scope, columns []*ngtypes.Value, offset int) (httpapi.Node, string, bool) {
+func traversalNode(scope httpapi.Scope, projection *httpapi.ProjectionIdentity, columns []*ngtypes.Value, offset int) (httpapi.Node, string, bool) {
 	if offset+5 >= len(columns) {
 		return httpapi.Node{}, "", false
 	}
 	key := columnString(columns, offset)
 	node := httpapi.Node{
 		Scope:           scope,
+		Projection:      projection,
 		NodeType:        columnString(columns, offset+1),
 		LogicalID:       columnString(columns, offset+2),
 		RootAssetType:   columnString(columns, offset+3),

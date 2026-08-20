@@ -130,7 +130,7 @@ Run `node .\\node_modules\\vitest\\vitest.mjs run --root . prisma/three-a-schema
 
 Expected: PASS with the existing schema assertions plus the new model assertions.
 
-- [ ] **Step 6: Commit the schema increment**
+- [x] **Step 6: Commit the schema increment**
 
 Run `git add prisma/schema.prisma prisma/migrations prisma/three-a-schema.test.ts && git commit -m "feat: add Nebula projection generation control schema"`.
 
@@ -183,7 +183,7 @@ Export the module from `packages/core/src/index.ts`, then run `pnpm --filter @sp
 
 Expected: Typecheck passes and all focused identity tests pass.
 
-- [ ] **Step 5: Commit the identity increment**
+- [x] **Step 5: Commit the identity increment**
 
 Run `git add packages/core/src/graph/projection-generation.ts packages/core/src/index.ts packages/core/src/__tests__/projection-generation.test.ts && git commit -m "feat: add generation-qualified graph identities"`.
 
@@ -232,7 +232,7 @@ Run `pnpm --filter @specforge/graph-projector typecheck` and the focused lifecyc
 
 Expected: Typecheck and all lifecycle tests pass.
 
-- [ ] **Step 5: Commit the lifecycle increment**
+- [x] **Step 5: Commit the lifecycle increment**
 
 Run `git add apps/graph-projector/src/generation-repository.ts apps/graph-projector/src/generation-repository.test.ts apps/graph-projector/src/index.ts && git commit -m "feat: add bounded Nebula generation lifecycle"`.
 
@@ -251,7 +251,7 @@ Run `git add apps/graph-projector/src/generation-repository.ts apps/graph-projec
 - Adds required `ProjectionIdentity` to the new generation-qualified projection and traversal payloads while retaining legacy payload decoding for the existing Outbox path.
 - Produces error codes `PROJECTION_IDENTITY_REQUIRED`, `PROJECTION_IDENTITY_MISMATCH`, and `ACTIVE_GENERATION_REQUIRED`.
 
-- [ ] **Step 1: Add failing Go contract tests**
+- [x] **Step 1: Add Go contract tests**
 
 Test that a generation-qualified request with mismatched Manifest IDs is rejected, a node from another Scope is rejected, and a valid request produces a VID that changes when only `generationId` changes.
 
@@ -259,7 +259,7 @@ Run `go test ./internal/httpapi ./internal/nebula`.
 
 Expected: FAIL because the identity contract is absent.
 
-- [ ] **Step 2: Add typed identity fields and validation**
+- [x] **Step 2: Add typed identity fields and validation**
 
 Define:
 
@@ -274,15 +274,15 @@ type ProjectionIdentity struct {
 
 Generation-qualified requests must carry one identity at the request level and every node and edge endpoint must match it. Legacy requests remain accepted only on the existing compatibility path.
 
-- [ ] **Step 3: Make generation VID and edge rank deterministic**
+- [x] **Step 3: Make generation VID and edge rank deterministic**
 
 Include `manifestId` and `generationId` in the canonical `vertexID` input. Add `ProjectionOrdinal` to the typed Edge contract and use it for Nebula rank. Reject missing ordinals on generation-qualified edges; retain the old hash rank only for legacy requests.
 
-- [ ] **Step 4: Add adapter traversal filtering and response metadata**
+- [x] **Step 4: Add adapter traversal filtering and response metadata**
 
 Use the generation-qualified VIDs as the traversal start keys and return the exact ProjectionIdentity in the response. Validate returned node keys against the request identity before returning them to the caller.
 
-- [ ] **Step 5: Run Go tests and commit**
+- [x] **Step 5: Run Go tests and commit**
 
 Run `go test ./internal/httpapi ./internal/nebula`.
 

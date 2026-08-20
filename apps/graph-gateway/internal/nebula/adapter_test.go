@@ -102,6 +102,46 @@ func TestOfficialClientHealthInitializesSchemaBeforeReadingTags(t *testing.T) {
 	}
 }
 
+func TestGenerationProjectionUsesGenerationVIDAndOrdinal(t *testing.T) {
+	t.Parallel()
+
+	scope := httpapi.Scope{EnterpriseID: "huawei", ApplicationServiceID: "com.huawei.celon.desiner", ScopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"}
+	identity := &httpapi.ProjectionIdentity{BaselineID: "b1", ManifestID: "m1", GenerationID: "g1", SchemaVersion: "v1"}
+	node := httpapi.Node{Scope: scope, Projection: identity, NodeType: "api", LogicalID: "api-payment", RootAssetType: "api", RootAssetID: "api-payment"}
+	executor := &recordingExecutor{}
+	client := nebula.NewOfficialClient(executor, "specforge_graph")
+	receipt, err := client.Project(context.Background(), httpapi.ProjectionRequest{
+		Scope: scope, GraphVersion: "8", Projection: identity,
+		Nodes: []httpapi.Node{node},
+		Edges: []httpapi.Edge{{ID: "edge-1", Code: "api_uses_model", Source: node, Target: node, ProjectionOrdinal: "42"}},
+	})
+	if err != nil {
+		t.Fatalf("project: %v", err)
+	}
+	if receipt.Projection == nil || receipt.Projection.GenerationID != "g1" {
+		t.Fatalf("receipt did not echo projection identity: %#v", receipt.Projection)
+	}
+	statements := strings.Join(executor.statements, "\n")
+	if !strings.Contains(statements, "@ 42:") {
+		t.Fatalf("expected persisted projection ordinal, got: %s", statements)
+	}
+	if !strings.Contains(statements, ":generation:") {
+		t.Fatalf("expected generation-qualified node key, got: %s", statements)
+	}
+
+	secondExecutor := &recordingExecutor{}
+	secondClient := nebula.NewOfficialClient(secondExecutor, "specforge_graph")
+	secondIdentity := &httpapi.ProjectionIdentity{BaselineID: "b1", ManifestID: "m1", GenerationID: "g2", SchemaVersion: "v1"}
+	secondNode := node
+	secondNode.Projection = secondIdentity
+	if _, err := secondClient.Project(context.Background(), httpapi.ProjectionRequest{Scope: scope, GraphVersion: "9", Projection: secondIdentity, Nodes: []httpapi.Node{secondNode}}); err != nil {
+		t.Fatalf("project second generation: %v", err)
+	}
+	if strings.Contains(statements, secondExecutor.statements[len(secondExecutor.statements)-2]) {
+		t.Fatalf("expected different generation-qualified vertex statement")
+	}
+}
+
 type recordingExecutor struct {
 	statements []string
 }
