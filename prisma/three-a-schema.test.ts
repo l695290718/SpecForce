@@ -22,3 +22,21 @@ it("defines exact-Scope 3A build, projection, and continuation storage", async (
   expect(architectureUnitMigration).toContain('"ArchitectureUnitMemberProjection"');
   expect(architectureUnitMigration).toContain('"ArchitectureUnitMappingProjection"');
 });
+
+it("defines bounded Nebula projection generation control storage", async () => {
+  const schema = await readFile("prisma/schema.prisma", "utf8");
+  for (const model of [
+    "NebulaProjectionManifest",
+    "NebulaProjectionHead",
+    "NebulaProjectionCheckpoint",
+    "NebulaProjectionPurgeChunk",
+    "NebulaProjectionCertificationRun"
+  ]) {
+    expect(schema).toContain(`model ${model}`);
+  }
+  expect(schema).toContain("@@unique([enterpriseId, applicationServiceId, scopePath]");
+  expect(schema).toContain("@@unique([applicationServiceId, scopePath, generationId]");
+  expect(schema).toContain("@@unique([applicationServiceId, scopePath, manifestId, partitionId]");
+  expect(schema).toContain("@@unique([applicationServiceId, scopePath, manifestId, chunkNumber]");
+  expect(schema).toContain("@@unique([applicationServiceId, scopePath, manifestId, tier]");
+});

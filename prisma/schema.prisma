@@ -1071,6 +1071,104 @@ model ProjectionManifest {
   @@index([applicationServiceId, scopePath, baselineId, projectionType], map: "ProjectionManifest_scope_baseline_type_idx")
 }
 
+model NebulaProjectionManifest {
+  dbId                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                      String
+  generationId            String
+  generationNumber        BigInt
+  baselineId              String
+  profileId               String
+  profileVersion          String
+  projectionSchemaVersion String
+  status                  String
+  sourceWatermarks        Json     @default("{}") @db.JsonB
+  expectedCounts          Json     @default("{}") @db.JsonB
+  bucketDigests            Json     @default("{}") @db.JsonB
+  contentDigest           String
+  errorCode               String?
+  diagnosticRef           String?
+  createdAt               DateTime @default(now())
+  validatedAt             DateTime?
+  retiredAt               DateTime?
+  purgedAt                DateTime?
+  applicationServiceId    String
+  scopePath               String
+
+  @@unique([applicationServiceId, scopePath, id], map: "NebulaProjectionManifest_scope_id_key")
+  @@unique([applicationServiceId, scopePath, generationId], map: "NebulaProjectionManifest_scope_generation_key")
+  @@index([applicationServiceId, scopePath, status, createdAt], map: "NebulaProjectionManifest_scope_status_idx")
+}
+
+model NebulaProjectionHead {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  buildingManifestId   String?
+  activeManifestId     String?
+  previousManifestId   String?
+  headVersion          BigInt   @default(0)
+  previousRetainUntil  DateTime?
+  updatedAt            DateTime @updatedAt
+  enterpriseId         String
+  applicationServiceId String
+  scopePath            String
+
+  @@unique([enterpriseId, applicationServiceId, scopePath], map: "NebulaProjectionHead_scope_key")
+  @@index([applicationServiceId, scopePath, activeManifestId], map: "NebulaProjectionHead_active_idx")
+}
+
+model NebulaProjectionCheckpoint {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  manifestId           String
+  partitionId          String
+  lastEventId          String?
+  projectionVersion   BigInt   @default(0)
+  status               String
+  error                String?
+  projectedAt          DateTime?
+  applicationServiceId String
+  scopePath            String
+
+  @@unique([applicationServiceId, scopePath, manifestId, partitionId], map: "NebulaProjectionCheckpoint_scope_manifest_partition_key")
+  @@index([applicationServiceId, scopePath, manifestId, status], map: "NebulaProjectionCheckpoint_scope_manifest_status_idx")
+}
+
+model NebulaProjectionPurgeChunk {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  manifestId           String
+  chunkNumber          Int
+  state                String
+  identityManifest     Json     @default("{}") @db.JsonB
+  deletedVertexCount   Int      @default(0)
+  deletedEdgeCount     Int      @default(0)
+  attemptCount         Int      @default(0)
+  lastError             String?
+  availableAt          DateTime @default(now())
+  completedAt          DateTime?
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, manifestId, chunkNumber], map: "NebulaProjectionPurgeChunk_scope_manifest_chunk_key")
+  @@index([applicationServiceId, scopePath, manifestId, state, availableAt], map: "NebulaProjectionPurgeChunk_scope_manifest_state_idx")
+}
+
+model NebulaProjectionCertificationRun {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  manifestId           String
+  tier                 String
+  status               String
+  workloadDigest       String
+  evidence             Json     @default("{}") @db.JsonB
+  startedAt            DateTime @default(now())
+  completedAt          DateTime?
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, manifestId, tier], map: "NebulaProjectionCertificationRun_scope_manifest_tier_key")
+  @@index([applicationServiceId, scopePath, status, tier], map: "NebulaProjectionCertificationRun_scope_status_idx")
+}
+
 model ProjectionBuildJob {
   dbId                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   id                      String
