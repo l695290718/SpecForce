@@ -1,14 +1,17 @@
 export {
   GraphProjector,
+  projectionIdentityFromEvent,
+  sameProjectionIdentity,
   type ClaimedProjection,
   type GraphGateway,
   type GraphProjectorOptions,
   type ProcessSummary,
   type ProjectionClaimOptions,
+  type ProjectionIdentity,
   type ProjectionRepository,
   type ProjectionScope
 } from "./projector.js";
-export { PrismaProjectionRepository } from "./repository.js";
+export { PrismaProjectionRepository, checkpointPartitionIdForEvent } from "./repository.js";
 export {
   HttpGraphGateway,
   type HttpGraphGatewayOptions,

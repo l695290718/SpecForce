@@ -1,4 +1,11 @@
-import type { ClaimedProjection, GraphGateway, ProjectionScope } from "./projector.js";
+import {
+  projectionIdentityFromEvent,
+  sameProjectionIdentity,
+  type ClaimedProjection,
+  type GraphGateway,
+  type ProjectionIdentity,
+  type ProjectionScope
+} from "./projector.js";
 
 export interface HttpGraphGatewayOptions {
   baseUrl: string;
@@ -30,6 +37,10 @@ export class HttpGraphGateway implements GraphGateway {
   async project(event: ClaimedProjection): Promise<void> {
     const { nodes, edges } = await this.resolvePayload(event);
     const scope = exactScope(event);
+    const projection = projectionIdentityFromEvent(event);
+    if (projection !== undefined && edges.some((edge) => typeof edge.projectionOrdinal !== "string" || edge.projectionOrdinal.trim() === "")) {
+      throw new Error("GRAPH_PROJECTION_ORDINAL_REQUIRED");
+    }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
     try {
@@ -39,8 +50,9 @@ export class HttpGraphGateway implements GraphGateway {
         body: JSON.stringify({
           scope,
           graphVersion: event.graphVersion.toString(),
-          nodes: nodes.map((node) => ({ ...node, ...scope })),
-          edges: edges.map((edge) => scopedEdge(edge, scope))
+          ...(projection === undefined ? {} : { projection }),
+          nodes: nodes.map((node) => scopedNode(node, scope, projection)),
+          edges: edges.map((edge) => scopedEdge(edge, scope, projection))
         }),
         signal: controller.signal
       });
@@ -49,6 +61,7 @@ export class HttpGraphGateway implements GraphGateway {
       if (
         !isRecord(receipt) ||
         receipt.graphVersion !== event.graphVersion.toString() ||
+        !receiptProjectionMatches(receipt, projection) ||
         !isNonNegativeInteger(receipt.projectedNodeCount) ||
         !isNonNegativeInteger(receipt.projectedEdgeCount)
       ) {
@@ -57,7 +70,13 @@ export class HttpGraphGateway implements GraphGateway {
     } catch (error) {
       if (
         error instanceof Error &&
-        (error.message === "GRAPH_GATEWAY_DELIVERY_FAILED" || error.message === "GRAPH_GATEWAY_RECEIPT_INVALID")
+        [
+          "GRAPH_GATEWAY_DELIVERY_FAILED",
+          "GRAPH_GATEWAY_RECEIPT_INVALID",
+          "GRAPH_PROJECTION_ORDINAL_REQUIRED",
+          "PROJECTION_IDENTITY_MISMATCH",
+          "GRAPH_PROJECTION_GENERATION_REQUIRED"
+        ].includes(error.message)
       ) {
         throw error;
       }
@@ -88,12 +107,47 @@ function recordArray(value: unknown): Array<Record<string, unknown>> | undefined
   return value as Array<Record<string, unknown>>;
 }
 
-function scopedEdge(edge: Record<string, unknown>, scope: ProjectionScope): Record<string, unknown> {
+function scopedEdge(edge: Record<string, unknown>, scope: ProjectionScope, projection: ProjectionIdentity | undefined): Record<string, unknown> {
   return {
     ...edge,
-    source: isRecord(edge.source) ? { ...edge.source, ...scope } : edge.source,
-    target: isRecord(edge.target) ? { ...edge.target, ...scope } : edge.target
+    source: isRecord(edge.source) ? scopedNode(edge.source, scope, projection) : edge.source,
+    target: isRecord(edge.target) ? scopedNode(edge.target, scope, projection) : edge.target
   };
+}
+
+function scopedNode(node: Record<string, unknown>, scope: ProjectionScope, projection: ProjectionIdentity | undefined): Record<string, unknown> {
+  const existing = projectionFromRecord(node.projection);
+  if (existing !== undefined && projection === undefined) throw new Error("PROJECTION_IDENTITY_MISMATCH");
+  if (existing !== undefined && projection !== undefined && !sameProjectionIdentity(existing, projection)) {
+    throw new Error("PROJECTION_IDENTITY_MISMATCH");
+  }
+  return {
+    ...node,
+    ...scope,
+    ...(projection === undefined ? {} : { projection })
+  };
+}
+
+function projectionFromRecord(value: unknown): ProjectionIdentity | undefined {
+  if (!isRecord(value)) return undefined;
+  const candidate = value as Record<string, unknown>;
+  const keys = ["baselineId", "manifestId", "generationId", "schemaVersion"] as const;
+  if (keys.every((key) => candidate[key] === undefined)) return undefined;
+  if (keys.some((key) => typeof candidate[key] !== "string" || (candidate[key] as string).trim() === "")) {
+    throw new Error("GRAPH_PROJECTION_GENERATION_REQUIRED");
+  }
+  return {
+    baselineId: candidate.baselineId as string,
+    manifestId: candidate.manifestId as string,
+    generationId: candidate.generationId as string,
+    schemaVersion: candidate.schemaVersion as string
+  };
+}
+
+function receiptProjectionMatches(receipt: Record<string, unknown>, expected: ProjectionIdentity | undefined): boolean {
+  const actual = projectionFromRecord(receipt.projection);
+  if (expected === undefined) return actual === undefined;
+  return actual !== undefined && sameProjectionIdentity(actual, expected);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

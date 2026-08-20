@@ -50,6 +50,66 @@ describe("HttpGraphGateway", () => {
     });
   });
 
+  it("forwards generation identity and qualifies every graph endpoint", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({
+      graphVersion: "8",
+      projection: generationIdentity(),
+      projectedNodeCount: 2,
+      projectedEdgeCount: 1
+    }), { status: 200 }));
+    const gateway = new HttpGraphGateway({
+      baseUrl: "http://graph-gateway:8088",
+      fetch: fetchMock as unknown as typeof globalThis.fetch
+    });
+
+    await gateway.project({
+      ...event,
+      payload: {
+        projection: generationIdentity(),
+        nodes: [
+          { nodeType: "api", logicalId: "api-1" },
+          { nodeType: "dataModel", logicalId: "model-1" }
+        ],
+        edges: [{
+          id: "edge-1",
+          code: "API_USES_MODEL",
+          projectionOrdinal: "42",
+          source: { nodeType: "api", logicalId: "api-1" },
+          target: { nodeType: "dataModel", logicalId: "model-1" }
+        }]
+      }
+    });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as {
+      projection: Record<string, string>;
+      nodes: Array<Record<string, unknown>>;
+      edges: Array<{ source: Record<string, unknown>; target: Record<string, unknown> }>;
+    };
+    expect(body.projection).toEqual(generationIdentity());
+    expect(body.nodes[0]?.projection).toEqual(generationIdentity());
+    expect(body.edges[0]?.source.projection).toEqual(generationIdentity());
+    expect(body.edges[0]?.target.projection).toEqual(generationIdentity());
+  });
+
+  it("rejects an endpoint carrying a different generation", async () => {
+    const fetch = vi.fn() as unknown as typeof globalThis.fetch;
+    const gateway = new HttpGraphGateway({ baseUrl: "http://graph-gateway:8088", fetch });
+
+    await expect(gateway.project({
+      ...event,
+      payload: {
+        projection: generationIdentity(),
+        nodes: [{
+          nodeType: "api",
+          logicalId: "api-1",
+          projection: { ...generationIdentity(), generationId: "generation-foreign" }
+        }],
+        edges: []
+      }
+    })).rejects.toThrow("PROJECTION_IDENTITY_MISMATCH");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("rejects unsupported payloads before delivery", async () => {
     const fetch = vi.fn() as unknown as typeof globalThis.fetch;
     const gateway = new HttpGraphGateway({
@@ -135,5 +195,14 @@ function exactScope() {
     enterpriseId: event.enterpriseId,
     applicationServiceId: event.applicationServiceId,
     scopePath: event.scopePath
+  };
+}
+
+function generationIdentity() {
+  return {
+    baselineId: "baseline-1",
+    manifestId: "manifest-1",
+    generationId: "generation-1",
+    schemaVersion: "nebula-v1"
   };
 }

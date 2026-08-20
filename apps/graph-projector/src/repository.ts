@@ -1,5 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import type { ClaimedProjection, ProjectionClaimOptions, ProjectionRepository } from "./projector.js";
+import { projectionIdentityFromEvent, type ClaimedProjection, type ProjectionClaimOptions, type ProjectionRepository } from "./projector.js";
 import type { ProjectionPayload } from "./gateway.js";
 import { ProjectionHealthError, type ProjectionHealthSnapshot } from "./runtime.js";
 
@@ -233,7 +233,12 @@ async function contiguousProjectedVersion(client: PrismaRepositoryClient, event:
 }
 
 async function upsertCheckpoint(client: PrismaRepositoryClient, event: ClaimedProjection, version: bigint, projectedAt: Date): Promise<void> {
-  await client.$executeRawUnsafe(CHECKPOINT_SQL, event.enterpriseId, event.applicationServiceId, event.scopePath, checkpointPartitionId, event.relationshipEventId, version, projectedAt);
+  await client.$executeRawUnsafe(CHECKPOINT_SQL, event.enterpriseId, event.applicationServiceId, event.scopePath, checkpointPartitionIdForEvent(event), event.relationshipEventId, version, projectedAt);
+}
+
+export function checkpointPartitionIdForEvent(event: Pick<ClaimedProjection, "payload">): string {
+  const projection = projectionIdentityFromEvent(event);
+  return projection === undefined ? checkpointPartitionId : `${projection.manifestId}:${checkpointPartitionId}`;
 }
 
 function scopeKey(event: ClaimedProjection): string {

@@ -306,7 +306,7 @@ Run `git add apps/graph-gateway/internal/httpapi apps/graph-gateway/internal/neb
 - Generation-qualified events must carry `manifestId`, `generationId`, `baselineId`, and `schemaVersion`; missing metadata causes a retryable `GRAPH_PROJECTION_GENERATION_REQUIRED` error on the new path.
 - Existing legacy events continue to use the current relationship-outbox checkpoint and contract.
 
-- [ ] **Step 1: Write failing metadata tests**
+- [x] **Step 1: Add generation metadata tests**
 
 Cover generation metadata forwarding, rejection of a cross-generation edge payload, and preservation of the legacy event path.
 
@@ -314,15 +314,15 @@ Run `pnpm --filter @specforge/graph-projector test -- gateway.test.ts projector.
 
 Expected: FAIL for the new generation assertions.
 
-- [ ] **Step 2: Add metadata parsing and forwarding**
+- [x] **Step 2: Add metadata parsing and forwarding**
 
 Parse the event envelope into a typed `ProjectionIdentity`, attach it to `/v1/projections`, and require the Gateway receipt to echo the same identity. Keep the old graphVersion-only request when the event has no generation metadata.
 
-- [ ] **Step 3: Add generation-aware checkpoint namespace**
+- [x] **Step 3: Add generation-aware checkpoint namespace**
 
 When generation metadata exists, use `manifestId:partitionId` as the checkpoint partition key and never update the legacy `relationship-outbox` checkpoint from a generation-qualified event.
 
-- [ ] **Step 4: Run focused tests and commit**
+- [x] **Step 4: Run focused tests and commit**
 
 Run `pnpm --filter @specforge/graph-projector typecheck` and `pnpm --filter @specforge/graph-projector test`.
 

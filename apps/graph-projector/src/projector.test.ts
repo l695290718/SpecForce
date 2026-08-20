@@ -5,6 +5,7 @@ import {
   type GraphGateway,
   type ProjectionRepository
 } from "./projector.js";
+import { checkpointPartitionIdForEvent } from "./repository.js";
 
 const now = new Date("2026-07-26T00:00:00.000Z");
 const scope = {
@@ -14,6 +15,22 @@ const scope = {
 };
 
 describe("GraphProjector", () => {
+  it("keeps generation checkpoints separate from the legacy outbox partition", () => {
+    const event = projection({
+      payload: {
+        projection: {
+          baselineId: "baseline-1",
+          manifestId: "manifest-1",
+          generationId: "generation-1",
+          schemaVersion: "nebula-v1"
+        }
+      }
+    });
+
+    expect(checkpointPartitionIdForEvent(event)).toBe("manifest-1:relationship-outbox");
+    expect(checkpointPartitionIdForEvent(projection())).toBe("relationship-outbox");
+  });
+
   it("replays a duplicate event through the same idempotency key without advancing its checkpoint twice", async () => {
     const event = projection({ id: "outbox-1", graphVersion: 4n });
     const repository = new MemoryRepository([event, event]);

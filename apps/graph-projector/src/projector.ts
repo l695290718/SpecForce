@@ -6,6 +6,13 @@ export interface ProjectionScope {
   scopePath: string;
 }
 
+export interface ProjectionIdentity {
+  baselineId: string;
+  manifestId: string;
+  generationId: string;
+  schemaVersion: string;
+}
+
 export interface ClaimedProjection extends ProjectionScope {
   id: string;
   relationshipEventId: string;
@@ -17,6 +24,36 @@ export interface ClaimedProjection extends ProjectionScope {
   attemptCount: number;
   leaseOwner?: string | null;
   leaseExpiresAt?: Date | null;
+}
+
+export function projectionIdentityFromEvent(event: Pick<ClaimedProjection, "payload">): ProjectionIdentity | undefined {
+  const nested = recordValue(event.payload.projection);
+  const source = nested ?? event.payload;
+  const keys = ["baselineId", "manifestId", "generationId", "schemaVersion"] as const;
+  const present = keys.some((key) => source[key] !== undefined);
+  if (!present) return undefined;
+  if (keys.some((key) => typeof source[key] !== "string" || source[key].trim() === "")) {
+    throw new Error("GRAPH_PROJECTION_GENERATION_REQUIRED");
+  }
+  return {
+    baselineId: source.baselineId as string,
+    manifestId: source.manifestId as string,
+    generationId: source.generationId as string,
+    schemaVersion: source.schemaVersion as string
+  };
+}
+
+export function sameProjectionIdentity(left: ProjectionIdentity, right: ProjectionIdentity): boolean {
+  return left.baselineId === right.baselineId &&
+    left.manifestId === right.manifestId &&
+    left.generationId === right.generationId &&
+    left.schemaVersion === right.schemaVersion;
+}
+
+function recordValue(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
 }
 
 export interface ProjectionClaimOptions {
