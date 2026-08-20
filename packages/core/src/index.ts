@@ -26,6 +26,7 @@ export * from "./relationships/types";
 export * from "./relationships/ontology";
 export * from "./relationships/extract";
 export * from "./data-model-v2";
+export * from "./data-model-graph";
 export * from "./graph-store/types";
 export * from "./graph/projection-generation";
 export * from "./graph/semantic-identity";
