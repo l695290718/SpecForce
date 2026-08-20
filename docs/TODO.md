@@ -110,7 +110,7 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 ## 5. Knowledge-Assertion-Aware Nebula 3A And Production-Scale Certification
 
-**Status:** Target design accepted on 2026-08-20. Phase 1 bounded-generation control, generation-qualified Gateway/Projector delivery, and parity primitives are implemented locally; MCP closure is pending. Full semantic Knowledge Assertion projection, Phase 2 production operations, and Phase 3 scale certification remain open.
+**Status:** Target design accepted on 2026-08-20. Phase 1 bounded-generation control, generation-qualified Gateway/Projector delivery, and parity primitives are implemented and reconciled in the exact Scope; full semantic Knowledge Assertion projection, Phase 2 production operations, and Phase 3 scale certification remain open.
 
 **Owner:** SpecForge Runtime for projection and Projector health; SpecForge Architecture for MCP synchronization.
 
@@ -124,7 +124,7 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **中文本地化：**
 
-**状态：** 目标设计已于 2026-08-20 接受。第一阶段有界代次控制、带代次 Gateway/Projector 投递和一致性比对基础能力已在本地实现，MCP 关闭仍待完成；完整 Knowledge Assertion 语义投影、第二阶段生产运维和第三阶段规模认证仍待实施。
+**状态：** 目标设计已于 2026-08-20 接受。第一阶段有界代次控制、带代次 Gateway/Projector 投递和一致性比对基础能力已实现，并已在精确 Scope 下完成对账；完整 Knowledge Assertion 语义投影、第二阶段生产运维和第三阶段规模认证仍待实施。
 
 **负责人：** SpecForge Runtime 负责投影和 Projector 健康；SpecForge Architecture 负责 MCP 同步。
 

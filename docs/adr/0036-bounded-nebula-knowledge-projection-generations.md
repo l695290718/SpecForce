@@ -66,7 +66,7 @@ Retain PREVIOUS for 72 hours by default, subject to stricter capacity watermarks
 - Root Vitest runner, excluding `.worktrees/**` and `.pnpm-store/**`, passed 4 focused files and 21 tests for generation parity, Gateway metadata, Projector checkpoint namespaces, and repository payload compatibility. The package-local `pnpm --filter @specforge/graph-projector test` command remains environment-blocked because its local `node_modules/vitest` link is absent; the repository-root runner is the successful verification path.
 - Go `go test ./...` passed for `cmd/server`, `internal/httpapi`, and `internal/nebula`.
 - `git diff --check` returned no errors. The existing projection E2E fixture referenced by the plan is absent from this checkout; the three-slot lifecycle repository tests are the available focused lifecycle evidence, not a production E2E claim.
-- MCP synchronization and implementation-session closure remain the final completion gate for this increment.
+- Implementation session `design-change-session:2a49648a-2fa4-4631-9424-c0583dd6cc63` closed `CONVERGED` after the exact evidence list above. The selected design-fact sync and read-back were successful; the package-local Vitest command remains an environment note because the repository-root runner passed.
 
 ## MCP Record
 
@@ -132,7 +132,7 @@ PREVIOUS 默认保留 72 小时，但更严格的容量水位可以优先。完�
 - `pnpm db:generate`、`pnpm db:push` 和 `pnpm exec prisma validate` 已针对 Docker PostgreSQL `localhost:15433/specforge_canonical` 通过，推送后 Schema 已同步。
 - `pnpm --filter @specforge/core typecheck`、`pnpm --filter @specforge/graph-projector typecheck` 通过；根 Vitest 聚焦运行通过 4 个文件、21 项测试；Go `go test ./...` 通过 3 个包。
 - `git diff --check` 无错误。当前检出没有计划中引用的投影 E2E fixture，因此三槽生命周期测试作为聚焦生命周期证据，不宣称生产 E2E 已完成。
-- `pnpm design-context:preflight` 已打开实施会话并返回摘要 `d393dda917db5ea6eb514189ba9ec4e5810845452bbdadefb8931de02bf3b602`；MCP 同步和同一实施会话关闭仍是本增量的最终完成门禁。
+- `pnpm design-context:preflight` 已打开实施会话并返回摘要 `d393dda917db5ea6eb514189ba9ec4e5810845452bbdadefb8931de02bf3b602`；`pnpm design-context:close` 已携带精确证据将同一实施会话 `design-change-session:2a49648a-2fa4-4631-9424-c0583dd6cc63` 关闭为 `CONVERGED`。
 - 2026-08-19 和 2026-08-20 的产品负责人设计评审确认了有界三槽模型、服务端解析代次、支持 Knowledge Assertion 的映射、PREVIOUS 默认保留 72 小时以及三个独立交付阶段。
 - 设计事实清单和 MCP 同步契约测试共 2 个文件、34 项测试通过，`git diff --check` 无错误。
 - 只选择本 ADR 的 `pnpm design-facts:sync` 返回 `complete`；`pnpm design-facts:check` 将该 ADR 列入 `verified`，缺失、差异、越界和阻塞列表均为空。
@@ -142,4 +142,4 @@ PREVIOUS 默认保留 72 小时，但更严格的容量水位可以优先。完�
 
 ### MCP 记录
 
-匹配 MCP ADR 为 `adr-bounded-nebula-knowledge-projection-generations`，Proposal 为 `proposal-bounded-nebula-knowledge-projection-generations`，Context Pack 为 `ctx-bounded-nebula-knowledge-projection-generations`。API、数据模型、发布规则、规模认证质量事实及其有类型关系已经通过 MCP 写入并完成精确 Scope 回读。本次书面设计会话已关闭为 `CONVERGED`；实施会话已创建，正在等待最终证据同步和关闭。
+匹配 MCP ADR 为 `adr-bounded-nebula-knowledge-projection-generations`，Proposal 为 `proposal-bounded-nebula-knowledge-projection-generations`，Context Pack 为 `ctx-bounded-nebula-knowledge-projection-generations`。API、数据模型、发布规则、规模认证质量事实及其有类型关系已经通过 MCP 写入并完成精确 Scope 回读。本次书面设计会话和实施会话均已在精确 Scope 下关闭为 `CONVERGED`。

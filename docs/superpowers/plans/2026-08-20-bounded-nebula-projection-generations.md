@@ -366,11 +366,11 @@ Run `pnpm db:generate`, `pnpm db:push`, `pnpm --filter @specforge/core typecheck
 
 Expected: All focused tests, typechecks, schema validation, Go tests, and diff checks pass. No scale certification claim is added.
 
-- [ ] **Step 5: Synchronize implementation evidence and close the implementation session**
+- [x] **Step 5: Synchronize implementation evidence and close the implementation session**
 
 Create a new exact-Scope `prepare_design_change` session for the implementation, update ADR-0036 and the MCP Evidence record with exact command results, run selected `pnpm design-facts:sync`, selected `pnpm design-facts:check`, and `pnpm design-facts:federation:check`, then close the same implementation session as `CONVERGED` only if every result passes.
 
-- [ ] **Step 6: Commit the Phase 1 integration**
+- [x] **Step 6: Commit the Phase 1 integration**
 
 Run `git add apps/graph-projector/src/generation-parity.ts apps/graph-projector/src/generation-parity.test.ts apps/graph-projector/src/projection.e2e.test.ts docs/adr/0036-bounded-nebula-knowledge-projection-generations.md docs/TODO.md && git commit -m "feat: verify bounded Nebula projection generations"`.
 
