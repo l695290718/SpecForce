@@ -669,7 +669,7 @@ async function readRepositoryAdr(path: string): Promise<AdrSource> {
 }
 
 export function splitAdrSource(content: string): AdrSource {
-  const boldLocalizationMarkers = [...content.matchAll(/^(?:\*\*中文本地化覆盖[：:]\*\*|中文本地化[^\r\n]*[：:])\s*$/gm)];
+  const boldLocalizationMarkers = [...content.matchAll(/^(?:\*\*中文本地化覆盖[：:]\*\*|中文本地化[^\r\n]*[：:]|##\s+中文本地化覆盖\s*)$/gm)];
   if (boldLocalizationMarkers.length) {
     const englishParts: string[] = [];
     const chineseParts: string[] = [];

@@ -198,6 +198,15 @@ describe("synchronizeDesignFacts", () => {
     expect(source.chinese).toContain("使用图数据库作为系统记录源");
   });
 
+  it("splits heading-based Chinese localization before bilingual corrective sections", async () => {
+    const source = splitAdrSource(await readFile("docs/adr/0037-webgl-data-model-er-workspace.md", "utf8"));
+
+    expect(source.english).toContain("## Alternatives");
+    expect(source.chinese).toContain("### 备选方案");
+    expect(source.chinese).not.toContain("## Alternatives");
+    expect(source.chinese).toContain("让浏览器成为编写客户端");
+  });
+
   it("rejects related assets with unknown prefixes", async () => {
     const callTool = vi.fn().mockResolvedValue({ ok: true });
 
