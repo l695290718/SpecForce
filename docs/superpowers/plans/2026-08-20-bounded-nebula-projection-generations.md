@@ -201,7 +201,7 @@ Run `git add packages/core/src/graph/projection-generation.ts packages/core/src/
 - All methods require `{ enterpriseId, applicationServiceId, scopePath }` and use Prisma transactions.
 - `publish` atomically moves old ACTIVE to PREVIOUS and new BUILDING to ACTIVE; `rollback` atomically swaps ACTIVE and PREVIOUS.
 
-- [ ] **Step 1: Write lifecycle tests**
+- [x] **Step 1: Write lifecycle tests**
 
 Cover these exact scenarios:
 
@@ -216,17 +216,17 @@ it("never retires or purges ACTIVE");
 
 Use the existing repository test fake pattern and assert transaction calls, head version checks, and explicit error codes.
 
-- [ ] **Step 2: Run the focused lifecycle test and confirm failure**
+- [x] **Step 2: Run the focused lifecycle test and confirm failure**
 
 Run `node .\\node_modules\\vitest\\vitest.mjs run --root . apps/graph-projector/src/generation-repository.test.ts`.
 
 Expected: FAIL because the repository does not exist.
 
-- [ ] **Step 3: Implement transaction-safe lifecycle methods**
+- [x] **Step 3: Implement transaction-safe lifecycle methods**
 
 Use `pg_advisory_xact_lock(hashtext(exactScopeKey))` inside every mutating transaction. Enforce one building row, verify `headVersion` with `updateMany`, set `previousRetainUntil` to `now + 72 hours` on publish, and write immutable manifest status changes rather than mutating content. Return durable receipts containing Scope, Manifest, generation, and new head version.
 
-- [ ] **Step 4: Add repository exports and run tests**
+- [x] **Step 4: Add repository exports and run tests**
 
 Run `pnpm --filter @specforge/graph-projector typecheck` and the focused lifecycle tests.
 

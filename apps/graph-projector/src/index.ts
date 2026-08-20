@@ -25,3 +25,11 @@ export {
   type ProjectorRuntimeConfig,
   type ProjectorRuntimeOptions
 } from "./runtime.js";
+export {
+  PrismaNebulaGenerationRepository,
+  type BuildingManifestInput,
+  type GenerationOperationReceipt,
+  type GenerationScope,
+  type NebulaGenerationHead,
+  type NebulaGenerationStatus
+} from "./generation-repository.js";
