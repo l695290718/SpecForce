@@ -2085,9 +2085,9 @@
                           { "sourceType": "proposal", "sourceId": "proposal-webgl-data-model-er-workspace", "targetType": "api", "targetId": "api-specforge-data-model-graph-query", "relationType": "IMPACTS" }
                       ],
                       "owner": "SpecForge Architecture and Web Runtime",
-                      "status": "Repository implementation complete; MCP synchronization complete; browser-safe projection hashing verified; standalone packaging is blocked only by Windows/OneDrive symlink permissions; fresh browser acceptance pending",
+                      "status": "Repository implementation complete; MCP synchronization complete; browser-safe projection hashing and exact-Scope browser acceptance verified; standalone packaging is blocked only by Windows/OneDrive symlink permissions",
                       "reason": "The Data Model surface needs a dedicated field-bearing ER workspace while PostgreSQL remains authoritative and the browser remains read-only.",
-                      "retryTrigger": "Perform a fresh exact-Scope browser inspection of the Data Model ER workspace before closing the design-change session.",
+                      "retryTrigger": "Re-run the focused browser and deployment checks when the runtime, browser, or packaging environment changes.",
                       "localizedContent": {
                           "en": {
                               "decision": "Use a bounded PixiJS WebGL ER workspace with a semantic fallback, exact-Scope graph reads, dual waterlines, and MCP-only authoring.",
@@ -2106,6 +2106,7 @@
                           { "command": "pnpm --filter @specforge/web build", "result": "Compilation and static generation passed; final standalone traced-file packaging was blocked by Windows/OneDrive EPERM while creating dependency symlinks." },
                           { "command": "pnpm design-facts:check", "result": "Passed after exact-Scope MCP synchronization and read-back." },
                           { "command": "$env:SPECFORGE_APPLICATION_SERVICE_ID='com.huawei.celon.desiner'; $env:SPECFORGE_SCOPE_PATH='pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner'; pnpm design-facts:federation:check", "result": "Passed with blocking=false." },
+                          { "command": "Browser exact-Scope Data Model list and model-level ER inspection", "result": "Passed: list ER view rendered 91 nodes and 142 relations; model ER view rendered 8 nodes and 14 relations with one Canvas, no Runtime Error, and empty clean-tab browser error logs." },
                           { "command": "git diff --check", "result": "Passed with Windows line-ending normalization warnings only." }
                       ]
                   }

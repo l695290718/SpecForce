@@ -18,7 +18,8 @@ The implementation turn produced the following local evidence:
 - `pnpm design-facts:federation:check` with the exact Designer Scope: passed with `blocking=false`.
 - `git diff --check`: passed with only Windows line-ending normalization warnings.
 
-Browser acceptance is not claimed here until a fresh exact-Scope inspection is performed.
+- Fresh exact-Scope browser acceptance: `http://localhost:3000/assets/data-models?scope=com.huawei.celon.desiner&view=er` loaded without a Runtime Error and exposed the ER toolbar, selected Scope, semantic fallback table, and `91 nodes · 142 relations`.
+- Fresh model-level browser acceptance: `http://localhost:3000/assets/data-models/data-specforge-assets?scope=com.huawei.celon.desiner&view=er` loaded without a Runtime Error, rendered one Canvas, and exposed `8 nodes · 14 relations`; browser error logs were empty on a clean tab.
 
 当前实现轮次的本地证据如下：
 
@@ -30,7 +31,8 @@ Browser acceptance is not claimed here until a fresh exact-Scope inspection is p
 - 使用精确 Designer Scope 执行 `pnpm design-facts:federation:check`：通过，`blocking=false`。
 - `git diff --check`：通过，仅有 Windows 换行规范化警告。
 
-在完成新的精确 Scope 浏览器检查前，不声明浏览器验收通过。
+- 新的精确 Scope 浏览器验收：访问 `http://localhost:3000/assets/data-models?scope=com.huawei.celon.desiner&view=er` 无 Runtime Error，并展示 ER 工具栏、选中的 Scope、语义回退表格和 `91 nodes · 142 relations`。
+- 新的单模型浏览器验收：访问 `http://localhost:3000/assets/data-models/data-specforge-assets?scope=com.huawei.celon.desiner&view=er` 无 Runtime Error，渲染出一个 Canvas，并展示 `8 nodes · 14 relations`；新标签页浏览器错误日志为空。
 
 ## Deferred production capability
 

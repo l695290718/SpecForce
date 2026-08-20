@@ -2,9 +2,9 @@
 
 ## Status
 
-Implemented in the repository for the exact Designer Scope. The shared projection identity utility is browser-safe and the Web production build passes with standalone output disabled. The default standalone packaging path remains blocked in this Windows/OneDrive workspace by symlink permissions; MCP read-back and fresh browser acceptance remain explicit verification steps. No production-scale claim is made.
+Implemented in the repository for the exact Designer Scope. The shared projection identity utility is browser-safe, the Data Model list and model-level ER views pass fresh exact-Scope browser acceptance, and the Web production build passes with standalone output disabled. The default standalone packaging path remains blocked in this Windows/OneDrive workspace by symlink permissions. No production-scale claim is made.
 
-已在精确 Designer Scope 的仓库代码中实现。共享投影身份工具已改为浏览器兼容实现，关闭 standalone 输出时 Web 生产构建通过；当前 Windows/OneDrive 工作区的默认 standalone 打包仍因符号链接权限受阻。MCP 回读和新的浏览器验收仍是明确的验证步骤；不宣称已达到生产规模。
+已在精确 Designer Scope 的仓库代码中实现。共享投影身份工具已改为浏览器兼容实现，数据模型列表页和单模型 ER 页已通过精确 Scope 的现场浏览器验收，关闭 standalone 输出时 Web 生产构建通过；当前 Windows/OneDrive 工作区的默认 standalone 打包仍因符号链接权限受阻。不宣称已达到生产规模。
 
 ## Context
 
@@ -52,7 +52,7 @@ The implementation evidence must record focused tests, web typecheck, web build,
 
 ### 状态
 
-已在精确 Designer Scope 的仓库代码中实现。共享投影身份工具已改为浏览器兼容实现，关闭 standalone 输出时 Web 生产构建通过；当前 Windows/OneDrive 工作区的默认 standalone 打包仍因符号链接权限受阻。MCP 回读和新的浏览器验收仍是明确的验证步骤；不宣称已达到生产规模。
+已在精确 Designer Scope 的仓库代码中实现。共享投影身份工具已改为浏览器兼容实现，数据模型列表页和单模型 ER 页已通过精确 Scope 的现场浏览器验收，关闭 standalone 输出时 Web 生产构建通过；当前 Windows/OneDrive 工作区的默认 standalone 打包仍因符号链接权限受阻。不宣称已达到生产规模。
 
 ### 上下文
 
