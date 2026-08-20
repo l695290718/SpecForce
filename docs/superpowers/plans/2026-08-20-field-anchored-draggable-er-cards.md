@@ -424,7 +424,7 @@ git commit -m "feat: integrate draggable er workspace controls"
 
 **Interfaces:**
 - Consumes: all code and focused test outputs from Tasks 1-5.
-- Produces: exact 3000/3010 browser evidence, synchronized ADR/Proposal/Context Pack/API facts, clean reconciliation, and a `CONVERGED` close receipt for `design-change-session:6249b0a9-bd5b-476d-81e6-b78bf7b19afc`.
+- Produces: exact 3000/3010 browser evidence when available, synchronized ADR/Proposal/Context Pack/API facts, clean reconciliation, and a `CONVERGED` or explicitly `BLOCKED` close receipt for the active exact-Scope design session.
 
 - [ ] **Step 1: Run the complete focused verification batch.**
 
@@ -485,7 +485,7 @@ Run with the exact evidence references:
 pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session design-change-session:6249b0a9-bd5b-476d-81e6-b78bf7b19afc --status CONVERGED --evidence "projection-tests=PASS,graph-metadata-tests=PASS,position-tests=PASS,interaction-tests=PASS,layout-tests=PASS,renderer-tests=PASS,workspace-tests=PASS,core-typecheck=PASS,web-typecheck=PASS,web-build=PASS,browser-3000=PASS,browser-3010=PASS,docker-health-3010=200,design-facts-sync=COMPLETE,design-facts-check=PASS,federation-check=blocking-false"
 ```
 
-Expected: the receipt status is `CONVERGED` for the same session ID; do not claim completion if any evidence or MCP write is missing.
+Expected: the receipt status is `CONVERGED` only when both browser ports are verified; otherwise close the same session as `BLOCKED` with the exact browser-policy or deployment retry trigger. Do not claim completion if any evidence or MCP write is missing.
 
 - [ ] **Step 6: Commit the final evidence records.**
 

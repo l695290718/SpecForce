@@ -168,13 +168,13 @@ Browser acceptance on ports 3000 and 3010 must verify a nonblank Canvas, visible
 
 ## 12. Delivery Boundary
 
-This written design records approved behavior only. Implementation has not started under this Design Change Session. Completion requires code, focused tests, browser evidence on 3000 and 3010, matching ADR/Proposal/Context Pack/API updates through MCP, exact-Scope reconciliation, and closure of the same session as `CONVERGED`.
+This written design records approved behavior and the implemented repository slice. Tasks 1-5 are implemented with focused tests, Web typecheck, and a non-standalone Web build. The 3000 fresh-browser inspection is blocked by the browser URL policy after service restart, and 3010 Docker browser acceptance remains pending. Matching ADR/Proposal/Context Pack/API updates through MCP and exact-Scope reconciliation are required before this session can be declared converged.
 
 ---
 
 # 字段锚定、可拖拽的 ER 表卡片
 
-状态：设计讨论已确认，等待书面 Spec 审阅
+状态：设计已确认，Tasks 1-5 已实现；3000 浏览器验收受 URL 安全策略阻塞，3010 Docker 验收待执行
 
 日期：2026-08-20
 
@@ -182,7 +182,7 @@ This written design records approved behavior only. Implementation has not start
 
 所属 Scope：`pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
 
-设计变更会话：`design-change-session:6249b0a9-bd5b-476d-81e6-b78bf7b19afc`
+设计变更会话：`design-change-session:23b28112-6a74-4dde-8367-845e4e977b6d`
 
 ## 1. 问题与纠偏范围
 
