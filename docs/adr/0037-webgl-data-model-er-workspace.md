@@ -2,9 +2,17 @@
 
 ## Status
 
-Implemented in the repository for the exact Designer Scope. The shared projection identity utility is browser-safe, the Data Model list and model-level ER views pass fresh exact-Scope browser acceptance, and the Web production build passes with standalone output disabled. The default standalone packaging path remains blocked in this Windows/OneDrive workspace by symlink permissions. No production-scale claim is made.
+Partially implemented in the repository for the exact Designer Scope. The exact-Scope read contract, flat graph store, basic layout, and WebGL canvas are implemented and browser-safe. Field-bearing entity cards, field-port relationships, camera controls, entity dragging, local position restoration, and the complete inspector remain pending under `design-change-session:6249b0a9-bd5b-476d-81e6-b78bf7b19afc`. No production-scale claim is made.
 
-已在精确 Designer Scope 的仓库代码中实现。共享投影身份工具已改为浏览器兼容实现，数据模型列表页和单模型 ER 页已通过精确 Scope 的现场浏览器验收，关闭 standalone 输出时 Web 生产构建通过；当前 Windows/OneDrive 工作区的默认 standalone 打包仍因符号链接权限受阻。不宣称已达到生产规模。
+已在精确 Designer Scope 的仓库代码中部分实现。精确 Scope 读取契约、扁平图存储、基础布局和 WebGL 画布已经实现并兼容浏览器；带字段行的实体表卡片、字段端口关系、画布相机控制、实体拖拽、本地位置恢复和完整检查器仍在 `design-change-session:6249b0a9-bd5b-476d-81e6-b78bf7b19afc` 下待实施。不宣称已达到生产规模。
+
+## Corrective Clarification (2026-08-20)
+
+The renderer must project flat model, entity, and field facts into draggable entity cards with ordered field rows. Structured field mappings anchor edges to exact field ports; entity-only relationships without mappings anchor to card headers and expose `FIELD_MAPPING_UNCONFIGURED`. Dragged positions are exact-Scope browser preferences, never authored facts. The complete approved behavior and acceptance criteria are recorded in `docs/superpowers/specs/2026-08-20-field-anchored-draggable-er-cards-design.md`.
+
+## 纠偏说明（2026-08-20）
+
+渲染器必须把扁平的模型、实体和字段事实投影为带有序字段行的可拖拽实体表卡片。结构化字段映射必须锚定到精确字段端口；没有映射的实体关系连接表头并显示 `FIELD_MAPPING_UNCONFIGURED`。拖拽位置只是精确 Scope 下的浏览器偏好，绝不是已编写设计事实。完整的已确认行为与验收标准记录在 `docs/superpowers/specs/2026-08-20-field-anchored-draggable-er-cards-design.md`。
 
 ## Context
 
@@ -52,7 +60,7 @@ The implementation evidence must record focused tests, web typecheck, web build,
 
 ### 状态
 
-已在精确 Designer Scope 的仓库代码中实现。共享投影身份工具已改为浏览器兼容实现，数据模型列表页和单模型 ER 页已通过精确 Scope 的现场浏览器验收，关闭 standalone 输出时 Web 生产构建通过；当前 Windows/OneDrive 工作区的默认 standalone 打包仍因符号链接权限受阻。不宣称已达到生产规模。
+已在精确 Designer Scope 的仓库代码中部分实现。精确 Scope 读取、扁平图存储、基础布局和 WebGL 画布已完成浏览器验证；字段表卡片、字段端口连线、相机交互、实体拖拽、刷新位置恢复和完整检查器仍待实现。不宣称已达到生产规模。
 
 ### 上下文
 

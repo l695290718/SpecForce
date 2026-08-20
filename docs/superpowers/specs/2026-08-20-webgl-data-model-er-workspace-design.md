@@ -1,10 +1,16 @@
 # SpecForge WebGL Data Model ER Workspace
 
-Status: Draft for written review  
-Date: 2026-08-20  
-Owning application service: `com.huawei.celon.desiner`  
-Owning Scope: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`  
+Status: Partially implemented; rendering interaction correction approved for written review
+
+Date: 2026-08-20
+
+Owning application service: `com.huawei.celon.desiner`
+
+Owning Scope: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
+
 Design Change Session: `design-change-session:7becc74f-cdf5-4512-8c6d-49d885c58f20`
+
+> Implementation correction: the read contract, flat graph store, basic layout, and WebGL canvas exist, but the current renderer does not yet implement field-bearing entity cards, field-port edges, camera controls, or entity dragging. The approved corrective design is `docs/superpowers/specs/2026-08-20-field-anchored-draggable-er-cards-design.md`, under session `design-change-session:6249b0a9-bd5b-476d-81e6-b78bf7b19afc`.
 
 ## 1. Problem
 
@@ -268,11 +274,17 @@ Each increment must distinguish designed, implemented, locally verified, and pro
 
 # SpecForge WebGL 数据模型 ER 工作区
 
-状态：待书面审阅  
-日期：2026-08-20  
-所属应用服务：`com.huawei.celon.desiner`  
-所属 Scope：`pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`  
+状态：部分实现；渲染交互纠偏设计已确认，等待书面审阅
+
+日期：2026-08-20
+
+所属应用服务：`com.huawei.celon.desiner`
+
+所属 Scope：`pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
+
 设计变更会话：`design-change-session:7becc74f-cdf5-4512-8c6d-49d885c58f20`
+
+> 实现纠偏说明：读取契约、扁平图存储、基础布局和 WebGL 画布已经存在，但当前渲染器尚未实现带字段行的实体表卡片、字段端口连线、画布相机控制和实体拖拽。已确认的纠偏设计见 `docs/superpowers/specs/2026-08-20-field-anchored-draggable-er-cards-design.md`，对应会话为 `design-change-session:6249b0a9-bd5b-476d-81e6-b78bf7b19afc`。
 
 ## 1. 问题
 
