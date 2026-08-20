@@ -9,17 +9,72 @@ import (
 )
 
 type Handler struct {
-	client NebulaClient
+	client   NebulaClient
+	semantic SemanticClient
+	active   ActiveManifestResolver
 }
 
 func NewHandler(client NebulaClient) http.Handler {
-	handler := Handler{client: client}
+	semantic, _ := client.(SemanticClient)
+	active, _ := client.(ActiveManifestResolver)
+	handler := Handler{client: client, semantic: semantic, active: active}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/projections", handler.project)
 	mux.HandleFunc("POST /v1/traversals", handler.traverse)
+	mux.HandleFunc("POST /v1/semantic-projections", handler.projectSemantic)
+	mux.HandleFunc("POST /v1/architecture-queries", handler.queryArchitecture)
 	mux.HandleFunc("GET /v1/checkpoints/{scopeID}", handler.checkpoint)
 	mux.HandleFunc("GET /health", handler.health)
 	return mux
+}
+
+func (h Handler) projectSemantic(writer http.ResponseWriter, request *http.Request) {
+	var projection SemanticProjectionRequest
+	if err := decodeContract(request, &projection); err != nil {
+		writeError(writer, err)
+		return
+	}
+	if err := validateSemanticProjection(projection); err != nil {
+		writeError(writer, err)
+		return
+	}
+	if h.semantic == nil {
+		writeError(writer, contractError{code: "SEMANTIC_GATEWAY_UNAVAILABLE", status: http.StatusServiceUnavailable})
+		return
+	}
+	receipt, err := h.semantic.ProjectSemantic(request.Context(), projection)
+	if err != nil {
+		writeError(writer, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, receipt)
+}
+
+func (h Handler) queryArchitecture(writer http.ResponseWriter, request *http.Request) {
+	var query SemanticQueryRequest
+	if err := decodeContract(request, &query); err != nil {
+		writeError(writer, err)
+		return
+	}
+	if err := validateSemanticQuery(query); err != nil {
+		writeError(writer, err)
+		return
+	}
+	if h.semantic == nil || h.active == nil {
+		writeError(writer, contractError{code: "SEMANTIC_GATEWAY_UNAVAILABLE", status: http.StatusServiceUnavailable})
+		return
+	}
+	identity, err := h.active.ResolveActive(request.Context(), query.Scope)
+	if err != nil {
+		writeError(writer, contractError{code: "ACTIVE_PROJECTION_UNAVAILABLE", status: http.StatusServiceUnavailable})
+		return
+	}
+	result, err := h.semantic.QueryArchitecture(request.Context(), query, identity)
+	if err != nil {
+		writeError(writer, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, result)
 }
 
 func (h Handler) project(writer http.ResponseWriter, request *http.Request) {
@@ -193,6 +248,76 @@ func validateProjectionIdentity(identity *ProjectionIdentity) error {
 		return contractError{code: "PROJECTION_IDENTITY_REQUIRED", status: http.StatusBadRequest}
 	}
 	return nil
+}
+
+func validateSemanticProjection(projection SemanticProjectionRequest) error {
+	if err := validateScope(projection.Scope); err != nil {
+		return err
+	}
+	if projection.ManifestStatus != "BUILDING" {
+		return contractError{code: "SEMANTIC_MANIFEST_NOT_BUILDING", status: http.StatusBadRequest}
+	}
+	if err := validateProjectionIdentity(&projection.Projection); err != nil {
+		return err
+	}
+	if projection.Source.SemanticSchemaVersion != SemanticSchemaVersion || !semanticSourceBindingComplete(projection.Source) {
+		return contractError{code: "SEMANTIC_SOURCE_BINDING_INVALID", status: http.StatusBadRequest}
+	}
+	for _, vertex := range projection.Vertices {
+		if !sameScope(projection.Scope, vertex.Scope) {
+			return contractError{code: "SCOPE_MISMATCH", status: http.StatusBadRequest}
+		}
+		if vertex.ID == "" || vertex.Family == "" || vertex.ContentDigest == "" {
+			return contractError{code: "SEMANTIC_VERTEX_INVALID", status: http.StatusBadRequest}
+		}
+		if !validSemanticVertexFamily(vertex.Family) {
+			return contractError{code: "SEMANTIC_VERTEX_FAMILY_INVALID", status: http.StatusBadRequest}
+		}
+	}
+	for _, edge := range projection.Edges {
+		if !sameScope(projection.Scope, edge.Scope) {
+			return contractError{code: "SCOPE_MISMATCH", status: http.StatusBadRequest}
+		}
+		if edge.ID == "" || edge.SourceID == "" || edge.TargetID == "" || edge.Code == "" || edge.ContentDigest == "" || !validSemanticEdgeFamily(edge.Family) {
+			return contractError{code: "SEMANTIC_EDGE_INVALID", status: http.StatusBadRequest}
+		}
+		ordinal, err := strconv.ParseInt(edge.ProjectionOrdinal, 10, 64)
+		if err != nil || ordinal <= 0 {
+			return contractError{code: "PROJECTION_ORDINAL_INVALID", status: http.StatusBadRequest}
+		}
+	}
+	return nil
+}
+
+func validateSemanticQuery(query SemanticQueryRequest) error {
+	if err := validateScope(query.Scope); err != nil {
+		return err
+	}
+	if strings.TrimSpace(query.AssetType) == "" || strings.TrimSpace(query.AssetID) == "" {
+		return contractError{code: "SEMANTIC_ASSET_REQUIRED", status: http.StatusBadRequest}
+	}
+	budget := query.Budget
+	if budget.MaxAssertions <= 0 || budget.MaxTargets <= 0 || budget.MaxTraceSteps <= 0 || budget.TimeoutMS <= 0 || budget.MaxPayloadBytes <= 0 {
+		return contractError{code: "SEMANTIC_QUERY_BUDGET_INVALID", status: http.StatusBadRequest}
+	}
+	return nil
+}
+
+func semanticSourceBindingComplete(source SemanticSourceBinding) bool {
+	return source.SourceProjectionManifestID != "" && source.SourceCoverageManifestID != "" && source.KnowledgeGenerationID != "" && source.CoverageGenerationID != "" && source.RelationshipVersion != "" && source.CatalogVersion != "" && source.CatalogDigest != ""
+}
+
+func validSemanticVertexFamily(family string) bool {
+	return family == "DesignAsset" || family == "KnowledgeAssertion" || family == "ArchitectureUnit"
+}
+
+func validSemanticEdgeFamily(family string) bool {
+	switch family {
+	case "ASSERTION_SUBJECT", "CLASSIFIED_AS", "REALIZED_BY", "DEPLOYED_ON", "ASSERTION_RELATION", "ASSET_RELATION", "ARCHITECTURE_RELATION":
+		return true
+	default:
+		return false
+	}
 }
 
 func sameProjection(left, right ProjectionIdentity) bool {

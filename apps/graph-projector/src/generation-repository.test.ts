@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { PrismaNebulaGenerationRepository, type BuildingManifestInput, type GenerationScope } from "./generation-repository.js";
+import type { SemanticSourceBinding } from "./generation-repository.js";
 
 const scope: GenerationScope = {
   enterpriseId: "enterprise-1",
@@ -18,12 +19,41 @@ const input = (suffix: string): BuildingManifestInput => ({
   contentDigest: `digest-${suffix}`
 });
 
+const semanticBinding: SemanticSourceBinding = {
+  sourceProjectionManifestId: "projection-manifest:designer:v6",
+  sourceCoverageManifestId: "coverage-generation:designer:3a:v13",
+  knowledgeGenerationId: "knowledge-generation:designer:v6",
+  coverageGenerationId: "coverage-generation:designer:3a:v13",
+  relationshipVersion: "graph-version:designer:42",
+  catalogVersion: "catalog:designer:307",
+  catalogDigest: "sha256:catalog-307",
+  semanticSchemaVersion: "nebula.3a.semantic.v1"
+};
+
 describe("PrismaNebulaGenerationRepository", () => {
   it("creates only one BUILDING generation per Scope", async () => {
     const prisma = fakePrisma();
     const repository = new PrismaNebulaGenerationRepository(prisma as never);
     await repository.createBuilding(scope, input("one"));
     await expect(repository.createBuilding(scope, input("two"))).rejects.toThrow("GENERATION_BUILD_CONFLICT");
+  });
+
+  it("persists explicit source binding fields for semantic generations", async () => {
+    const prisma = fakePrisma();
+    const repository = new PrismaNebulaGenerationRepository(prisma as never);
+    await repository.createBuilding(scope, { ...input("semantic"), semanticSourceBinding: semanticBinding });
+    expect(prisma.nebulaProjectionManifest.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        sourceProjectionManifestId: semanticBinding.sourceProjectionManifestId,
+        sourceCoverageManifestId: semanticBinding.sourceCoverageManifestId,
+        knowledgeGenerationId: semanticBinding.knowledgeGenerationId,
+        coverageGenerationId: semanticBinding.coverageGenerationId,
+        relationshipVersion: semanticBinding.relationshipVersion,
+        catalogVersion: semanticBinding.catalogVersion,
+        catalogDigest: semanticBinding.catalogDigest,
+        semanticSchemaVersion: semanticBinding.semanticSchemaVersion
+      })
+    }));
   });
 
   it("does not publish before validation", async () => {

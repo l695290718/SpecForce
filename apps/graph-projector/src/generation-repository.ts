@@ -8,6 +8,17 @@ export interface GenerationScope {
   scopePath: string;
 }
 
+export interface SemanticSourceBinding {
+  sourceProjectionManifestId: string;
+  sourceCoverageManifestId: string;
+  knowledgeGenerationId: string;
+  coverageGenerationId: string;
+  relationshipVersion: string;
+  catalogVersion: string;
+  catalogDigest: string;
+  semanticSchemaVersion: "nebula.3a.semantic.v1";
+}
+
 export interface BuildingManifestInput {
   id: string;
   generationId: string;
@@ -20,6 +31,7 @@ export interface BuildingManifestInput {
   expectedCounts?: Prisma.InputJsonValue;
   bucketDigests?: Prisma.InputJsonValue;
   contentDigest: string;
+  semanticSourceBinding?: SemanticSourceBinding;
 }
 
 export interface NebulaGenerationHead {
@@ -69,7 +81,15 @@ export class PrismaNebulaGenerationRepository {
           sourceWatermarks: input.sourceWatermarks ?? {},
           expectedCounts: input.expectedCounts ?? {},
           bucketDigests: input.bucketDigests ?? {},
-          contentDigest: input.contentDigest
+          contentDigest: input.contentDigest,
+          sourceProjectionManifestId: input.semanticSourceBinding?.sourceProjectionManifestId,
+          sourceCoverageManifestId: input.semanticSourceBinding?.sourceCoverageManifestId,
+          knowledgeGenerationId: input.semanticSourceBinding?.knowledgeGenerationId,
+          coverageGenerationId: input.semanticSourceBinding?.coverageGenerationId,
+          relationshipVersion: input.semanticSourceBinding?.relationshipVersion,
+          catalogVersion: input.semanticSourceBinding?.catalogVersion,
+          catalogDigest: input.semanticSourceBinding?.catalogDigest,
+          semanticSchemaVersion: input.semanticSourceBinding?.semanticSchemaVersion
         }
       });
 

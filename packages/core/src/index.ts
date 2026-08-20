@@ -27,6 +27,8 @@ export * from "./relationships/ontology";
 export * from "./relationships/extract";
 export * from "./graph-store/types";
 export * from "./graph/projection-generation";
+export * from "./graph/semantic-identity";
+export * from "./graph/semantic-projection";
 export * from "./federation";
 export * from "./knowledge";
 export * from "./scanner";

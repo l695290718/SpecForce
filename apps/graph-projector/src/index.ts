@@ -12,6 +12,7 @@ export {
   type ProjectionScope
 } from "./projector.js";
 export { PrismaProjectionRepository, checkpointPartitionIdForEvent } from "./repository.js";
+export { PrismaSemanticProjectionSource, type SemanticGenerationScope, type SemanticPage, type SemanticSourceBinding } from "./semantic-source-repository.js";
 export {
   compareGenerationParity,
   type GenerationParityOptions,

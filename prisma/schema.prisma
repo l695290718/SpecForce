@@ -1081,6 +1081,14 @@ model NebulaProjectionManifest {
   profileVersion          String
   projectionSchemaVersion String
   status                  String
+  sourceProjectionManifestId String?
+  sourceCoverageManifestId   String?
+  knowledgeGenerationId      String?
+  coverageGenerationId       String?
+  relationshipVersion        String?
+  catalogVersion             String?
+  catalogDigest              String?
+  semanticSchemaVersion      String?
   sourceWatermarks        Json     @default("{}") @db.JsonB
   expectedCounts          Json     @default("{}") @db.JsonB
   bucketDigests            Json     @default("{}") @db.JsonB
