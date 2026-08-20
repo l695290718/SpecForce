@@ -2,9 +2,9 @@
 
 ## Status
 
-Implemented in the repository for the exact Designer Scope. The field-bearing entity cards, field-port relationships, camera controls, entity dragging, exact-Scope local position restoration, bilingual semantic fallback, and inspector are implemented. Focused tests, Web typecheck, the non-standalone Web build, Docker image rebuild, and port 3010 health pass. Fresh in-app browser acceptance after restarting port 3000 was blocked by the browser URL policy; 3010 browser interaction acceptance remains pending. No production-scale claim is made.
+Implemented in the repository for the exact Designer Scope. The field-bearing entity cards, field-port relationships, bounded labels, camera controls, entity dragging, exact-Scope local position restoration, bilingual semantic fallback, inspector, complete cursor-page aggregation, and stale-ledger suppression are implemented. The current MCP catalog contains 12 v2 self-design models, 40 entities, and 79 fields; legacy ambiguous field ownership is rejected instead of silently attached. Focused tests and Web typecheck pass. No production-scale claim is made.
 
-已在精确 Designer Scope 的仓库代码中实现。带字段行的实体表卡片、字段端口关系、画布相机控制、实体拖拽、精确 Scope 本地位置恢复、双语语义回退和检查器已经实现。聚焦测试、Web 类型检查、非 standalone Web 构建、Docker 镜像重建和 3010 健康检查通过；3000 端口重启后的新鲜应用内浏览器验收被浏览器 URL 安全策略阻塞，3010 浏览器交互验收仍待执行；不宣称已达到生产规模。
+已在精确 Designer Scope 的仓库代码中实现。带字段行的实体表卡片、字段端口关系、有界标签、画布相机控制、实体拖拽、精确 Scope 本地位置恢复、双语语义回退、检查器、完整游标分页聚合和旧账本过滤已经实现。当前 MCP 目录包含 12 个 v2 自设计数据模型、40 个实体和 79 个字段；未知字段归属会被拒绝，不会静默挂载。聚焦测试和 Web 类型检查通过；不宣称已达到生产规模。
 
 ## Corrective Clarification (2026-08-20)
 
@@ -27,18 +27,24 @@ The Data Model page previously exposed a flat field table and narrative relation
 3. Add `ER Diagram` and `Field Catalog` views to Data Model detail pages and `List` and `Global ER` views to Data Model list pages. URL state records view, graph mode, root model, filters, and selection.
 4. Keep the browser read-only. Data Model v2, stable IDs, composite relations, and atomic MCP change sets remain the authoring contract.
 5. Render entities and fields as semantic records and relation mappings as grouped typed edges. Unknown ownership, stale waterlines, partial results, WebGL failure, and layout degradation remain visible states rather than inferred success.
+6. Keep field rows visible through normal working zoom, bound long model/entity/field labels to card and canvas dimensions, and expose explicit zoom controls plus pointer-based canvas pan. The complete graph reader follows signed cursors and refuses a changed waterline.
+7. Treat Data Model v2 `entityId` as the only authored field ownership source. For authored v2 models, stale ledger entity/field nodes and relationship rows are suppressed; for ambiguous legacy ownership, the projection emits `FIELD_OWNERSHIP_AMBIGUOUS` and renders no guessed field attachment.
 
 1. 使用专用 PixiJS WebGL ER 工作区，并始终提供语义列表回退。ELK 兼容的确定性布局受声明的客户端容量限制。
 2. 通过 `GET /api/data-model-graph` 按精确应用服务 Scope 读取图事实，并绑定签名的双水位。PostgreSQL 保持权威，图数据库只能是派生投影。
 3. 数据模型详情页增加“ER 图”和“字段目录”，数据模型列表页增加“列表”和“全局 ER”。URL 状态记录视图、图范围、根模型、过滤器和选择项。
 4. 浏览器保持只读。数据模型 v2、稳定 ID、复合关系和原子 MCP 变更集保持为写入契约。
 5. 实体与字段以语义记录展示，关系映射以分组的有类型边展示。未知归属、过期水位、部分结果、WebGL 失败和布局降级都必须以显式状态呈现，不得推断为成功。
+6. 正常工作缩放范围内保持字段行可见；长模型名、实体名和字段名必须受卡片与画布尺寸约束，并提供明确的缩放控件和基于指针的画布平移。完整图读取器必须跟随签名游标，并拒绝水位变化。
+7. 将数据模型 v2 的 `entityId` 作为唯一的字段归属事实。对于已编写的 v2 模型，过滤掉旧账本实体、字段节点和关系行；对于字段归属不明确的旧模型，投影必须发出 `FIELD_OWNERSHIP_AMBIGUOUS`，不得猜测挂载字段。
 
 ## Consequences
 
 The page can explain field-level relationships and keep the current Scope visible while preserving the existing list and field catalog. Large graphs degrade to a verified semantic subset or fallback state; this is an operational contract, not an assertion of unlimited browser capacity. Existing v1 models remain readable but require an MCP upgrade before mutation.
+The migration is an explicit MCP operation, not a browser-side write. It is idempotent by migration key and must be rerun after restoring a database snapshot that predates the v2 field ownership facts.
 
 页面可以解释字段级关系，并在保留现有列表和字段目录的同时保持当前 Scope 可见。大型图谱会降级为已验证的语义子集或回退状态；这是运行契约，不是浏览器无限容量的声明。现有 v1 模型仍可读取，但变更前必须通过 MCP 升级。
+迁移是显式的 MCP 操作，不是浏览器写入。迁移键保证幂等；如果恢复到没有 v2 字段归属事实的数据库快照，必须重新执行迁移。
 
 ## Alternatives
 

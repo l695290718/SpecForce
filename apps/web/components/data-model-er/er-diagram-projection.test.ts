@@ -78,4 +78,12 @@ describe("projectErDiagram", () => {
     expect(projection.relations).toHaveLength(0);
     expect(projection.qualityIssues[0]).toMatchObject({ code: "ENDPOINT_NOT_FOUND", relationId: "missing", targetId: "dataField:account.missing" });
   });
+
+  it("reports ambiguous legacy fields instead of assigning them to a guessed entity", () => {
+    const legacyField = node("dataField:legacy.email", "dataField", "email", { dataType: "text", ordinal: 0 });
+    const projection = projectErDiagram(response([account, order, legacyField], []));
+
+    expect(projection.entities.every((entity) => entity.fields.length === 0)).toBe(true);
+    expect(projection.qualityIssues).toContainEqual(expect.objectContaining({ code: "FIELD_OWNERSHIP_AMBIGUOUS", fieldId: legacyField.id, modelId: "model:orders" }));
+  });
 });

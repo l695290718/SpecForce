@@ -22,6 +22,7 @@ describe("er graph store", () => {
 
   it("downgrades to semantic skeleton above the declared capacity", () => {
     expect(deriveErLod(501, 0, 1, 500).lod).toBe("SKELETON");
-    expect(deriveErLod(2, 1, 0.4).showFields).toBe(false);
+    expect(deriveErLod(2, 1, 0.4).showFields).toBe(true);
+    expect(deriveErLod(2, 1, 0.2).showFields).toBe(false);
   });
 });

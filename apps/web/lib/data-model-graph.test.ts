@@ -21,6 +21,17 @@ describe("scoped data model graph", () => {
     expect(field?.metadata).toMatchObject({ entityId: "entity-1", displayName: "ID", dataType: "uuid", ordinal: 0, primaryKey: true, unique: true, nullable: false, generated: true, classification: "identifier", sensitiveLevel: "internal", example: "00000000-0000-0000-0000-000000000001", owner: "team" });
   });
 
+  it("does not reintroduce stale ledger nodes for an authored model", async () => {
+    const result = await getDataModelGraph({ architectureScope: scope, subject: "tester", mode: "MODEL", rootModelId: "model-a" }, undefined, repository([model("model-a", "Order")], [
+      { nodeType: "dataEntity", logicalId: "Order", rootAssetId: "model-a", displayName: "Order", metadata: {} },
+      { nodeType: "dataField", logicalId: "Order.id", rootAssetId: "model-a", displayName: "id", metadata: {} }
+    ], [{ dbId: 1, relationType: "CONTAINS", sourceNode: { nodeType: "dataEntity", logicalId: "Order", rootAssetId: "model-a" }, targetNode: { nodeType: "dataField", logicalId: "Order.id", rootAssetId: "model-a" }, metadata: {} }]));
+
+    expect(result.nodes.filter((node) => node.nodeType === "dataEntity")).toHaveLength(1);
+    expect(result.nodes.filter((node) => node.nodeType === "dataField")).toHaveLength(1);
+    expect(result.edges).toHaveLength(2);
+  });
+
   it("rejects a cursor signed for another subject", async () => {
     const first = await getDataModelGraph({ architectureScope: scope, subject: "tester", mode: "SCOPE", pageSize: 1 }, undefined, repository([model("model-a", "Order")]));
     const cursor = first.nextCursor;

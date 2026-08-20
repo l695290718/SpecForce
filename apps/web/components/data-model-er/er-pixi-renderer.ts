@@ -12,6 +12,9 @@ import {
   pointerMove,
   pointerUp,
   reduceErPointer,
+  clampCameraScale,
+  screenToWorld,
+  zoomAtPoint,
   type ErCamera,
   type ErPoint,
   type ErPointerState
@@ -19,6 +22,7 @@ import {
 import { layoutErDiagramWithFallback, type ErLayoutResult } from "./er-layout";
 import { createErPositionStore, ER_POSITION_SCHEMA_VERSION, type ErEntityPositions, type ErPositionKey, type ErPositionStore } from "./er-position-store";
 import { ErTextureCache } from "./er-texture-cache";
+import { fitErLabel, getErHeaderLabelWidths } from "./er-label-fitting";
 
 export type ErRendererFailure = "WEBGL_UNAVAILABLE" | "WEBGL_CONTEXT_LOST" | "LAYOUT_DEGRADED" | "CLIENT_CAPACITY_EXCEEDED";
 
@@ -172,13 +176,13 @@ export class ErPixiRenderer {
       await app.init({ preference: "webgl", antialias: true, backgroundAlpha: 0, resizeTo: host });
       app.stage.eventMode = "static";
       app.stage.hitArea = new Rectangle(0, 0, Math.max(1, host.clientWidth), Math.max(1, host.clientHeight));
+      this.app = app;
       this.root.eventMode = "static";
       this.root.hitArea = new Rectangle(0, 0, Math.max(1, host.clientWidth), Math.max(1, host.clientHeight));
       this.root.addChild(this.routeLayer, this.entityLayer);
       this.attachPointerListeners();
       app.stage.addChild(this.root);
       host.replaceChildren(app.canvas);
-      this.app = app;
       app.canvas.addEventListener("webglcontextlost", this.handleContextLost);
       app.canvas.addEventListener("webglcontextrestored", this.handleContextRestored);
       app.canvas.addEventListener("wheel", this.handleWheel, { passive: false });
@@ -233,6 +237,16 @@ export class ErPixiRenderer {
   }
 
   resetCamera(): ErCamera { return this.setCamera(DEFAULT_ER_CAMERA); }
+
+  zoomIn(anchor = this.viewportCenter()): ErCamera { return this.setCamera(zoomAtPoint(this.camera, anchor, -200)); }
+
+  zoomOut(anchor = this.viewportCenter()): ErCamera { return this.setCamera(zoomAtPoint(this.camera, anchor, 200)); }
+
+  setZoom(scale: number, anchor = this.viewportCenter()): ErCamera {
+    const nextScale = clampCameraScale(scale);
+    const world = screenToWorld(anchor, this.camera);
+    return this.setCamera({ scale: nextScale, x: anchor.x - world.x * nextScale, y: anchor.y - world.y * nextScale });
+  }
 
   resetLayout(): void {
     if (this.positionKey) this.positionStore.clear(this.positionKey);
@@ -312,8 +326,9 @@ export class ErPixiRenderer {
     header.roundRect(entity.x, entity.y, entity.width, entity.headerHeight, 6).fill(entity.selected ? 0xccfbf1 : 0xf0fdfa);
     header.rect(entity.x, entity.y + entity.headerHeight - 6, entity.width, 6).fill(entity.selected ? 0xccfbf1 : 0xf0fdfa);
     card.addChild(header);
-    card.addChild(this.text(entity.entity.displayName, entity.x + 12, entity.y + 9, { fill: 0x0f172a, fontSize: 14, fontWeight: "600" }));
-    card.addChild(this.text(entity.entity.physicalName ?? `${entity.entity.fields.length} ${this.options.locale === "zh" ? "fields" : "fields"}`, entity.x + 12, entity.y + 28, { fill: 0x475569, fontSize: 10 }));
+    const labelWidths = getErHeaderLabelWidths(entity.width);
+    card.addChild(this.text(fitErLabel(entity.entity.displayName, labelWidths.title), entity.x + 12, entity.y + 9, { fill: 0x0f172a, fontSize: 14, fontWeight: "600" }));
+    card.addChild(this.text(fitErLabel(entity.entity.physicalName ?? `${entity.entity.fields.length} fields`, labelWidths.subtitle), entity.x + 12, entity.y + 28, { fill: 0x475569, fontSize: 10 }));
     if (showFields) for (const field of entity.fields) this.drawField(card, field);
     this.entityLayer.addChild(card);
   }
@@ -401,17 +416,17 @@ export class ErPixiRenderer {
   };
 
   private attachPointerListeners(): void {
-    this.root.on("pointerdown", this.handlePointerDown);
-    this.root.on("globalpointermove", this.handlePointerMove);
-    this.root.on("pointerup", this.handlePointerUp);
-    this.root.on("pointerupoutside", this.handlePointerUp);
+    this.app?.stage.on("pointerdown", this.handlePointerDown);
+    this.app?.stage.on("globalpointermove", this.handlePointerMove);
+    this.app?.stage.on("pointerup", this.handlePointerUp);
+    this.app?.stage.on("pointerupoutside", this.handlePointerUp);
   }
 
   private detachPointerListeners(): void {
-    this.root.off("pointerdown", this.handlePointerDown);
-    this.root.off("globalpointermove", this.handlePointerMove);
-    this.root.off("pointerup", this.handlePointerUp);
-    this.root.off("pointerupoutside", this.handlePointerUp);
+    this.app?.stage.off("pointerdown", this.handlePointerDown);
+    this.app?.stage.off("globalpointermove", this.handlePointerMove);
+    this.app?.stage.off("pointerup", this.handlePointerUp);
+    this.app?.stage.off("pointerupoutside", this.handlePointerUp);
   }
 
   private relayoutWithPositions(): void {
@@ -430,12 +445,14 @@ export class ErPixiRenderer {
   private selectionForId(id: string): ErRendererSelection {
     const field = this.projection?.entities.flatMap((entity) => entity.fields).find((candidate) => candidate.id === id);
     if (field) return { fieldId: id, entityId: field.entityId };
-    if (this.projection?.entities.some((entity) => entity.id === id)) return { entityId: id };
+    const entity = this.projection?.entities.find((candidate) => candidate.id === id || candidate.logicalId === id.replace(/^dataEntity:/u, "") || `dataEntity:${candidate.rootModelId}.${candidate.displayName}` === id);
+    if (entity) return { entityId: entity.id };
     if (this.projection?.relations.some((relation) => relation.id === id || relation.relationId === id)) return { relationId: id };
     return {};
   }
 
   private buildPositionKey(projection: ErDiagramProjection): ErPositionKey { return { ...projection.identity, schemaVersion: ER_POSITION_SCHEMA_VERSION }; }
+  private viewportCenter(): ErPoint { return { x: (this.app?.screen.width ?? this.host?.clientWidth ?? 1) / 2, y: (this.app?.screen.height ?? this.host?.clientHeight ?? 1) / 2 }; }
   private eventPoint(event: PixiPointerEventLike): ErPoint { return { x: event.global.x, y: event.global.y }; }
   private currentLod() { return deriveErLod(this.state?.snapshot.nodes.length ?? 0, this.state?.snapshot.edges.length ?? 0, this.camera.scale); }
   private fail(failure: ErRendererFailure, lod: ReturnType<typeof deriveErLod>): ErRendererStatus { const status = { ready: false, failure, lod }; this.options.onStatus?.(status); return status; }

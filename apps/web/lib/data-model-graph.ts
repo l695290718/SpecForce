@@ -185,6 +185,7 @@ function latestDataModels(revisions: unknown[], fallbackRows: unknown[]): DataMo
 function materializeGraph(assets: DataModel[], ledgerNodes: unknown[], relationships: unknown[], scope: ArchitectureScopeRef, locale: "en" | "zh"): { nodes: DataModelGraphNode[]; edges: DataModelGraphEdge[] } {
   const nodes = new Map<string, DataModelGraphNode>();
   const edges = new Map<string, DataModelGraphEdge>();
+  const authoredRootModelIds = new Set(assets.map((asset) => asset.id));
   for (const asset of assets) {
     const extracted = extractAssetGraph("dataModel", { ...asset, architectureScope: scope });
     for (const node of extracted.nodes) nodes.set(nodeKey(node), graphNodeFromIdentity(node, asset, locale));
@@ -194,6 +195,7 @@ function materializeGraph(assets: DataModel[], ledgerNodes: unknown[], relations
     const node = asRecord(row);
     const nodeType = String(node.nodeType) as DataModelGraphNode["nodeType"];
     if (!["dataModel", "dataEntity", "dataField"].includes(nodeType)) continue;
+    if ((nodeType === "dataEntity" || nodeType === "dataField") && authoredRootModelIds.has(String(node.rootAssetId))) continue;
     const identity = { nodeType, logicalId: String(node.logicalId), rootAssetId: String(node.rootAssetId), displayName: String(node.displayName ?? node.logicalId), external: true };
     const key = `${nodeType}:${identity.logicalId}`;
     if (!nodes.has(key)) nodes.set(key, { id: key, nodeType, logicalId: identity.logicalId, rootModelId: identity.rootAssetId, displayName: identity.displayName, external: true, scope, metadata: asRecord(node.metadata) });
@@ -204,6 +206,7 @@ function materializeGraph(assets: DataModel[], ledgerNodes: unknown[], relations
     if (relationType !== "REFERENCES" && relationType !== "CONTAINS") continue;
     const sourceNode = asRecord(value.sourceNode);
     const targetNode = asRecord(value.targetNode);
+    if (authoredRootModelIds.has(String(sourceNode.rootAssetId)) || authoredRootModelIds.has(String(targetNode.rootAssetId))) continue;
     const source = nodeRefFromLedger(sourceNode);
     const target = nodeRefFromLedger(targetNode);
     if (!source || !target) continue;

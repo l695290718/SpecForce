@@ -1,6 +1,6 @@
 "use client";
 
-import { Maximize2, RefreshCw, RotateCcw } from "lucide-react";
+import { Maximize2, Minus, Plus, RefreshCw, RotateCcw } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DataModelGraphResponse } from "@specforge/core";
@@ -9,6 +9,7 @@ import { createErGraphState, deriveErLod, mergeErGraphResponses, selectErGraph, 
 import { projectErDiagram, type ErDiagramProjection } from "./er-diagram-projection";
 import { layoutErDiagramWithFallback, type ErLayoutResult } from "./er-layout";
 import { ErPixiRenderer, type ErRendererFailure, type ErRendererStatus } from "./er-pixi-renderer";
+import { DEFAULT_ER_CAMERA, type ErCamera } from "./er-interaction";
 import { ErInspector } from "./er-inspector";
 
 export interface DataModelErWorkspaceProps {
@@ -82,6 +83,7 @@ export function DataModelErWorkspace({ responses, locale = "en", title }: DataMo
   const [search, setSearch] = useState("");
   const [retryKey, setRetryKey] = useState(0);
   const [status, setStatus] = useState<ErRendererStatus>({ ready: false, lod: deriveErLod(snapshot?.nodes.length ?? 0, snapshot?.edges.length ?? 0) });
+  const [camera, setCamera] = useState<ErCamera>(DEFAULT_ER_CAMERA);
   const [failure, setFailure] = useState<ErRendererFailure>();
   const state = useMemo<ErGraphState | undefined>(() => {
     if (!snapshot) return undefined;
@@ -103,6 +105,7 @@ export function DataModelErWorkspace({ responses, locale = "en", title }: DataMo
       onEntitySelect: selectFromRenderer,
       onFieldSelect: selectFromRenderer,
       onRelationSelect: selectFromRenderer,
+      onCameraChange: setCamera,
     });
     rendererRef.current = renderer;
     let active = true;
@@ -152,13 +155,16 @@ export function DataModelErWorkspace({ responses, locale = "en", title }: DataMo
       <label className="flex items-center gap-2 text-xs text-muted"><span>{copy("er.find")}</span><input aria-label={copy("er.find")} className="rounded border border-border px-2 py-1 text-ink" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={copy("er.findPlaceholder")} /></label>
     </header>
     <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface/40 px-4 py-2" aria-label={copy("er.controls")}>
+      <button aria-label={copy("er.zoomOut")} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-white text-muted disabled:cursor-not-allowed disabled:opacity-50" disabled={!showControls} onClick={() => rendererRef.current?.zoomOut()} title={copy("er.zoomOut")} type="button"><Minus size={14} aria-hidden="true" /></button>
+      <span className="min-w-12 text-center font-mono text-xs text-muted" aria-live="polite">{Math.round(camera.scale * 100)}%</span>
+      <button aria-label={copy("er.zoomIn")} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-white text-muted disabled:cursor-not-allowed disabled:opacity-50" disabled={!showControls} onClick={() => rendererRef.current?.zoomIn()} title={copy("er.zoomIn")} type="button"><Plus size={14} aria-hidden="true" /></button>
       <button className="inline-flex items-center gap-1 rounded-md border border-border bg-white px-2 py-1.5 text-xs text-muted disabled:cursor-not-allowed disabled:opacity-50" disabled={!showControls} onClick={() => rendererRef.current?.fitToView()} title={copy("er.fit")} type="button"><Maximize2 size={14} aria-hidden="true" />{copy("er.fit")}</button>
       <button className="inline-flex items-center gap-1 rounded-md border border-border bg-white px-2 py-1.5 text-xs text-muted disabled:cursor-not-allowed disabled:opacity-50" disabled={!showControls} onClick={() => rendererRef.current?.resetCamera()} title={copy("er.resetCamera")} type="button"><RotateCcw size={14} aria-hidden="true" />{copy("er.resetCamera")}</button>
       <button className="inline-flex items-center gap-1 rounded-md border border-border bg-white px-2 py-1.5 text-xs text-muted disabled:cursor-not-allowed disabled:opacity-50" disabled={!showControls} onClick={() => rendererRef.current?.resetLayout()} title={copy("er.resetLayout")} type="button"><RotateCcw size={14} aria-hidden="true" />{copy("er.resetLayout")}</button>
       <button className="ml-auto inline-flex items-center gap-1 rounded-md border border-border bg-white px-2 py-1.5 text-xs text-muted" onClick={retryRenderer} title={copy("er.retry")} type="button"><RefreshCw size={14} aria-hidden="true" />{copy("er.retry")}</button>
       <span className="text-[11px] text-muted">{copy("er.readOnly")}</span>
     </div>
-    <div ref={canvasRef} className="relative min-h-[32rem] bg-slate-50" data-testid="data-model-er-canvas">
+    <div ref={canvasRef} className="relative min-h-[32rem] touch-none select-none bg-slate-50" data-testid="data-model-er-canvas">
       {fallbackReason ? <div className="absolute inset-x-4 top-4 z-10 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950" role="status"><strong>{semanticFallback ? copy("er.semanticFallback") : copy("er.status")}</strong><span className="ml-2">{fallbackReason}</span></div> : null}
     </div>
     {semanticFallback ? <div className="border-t border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="status"><strong>{copy("er.semanticFallback")}</strong><span className="ml-2">{fallbackReason ?? copy("er.loading")}</span></div> : null}

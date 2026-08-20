@@ -2101,9 +2101,9 @@
                           { "sourceType": "proposal", "sourceId": "proposal-webgl-data-model-er-workspace", "targetType": "api", "targetId": "api-specforge-data-model-graph-query", "relationType": "IMPACTS" }
                       ],
                       "owner": "SpecForge Architecture and Web Runtime",
-                      "status": "Repository implementation complete for field-aware draggable ER cards and inspector; exact-Scope MCP synchronization, local verification, Docker rebuild, and 3010 health are complete; fresh 3000 browser acceptance is blocked by the browser URL policy after restart and 3010 browser interaction acceptance remains pending",
+                      "status": "Repository implementation complete for field-aware draggable ER cards, bounded labels, camera controls, complete cursor-page aggregation, stale-ledger suppression, and v2 field ownership; exact-Scope MCP synchronization and local verification are complete; no production-scale claim is made",
                       "reason": "The Data Model surface needs a dedicated field-bearing ER workspace while PostgreSQL remains authoritative and the browser remains read-only.",
-                      "retryTrigger": "Retry 3000 and 3010 in-app browser acceptance when the browser URL policy permits the local URLs; Docker rebuild and 3010 health are already verified.",
+                      "retryTrigger": "Re-run the explicit MCP v2 data-model migration after restoring a database snapshot that predates the field ownership facts; production-scale and external identity verification remain separate work.",
                       "localizedContent": {
                           "en": {
                               "decision": "Use a bounded PixiJS WebGL ER workspace with a semantic fallback, exact-Scope graph reads, dual waterlines, and MCP-only authoring.",
@@ -2116,7 +2116,7 @@
                       },
                       "evidence": [
                           { "command": "pnpm exec vitest run --exclude \".worktrees/**\" --exclude \".pnpm-store/**\" packages/core apps/web", "result": "76 tests passed across 21 files, including ER, graph query, and manifest coverage." },
-                          { "command": "pnpm exec vitest run packages/core apps/web/components/data-model-er apps/web/lib/data-model-graph.test.ts apps/web/app/api/data-model-graph/route.test.ts --exclude \".worktrees/**\" --exclude \".pnpm-store/**\"", "result": "239 tests passed across 41 files after the browser-safe projection hashing fix." },
+                          { "command": "pnpm exec vitest run packages/core/src/__tests__/data-model-v2.test.ts apps/web/components/data-model-er apps/web/lib/data-model-graph.test.ts apps/web/app/api/data-model-graph/route.test.ts", "result": "48 tests passed across 13 files, covering v2 ownership, cursor aggregation, stale-ledger suppression, label fitting, camera controls, renderer behavior, and API projection." },
                           { "command": "pnpm --filter @specforge/web typecheck", "result": "Passed." },
                           { "command": "SPECFORGE_NEXT_STANDALONE=0 pnpm --filter @specforge/web build", "result": "Passed compilation, lint/type validation, static generation, and route optimization; pure TypeScript SHA-256 removed the browser-incompatible node:crypto import chain." },
                           { "command": "pnpm --filter @specforge/web build", "result": "Compilation and static generation passed; final standalone traced-file packaging was blocked by Windows/OneDrive EPERM while creating dependency symlinks." },
@@ -2125,6 +2125,8 @@
                           { "command": "Invoke-WebRequest -UseBasicParsing http://localhost:3000/assets/data-models?scope=com.huawei.celon.desiner^&view=er", "result": "Passed: HTTP 200 after restarting the current SpecForge dev service; fresh in-app browser inspection was blocked by the browser URL policy and is not claimed." },
                           { "command": "In-app browser inspection after 3000 restart", "result": "BLOCKED: browser URL policy rejected access to the restarted local URL; retry when the browser permits the local page." },
                           { "command": "powershell -ExecutionPolicy Bypass -File .\\deploy\\scripts\\start.ps1; Invoke-WebRequest -UseBasicParsing http://localhost:3010/healthz; docker ps --format '{{.Names}} {{.Status}} {{.Ports}}'", "result": "Passed: Docker images rebuilt; 3010 /healthz returned 200; deploy-web-1, deploy-knowledge-projector-1, and deploy-connector-worker-1 reported healthy. Clean-tab ER interaction acceptance remains pending because browser URL access is blocked." },
+                          { "command": "pnpm exec tsx scripts/mcp-migrate-self-design-data-models.ts", "result": "Passed in the exact Designer Scope: six idempotent MCP change-set batches persisted 12 v2 models, 40 entities, and 79 fields with stable entity ownership and bilingual overlays." },
+                          { "command": "Invoke-RestMethod http://localhost:3000/api/data-model-graph?mode=MODEL^&scope=com.huawei.celon.desiner^&rootModelId=data-specforge-ai-generation^&pageSize=100^&clientCapacity=500", "result": "Passed: AI Generation returned 4 dataEntity nodes, 8 dataField nodes, no errors, hasMore=false, and partial=false." },
                           { "command": "git diff --check", "result": "Passed with Windows line-ending normalization warnings only." }
                       ]
                   }

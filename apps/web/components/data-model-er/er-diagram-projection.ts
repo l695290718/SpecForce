@@ -64,12 +64,14 @@ export interface ErRelationGroup {
   metadata: Record<string, unknown>;
 }
 
-export type ErQualityIssueCode = "ENDPOINT_NOT_FOUND" | "FIELD_OWNER_NOT_FOUND" | "UNSUPPORTED_REFERENCE_ENDPOINT";
+export type ErQualityIssueCode = "ENDPOINT_NOT_FOUND" | "FIELD_OWNER_NOT_FOUND" | "FIELD_OWNERSHIP_AMBIGUOUS" | "UNSUPPORTED_REFERENCE_ENDPOINT";
 
 export interface ErQualityIssue {
   code: ErQualityIssueCode;
   relationId?: string;
   edgeId: string;
+  modelId?: string;
+  fieldId?: string;
   sourceId?: string;
   targetId?: string;
   message: string;
@@ -118,6 +120,11 @@ export function projectErDiagram(input: ErProjectionInput): ErDiagramProjection 
 
   const entities = entityNodes.map((node) => buildEntityCard(node, nodes, fieldOwnerById, foreignKeyIds));
   const models = buildModelGroups(nodes, entities);
+  for (const node of nodes) {
+    if (node.nodeType !== "dataField" || fieldOwnerById.has(node.id)) continue;
+    const modelEntityCount = entityNodes.filter((entity) => entity.rootModelId === node.rootModelId).length;
+    if (modelEntityCount > 1) qualityIssues.push({ code: "FIELD_OWNERSHIP_AMBIGUOUS", edgeId: `field:${node.id}`, modelId: node.rootModelId, fieldId: node.id, sourceId: node.id, message: `Field ownership is ambiguous for ${node.id}.` });
+  }
   return {
     identity: buildIdentity(input, nodes, edges),
     models,

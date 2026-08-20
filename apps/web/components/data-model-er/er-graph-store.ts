@@ -118,7 +118,7 @@ export function deriveErLod(nodeCount: number, edgeCount: number, zoom = 1, clie
   const visibleNodeCount = Math.max(0, nodeCount);
   const visibleEdgeCount = Math.max(0, edgeCount);
   if (visibleNodeCount > clientCapacity || visibleEdgeCount > clientCapacity * 2) return { lod: "SKELETON", showFields: false, showLabels: false, visibleNodeCount, visibleEdgeCount, reason: "CAPACITY" };
-  if (zoom < 0.55 || visibleNodeCount > 180) return { lod: "COMPACT", showFields: false, showLabels: zoom >= 0.35, visibleNodeCount, visibleEdgeCount, reason: "ZOOM" };
+  if (zoom < 0.22 || visibleNodeCount > 180) return { lod: "COMPACT", showFields: zoom >= 0.22, showLabels: zoom >= 0.22, visibleNodeCount, visibleEdgeCount, reason: "ZOOM" };
   return { lod: "FULL", showFields: true, showLabels: true, visibleNodeCount, visibleEdgeCount, reason: "DEFAULT" };
 }
 
