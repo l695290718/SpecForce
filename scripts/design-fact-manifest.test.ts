@@ -45,7 +45,7 @@ it("records the scoped Data Model ER workspace without claiming MCP or browser c
   expect(decision?.localizedContent?.zh.decision).toContain("语义回退");
   expect(decision?.managedAssets?.some((managed) => managed.asset.id === "api-specforge-data-model-graph-query")).toBe(true);
   expect(decision?.managedRelationships).toEqual(expect.arrayContaining([
-    expect.objectContaining({ sourceId: "adr-webgl-data-model-er-workspace", targetId: "data-specforge-assets", relationType: "GOVERNS" }),
+    expect.objectContaining({ sourceId: "adr-webgl-data-model-er-workspace", targetId: "data-specforge-assets", relationType: "DECIDES" }),
     expect.objectContaining({ sourceId: "proposal-webgl-data-model-er-workspace", targetId: "api-specforge-data-model-graph-query", relationType: "IMPACTS" })
   ]));
 });

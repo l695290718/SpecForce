@@ -2080,8 +2080,8 @@
                           }
                       ],
                       "managedRelationships": [
-                          { "sourceType": "adr", "sourceId": "adr-webgl-data-model-er-workspace", "targetType": "dataModel", "targetId": "data-specforge-assets", "relationType": "GOVERNS" },
-                          { "sourceType": "adr", "sourceId": "adr-webgl-data-model-er-workspace", "targetType": "api", "targetId": "api-specforge-data-model-graph-query", "relationType": "GOVERNS" },
+                          { "sourceType": "adr", "sourceId": "adr-webgl-data-model-er-workspace", "targetType": "dataModel", "targetId": "data-specforge-assets", "relationType": "DECIDES" },
+                          { "sourceType": "adr", "sourceId": "adr-webgl-data-model-er-workspace", "targetType": "api", "targetId": "api-specforge-data-model-graph-query", "relationType": "DECIDES" },
                           { "sourceType": "proposal", "sourceId": "proposal-webgl-data-model-er-workspace", "targetType": "api", "targetId": "api-specforge-data-model-graph-query", "relationType": "IMPACTS" }
                       ],
                       "owner": "SpecForge Architecture and Web Runtime",
