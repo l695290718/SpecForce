@@ -1,5 +1,5 @@
 import ELK from "elkjs/lib/elk.bundled.js";
-import { fromElkGraph, layoutErGraphWithFallback, toElkGraph, type ErLayoutRequest } from "./er-layout";
+import { fromElkGraph, layoutErDiagramWithFallback, layoutErGraphWithFallback, toElkGraph, type ErLayoutRequest } from "./er-layout";
 
 export interface ErLayoutWorkerRequest { type: "LAYOUT"; request: ErLayoutRequest; }
 export interface ErLayoutWorkerResponse { type: "LAYOUT_RESULT"; result: ReturnType<typeof layoutErGraphWithFallback>; }
@@ -11,7 +11,8 @@ export async function runErLayout(request: ErLayoutRequest) {
     const result = await elk.layout(toElkGraph(request));
     return fromElkGraph(request, result);
   } catch (error) {
-    return { ...layoutErGraphWithFallback(request), degraded: true, error: error instanceof Error ? error.message : "LAYOUT_DEGRADED" };
+    const fallback = request.entities ? layoutErDiagramWithFallback({ entities: request.entities, relations: request.relations ?? [], positions: request.positions, dimensions: request.dimensions, width: request.width, height: request.height }) : layoutErGraphWithFallback(request);
+    return { ...fallback, degraded: true, error: error instanceof Error ? error.message : "LAYOUT_DEGRADED" };
   }
 }
 
