@@ -2,13 +2,14 @@
 
 ## Status
 
-- Draft for product-owner review on 2026-08-20.
+- Approved by product owner on 2026-08-20.
 - English is canonical. The Chinese section is the complete human-facing localization.
 - Owning application service: `com.huawei.celon.desiner`.
 - Owning Scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`.
 - Design Change Session: `design-change-session:ce663776-075b-426f-a631-89c7b6b72dba`.
 - Design-context digest: `fc24269b053ff5d4b4a9c587c0ba1655c8e64c99f71d2c3c807b66f711c97e8e`.
 - Extends ADR-0019 and ADR-0036. It does not replace PostgreSQL authority or the bounded-generation lifecycle.
+- Implementation plan: `docs/superpowers/plans/2026-08-20-nebula-3a-semantic-projection-core.md`.
 
 ## Problem
 
@@ -266,7 +267,7 @@ No migration rewrites authored assets, Knowledge Assertions, Baselines, or archi
 
 ### 状态与问题
 
-本文为 2026-08-20 提交产品负责人评审的草案。英文内容为规范定义，所属应用服务为 `com.huawei.celon.desiner`，所属 Scope 路径为 `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`，设计变更会话为 `design-change-session:ce663776-075b-426f-a631-89c7b6b72dba`。
+本文已于 2026-08-20 获产品负责人批准。英文内容为规范定义，所属应用服务为 `com.huawei.celon.desiner`，所属 Scope 路径为 `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`，设计变更会话为 `design-change-session:ce663776-075b-426f-a631-89c7b6b72dba`，实施计划为 `docs/superpowers/plans/2026-08-20-nebula-3a-semantic-projection-core.md`。
 
 上一阶段已经实现 PostgreSQL 三槽控制、BUILDING/ACTIVE/PREVIOUS 生命周期、包含 Manifest 的图身份、带代次投递元数据和确定性一致性比较基础能力，但还没有把 PostgreSQL-first 3A 的完整语义投影到 NebulaGraph。现有通用图节点和关系不能解释资产为什么属于某个业务、系统或技术架构单元；如果直接创建资产到架构单元的通用关系，会隐藏 Knowledge Assertion、混淆直接映射与追溯映射，并让图数据库看起来像是在编写权威语义。
 

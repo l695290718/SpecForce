@@ -12,6 +12,8 @@ Accepted design; Phase 1 bounded-generation control and generation-qualified del
 - Proposal: `proposal-bounded-nebula-knowledge-projection-generations`
 - Context Pack: `ctx-bounded-nebula-knowledge-projection-generations`
 - Spec: `docs/superpowers/specs/2026-08-20-bounded-nebula-knowledge-projection-generations-design.md`
+- Approved semantic Spec: `docs/superpowers/specs/2026-08-20-nebula-3a-semantic-projection-core-design.md`
+- Semantic implementation plan: `docs/superpowers/plans/2026-08-20-nebula-3a-semantic-projection-core.md`
 
 ## Context
 
