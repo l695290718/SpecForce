@@ -102,7 +102,7 @@ export class PrismaSemanticProjectionSource {
 
   async readAssertions(scope: SemanticGenerationScope, cursor: string | null, limit: number): Promise<SemanticPage<SemanticAssertionSource>> {
     const source = await this.validatedSource(scope);
-    return this.page(this.prisma.knowledgeAssertion, { applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath, status: "ACCEPTED", ...(cursor ? { dbId: { gt: cursor } } : {}) }, cursor, limit, (row) => ({
+    return this.page(this.prisma.knowledgeProjectionNode, { applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath, generationId: source.knowledgeGenerationId, baselineId: scope.baselineId, ...(cursor ? { dbId: { gt: cursor } } : {}) }, cursor, limit, (row) => ({
       applicationServiceId: scope.applicationServiceId,
       scopePath: scope.scopePath,
       generationId: source.knowledgeGenerationId,
@@ -110,9 +110,9 @@ export class PrismaSemanticProjectionSource {
       projectionManifestId: source.sourceProjectionManifestId,
       assertionId: String(row.id),
       semanticIdentity: String(row.semanticIdentity),
-      factType: String(row.factType),
+      factType: String(row.factType ?? "KNOWLEDGE_ASSERTION"),
       layer: String(row.layer) as SemanticAssertionSource["layer"],
-      confidence: Number(row.confidence),
+      confidence: Number(row.confidence ?? 1),
       status: "ACCEPTED" as const,
       contentDigest: String(row.dbId)
     }));
@@ -265,7 +265,7 @@ export class PrismaSemanticProjectionSource {
   }
 
   private assetWhere(scope: SemanticGenerationScope, source: SemanticSourceBinding, cursor: string | null): Record<string, unknown> {
-    return { enterpriseId: scope.enterpriseId, applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath, lifecycleStatus: "ACTIVE", ...(cursor ? { dbId: { gt: cursor } } : {}), sourceProjectionManifestId: source.sourceProjectionManifestId };
+    return { enterpriseId: scope.enterpriseId, applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath, lifecycleStatus: "ACTIVE", ...(cursor ? { dbId: { gt: cursor } } : {}) };
   }
 }
 

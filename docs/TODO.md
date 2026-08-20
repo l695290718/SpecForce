@@ -110,31 +110,35 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 ## 5. Knowledge-Assertion-Aware Nebula 3A And Production-Scale Certification
 
-**Status:** Target design and implementation plan accepted on 2026-08-20. Phase 1 bounded-generation control, generation-qualified Gateway/Projector delivery, and parity primitives are implemented and reconciled in the exact Scope; the semantic projection core is the next implementation increment, while Phase 2 production operations and Phase 3 scale certification remain open.
+**Status:** Target design and implementation plan accepted on 2026-08-20. The semantic projection core increment is locally verified for exact source binding, deterministic materialization, typed Gateway delivery, PostgreSQL ACTIVE resolution, bounded lifecycle, query fallback, and compatibility tests. Live semantic build/publish, Phase 2 production operations, and Phase 3 scale certification remain open.
 
 **Owner:** SpecForge Runtime for projection and Projector health; SpecForge Architecture for MCP synchronization.
 
 **Rationale:** The current NebulaGraph projection stores design-asset identities and current typed relationships. The accepted target uses a shared Space with exact-Scope, Manifest-qualified identities and bounded BUILDING, ACTIVE, and PREVIOUS slots. PostgreSQL controls atomic publication and preserves complete history; NebulaGraph remains a rebuildable online projection. Enterprise multi-node operations and billion-scale certification remain separately evidenced phases.
 
-**Trigger:** Start the semantic projection core with the approved exact-Scope implementation preflight and plan. Phase 2 starts after semantic parity and rollback pass; Phase 3 starts only on a production-representative topology with an approved workload and capacity plan.
+**Trigger:** Run the semantic verification script against a running exact-Scope build/publish fixture to close the remaining local operational evidence. Phase 2 starts after semantic parity and rollback pass; Phase 3 starts only on a production-representative topology with an approved workload and capacity plan.
 
 **Completion evidence:** The semantic core must implement Knowledge Assertion vertices, explicit source-manifest binding, Manifest-qualified identities, versioned relationship edges, generation-aware checkpoints, bounded publication/rollback/cleanup, semantic query/fallback, and PostgreSQL/Nebula parity. Phase 2 must prove external multi-node configuration, Kubernetes, secrets, backup/restore, object storage, observability, and failure recovery. Phase 3 must publish auditable `10M`, `100M`, and `1B` certification reports before claiming each tier. Synchronize matching ADR, Proposal, Context Pack, Evidence, backlog state, and typed links through MCP for every phase.
+
+**Current evidence:** `pnpm db:generate`, Core/Graph Projector typechecks, 8 focused Vitest files with 27 tests, Gateway `go test ./...`, and the graph configuration check pass. The Gateway resolves ACTIVE from PostgreSQL; local Compose connects it to the canonical database through `deploy_default`. `deploy/graph/verify-semantic-projection.ps1` is a health/query check and explicitly does not claim live build/publish parity. Implementation session `design-change-session:aa74dafc-08bb-4378-990f-ec38cf62d609` closed as `CONVERGED` after MCP synchronization, exact-Scope read-back, and closure evidence.
 
 **Design references:** ADR-0005, ADR-0006, ADR-0012, ADR-0018, ADR-0019, ADR-0022, ADR-0036; `docs/superpowers/specs/2026-08-20-bounded-nebula-knowledge-projection-generations-design.md`; `docs/superpowers/specs/2026-08-20-nebula-3a-semantic-projection-core-design.md`; `docs/superpowers/plans/2026-08-20-nebula-3a-semantic-projection-core.md`; `deploy/graph/verify-projection.ps1`.
 
 **中文本地化：**
 
-**状态：** 目标设计和实施计划已于 2026-08-20 接受。第一阶段有界代次控制、带代次 Gateway/Projector 投递和一致性比对基础能力已实现，并已在精确 Scope 下完成对账；语义投影核心是下一项实现增量，第二阶段生产运维和第三阶段规模认证仍待实施。
+**状态：** 目标设计和实施计划已于 2026-08-20 接受。语义投影核心增量已完成精确源绑定、确定性物化、类型化 Gateway 投递、PostgreSQL ACTIVE 解析、有界生命周期、查询回退和兼容性测试的本地验证。运行中的语义构建/发布、第二阶段生产运维和第三阶段规模认证仍待完成。
 
 **负责人：** SpecForge Runtime 负责投影和 Projector 健康；SpecForge Architecture 负责 MCP 同步。
 
 **理由：** 当前 NebulaGraph 投影保存设计资产身份和当前类型关系。已接受的目标是在共享 Space 中采用精确 Scope、包含 Manifest 的图身份以及有界 BUILDING、ACTIVE、PREVIOUS 三槽模型。PostgreSQL 控制原子发布并保存完整历史，NebulaGraph 保持可重建在线投影。企业多节点运维和十亿级规模认证仍作为独立取证阶段处理。
 
-**启动条件：** 语义投影核心必须使用已接受计划完成精确 Scope 的实现前置预检后启动；第二阶段在语义一致性和回滚通过后启动；第三阶段只能在生产代表性拓扑、工作负载和容量计划获批后启动。
+**启动条件：** 运行精确 Scope 的语义构建/发布夹具并完成验证脚本，以补齐当前本地运行证据；第二阶段在语义一致性和回滚通过后启动；第三阶段只能在生产代表性拓扑、工作负载和容量计划获批后启动。
 
 **完成证据：** 语义核心必须实现 Knowledge Assertion 顶点、显式源 Manifest 绑定、包含 Manifest 的身份、版本化关系边、代次感知检查点、有界发布/回滚/清理、语义查询/回退以及 PostgreSQL/Nebula 一致性。第二阶段必须证明外部多节点配置、Kubernetes、密钥、备份恢复、对象存储、可观测性和故障恢复。第三阶段必须发布可审计的 `10M`、`100M`、`1B` 认证报告，未通过的级别不能对外宣称。每个阶段都必须通过 MCP 同步匹配的 ADR、Proposal、Context Pack、Evidence、待办状态和有类型关系。
 
-**设计引用：** ADR-0005、ADR-0006、ADR-0012、ADR-0018、ADR-0019、ADR-0022、ADR-0036；`docs/superpowers/specs/2026-08-20-bounded-nebula-knowledge-projection-generations-design.md`; `docs/superpowers/specs/2026-08-20-nebula-3a-semantic-projection-core-design.md`; `docs/superpowers/plans/2026-08-20-nebula-3a-semantic-projection-core.md`; `deploy/graph/verify-projection.ps1`。
+**当前证据：** `pnpm db:generate`、Core/Graph Projector 类型检查、8 个文件 27 项聚焦 Vitest 测试、Gateway `go test ./...` 和图配置检查通过。Gateway 从 PostgreSQL 解析 ACTIVE；本地 Compose 让 Gateway 连接规范数据库。`deploy/graph/verify-semantic-projection.ps1` 是健康/查询检查，在运行中的语义构建夹具出现前不宣称实时构建/发布一致性。实施会话 `design-change-session:aa74dafc-08bb-4378-990f-ec38cf62d609` 已在 MCP 同步、精确 Scope 回读和关闭证据完成后关闭为 `CONVERGED`。
+
+**设计引用：** ADR-0005、ADR-0006、ADR-0012、ADR-0018、ADR-0019、ADR-0022、ADR-0036；`docs/superpowers/specs/2026-08-20-bounded-nebula-knowledge-projection-generations-design.md`; `docs/superpowers/specs/2026-08-20-nebula-3a-semantic-projection-core-design.md`; `docs/superpowers/plans/2026-08-20-nebula-3a-semantic-projection-core.md`; `deploy/graph/verify-projection.ps1`; `deploy/graph/verify-semantic-projection.ps1`。
 
 ## 6. PostgreSQL/MCP Synchronization Resilience
 

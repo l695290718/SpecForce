@@ -240,6 +240,19 @@ Diagnostics expose stable codes and hashed references. They do not expose creden
 
 No migration rewrites authored assets, Knowledge Assertions, Baselines, or architecture revisions.
 
+## Implementation Evidence
+
+The current implementation increment is locally verified in the owning Scope `com.huawei.celon.desiner`:
+
+- `pnpm db:generate` passed after adding the semantic source-binding fields and generation checkpoint persistence.
+- `pnpm --filter @specforge/core typecheck` and `pnpm --filter @specforge/graph-projector typecheck` passed.
+- Focused root Vitest passed 8 files and 27 tests covering source pagination, deterministic materialization/query, bounded builder receipts/checkpoints, fallback identity safety, generation compatibility, Gateway client behavior, and the local integration fixture.
+- Gateway `go test ./...` passed for `cmd/server`, `internal/httpapi`, `internal/nebula`, and `internal/postgres` with a writable temporary `GOCACHE`.
+- The Go Gateway resolves ACTIVE from PostgreSQL through `database/sql` and `pgx`; the local graph Compose profile supplies its canonical database URL and `deploy_default` network.
+- `deploy/graph/verify-semantic-projection.ps1` verifies graph health and exact-Scope query shape. It intentionally does not claim live semantic build/publish parity until a running semantic build fixture is available.
+
+This increment is implementation evidence, not production-scale certification. External multi-node operations, live build/publish rehearsal, backup/restore, Kubernetes, and `10M`/`100M`/`1B` scale claims remain deferred.
+
 ## Verification Strategy
 
 - Core tests: source identity, mapping modes, layer policy, duplicate handling, deterministic digests, and stable ranks.
@@ -269,7 +282,7 @@ No migration rewrites authored assets, Knowledge Assertions, Baselines, or archi
 
 本文已于 2026-08-20 获产品负责人批准。英文内容为规范定义，所属应用服务为 `com.huawei.celon.desiner`，所属 Scope 路径为 `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`，设计变更会话为 `design-change-session:ce663776-075b-426f-a631-89c7b6b72dba`，实施计划为 `docs/superpowers/plans/2026-08-20-nebula-3a-semantic-projection-core.md`。
 
-上一阶段已经实现 PostgreSQL 三槽控制、BUILDING/ACTIVE/PREVIOUS 生命周期、包含 Manifest 的图身份、带代次投递元数据和确定性一致性比较基础能力，但还没有把 PostgreSQL-first 3A 的完整语义投影到 NebulaGraph。现有通用图节点和关系不能解释资产为什么属于某个业务、系统或技术架构单元；如果直接创建资产到架构单元的通用关系，会隐藏 Knowledge Assertion、混淆直接映射与追溯映射，并让图数据库看起来像是在编写权威语义。
+上一阶段已经实现 PostgreSQL 三槽控制、BUILDING/ACTIVE/PREVIOUS 生命周期、包含 Manifest 的图身份、带代次投递元数据和确定性一致性比较基础能力。本次实现增量已在本地完成语义来源绑定、确定性物化、类型化 Gateway、PostgreSQL ACTIVE 解析、有界构建检查点、查询回退和兼容性验证；运行中的语义构建/发布、多节点运维和规模认证仍保持延期。现有通用图节点和关系不能解释资产为什么属于某个业务、系统或技术架构单元；如果直接创建资产到架构单元的通用关系，会隐藏 Knowledge Assertion、混淆直接映射与追溯映射，并让图数据库看起来像是在编写权威语义。
 
 ### 目标与非目标
 
@@ -302,6 +315,10 @@ Graph Projector 新增只读语义来源仓库，按精确 Scope、来源代次�
 Projector 按语义家族和稳定 Key 分区，检查点身份为 `manifestId + family + logicalPartition`，重启后从同一 Manifest 继续，不更新旧 relationship-outbox 检查点。Gateway 增加内部 `/v1/semantic-projections` 强类型契约，只接受三种顶点和七种关系家族，并拒绝未知家族、跨 Scope、跨 Manifest、缺少 rank 和来源摘要不一致。
 
 Go Gateway 增加 PostgreSQL `ActiveManifestResolver`。普通查询只提交精确 Scope 和有界参数，Gateway 从 `NebulaProjectionHead` 解析 ACTIVE 并固定请求身份，普通调用方不能提交 Manifest。内部验证通过独立鉴权路由读取 BUILDING，不对普通用户或 Agent 开放。
+
+### 当前实现证据
+
+`pnpm db:generate`、Core/Graph Projector 类型检查、8 个文件 27 项聚焦 Vitest 测试、Gateway `go test ./...` 和图配置检查已通过。Gateway 已通过 `database/sql + pgx` 从 PostgreSQL 解析 ACTIVE，本地 Compose 已为 Gateway 配置规范数据库 URL 和 `deploy_default` 网络。`deploy/graph/verify-semantic-projection.ps1` 只验证健康与精确 Scope 查询；在运行中的语义构建夹具出现前，不宣称实时构建/发布 parity 已完成。外部多节点、生产运维和规模认证继续延期。
 
 ### 构建、发布与查询
 

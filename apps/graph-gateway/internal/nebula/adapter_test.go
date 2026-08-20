@@ -142,6 +142,55 @@ func TestGenerationProjectionUsesGenerationVIDAndOrdinal(t *testing.T) {
 	}
 }
 
+func TestSemanticProjectionUsesTypedGenerationQualifiedStatements(t *testing.T) {
+	t.Parallel()
+
+	scope := httpapi.Scope{EnterpriseID: "huawei", ApplicationServiceID: "com.huawei.celon.desiner", ScopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"}
+	identity := httpapi.ProjectionIdentity{BaselineID: "b1", ManifestID: "m1", GenerationID: "g1", SchemaVersion: "nebula.3a.v1"}
+	vertices := []httpapi.SemanticVertex{
+		{Scope: scope, Family: "DesignAsset", ID: "asset:api:orders", LogicalID: "orders", AssetType: "api", AssetID: "orders", MappingMode: "DIRECT", ContentDigest: "asset-digest"},
+		{Scope: scope, Family: "KnowledgeAssertion", ID: "assertion:a1", AssertionID: "a1", SemanticIdentity: "orders-api", Layer: "SYS", Confidence: 0.9, ContentDigest: "assertion-digest"},
+	}
+	executor := &recordingExecutor{}
+	client := nebula.NewOfficialClient(executor, "specforge_graph")
+	receipt, err := client.ProjectSemantic(context.Background(), httpapi.SemanticProjectionRequest{
+		Scope: scope, Projection: identity, ManifestStatus: "BUILDING",
+		Source:   httpapi.SemanticSourceBinding{SourceProjectionManifestID: "pm1", SourceCoverageManifestID: "cm1", KnowledgeGenerationID: "kg1", CoverageGenerationID: "cg1", RelationshipVersion: "rv1", CatalogVersion: "cv1", CatalogDigest: "cd1", SemanticSchemaVersion: httpapi.SemanticSchemaVersion},
+		Vertices: vertices,
+		Edges:    []httpapi.SemanticEdge{{Scope: scope, Family: "ASSERTION_SUBJECT", ID: "edge:a1", SourceID: "assertion:a1", TargetID: "asset:api:orders", Code: "SUBJECT_OF", Confidence: 1, ProjectionOrdinal: "1", ContentDigest: "edge-digest"}},
+	})
+	if err != nil {
+		t.Fatalf("semantic project: %v", err)
+	}
+	if receipt.ProjectedVertexCount != 2 || receipt.ProjectedEdgeCount != 1 {
+		t.Fatalf("unexpected receipt: %#v", receipt)
+	}
+	statements := strings.Join(executor.statements, "\n")
+	for _, expected := range []string{"specforge_semantic_vertex", "specforge_semantic_relation", "baseline_id", "manifest_id", "generation_id", "nebula.3a.semantic.v1"} {
+		if !strings.Contains(statements, expected) {
+			t.Fatalf("expected %q in typed semantic statements: %s", expected, statements)
+		}
+	}
+}
+
+func TestSemanticProjectionRejectsEdgeOutsideDeclaredBatch(t *testing.T) {
+	t.Parallel()
+
+	scope := httpapi.Scope{EnterpriseID: "huawei", ApplicationServiceID: "com.huawei.celon.desiner", ScopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"}
+	client := nebula.NewOfficialClient(&recordingExecutor{}, "specforge_graph")
+	_, err := client.ProjectSemantic(context.Background(), httpapi.SemanticProjectionRequest{
+		Scope:          scope,
+		Projection:     httpapi.ProjectionIdentity{BaselineID: "b1", ManifestID: "m1", GenerationID: "g1", SchemaVersion: "nebula.3a.v1"},
+		ManifestStatus: "BUILDING",
+		Source:         httpapi.SemanticSourceBinding{SourceProjectionManifestID: "pm1", SourceCoverageManifestID: "cm1", KnowledgeGenerationID: "kg1", CoverageGenerationID: "cg1", RelationshipVersion: "rv1", CatalogVersion: "cv1", CatalogDigest: "cd1", SemanticSchemaVersion: httpapi.SemanticSchemaVersion},
+		Vertices:       []httpapi.SemanticVertex{{Scope: scope, Family: "DesignAsset", ID: "asset:api:orders", ContentDigest: "asset-digest"}},
+		Edges:          []httpapi.SemanticEdge{{Scope: scope, Family: "ASSERTION_SUBJECT", ID: "edge:a1", SourceID: "assertion:a1", TargetID: "asset:api:orders", Code: "SUBJECT_OF", ProjectionOrdinal: "1", ContentDigest: "edge-digest"}},
+	})
+	if err == nil || err.Error() != "SEMANTIC_EDGE_ENDPOINT_MISSING" {
+		t.Fatalf("expected missing endpoint rejection, got %v", err)
+	}
+}
+
 type recordingExecutor struct {
 	statements []string
 }

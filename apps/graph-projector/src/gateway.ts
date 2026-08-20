@@ -19,6 +19,28 @@ export interface ProjectionPayload {
   edges: Array<Record<string, unknown>>;
 }
 
+export interface SemanticGatewayRequest {
+  scope: ProjectionScope;
+  projection: ProjectionIdentity;
+  manifestStatus: "BUILDING";
+  source: Record<string, unknown>;
+  vertices: Array<Record<string, unknown>>;
+  edges: Array<Record<string, unknown>>;
+}
+
+export interface SemanticGatewayReceipt {
+  projection: ProjectionIdentity;
+  projectedVertexCount: number;
+  projectedEdgeCount: number;
+}
+
+export interface SemanticGatewayQuery {
+  scope: ProjectionScope;
+  assetType: string;
+  assetId: string;
+  budget: { maxAssertions: number; maxTargets: number; maxTraceSteps: number; timeoutMs: number; maxPayloadBytes: number };
+}
+
 export type ProjectionPayloadResolver = (event: ClaimedProjection) => ProjectionPayload | Promise<ProjectionPayload>;
 
 export class HttpGraphGateway implements GraphGateway {
@@ -81,6 +103,37 @@ export class HttpGraphGateway implements GraphGateway {
         throw error;
       }
       throw new Error("GRAPH_GATEWAY_DELIVERY_FAILED");
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async projectSemantic(request: SemanticGatewayRequest): Promise<SemanticGatewayReceipt> {
+    return this.postSemantic<SemanticGatewayReceipt>("/v1/semantic-projections", request, (value) => {
+      if (!isRecord(value) || !isRecord(value.projection) || !isNonNegativeInteger(value.projectedVertexCount) || !isNonNegativeInteger(value.projectedEdgeCount)) throw new Error("GRAPH_GATEWAY_RECEIPT_INVALID");
+      const projection = projectionFromRecord(value.projection);
+      if (projection === undefined || !sameProjectionIdentity(projection, request.projection)) throw new Error("GRAPH_GATEWAY_RECEIPT_INVALID");
+      return { projection, projectedVertexCount: value.projectedVertexCount, projectedEdgeCount: value.projectedEdgeCount };
+    });
+  }
+
+  async querySemantic(query: SemanticGatewayQuery): Promise<Record<string, unknown>> {
+    return this.postSemantic<Record<string, unknown>>("/v1/architecture-queries", query, (value) => {
+      if (!isRecord(value) || !isRecord(value.projection) || typeof value.source !== "string") throw new Error("GRAPH_GATEWAY_RESULT_INVALID");
+      return value;
+    });
+  }
+
+  private async postSemantic<T>(path: string, body: unknown, parse: (value: unknown) => T): Promise<T> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
+    try {
+      const response = await this.fetch(`${this.baseUrl}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: controller.signal });
+      if (!response.ok) throw new Error(response.status >= 500 ? "SEMANTIC_GATEWAY_UNAVAILABLE" : "SEMANTIC_GATEWAY_REJECTED");
+      return parse(await response.json());
+    } catch (error) {
+      if (error instanceof Error && ["SEMANTIC_GATEWAY_UNAVAILABLE", "SEMANTIC_GATEWAY_REJECTED", "GRAPH_GATEWAY_RECEIPT_INVALID", "GRAPH_GATEWAY_RESULT_INVALID"].includes(error.message)) throw error;
+      throw new Error("SEMANTIC_GATEWAY_UNAVAILABLE");
     } finally {
       clearTimeout(timeout);
     }

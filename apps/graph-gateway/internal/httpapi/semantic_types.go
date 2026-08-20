@@ -16,19 +16,24 @@ type SemanticSourceBinding struct {
 }
 
 type SemanticVertex struct {
-	Scope         `json:"scope"`
-	Family        string `json:"family"`
-	ID            string `json:"id"`
-	LogicalID     string `json:"logicalId,omitempty"`
-	AssetType     string `json:"assetType,omitempty"`
-	AssetID       string `json:"assetId,omitempty"`
-	AssertionID   string `json:"assertionId,omitempty"`
-	UnitIdentity  string `json:"unitIdentity,omitempty"`
-	Layer         string `json:"layer,omitempty"`
-	Kind          string `json:"kind,omitempty"`
-	MappingMode   string `json:"mappingMode,omitempty"`
-	Reason        string `json:"reason,omitempty"`
-	ContentDigest string `json:"contentDigest"`
+	Scope            `json:"scope"`
+	Family           string  `json:"family"`
+	ID               string  `json:"id"`
+	LogicalID        string  `json:"logicalId,omitempty"`
+	AssetType        string  `json:"assetType,omitempty"`
+	AssetID          string  `json:"assetId,omitempty"`
+	AssertionID      string  `json:"assertionId,omitempty"`
+	SemanticIdentity string  `json:"semanticIdentity,omitempty"`
+	FactType         string  `json:"factType,omitempty"`
+	UnitIdentity     string  `json:"unitIdentity,omitempty"`
+	Layer            string  `json:"layer,omitempty"`
+	Kind             string  `json:"kind,omitempty"`
+	CanonicalName    string  `json:"canonicalName,omitempty"`
+	LocalizedName    string  `json:"localizedName,omitempty"`
+	MappingMode      string  `json:"mappingMode,omitempty"`
+	Reason           string  `json:"reason,omitempty"`
+	Confidence       float64 `json:"confidence,omitempty"`
+	ContentDigest    string  `json:"contentDigest"`
 }
 
 type SemanticEdge struct {

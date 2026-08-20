@@ -8,6 +8,8 @@
 
 **Tech Stack:** TypeScript, Prisma 6, PostgreSQL, Vitest, Go 1.26, nebula-go v3.8, NebulaGraph, pnpm workspaces.
 
+**Implementation status (2026-08-20):** Tasks 1-4, the pure query/fallback portion of Task 6, and the bounded local implementation/integration portion of Tasks 5 and 7 are implemented and locally verified. The plan intentionally remains open for live semantic build/publish rehearsal, full family-partition restart semantics, production operation evidence, and scale certification. The exact implementation preflight session is `design-change-session:aa74dafc-08bb-4378-990f-ec38cf62d609`.
+
 ## Global Constraints
 
 - `com.huawei.celon.desiner` and `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner` are the only owning Scope for this increment.

@@ -29,6 +29,7 @@ export * from "./graph-store/types";
 export * from "./graph/projection-generation";
 export * from "./graph/semantic-identity";
 export * from "./graph/semantic-projection";
+export * from "./architecture-map/semantic-query";
 export * from "./federation";
 export * from "./knowledge";
 export * from "./scanner";

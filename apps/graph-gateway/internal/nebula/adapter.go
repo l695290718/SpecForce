@@ -95,6 +95,100 @@ func (c *OfficialClient) Project(ctx context.Context, projection httpapi.Project
 	return httpapi.ProjectionReceipt{GraphVersion: projection.GraphVersion, Projection: projection.Projection, ProjectedNodeCount: len(projection.Nodes), ProjectedEdgeCount: len(projection.Edges)}, nil
 }
 
+func (c *OfficialClient) ProjectSemantic(ctx context.Context, projection httpapi.SemanticProjectionRequest) (httpapi.SemanticProjectionReceipt, error) {
+	if err := ctx.Err(); err != nil {
+		return httpapi.SemanticProjectionReceipt{}, err
+	}
+	if err := validateSemanticRequest(projection); err != nil {
+		return httpapi.SemanticProjectionReceipt{}, err
+	}
+	if err := c.ensureSchema(ctx); err != nil {
+		return httpapi.SemanticProjectionReceipt{}, err
+	}
+	vertexIDs := make(map[string]string, len(projection.Vertices))
+	for _, vertex := range projection.Vertices {
+		id := semanticVertexID(projection.Scope, projection.Projection, vertex.ID)
+		vertexIDs[vertex.ID] = id
+		if err := c.execute(ctx, "semantic_vertex_upsert", semanticVertexStatement(projection, vertex, id)); err != nil {
+			return httpapi.SemanticProjectionReceipt{}, err
+		}
+	}
+	for _, edge := range projection.Edges {
+		sourceID, sourceOK := vertexIDs[edge.SourceID]
+		targetID, targetOK := vertexIDs[edge.TargetID]
+		if !sourceOK || !targetOK {
+			return httpapi.SemanticProjectionReceipt{}, errors.New("SEMANTIC_EDGE_ENDPOINT_MISSING")
+		}
+		if err := c.execute(ctx, "semantic_edge_upsert", semanticEdgeStatement(projection, edge, sourceID, targetID)); err != nil {
+			return httpapi.SemanticProjectionReceipt{}, err
+		}
+	}
+	if err := c.execute(ctx, "semantic_manifest_upsert", semanticManifestStatement(projection, "BUILDING")); err != nil {
+		return httpapi.SemanticProjectionReceipt{}, err
+	}
+	return httpapi.SemanticProjectionReceipt{
+		Projection:           projection.Projection,
+		ProjectedVertexCount: len(projection.Vertices),
+		ProjectedEdgeCount:   len(projection.Edges),
+	}, nil
+}
+
+func (c *OfficialClient) QueryArchitecture(ctx context.Context, query httpapi.SemanticQueryRequest, projection httpapi.ProjectionIdentity) (httpapi.SemanticQueryResult, error) {
+	if err := ctx.Err(); err != nil {
+		return httpapi.SemanticQueryResult{}, err
+	}
+	if err := validateSemanticQueryRequest(query, projection); err != nil {
+		return httpapi.SemanticQueryResult{}, err
+	}
+	if err := c.useSpace(ctx); err != nil {
+		return httpapi.SemanticQueryResult{}, err
+	}
+	assetID := semanticAssetID(query.AssetType, query.AssetID)
+	statement := fmt.Sprintf("MATCH (asset:specforge_semantic_vertex)-[subject:specforge_semantic_relation]->(assertion:specforge_semantic_vertex) WHERE asset.specforge_semantic_vertex.family == \"DesignAsset\" AND asset.specforge_semantic_vertex.semantic_id == %s AND asset.specforge_semantic_vertex.application_service_id == %s AND asset.specforge_semantic_vertex.scope_path == %s AND asset.specforge_semantic_vertex.baseline_id == %s AND asset.specforge_semantic_vertex.manifest_id == %s AND asset.specforge_semantic_vertex.generation_id == %s AND asset.specforge_semantic_vertex.schema_version == %s AND subject.specforge_semantic_relation.family == \"ASSERTION_SUBJECT\" YIELD assertion.specforge_semantic_vertex.assertion_id, assertion.specforge_semantic_vertex.semantic_identity, assertion.specforge_semantic_vertex.layer, assertion.specforge_semantic_vertex.confidence, assertion.specforge_semantic_vertex.unit_identity, assertion.specforge_semantic_vertex.canonical_name, asset.specforge_semantic_vertex.mapping_mode, asset.specforge_semantic_vertex.reason LIMIT %d;", literal(assetID), literal(query.Scope.ApplicationServiceID), literal(query.Scope.ScopePath), literal(projection.BaselineID), literal(projection.ManifestID), literal(projection.GenerationID), literal(projection.SchemaVersion), query.Budget.MaxAssertions)
+	response, err := c.executeResponse(ctx, "semantic_query", statement)
+	if err != nil {
+		return httpapi.SemanticQueryResult{}, err
+	}
+	result := httpapi.SemanticQueryResult{
+		Status:            "COMPLETE",
+		Source:            "NEBULA",
+		Projection:        projection,
+		Targets:           httpapi.SemanticTargets{BIZ: []httpapi.SemanticTarget{}, SYS: []httpapi.SemanticTarget{}, TECH: []httpapi.SemanticTarget{}},
+		Assertions:        []httpapi.SemanticAssertionResult{},
+		TracePath:         []httpapi.SemanticTraceStep{},
+		TruncationReasons: []string{},
+	}
+	for _, row := range response.GetRows() {
+		columns := row.GetValues()
+		if len(columns) < 8 {
+			return httpapi.SemanticQueryResult{}, errors.New("SEMANTIC_QUERY_RESULT_INVALID")
+		}
+		assertion := httpapi.SemanticAssertionResult{
+			AssertionID:      columnString(columns, 0),
+			SemanticIdentity: columnString(columns, 1),
+			Layer:            columnString(columns, 2),
+			Confidence:       columns[3].GetFVal(),
+		}
+		result.Assertions = append(result.Assertions, assertion)
+		target := httpapi.SemanticTarget{UnitIdentity: columnString(columns, 4), Layer: assertion.Layer, CanonicalName: columnString(columns, 5)}
+		switch assertion.Layer {
+		case "BIZ":
+			result.Targets.BIZ = append(result.Targets.BIZ, target)
+		case "SYS":
+			result.Targets.SYS = append(result.Targets.SYS, target)
+		case "TECH":
+			result.Targets.TECH = append(result.Targets.TECH, target)
+		default:
+			return httpapi.SemanticQueryResult{}, errors.New("SEMANTIC_QUERY_LAYER_INVALID")
+		}
+		if result.MappingMode == "" {
+			result.MappingMode = columnString(columns, 6)
+			result.Reason = columnString(columns, 7)
+		}
+	}
+	return result, nil
+}
+
 func (c *OfficialClient) Traverse(ctx context.Context, traversal httpapi.TraversalRequest) (httpapi.TraversalResult, error) {
 	if err := c.useSpace(ctx); err != nil {
 		return httpapi.TraversalResult{}, err
@@ -197,6 +291,9 @@ func (c *OfficialClient) ensureSchema(ctx context.Context) error {
 		{"schema_create_node_tag", "CREATE TAG IF NOT EXISTS specforge_node(node_key string, enterprise_id string, application_service_id string, scope_path string, node_type string, logical_id string, root_asset_type string, root_asset_id string, parent_logical_id string);"},
 		{"schema_create_checkpoint_tag", "CREATE TAG IF NOT EXISTS specforge_checkpoint(graph_version string, enterprise_id string, application_service_id string, scope_path string);"},
 		{"schema_create_relation_edge", "CREATE EDGE IF NOT EXISTS specforge_relation(edge_id string, code string, strength string, confidence double, version string);"},
+		{"schema_create_semantic_vertex_tag", "CREATE TAG IF NOT EXISTS specforge_semantic_vertex(semantic_id string, family string, enterprise_id string, application_service_id string, scope_path string, baseline_id string, manifest_id string, generation_id string, schema_version string, semantic_schema_version string, logical_id string, asset_type string, asset_id string, assertion_id string, semantic_identity string, fact_type string, unit_identity string, layer string, kind string, canonical_name string, localized_name string, mapping_mode string, reason string, confidence double, content_digest string);"},
+		{"schema_create_semantic_relation_edge", "CREATE EDGE IF NOT EXISTS specforge_semantic_relation(edge_id string, family string, code string, confidence double, projection_ordinal string, relationship_version string, baseline_id string, manifest_id string, generation_id string, schema_version string, semantic_schema_version string, content_digest string);"},
+		{"schema_create_semantic_manifest_tag", "CREATE TAG IF NOT EXISTS specforge_semantic_manifest(status string, enterprise_id string, application_service_id string, scope_path string, baseline_id string, manifest_id string, generation_id string, schema_version string, semantic_schema_version string, source_projection_manifest_id string, source_coverage_manifest_id string, knowledge_generation_id string, coverage_generation_id string, relationship_version string, catalog_version string, catalog_digest string);"},
 	} {
 		if err := c.execute(ctx, schema.operation, schema.statement); err != nil {
 			return err
@@ -362,4 +459,103 @@ func traversalNode(scope httpapi.Scope, projection *httpapi.ProjectionIdentity, 
 		return httpapi.Node{}, "", false
 	}
 	return node, key, true
+}
+
+func validateSemanticRequest(request httpapi.SemanticProjectionRequest) error {
+	if request.ManifestStatus != "BUILDING" {
+		return errors.New("SEMANTIC_MANIFEST_NOT_BUILDING")
+	}
+	if request.Source.SemanticSchemaVersion != httpapi.SemanticSchemaVersion {
+		return errors.New("SEMANTIC_SOURCE_BINDING_INVALID")
+	}
+	if request.Projection.BaselineID == "" || request.Projection.ManifestID == "" || request.Projection.GenerationID == "" || request.Projection.SchemaVersion == "" {
+		return errors.New("PROJECTION_IDENTITY_REQUIRED")
+	}
+	if request.Source.SourceProjectionManifestID == "" || request.Source.SourceCoverageManifestID == "" || request.Source.KnowledgeGenerationID == "" || request.Source.CoverageGenerationID == "" || request.Source.RelationshipVersion == "" || request.Source.CatalogVersion == "" || request.Source.CatalogDigest == "" {
+		return errors.New("SEMANTIC_SOURCE_BINDING_INVALID")
+	}
+	seen := make(map[string]struct{}, len(request.Vertices))
+	for _, vertex := range request.Vertices {
+		if vertex.ID == "" || vertex.ContentDigest == "" || vertex.Scope != request.Scope {
+			return errors.New("SEMANTIC_VERTEX_INVALID")
+		}
+		if _, exists := seen[vertex.ID]; exists {
+			return errors.New("SEMANTIC_VERTEX_DUPLICATE")
+		}
+		seen[vertex.ID] = struct{}{}
+		if !validSemanticVertexFamily(vertex.Family) {
+			return errors.New("SEMANTIC_VERTEX_FAMILY_INVALID")
+		}
+	}
+	for _, edge := range request.Edges {
+		if edge.ID == "" || edge.SourceID == "" || edge.TargetID == "" || edge.Code == "" || edge.ContentDigest == "" || edge.Scope != request.Scope {
+			return errors.New("SEMANTIC_EDGE_INVALID")
+		}
+		if _, err := strconv.ParseInt(edge.ProjectionOrdinal, 10, 64); err != nil {
+			return errors.New("PROJECTION_ORDINAL_INVALID")
+		}
+		if !validSemanticEdgeFamily(edge.Family) {
+			return errors.New("SEMANTIC_EDGE_FAMILY_INVALID")
+		}
+	}
+	return nil
+}
+
+func validateSemanticQueryRequest(query httpapi.SemanticQueryRequest, projection httpapi.ProjectionIdentity) error {
+	if query.Scope.EnterpriseID == "" || query.Scope.ApplicationServiceID == "" || query.Scope.ScopePath == "" || query.AssetType == "" || query.AssetID == "" {
+		return errors.New("SEMANTIC_QUERY_SCOPE_OR_ASSET_REQUIRED")
+	}
+	if projection.BaselineID == "" || projection.ManifestID == "" || projection.GenerationID == "" || projection.SchemaVersion == "" {
+		return errors.New("PROJECTION_IDENTITY_REQUIRED")
+	}
+	if query.Budget.MaxAssertions <= 0 || query.Budget.MaxTargets <= 0 || query.Budget.MaxTraceSteps <= 0 || query.Budget.TimeoutMS <= 0 || query.Budget.MaxPayloadBytes <= 0 {
+		return errors.New("SEMANTIC_QUERY_BUDGET_INVALID")
+	}
+	return nil
+}
+
+func validSemanticVertexFamily(family string) bool {
+	return family == "DesignAsset" || family == "KnowledgeAssertion" || family == "ArchitectureUnit"
+}
+
+func validSemanticEdgeFamily(family string) bool {
+	switch family {
+	case "ASSERTION_SUBJECT", "CLASSIFIED_AS", "REALIZED_BY", "DEPLOYED_ON", "ASSERTION_RELATION", "ASSET_RELATION", "ARCHITECTURE_RELATION":
+		return true
+	default:
+		return false
+	}
+}
+
+func semanticVertexID(scope httpapi.Scope, projection httpapi.ProjectionIdentity, semanticID string) string {
+	return stableID("sv", httpapi.EncodeScopeKey(scope)+":"+projectionKey(projection)+":"+semanticID)
+}
+
+func semanticAssetID(assetType, assetID string) string {
+	return "asset:" + assetType + ":" + assetID
+}
+
+func semanticVertexStatement(projection httpapi.SemanticProjectionRequest, vertex httpapi.SemanticVertex, vertexID string) string {
+	values := []string{
+		literal(vertex.ID), literal(vertex.Family), literal(vertex.Scope.EnterpriseID), literal(vertex.Scope.ApplicationServiceID), literal(vertex.Scope.ScopePath),
+		literal(projection.Projection.BaselineID), literal(projection.Projection.ManifestID), literal(projection.Projection.GenerationID), literal(projection.Projection.SchemaVersion), literal(projection.Source.SemanticSchemaVersion),
+		literal(vertex.LogicalID), literal(vertex.AssetType), literal(vertex.AssetID), literal(vertex.AssertionID), literal(vertex.SemanticIdentity), literal(vertex.FactType), literal(vertex.UnitIdentity), literal(vertex.Layer), literal(vertex.Kind), literal(vertex.CanonicalName), literal(vertex.LocalizedName), literal(vertex.MappingMode), literal(vertex.Reason), strconv.FormatFloat(vertex.Confidence, 'f', -1, 64), literal(vertex.ContentDigest),
+	}
+	return fmt.Sprintf("INSERT VERTEX specforge_semantic_vertex(semantic_id, family, enterprise_id, application_service_id, scope_path, baseline_id, manifest_id, generation_id, schema_version, semantic_schema_version, logical_id, asset_type, asset_id, assertion_id, semantic_identity, fact_type, unit_identity, layer, kind, canonical_name, localized_name, mapping_mode, reason, confidence, content_digest) VALUES %s:(%s);", literal(vertexID), strings.Join(values, ", "))
+}
+
+func semanticEdgeStatement(projection httpapi.SemanticProjectionRequest, edge httpapi.SemanticEdge, sourceID, targetID string) string {
+	ordinal, _ := strconv.ParseInt(edge.ProjectionOrdinal, 10, 64)
+	values := []string{
+		literal(edge.ID), literal(edge.Family), literal(edge.Code), strconv.FormatFloat(edge.Confidence, 'f', -1, 64), literal(edge.ProjectionOrdinal), literal(edge.RelationshipVersion),
+		literal(projection.Projection.BaselineID), literal(projection.Projection.ManifestID), literal(projection.Projection.GenerationID), literal(projection.Projection.SchemaVersion), literal(projection.Source.SemanticSchemaVersion), literal(edge.ContentDigest),
+	}
+	return fmt.Sprintf("INSERT EDGE specforge_semantic_relation(edge_id, family, code, confidence, projection_ordinal, relationship_version, baseline_id, manifest_id, generation_id, schema_version, semantic_schema_version, content_digest) VALUES %s -> %s @ %d:(%s);", literal(sourceID), literal(targetID), ordinal, strings.Join(values, ", "))
+}
+
+func semanticManifestStatement(projection httpapi.SemanticProjectionRequest, status string) string {
+	values := []string{
+		literal(status), literal(projection.Scope.EnterpriseID), literal(projection.Scope.ApplicationServiceID), literal(projection.Scope.ScopePath), literal(projection.Projection.BaselineID), literal(projection.Projection.ManifestID), literal(projection.Projection.GenerationID), literal(projection.Projection.SchemaVersion), literal(projection.Source.SemanticSchemaVersion), literal(projection.Source.SourceProjectionManifestID), literal(projection.Source.SourceCoverageManifestID), literal(projection.Source.KnowledgeGenerationID), literal(projection.Source.CoverageGenerationID), literal(projection.Source.RelationshipVersion), literal(projection.Source.CatalogVersion), literal(projection.Source.CatalogDigest),
+	}
+	return fmt.Sprintf("INSERT VERTEX specforge_semantic_manifest(status, enterprise_id, application_service_id, scope_path, baseline_id, manifest_id, generation_id, schema_version, semantic_schema_version, source_projection_manifest_id, source_coverage_manifest_id, knowledge_generation_id, coverage_generation_id, relationship_version, catalog_version, catalog_digest) VALUES %s:(%s);", literal(stableID("sm", httpapi.EncodeScopeKey(projection.Scope)+":"+projection.Projection.ManifestID)), strings.Join(values, ", "))
 }

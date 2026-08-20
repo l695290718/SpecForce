@@ -13,6 +13,8 @@ export {
 } from "./projector.js";
 export { PrismaProjectionRepository, checkpointPartitionIdForEvent } from "./repository.js";
 export { PrismaSemanticProjectionSource, type SemanticGenerationScope, type SemanticPage, type SemanticSourceBinding } from "./semantic-source-repository.js";
+export { queryArchitectureSemantics, type SemanticActiveResolver, type SemanticPostgresFallback, type SemanticQueryDependencies, type SemanticQueryGateway, type SemanticQueryInput, type SemanticQueryResult } from "./semantic-query-service.js";
+export { buildSemanticGeneration, type SemanticBatch, type SemanticGenerationBuildOptions, type SemanticGenerationBuildReceipt, type SemanticGenerationDependencies, type SemanticGateway, type SemanticProjectionIdentity } from "./semantic-projector.js";
 export {
   compareGenerationParity,
   type GenerationParityOptions,
@@ -24,7 +26,10 @@ export {
   HttpGraphGateway,
   type HttpGraphGatewayOptions,
   type ProjectionPayload,
-  type ProjectionPayloadResolver
+  type ProjectionPayloadResolver,
+  type SemanticGatewayQuery,
+  type SemanticGatewayReceipt,
+  type SemanticGatewayRequest
 } from "./gateway.js";
 export {
   createProjectorRuntime,

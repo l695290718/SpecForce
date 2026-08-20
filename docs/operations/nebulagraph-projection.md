@@ -4,6 +4,25 @@
 
 PostgreSQL remains the authoritative store for authored design assets, typed relationships, and relationship outbox events. NebulaGraph is a rebuildable projection used by the graph adapter. The Graph Gateway is the only service that connects to NebulaGraph; authoring and MCP writes never depend on NebulaGraph availability.
 
+## Semantic 3A projection
+
+The semantic projection increment uses `nebula.3a.semantic.v1`. PostgreSQL remains authoritative for authored assets, Knowledge Projection rows, architecture units, coverage, relationships, and the generation head. NebulaGraph stores only a derived, generation-qualified projection.
+
+The build boundary is typed. A build must carry the exact application-service Scope, a `BUILDING` output Manifest, source Projection/Coverage Manifest IDs, source generation IDs, relationship version, catalog version/digest, and the semantic schema version. Ordinary semantic queries do not accept a generation from the caller; the application resolves the ACTIVE Manifest and the result must echo the same identity.
+
+The local query check is:
+
+```powershell
+./deploy/graph/verify-semantic-projection.ps1 `
+  -EnterpriseId enterprise-1 `
+  -ApplicationServiceId com.huawei.celon.desiner `
+  -ScopePath pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner `
+  -AssetType api `
+  -AssetId orders
+```
+
+`POSTGRESQL_FALLBACK` is an explicit read result when Nebula transport is unavailable. Identity mismatch, parity mismatch, and cross-Scope data are fail-closed errors and must not be hidden by fallback. The current local builder is bounded by page and batch limits; multi-node operations, scale certification, backup/restore, and billion-edge capacity remain deferred operational work.
+
 ## Deployment Modes
 
 ### Local compatibility verification

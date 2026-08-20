@@ -120,6 +120,14 @@ export class PrismaNebulaGenerationRepository {
     });
   }
 
+  async recordCheckpoint(scope: GenerationScope, manifestId: string, partitionId: string, projectionVersion: bigint, status: "COMPLETED" | "FAILED", error?: string): Promise<void> {
+    await this.prisma.nebulaProjectionCheckpoint.upsert({
+      where: { applicationServiceId_scopePath_manifestId_partitionId: { applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath, manifestId, partitionId } },
+      create: { applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath, manifestId, partitionId, projectionVersion, status, error: error ?? null, projectedAt: new Date() },
+      update: { projectionVersion, status, error: error ?? null, projectedAt: new Date() }
+    });
+  }
+
   async publish(scope: GenerationScope, manifestId: string): Promise<GenerationOperationReceipt> {
     return this.prisma.$transaction(async (transaction) => {
       await lockScope(transaction, scope);

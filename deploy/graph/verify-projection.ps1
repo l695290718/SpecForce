@@ -192,6 +192,8 @@ try {
   Assert-Condition ($gateway.depends_on."nebula-bootstrap".condition -eq "service_completed_successfully") "Gateway must wait for local Nebula bootstrap completion."
   Assert-Condition ($null -eq $gateway.depends_on.postgres) "Gateway must not depend on a PostgreSQL service."
   Assert-Condition ($gateway.depends_on."nebula-graphd".condition -eq "service_healthy") "Gateway must wait for healthy Nebula graphd."
+  Assert-Condition ($gateway.environment.DATABASE_URL -match "deploy-postgres-1:5432/specforge_canonical") "Gateway must use the canonical PostgreSQL connection for ACTIVE Manifest resolution."
+  Assert-Condition ($gateway.networks.PSObject.Properties.Name -contains "deploy_default") "Gateway must join deploy_default for PostgreSQL ACTIVE Manifest resolution."
   Assert-Condition ($null -eq $projector.depends_on.postgres) "Projector must not depend on a PostgreSQL service."
   Assert-Condition ($projector.depends_on."nebula-graphd".condition -eq "service_healthy") "Projector must wait for healthy Nebula graphd."
   Assert-Condition ($projector.depends_on."graph-gateway".condition -eq "service_healthy") "Projector must wait for a healthy Gateway."

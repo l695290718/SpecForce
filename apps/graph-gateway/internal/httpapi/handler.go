@@ -15,8 +15,15 @@ type Handler struct {
 }
 
 func NewHandler(client NebulaClient) http.Handler {
+	return NewHandlerWithResolver(client, nil)
+}
+
+func NewHandlerWithResolver(client NebulaClient, resolver ActiveManifestResolver) http.Handler {
 	semantic, _ := client.(SemanticClient)
 	active, _ := client.(ActiveManifestResolver)
+	if resolver != nil {
+		active = resolver
+	}
 	handler := Handler{client: client, semantic: semantic, active: active}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/projections", handler.project)

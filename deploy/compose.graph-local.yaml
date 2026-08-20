@@ -85,6 +85,7 @@ services:
       dockerfile: deploy/graph-gateway.Dockerfile
     restart: unless-stopped
     environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to deploy-postgres-1/specforge_canonical in deploy/graph/.env}
       SPECFORGE_GRAPH_GATEWAY_PORT: "8088"
       SPECFORGE_NEBULA_ADDRESS: nebula-graphd:9669
       SPECFORGE_NEBULA_USER: ${SPECFORGE_NEBULA_USER:?Set SPECFORGE_NEBULA_USER in deploy/graph/.env}
@@ -101,6 +102,9 @@ services:
       timeout: 5s
       retries: 12
       start_period: 20s
+    networks:
+      - default
+      - deploy_default
 
   graph-projector:
     image: ${SPECFORGE_GRAPH_PROJECTOR_IMAGE:-specforge/graph-projector:local}
