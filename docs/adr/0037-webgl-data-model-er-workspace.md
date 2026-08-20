@@ -2,9 +2,9 @@
 
 ## Status
 
-Implemented in the repository for the exact Designer Scope. The field-bearing entity cards, field-port relationships, camera controls, entity dragging, exact-Scope local position restoration, bilingual semantic fallback, and inspector are implemented. Focused tests, Web typecheck, and the non-standalone Web build pass. Fresh in-app browser acceptance after restarting port 3000 was blocked by the browser URL policy, and port 3010 Docker acceptance remains pending; no production-scale claim is made.
+Implemented in the repository for the exact Designer Scope. The field-bearing entity cards, field-port relationships, camera controls, entity dragging, exact-Scope local position restoration, bilingual semantic fallback, and inspector are implemented. Focused tests, Web typecheck, the non-standalone Web build, Docker image rebuild, and port 3010 health pass. Fresh in-app browser acceptance after restarting port 3000 was blocked by the browser URL policy; 3010 browser interaction acceptance remains pending. No production-scale claim is made.
 
-已在精确 Designer Scope 的仓库代码中实现。带字段行的实体表卡片、字段端口关系、画布相机控制、实体拖拽、精确 Scope 本地位置恢复、双语语义回退和检查器已经实现。聚焦测试、Web 类型检查和非 standalone Web 构建通过；3000 端口重启后的新鲜应用内浏览器验收被浏览器 URL 安全策略阻塞，3010 Docker 验收仍待执行；不宣称已达到生产规模。
+已在精确 Designer Scope 的仓库代码中实现。带字段行的实体表卡片、字段端口关系、画布相机控制、实体拖拽、精确 Scope 本地位置恢复、双语语义回退和检查器已经实现。聚焦测试、Web 类型检查、非 standalone Web 构建、Docker 镜像重建和 3010 健康检查通过；3000 端口重启后的新鲜应用内浏览器验收被浏览器 URL 安全策略阻塞，3010 浏览器交互验收仍待执行；不宣称已达到生产规模。
 
 ## Corrective Clarification (2026-08-20)
 
@@ -48,9 +48,9 @@ The page can explain field-level relationships and keep the current Scope visibl
 
 ## Verification and Boundary
 
-The implementation evidence must record focused tests, web typecheck, web build, manifest checks, federation checks, and an exact-Scope browser inspection when available. The current 3000 browser inspection is blocked by the browser URL policy after the service restart; 3010 Docker browser acceptance is still pending. Retry when the in-app browser can access the restarted local URL and the Docker image has been rebuilt. Production capacity, external identity, continuous synchronization, and graph-store scale certification are deferred.
+The implementation evidence must record focused tests, web typecheck, web build, manifest checks, federation checks, and an exact-Scope browser inspection when available. The current 3000 browser inspection is blocked by the browser URL policy after the service restart; the rebuilt 3010 Docker service is healthy but its browser interaction acceptance is still pending. Retry when the in-app browser can access the restarted local URL.
 
-实现证据必须记录聚焦测试、Web 类型检查、Web 构建、manifest 校验、联邦校验，以及条件允许时的精确 Scope 浏览器检查。当前 3000 端口重启后的浏览器检查被 URL 安全策略阻塞，3010 Docker 浏览器验收仍待执行；应在应用内浏览器可以访问重启后的本地 URL 且 Docker 镜像重建后重试。生产容量、外部身份、持续同步和图存储规模认证延期处理。
+实现证据必须记录聚焦测试、Web 类型检查、Web 构建、manifest 校验、联邦校验，以及条件允许时的精确 Scope 浏览器检查。当前 3000 端口重启后的浏览器检查被 URL 安全策略阻塞；重建后的 3010 Docker 服务已健康，但浏览器交互验收仍待执行；应在应用内浏览器可以访问重启后的本地 URL 后重试。生产容量、外部身份、持续同步和图存储规模认证延期处理。
 
 ## 中文本地化覆盖
 

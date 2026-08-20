@@ -174,7 +174,7 @@ This written design records approved behavior and the implemented repository sli
 
 # 字段锚定、可拖拽的 ER 表卡片
 
-状态：设计已确认，Tasks 1-5 已实现；3000 浏览器验收受 URL 安全策略阻塞，3010 Docker 验收待执行
+状态：设计已确认，Tasks 1-5 已实现；3000 浏览器验收受 URL 安全策略阻塞，3010 Docker 已重建并健康，浏览器交互验收待执行
 
 日期：2026-08-20
 

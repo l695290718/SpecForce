@@ -2101,9 +2101,9 @@
                           { "sourceType": "proposal", "sourceId": "proposal-webgl-data-model-er-workspace", "targetType": "api", "targetId": "api-specforge-data-model-graph-query", "relationType": "IMPACTS" }
                       ],
                       "owner": "SpecForge Architecture and Web Runtime",
-                      "status": "Repository implementation complete for field-aware draggable ER cards and inspector; exact-Scope MCP synchronization and local verification are complete; fresh 3000 browser acceptance is blocked by the browser URL policy after restart and 3010 Docker browser acceptance remains pending",
+                      "status": "Repository implementation complete for field-aware draggable ER cards and inspector; exact-Scope MCP synchronization, local verification, Docker rebuild, and 3010 health are complete; fresh 3000 browser acceptance is blocked by the browser URL policy after restart and 3010 browser interaction acceptance remains pending",
                       "reason": "The Data Model surface needs a dedicated field-bearing ER workspace while PostgreSQL remains authoritative and the browser remains read-only.",
-                      "retryTrigger": "Retry 3000 in-app browser acceptance when the browser URL policy permits the restarted local URL, then rebuild the 3010 Docker image and repeat the same acceptance before declaring the session converged.",
+                      "retryTrigger": "Retry 3000 and 3010 in-app browser acceptance when the browser URL policy permits the local URLs; Docker rebuild and 3010 health are already verified.",
                       "localizedContent": {
                           "en": {
                               "decision": "Use a bounded PixiJS WebGL ER workspace with a semantic fallback, exact-Scope graph reads, dual waterlines, and MCP-only authoring.",
@@ -2124,7 +2124,7 @@
                           { "command": "$env:SPECFORGE_APPLICATION_SERVICE_ID='com.huawei.celon.desiner'; $env:SPECFORGE_SCOPE_PATH='pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner'; pnpm design-facts:federation:check", "result": "Passed with blocking=false." },
                           { "command": "Invoke-WebRequest -UseBasicParsing http://localhost:3000/assets/data-models?scope=com.huawei.celon.desiner^&view=er", "result": "Passed: HTTP 200 after restarting the current SpecForge dev service; fresh in-app browser inspection was blocked by the browser URL policy and is not claimed." },
                           { "command": "In-app browser inspection after 3000 restart", "result": "BLOCKED: browser URL policy rejected access to the restarted local URL; retry when the browser permits the local page." },
-                          { "command": "3010 Docker ER browser acceptance", "result": "PENDING: Docker service health and clean-tab ER interaction acceptance still require an image rebuild and browser access." },
+                          { "command": "powershell -ExecutionPolicy Bypass -File .\\deploy\\scripts\\start.ps1; Invoke-WebRequest -UseBasicParsing http://localhost:3010/healthz; docker ps --format '{{.Names}} {{.Status}} {{.Ports}}'", "result": "Passed: Docker images rebuilt; 3010 /healthz returned 200; deploy-web-1, deploy-knowledge-projector-1, and deploy-connector-worker-1 reported healthy. Clean-tab ER interaction acceptance remains pending because browser URL access is blocked." },
                           { "command": "git diff --check", "result": "Passed with Windows line-ending normalization warnings only." }
                       ]
                   }
