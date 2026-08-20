@@ -271,3 +271,27 @@ Only incomplete work is listed here. Completed and superseded records are preser
 **完成证据：** 生产者不再向 Designer Scope 写入验证数据；聚焦测试使用隔离 Scope 并确定性清理；9 条已知记录通过获批且可审计的路径删除；MCP 目录回读确认记录消失，同时不改变生产设计资产或 v5 架构成员。
 
 **设计引用：** ADR-0025；`docs/superpowers/specs/2026-08-15-designer-3a-v5-membership-expansion-design.md`。
+
+## 11. Production Certification For The Data Model ER Workspace
+
+**Status:** Deferred; repository implementation is present, but MCP read-back, fresh browser acceptance, and production capacity certification are not claimed.
+
+**Owner:** SpecForge Architecture and Web Runtime.
+
+**Rationale:** The current slice provides exact-Scope reads, PixiJS WebGL rendering, semantic fallback, URL state, and bounded client-capacity semantics. External identity, continuous legacy synchronization, graph-store scale, and fresh visual acceptance require environment-specific evidence.
+
+**Trigger:** Run the exact Designer-Scope design-fact synchronization and read-back, start the canonical Web service, perform desktop and compact browser checks, and certify declared capacity with production telemetry.
+
+**Completion evidence:** MCP records and typed links read back with no missing, mismatched, out-of-scope, or blocked facts; the browser confirms MODEL/SCOPE isolation, filters, selection, bilingual rendering, WebGL fallback, and snapshot recovery; production capacity is measured rather than inferred.
+
+**中文本地化：**
+
+**状态：** 延期；仓库实现已存在，但未声明 MCP 回读、新的浏览器验收和生产容量认证已完成。
+
+**负责人：** SpecForge 架构与 Web 运行时团队。
+
+**理由：** 当前切片提供精确 Scope 读取、PixiJS WebGL 渲染、语义回退、URL 状态和有界客户端容量语义。外部身份、存量系统持续同步、图存储规模和新的视觉验收需要依赖环境的证据。
+
+**启动条件：** 在精确 Designer Scope 执行设计事实同步与回读，启动权威 Web 服务，完成桌面和紧凑视口检查，并用生产遥测认证声明的容量。
+
+**完成证据：** MCP 记录与有类型链接回读时 missing、mismatched、outOfScope、blocked 均为空；浏览器确认 MODEL/SCOPE 隔离、过滤、选择、双语、WebGL 回退和快照恢复；生产容量通过测量得到而非推断。

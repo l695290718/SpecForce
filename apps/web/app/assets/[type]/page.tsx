@@ -7,6 +7,8 @@ import { LocalizedSearchInput } from "../../../components/localized-search-input
 import { buildScopedHref } from "../../../lib/scope";
 import { getRequestLocale, withSearchParams } from "../../../lib/locale";
 import { getRequestPrincipal } from "../../../lib/request-principal";
+import { requireReadableApplicationService } from "../../../lib/scope";
+import { DataModelGraphSurface } from "../../../components/asset-detail-sections";
 
 export default async function AssetListPage({ params, searchParams }: { params: Promise<{ type: AssetRouteType }>; searchParams: Promise<{ q?: string; scope?: string; limit?: string; offset?: string }> }) {
   const { type } = await params;
@@ -18,6 +20,7 @@ export default async function AssetListPage({ params, searchParams }: { params: 
   const offset = boundedInteger(offsetParam, 0, 0, Number.MAX_SAFE_INTEGER);
   const result = await searchScopedAssets(assetType, scope, q, locale, { limit, offset }, principal);
   const assets = result.items.map((item) => item.asset);
+  const scopeRef = assetType === "dataModel" ? requireReadableApplicationService(scope, principal) : undefined;
 
   return (
     <>
@@ -30,6 +33,7 @@ export default async function AssetListPage({ params, searchParams }: { params: 
           <div className="text-sm text-muted">{result.total} <T k="asset.countSuffix" /></div>
         </form>
       </Card>
+      {assetType === "dataModel" && scopeRef ? <DataModelGraphSurface locale={locale} scope={scopeRef.id} scopePath={scopeRef.scopePath} defaultView="list" defaultMode="SCOPE" allowScopeMode={false} /> : null}
       <DataTable
         columns={[<T k="table.name" key="name" />, <T k="table.type" key="type" />, <T k="table.description" key="description" />, <T k="table.updated" key="updated" />, <T k="table.details" key="details" />]}
         rows={assets.map((asset) => [

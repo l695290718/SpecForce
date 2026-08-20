@@ -2019,5 +2019,93 @@
                               }
                           ]
                       }
+                  ,
+                  {
+                      "id": "adr-webgl-data-model-er-workspace",
+                      "repositoryAdr": "docs/adr/0037-webgl-data-model-er-workspace.md",
+                      "mcpAdrId": "adr-webgl-data-model-er-workspace",
+                      "scope": {
+                          "applicationServiceId": "com.huawei.celon.desiner",
+                          "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                      },
+                      "proposalId": "proposal-webgl-data-model-er-workspace",
+                      "proposalStatus": "implemented",
+                      "contextPackId": "ctx-webgl-data-model-er-workspace",
+                      "relatedAssetIds": [
+                          "data-specforge-assets",
+                          "data-specforge-asset-graph",
+                          "api-specforge-data-model-graph-query"
+                      ],
+                      "managedAssets": [
+                          {
+                              "assetType": "api",
+                              "asset": {
+                                  "id": "api-specforge-data-model-graph-query",
+                                  "type": "api",
+                                  "name": "SpecForge Data Model Graph Query",
+                                  "title": "SpecForge Data Model Graph Query",
+                                  "description": "Read-only exact-Scope Data Model graph query with signed cursors, dual waterlines, bounded capacity, and semantic fallback.",
+                                  "localizedContent": {
+                                      "en": {
+                                          "name": "SpecForge Data Model Graph Query",
+                                          "description": "Read-only exact-Scope Data Model graph query with signed cursors, dual waterlines, bounded capacity, and semantic fallback.",
+                                          "authType": "Scoped principal"
+                                      },
+                                      "zh": {
+                                          "name": "SpecForge 数据模型关系图查询",
+                                          "description": "按精确 Scope 提供只读数据模型关系图查询，支持签名游标、双水位、有界容量和语义回退。",
+                                          "authType": "Scope 作用域主体"
+                                      }
+                                  },
+                                  "method": "GET",
+                                  "path": "/api/data-model-graph",
+                                  "providerSystem": "SpecForge Web",
+                                  "authType": "ScopedPrincipal",
+                                  "requestSchema": {
+                                      "scope": "application-service id",
+                                      "scopePath": "exact scope path",
+                                      "mode": "MODEL|SCOPE",
+                                      "rootModelId": "optional model id",
+                                      "filters": "search, nodeTypes, relationshipCodes",
+                                      "cursor": "signed opaque cursor"
+                                  },
+                                  "responseSchema": {
+                                      "nodes": "bounded model/entity/field records",
+                                      "edges": "typed CONTAINS/REFERENCES records",
+                                      "waterlines": "catalog and relationship bindings",
+                                      "errors": "explicit fallback and partial states"
+                                  },
+                                  "errorCodes": ["SCOPE_UNAVAILABLE", "CURSOR_INVALID", "SNAPSHOT_CHANGED", "CLIENT_CAPACITY_EXCEEDED", "PARTIAL"]
+                              }
+                          }
+                      ],
+                      "managedRelationships": [
+                          { "sourceType": "adr", "sourceId": "adr-webgl-data-model-er-workspace", "targetType": "dataModel", "targetId": "data-specforge-assets", "relationType": "GOVERNS" },
+                          { "sourceType": "adr", "sourceId": "adr-webgl-data-model-er-workspace", "targetType": "api", "targetId": "api-specforge-data-model-graph-query", "relationType": "GOVERNS" },
+                          { "sourceType": "proposal", "sourceId": "proposal-webgl-data-model-er-workspace", "targetType": "api", "targetId": "api-specforge-data-model-graph-query", "relationType": "IMPACTS" }
+                      ],
+                      "owner": "SpecForge Architecture and Web Runtime",
+                      "status": "Repository implementation complete; web build blocked by pre-existing node:crypto webpack error; MCP synchronization and fresh browser acceptance pending",
+                      "reason": "The Data Model surface needs a dedicated field-bearing ER workspace while PostgreSQL remains authoritative and the browser remains read-only.",
+                      "retryTrigger": "Run exact-Scope design-fact synchronization and read-back, then perform a fresh browser inspection before closing the design-change session.",
+                      "localizedContent": {
+                          "en": {
+                              "decision": "Use a bounded PixiJS WebGL ER workspace with a semantic fallback, exact-Scope graph reads, dual waterlines, and MCP-only authoring.",
+                              "constraints": ["PostgreSQL is authoritative.", "No cross-Scope aggregation.", "Production scale is not certified by local browser tests."]
+                          },
+                          "zh": {
+                              "decision": "采用有界 PixiJS WebGL ER 工作区、语义回退、精确 Scope 图读取、双水位和 MCP-only 编写边界。",
+                              "constraints": ["PostgreSQL 保持权威。", "禁止跨 Scope 聚合。", "本地浏览器测试不等同于生产规模认证。"]
+                          }
+                      },
+                      "evidence": [
+                          { "command": "pnpm exec vitest run --exclude \".worktrees/**\" --exclude \".pnpm-store/**\" packages/core apps/web", "result": "76 tests passed across 21 files, including ER, graph query, and manifest coverage." },
+                          { "command": "pnpm --filter @specforge/web typecheck", "result": "Passed." },
+                          { "command": "pnpm --filter @specforge/web build", "result": "Blocked by pre-existing webpack UnhandledSchemeError for node:crypto through packages/core/src/graph/projection-generation.ts -> existing app shell; Task 5 did not change this import chain." },
+                          { "command": "pnpm design-facts:check", "result": "Blocked: Asset not found: adr/adr-webgl-data-model-er-workspace because MCP persistence is pending." },
+                          { "command": "$env:SPECFORGE_APPLICATION_SERVICE_ID='com.huawei.celon.desiner'; $env:SPECFORGE_SCOPE_PATH='pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner'; pnpm design-facts:federation:check", "result": "Passed with blocking=false." },
+                          { "command": "git diff --check", "result": "Passed with Windows line-ending normalization warnings only." }
+                      ]
+                  }
                   ]
 }

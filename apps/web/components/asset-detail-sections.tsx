@@ -1,19 +1,29 @@
-import type { ApiContract, AssetLocale, AssetType, DataModel, EventContract, StateMachine } from "@specforge/core";
-import { Badge, Card, DataTable } from "./ui";
+"use client";
 
-export function SpecializedAssetSections({ assetType, asset, locale }: { assetType: AssetType; asset: Record<string, any>; locale: AssetLocale }) {
-  if (assetType === "dataModel") return <DataModelSection model={asset as DataModel} locale={locale} />;
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import type { ApiContract, AssetLocale, AssetType, DataModel, DataModelGraphResponse, EventContract, StateMachine } from "@specforge/core";
+import { Badge, Card, DataTable } from "./ui";
+import { DataModelErWorkspace } from "./data-model-er/data-model-er-workspace";
+import { ErInspector } from "./data-model-er/er-inspector";
+import { ErToolbar, type ErToolbarMode, type ErView } from "./data-model-er/er-toolbar";
+
+export function SpecializedAssetSections({ assetType, asset, locale, scope, scopePath }: { assetType: AssetType; asset: Record<string, any>; locale: AssetLocale; scope?: string; scopePath?: string }) {
+  if (assetType === "dataModel") return <DataModelSection model={asset as DataModel} locale={locale} scope={scope ?? asset.architectureScope?.applicationServiceId ?? ""} scopePath={scopePath ?? asset.architectureScope?.scopePath ?? ""} />;
   if (assetType === "stateMachine") return <StateMachineSection machine={asset as StateMachine} locale={locale} />;
   if (assetType === "api") return <ApiContractSection api={asset as ApiContract} locale={locale} />;
   if (assetType === "event") return <EventContractSection event={asset as EventContract} locale={locale} />;
   return null;
 }
 
-function DataModelSection({ model, locale }: { model: DataModel; locale: AssetLocale }) {
+function DataModelSection({ model, locale, scope, scopePath }: { model: DataModel; locale: AssetLocale; scope: string; scopePath: string }) {
   const l = labels[locale];
+  const params = useSearchParams();
+  const view = (params.get("view") as ErView | null) ?? "er";
   return (
     <div className="mt-6 grid gap-6">
-      <Card>
+      <DataModelGraphSurface locale={locale} scope={scope} scopePath={scopePath} modelId={model.id} defaultView="er" defaultMode="MODEL" allowScopeMode />
+      {view === "list" ? <Card>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold">{l.fieldCatalog}</h2>
           <Badge tone="blue">{model.modelType}</Badge>
@@ -31,7 +41,7 @@ function DataModelSection({ model, locale }: { model: DataModel; locale: AssetLo
             field.owner
           ])}
         />
-      </Card>
+      </Card> : null}
       <div className="grid gap-6 lg:grid-cols-3">
         <InfoList title={l.relationships} items={model.relationships} empty={l.none} />
         <InfoList title={l.constraints} items={model.constraints} empty={l.none} />
@@ -42,6 +52,50 @@ function DataModelSection({ model, locale }: { model: DataModel; locale: AssetLo
       </div>
     </div>
   );
+}
+
+export function DataModelGraphSurface({ locale, scope, scopePath, modelId, defaultView, defaultMode, allowScopeMode }: { locale: AssetLocale; scope: string; scopePath: string; modelId?: string; defaultView: ErView; defaultMode: ErToolbarMode; allowScopeMode: boolean }) {
+  const params = useSearchParams();
+  const [response, setResponse] = useState<DataModelGraphResponse>();
+  const [error, setError] = useState<string>();
+  const view = (params.get("view") as ErView | null) ?? defaultView;
+  const mode = (params.get("mode") as ErToolbarMode | null) ?? defaultMode;
+  const rootModelId = mode === "MODEL" ? (params.get("rootModelId") ?? modelId) : undefined;
+  const query = useMemo(() => {
+    const query = new URLSearchParams({ scope, scopePath, mode, pageSize: "200", clientCapacity: "5000" });
+    if (rootModelId) query.set("rootModelId", rootModelId);
+    const search = params.get("search");
+    const nodeTypes = params.get("nodeTypes");
+    const relationshipCodes = params.get("relationshipCodes");
+    if (search) query.set("search", search);
+    if (nodeTypes) query.set("nodeTypes", nodeTypes);
+    if (relationshipCodes) query.set("relationshipCodes", relationshipCodes);
+    return query.toString();
+  }, [mode, nodeTypesKey(params), params, rootModelId, scope, scopePath]);
+
+  useEffect(() => {
+    let active = true;
+    setError(undefined);
+    fetch(`/api/data-model-graph?${query}`, { headers: { "x-specforge-application-service-id": scope, "x-specforge-scope-path": scopePath } })
+      .then(async (result) => {
+        const payload = await result.json() as DataModelGraphResponse | { error?: { code?: string } };
+        if (!result.ok) throw new Error("error" in payload && payload.error?.code ? payload.error.code : "GRAPH_READ_FAILED");
+        return payload as DataModelGraphResponse;
+      })
+      .then((payload) => { if (active) setResponse(payload); })
+      .catch((reason: unknown) => { if (active) { setResponse(undefined); setError(reason instanceof Error ? reason.message : "GRAPH_READ_FAILED"); } });
+    return () => { active = false; };
+  }, [query, scope, scopePath]);
+
+  const title = locale === "zh" ? "数据模型关系工作区" : "Data model relationship workspace";
+  return <section className="overflow-hidden rounded-lg border border-border bg-white" aria-label={title}>
+    <ErToolbar locale={locale} defaultView={defaultView} defaultMode={defaultMode} allowScopeMode={allowScopeMode} rootModelId={modelId} />
+    {view === "er" ? response ? <><DataModelErWorkspace responses={[response]} locale={locale} title={title} /><ErInspector response={response} locale={locale} /></> : <div className="p-6 text-sm text-muted" role="status">{error ? `${locale === "zh" ? "关系图读取失败" : "Graph read failed"}: ${error}` : (locale === "zh" ? "正在读取关系事实…" : "Reading relationship facts…")}</div> : null}
+  </section>;
+}
+
+function nodeTypesKey(params: Readonly<URLSearchParams>): string {
+  return `${params.get("search") ?? ""}|${params.get("nodeTypes") ?? ""}|${params.get("relationshipCodes") ?? ""}|${params.get("view") ?? ""}|${params.get("mode") ?? ""}|${params.get("rootModelId") ?? ""}`;
 }
 
 function StateMachineSection({ machine, locale }: { machine: StateMachine; locale: AssetLocale }) {

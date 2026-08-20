@@ -5,13 +5,16 @@ import { T } from "../../../../components/language-provider";
 import { SpecializedAssetSections } from "../../../../components/asset-detail-sections";
 import { getRequestLocale } from "../../../../lib/locale";
 import { getRequestPrincipal } from "../../../../lib/request-principal";
+import { requireReadableApplicationService } from "../../../../lib/scope";
 
 export default async function AssetDetailPage({ params, searchParams }: { params: Promise<{ type: AssetRouteType; id: string }>; searchParams: Promise<{ scope?: string }> }) {
   const { type, id } = await params;
   const { scope = "" } = await searchParams;
   const locale = await getRequestLocale();
   const assetType = routeToAssetType(type);
-  const detail = await getScopedAssetDetail(assetType, id, scope, locale, await getRequestPrincipal());
+  const principal = await getRequestPrincipal();
+  const detail = await getScopedAssetDetail(assetType, id, scope, locale, principal);
+  const scopeRef = assetType === "dataModel" ? requireReadableApplicationService(scope, principal) : undefined;
   const asset = detail.asset as Record<string, any>;
   const checks = detail.governance;
   const title = asset.title ?? asset.name;
@@ -36,7 +39,7 @@ export default async function AssetDetailPage({ params, searchParams }: { params
           </div>
         </Card>
       </div>
-      <SpecializedAssetSections assetType={routeToAssetType(type)} asset={asset} locale={locale} />
+      <SpecializedAssetSections assetType={routeToAssetType(type)} asset={asset} locale={locale} scope={scopeRef?.id} scopePath={scopeRef?.scopePath} />
       <Card className="mt-6">
         <h2 className="mb-3 text-base font-semibold"><T k="asset.structuredContent" /></h2>
         <pre className="rounded-md bg-slate-950 p-4 text-xs text-slate-50">{JSON.stringify(asset, null, 2)}</pre>

@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(24);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(24);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(24);
+  expect(manifest.decisions).toHaveLength(25);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(25);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(25);
   const proposalByContextPack = new Map<string, string>();
 
   for (const decision of manifest.decisions) {
@@ -32,6 +32,22 @@ it("maps every baseline decision to a complete repository and MCP record", () =>
 
 it("includes federated design-fact governance in the baseline", () => {
   expect(manifest.decisions.some((decision) => decision.mcpAdrId === "adr-federated-design-fact-synchronization")).toBe(true);
+});
+
+it("records the scoped Data Model ER workspace without claiming MCP or browser completion", () => {
+  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-webgl-data-model-er-workspace");
+  expect(decision?.repositoryAdr).toBe("docs/adr/0037-webgl-data-model-er-workspace.md");
+  expect(decision?.proposalId).toBe("proposal-webgl-data-model-er-workspace");
+  expect(decision?.contextPackId).toBe("ctx-webgl-data-model-er-workspace");
+  expect(decision?.scope).toEqual(expectedScope);
+  expect(decision?.status).toContain("MCP synchronization");
+  expect(decision?.localizedContent?.en.decision).toContain("semantic fallback");
+  expect(decision?.localizedContent?.zh.decision).toContain("语义回退");
+  expect(decision?.managedAssets?.some((managed) => managed.asset.id === "api-specforge-data-model-graph-query")).toBe(true);
+  expect(decision?.managedRelationships).toEqual(expect.arrayContaining([
+    expect.objectContaining({ sourceId: "adr-webgl-data-model-er-workspace", targetId: "data-specforge-assets", relationType: "GOVERNS" }),
+    expect.objectContaining({ sourceId: "proposal-webgl-data-model-er-workspace", targetId: "api-specforge-data-model-graph-query", relationType: "IMPACTS" })
+  ]));
 });
 
 it("includes Agent-driven legacy baseline discovery in the baseline", () => {
