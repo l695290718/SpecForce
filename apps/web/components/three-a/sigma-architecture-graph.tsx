@@ -4,11 +4,13 @@ import type Sigma from "sigma";
 import type { EdgeProgramType } from "sigma/rendering";
 import FA2LayoutSupervisor from "graphology-layout-forceatlas2/worker";
 import noverlap from "graphology-layout-noverlap";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { GRAPH_CAMERA_TRANSITION_MS, GRAPH_PULSE_MS, type GraphPulseState } from "./architecture-graph-motion";
 import { deterministicLayout, type LayoutLifecycle, type LayoutRunMode, type LayoutWorkerRequest } from "./architecture-graph-layout-worker";
 import { NOVERLAP_PARAMETERS, forceSettings, runForceArchitectureLayout } from "./architecture-graph-layout-force";
 import { nodeColor, nodeSize, oneHopNeighborhood, visibleLabel, type ArchitectureGraphStore, type GraphEdgeAttributes, type GraphNodeAttributes } from "./architecture-graph-store";
+import { relationColor } from "./architecture-graph-relations";
+import { ArchitectureGraphMinimap } from "./architecture-graph-minimap";
 import type { ArchitectureGraphSemanticState } from "./architecture-graph-state";
 
 export type ArchitectureGraphView = "overview" | "explore" | "impact";
@@ -71,6 +73,8 @@ export interface SigmaArchitectureGraphProps {
   reducedMotion: boolean;
   semanticState?: ArchitectureGraphSemanticState;
   retryKey?: number;
+  hiddenRelations?: ReadonlySet<string>;
+  overlay?: ReactNode;
   onNodeSelect(id: string): void;
   onNodeHover?(id?: string): void;
   onStageClick?(): void;
@@ -82,6 +86,7 @@ export interface SigmaArchitectureGraphProps {
 }
 
 type SigmaInstance = Sigma<GraphNodeAttributes, GraphEdgeAttributes>;
+const EMPTY_RELATION_FILTER: ReadonlySet<string> = new Set<string>();
 type SigmaEdgeProgram = EdgeProgramType<GraphNodeAttributes, GraphEdgeAttributes>;
 type GraphVisualSelection = Pick<ArchitectureGraphSemanticState, "selectedId" | "hoveredId" | "neighborhoodIds">;
 type GraphNodeInput = GraphNodeAttributes & Partial<{ size: number }>;
@@ -136,8 +141,9 @@ export function createNodeVisualState(nodeId: string, data: GraphNodeInput, stat
   };
 }
 
-export function createEdgeVisualState(edge: GraphEdgeInput, state: Partial<GraphVisualSelection> = {}, layoutAnimating = false): GraphEdgeVisualState {
+export function createEdgeVisualState(edge: GraphEdgeInput, state: Partial<GraphVisualSelection> & { hiddenRelations?: ReadonlySet<string> } = {}, layoutAnimating = false): GraphEdgeVisualState {
   const attributes = "attributes" in edge ? edge.attributes : edge;
+  if (state.hiddenRelations?.has(attributes.relationCode)) return { color: "transparent", size: 0, hidden: true, highlighted: false, zIndex: 0, opacity: 0 };
   const focusId = state.selectedId ?? state.hoveredId;
   const neighborhoodIds = state.neighborhoodIds ?? new Set<string>();
   const highlighted = neighborhoodIds.has(edge.source) && neighborhoodIds.has(edge.target);
@@ -151,7 +157,7 @@ export function createEdgeVisualState(edge: GraphEdgeInput, state: Partial<Graph
   const effectiveOpacity = moving ? Math.max(0.14, opacity * 0.6) : opacity;
 
   return {
-    color: edgeColor(attributes, effectiveOpacity),
+    color: relationColor(attributes.relationCode, effectiveOpacity),
     size: moving ? size * 0.8 : size,
     hidden: false,
     highlighted: connected || attributes.highlighted === true,
@@ -209,7 +215,7 @@ async function loadEdgeCurveProgram(): Promise<SigmaEdgeProgram | undefined> {
   }
 }
 
-export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, reducedMotion, semanticState, retryKey = 0, onNodeSelect, onNodeHover, onStageClick, onEdgeSelect, onRendererFailure, onRendererReady, onControllerReady, onLayoutLifecycleChange }: SigmaArchitectureGraphProps) {
+export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, reducedMotion, semanticState, retryKey = 0, hiddenRelations, overlay, onNodeSelect, onNodeHover, onStageClick, onEdgeSelect, onRendererFailure, onRendererReady, onControllerReady, onLayoutLifecycleChange }: SigmaArchitectureGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sigmaRef = useRef<SigmaInstance | undefined>(undefined);
   const callbacksRef = useRef({ onNodeSelect, onNodeHover, onStageClick, onEdgeSelect, onRendererFailure, onRendererReady, onControllerReady, onLayoutLifecycleChange });
@@ -225,6 +231,8 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
   const layoutRunIdRef = useRef(0);
   const layoutLifecycleRef = useRef<LayoutLifecycle>("seeded");
   const layoutActionsRef = useRef<SigmaArchitectureGraphLayoutActions>({ start: () => undefined, stop: () => undefined, restart: () => undefined });
+  const hiddenRelationsRef = useRef<ReadonlySet<string>>(hiddenRelations ?? EMPTY_RELATION_FILTER);
+  hiddenRelationsRef.current = hiddenRelations ?? EMPTY_RELATION_FILTER;
   callbacksRef.current = { onNodeSelect, onNodeHover, onStageClick, onEdgeSelect, onRendererFailure, onRendererReady, onControllerReady, onLayoutLifecycleChange };
   semanticStateRef.current = semanticState;
   const graphShape = `${store.graph.order}:${store.graph.size}`;
@@ -376,7 +384,7 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
       if (disposed) return;
       const edgeCurveProgram = await loadEdgeCurveProgram();
       if (disposed) return;
-      const sigma = new SigmaRenderer(store.graph, container, createSigmaSettings(store, selectedRef, hoverRef, semanticStateRef, layoutAnimatingRef, pulseRef, highlightedRef, edgeCurveProgram));
+      const sigma = new SigmaRenderer(store.graph, container, createSigmaSettings(store, selectedRef, hoverRef, semanticStateRef, layoutAnimatingRef, pulseRef, highlightedRef, edgeCurveProgram, hiddenRelationsRef));
       sigmaRef.current = sigma;
       const clearSelection = () => {
         selectedRef.current = undefined;
@@ -433,7 +441,20 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
     else highlightedRef.current = new Set();
     sigmaRef.current?.refresh();
   }, [semanticState, store]);
-  return <div className="h-[clamp(36rem,calc(100dvh-12rem),52rem)] min-h-0 w-full overflow-hidden" data-testid="sigma-architecture-graph" ref={containerRef} />;
+  useEffect(() => {
+    sigmaRef.current?.refresh();
+  }, [hiddenRelations]);
+  const minimapCameraProvider = () => {
+    const camera = sigmaRef.current?.getCamera();
+    return camera ? { getState: () => camera.getState(), animate: (state: { x?: number; y?: number }, options?: { duration?: number }) => void camera.animate(state as never, options as never) } : undefined;
+  };
+  return (
+    <div className="relative h-[clamp(36rem,calc(100dvh-12rem),52rem)] min-h-0 w-full overflow-hidden" data-testid="sigma-architecture-graph">
+      <div className="h-full w-full" ref={containerRef} />
+      <ArchitectureGraphMinimap store={store} cameraProvider={minimapCameraProvider} />
+      {overlay ? <div className="pointer-events-none absolute inset-0">{overlay}</div> : null}
+    </div>
+  );
 }
 
 export function createLayoutRequest(store: ArchitectureGraphStore, _view: ArchitectureGraphView, layoutMode: LayoutRunMode, reducedMotion: boolean): LayoutWorkerRequest {
@@ -453,7 +474,8 @@ export function createSigmaSettings(
   layoutAnimatingRef: React.RefObject<boolean> = { current: false },
   pulseRef: React.RefObject<GraphPulseState | undefined> = { current: undefined },
   highlightedRef: React.RefObject<ReadonlySet<string> | undefined> = { current: undefined },
-  edgeCurveProgram?: SigmaEdgeProgram
+  edgeCurveProgram?: SigmaEdgeProgram,
+  hiddenRelationsRef: React.RefObject<ReadonlySet<string>> = { current: EMPTY_RELATION_FILTER }
 ) {
   const edgeProgramClasses: Record<string, SigmaEdgeProgram> = edgeCurveProgram ? { curved: edgeCurveProgram } : {};
   return {
@@ -479,7 +501,7 @@ export function createSigmaSettings(
       const target = store.graph.target(edgeId);
       const semantic = semanticStateRef.current;
       const neighborhoodIds = highlightedRef.current ?? semantic?.neighborhoodIds ?? new Set<string>();
-      const visual = createEdgeVisualState({ source, target, attributes: data }, { selectedId: selectedRef.current, hoveredId: hoverRef.current, neighborhoodIds }, layoutAnimatingRef.current === true);
+      const visual = createEdgeVisualState({ source, target, attributes: data }, { selectedId: selectedRef.current, hoveredId: hoverRef.current, neighborhoodIds, hiddenRelations: hiddenRelationsRef.current }, layoutAnimatingRef.current === true);
       return { ...data, ...visual };
     }
   };
@@ -494,5 +516,4 @@ export function focusSelectedNode(sigma: Pick<SigmaInstance, "getCamera">, store
   else void camera.animate(state, { duration: 180 });
 }
 
-function edgeColor(edge: GraphEdgeAttributes, opacity: number): string { return `rgba(${edge.bridge ? "77,97,122" : "100,116,139"},${Math.max(0.08, Math.min(1, opacity))})`; }
 function stableSeed(value: string): number { let hash = 2_166_136_261; for (let index = 0; index < value.length; index += 1) { hash ^= value.charCodeAt(index); hash = Math.imul(hash, 16_777_619); } return hash >>> 0; }

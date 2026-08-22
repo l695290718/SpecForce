@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createArchitectureGraphStore, oneHopNeighborhood, type GraphStoreIdentity } from "./architecture-graph-store";
+import { relationRgb } from "./architecture-graph-relations";
 import { applyLayoutPositions, createEdgeVisualState, createLayoutRequest, createNodeVisualState, createSigmaArchitectureGraphController, createSigmaSettings, drawArchitectureNodeHover, focusSelectedNode } from "./sigma-architecture-graph";
 
 const identity: GraphStoreIdentity = { applicationServiceId: "com.huawei.celon.desiner", scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner", baselineId: "baseline-1", projectionManifestId: "projection-1" };
@@ -19,6 +20,24 @@ describe("SigmaArchitectureGraph adapters", () => {
     expect(settings.nodeReducer("fact:one", node)).toMatchObject({ x: 12, y: -4, kind: "fact", label: null });
     expect(settings.nodeReducer("fact:one", node).label).toBeNull();
     expect(settings.edgeReducer("relationship:one", store.graph.getEdgeAttributes("relationship:one"))).toMatchObject({ stableId: "relationship:one", relationCode: "CALLS" });
+  });
+
+  it("colors edges by relation code and hides filtered relations in the reducer", () => {
+    const store = createArchitectureGraphStore(identity);
+    const node = { stableId: "fact:one", kind: "fact" as const, label: "one", layer: "SYS" as const, memberCount: 1, degree: 1, criticality: 0, x: 12, y: -4 };
+    store.graph.addNode("fact:one", node);
+    store.graph.addNode("fact:two", { ...node, stableId: "fact:two", label: "two", x: 20, y: 8 });
+    store.graph.addDirectedEdgeWithKey("relationship:one", "fact:one", "fact:two", { stableId: "relationship:one", relationCode: "CALLS", confidence: 1, bridge: false, weight: 1 });
+    store.graph.addDirectedEdgeWithKey("relationship:two", "fact:one", "fact:two", { stableId: "relationship:two", relationCode: "READS", confidence: 1, bridge: false, weight: 1 });
+    const settings = createSigmaSettings(store, { current: undefined }, { current: undefined }, { current: undefined });
+    const calls = settings.edgeReducer("relationship:one", store.graph.getEdgeAttributes("relationship:one"));
+    const reads = settings.edgeReducer("relationship:two", store.graph.getEdgeAttributes("relationship:two"));
+    expect(calls.color).toBe(`rgba(${relationRgb("CALLS")},0.72)`);
+    expect(calls.color).not.toBe(reads.color);
+    const filteredSettings = createSigmaSettings(store, { current: undefined }, { current: undefined }, { current: undefined }, { current: false }, { current: undefined }, { current: undefined }, undefined, { current: new Set(["CALLS"]) });
+    expect(filteredSettings.edgeReducer("relationship:one", store.graph.getEdgeAttributes("relationship:one")).hidden).toBe(true);
+    expect(filteredSettings.edgeReducer("relationship:two", store.graph.getEdgeAttributes("relationship:two")).hidden).toBe(false);
+    expect(createEdgeVisualState({ source: "fact:one", target: "fact:two", attributes: store.graph.getEdgeAttributes("relationship:one") }, { hiddenRelations: new Set(["CALLS"]) })).toMatchObject({ hidden: true, opacity: 0 });
   });
 
   it("emphasizes the selected neighborhood and keeps edges visible while layout runs", () => {

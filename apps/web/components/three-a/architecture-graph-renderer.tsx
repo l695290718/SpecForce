@@ -2,7 +2,7 @@
 
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import React from "react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { ArchitectureGraphStore, GraphSemanticEdge, GraphSemanticNode } from "./architecture-graph-store";
 import { SigmaArchitectureGraph, type ArchitectureGraphView, type RendererFailureReason, type SigmaArchitectureGraphController } from "./sigma-architecture-graph";
 import type { LayoutLifecycle, LayoutRunMode } from "./architecture-graph-layout-worker";
@@ -15,6 +15,8 @@ export interface ArchitectureGraphRendererProps {
   layoutMode: LayoutRunMode;
   selectedId?: string;
   reducedMotion: boolean;
+  hiddenRelations?: ReadonlySet<string>;
+  overlay?: ReactNode;
   onNodeSelect(id: string): void;
   onEdgeSelect(id: string): void;
   onRendererFailure(reason: Exclude<RendererFailureReason, "WORKER_ERROR">): void;
@@ -23,7 +25,7 @@ export interface ArchitectureGraphRendererProps {
   onLayoutLifecycleChange?(lifecycle: LayoutLifecycle): void;
 }
 
-export function ArchitectureGraphRenderer({ store, view, layoutMode, selectedId, reducedMotion, onNodeSelect, onEdgeSelect, onRendererFailure, onStageClick, onControllerReady, onLayoutLifecycleChange }: ArchitectureGraphRendererProps) {
+export function ArchitectureGraphRenderer({ store, view, layoutMode, selectedId, reducedMotion, hiddenRelations, overlay, onNodeSelect, onEdgeSelect, onRendererFailure, onStageClick, onControllerReady, onLayoutLifecycleChange }: ArchitectureGraphRendererProps) {
   const [failure, setFailure] = useState<RendererFailureReason>();
   const [retryKey, setRetryKey] = useState(0);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string>();
@@ -32,7 +34,7 @@ export function ArchitectureGraphRenderer({ store, view, layoutMode, selectedId,
   const fail = (reason: RendererFailureReason) => { if (reason === "WORKER_ERROR") return; setFailure(reason); onRendererFailure(reason); };
   const selectEdge = (edgeId: string) => { setSelectedEdgeId(edgeId); onEdgeSelect(edgeId); };
   return <section className="min-w-0" data-testid="architecture-graph-renderer">
-    {failure ? <ArchitectureGraphListFallback reason={failure} nodes={snapshot.nodes} edges={snapshot.edges} onNodeSelect={onNodeSelect} onEdgeSelect={selectEdge} onRetry={() => { setFailure(undefined); setRetryKey((key) => key + 1); }} /> : <SigmaArchitectureGraph store={store} view={view} layoutMode={layoutMode} selectedId={selectedId} reducedMotion={reducedMotion} retryKey={retryKey} onNodeSelect={onNodeSelect} onStageClick={onStageClick} onEdgeSelect={selectEdge} onRendererFailure={fail} onControllerReady={onControllerReady} onLayoutLifecycleChange={onLayoutLifecycleChange} />}
+    {failure ? <ArchitectureGraphListFallback reason={failure} nodes={snapshot.nodes} edges={snapshot.edges} onNodeSelect={onNodeSelect} onEdgeSelect={selectEdge} onRetry={() => { setFailure(undefined); setRetryKey((key) => key + 1); }} /> : <SigmaArchitectureGraph store={store} view={view} layoutMode={layoutMode} selectedId={selectedId} reducedMotion={reducedMotion} retryKey={retryKey} hiddenRelations={hiddenRelations} overlay={overlay} onNodeSelect={onNodeSelect} onStageClick={onStageClick} onEdgeSelect={selectEdge} onRendererFailure={fail} onControllerReady={onControllerReady} onLayoutLifecycleChange={onLayoutLifecycleChange} />}
     {selectedEdge ? <div className="mt-3"><ArchitectureRelationshipInspector edge={selectedEdge} onClose={() => setSelectedEdgeId(undefined)} /></div> : null}
   </section>;
 }
