@@ -2129,6 +2129,32 @@
                           { "command": "Invoke-RestMethod http://localhost:3000/api/data-model-graph?mode=MODEL^&scope=com.huawei.celon.desiner^&rootModelId=data-specforge-ai-generation^&pageSize=100^&clientCapacity=500", "result": "Passed: AI Generation returned 4 dataEntity nodes, 8 dataField nodes, no errors, hasMore=false, and partial=false." },
                           { "command": "git diff --check", "result": "Passed with Windows line-ending normalization warnings only." }
                       ]
+                  },
+                  {
+                      "id":  "adr-expressive-web-design-system",
+                      "repositoryAdr":  "docs/adr/0038-expressive-web-design-system.md",
+                      "mcpAdrId":  "adr-expressive-web-design-system",
+                      "scope":  { "applicationServiceId":  "com.huawei.celon.desiner",
+                                        "scopePath":  "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                                    },
+                      "proposalId":  "proposal-specforge-self-design",
+                      "proposalStatus":  "implemented",
+                      "contextPackId":  "ctx-specforge-self-design",
+                      "relatedAssetIds":  [
+                                              "data-specforge-web-workspace",
+                                              "data-specforge-i18n"
+                                          ],
+                      "managedRelationships":  [],
+                      "owner":  "SpecForge Architecture and Runtime",
+                      "status":  "Implemented in source/build; fresh browser visual acceptance pending on the deployed web container",
+                      "reason":  "The SpecForge web shell was visually plain; users asked for a cooler overall style. This increment adopts an expressive mission-control design language (aurora background, glass panels, dark sidebar deck, gradient heroes and buttons) through tokens and shared components only, keeping every route, URL state, budget, scope rule, and semantic class intact.",
+                      "retryTrigger":  "Open a new exact-Scope design-change session for any future theme token, shell layout, motion policy, or command-palette change.",
+                      "evidence":  [
+                                       { "command": "scripts/design-context.ts preflight --intent Expressive-mission-control-design-system-refresh-for-SpecForge-web-shell-shared-components-and-page-heroes --affected adr-architecture-overview-home,proposal-specforge-self-design,ctx-specforge-self-design --evidence web-typecheck,web-full-suite,web-build", "result": "Opened design-change-session:9b7d91a7-7db1-46ed-a8a2-91318a5e5029 in the exact Designer Scope with reconciliation read before implementation." },
+                                       { "command": "pnpm exec tsc --noEmit -p apps/web", "result": "Exited 0 after the restyle." },
+                                       { "command": "apps/web: node node_modules/vitest/vitest.mjs run --pool=threads", "result": "Full web suite passed 45 files and 198 tests after the restyle." },
+                                       { "command": "apps/web: $env:SPECFORGE_NEXT_STANDALONE='0'; pnpm build", "result": "Exited 0 and emitted /architecture/3a; standalone packaging remains blocked only by the documented Windows/OneDrive symlink EPERM." }
+                                   ]
                   }
                   ]
 }

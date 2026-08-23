@@ -1,0 +1,51 @@
+# ADR-0038: Expressive Mission-Control Web Design System
+
+## Status
+
+Implemented in the repository for the exact Designer Scope on 2026-08-22. The shared design tokens, aurora workspace background, glass panels, dark mission-control sidebar, gradient page heroes, glow accents, and bilingual i18n labels are implemented in `apps/web` and verified by typecheck, the full web suite, and a production build. No query contract, scope rule, budget, or data model changed. No production-scale claim is made.
+
+已在精确 Designer Scope 的仓库代码中实现（2026-08-22）。共享设计令牌、极光工作区背景、玻璃面板、深色指挥台侧栏、渐变页面英雄头、发光强调与双语 i18n 标签已在 `apps/web` 实现，并通过类型检查、完整 Web 测试套件和生产构建验证。查询契约、Scope 规则、预算和数据模型均未改变；不宣称已达到生产规模。
+
+## Context
+
+The SpecForge web shell was functional but visually plain: flat white cards, hairline borders, a light sidebar, and no expressive hierarchy between navigation, heroes, and content. Users asked for a cooler, more distinctive overall style ("酷炫一点") without sacrificing readability, accessibility, or the exact-Scope information design. Prior increments already introduced motion utilities (`sf-scan`, `sf-rise`, `sf-border-live`) and the dark overview canvas, but tokens were minimal and the shell stayed light-only.
+
+SpecForge 的 Web 外壳功能完备但视觉平淡：扁平白卡片、发丝边框、浅色侧栏，导航、英雄区与内容之间缺乏表现力层级。用户要求在不牺牲可读性、无障碍与精确 Scope 信息设计的前提下，让整体风格更酷炫、更有辨识度。此前增量已引入动效工具类（`sf-scan`、`sf-rise`、`sf-border-live`）和深色总览画布，但设计令牌极少，外壳仍是纯浅色。
+
+## Decision
+
+1. Adopt an expressive "mission control" design language while keeping the light theme as the default reading surface: layered aurora gradients over the fine grid background, glass panels (`sf-glass`) for cards, and a deep navy-to-blue gradient deck (`sf-deck`) for the sidebar and page heroes.
+2. Extend Tailwind tokens: add `accent2` (#7c3aed violet) for gradient pairing with `accent`, add `glow`, `glow-strong`, and `deck` shadows, and add bounded keyframe animations (`sf-shimmer`, `sf-drift`). All new animations are covered by the existing `prefers-reduced-motion` guard.
+3. Restyle the app shell: the sidebar becomes the dark deck with a glass brand card, glowing active-nav pill with gradient edge indicator, uppercase tracked section labels, and a styled search affordance; the topbar becomes white glass with a gradient hairline.
+4. Upgrade shared components: `Card` becomes translucent glass with hover lift and blue glow; `PageHeader` becomes a dark hero band with grid overlay, scan line, and gradient-clipped title text (`sf-gradient-text`); `ButtonLink` becomes a blue→violet gradient button with glow and a sweep highlight; `Badge` gains tone rings and status dots; `DataTable` gets rounded corners, translucency, and stronger row hover/focus states.
+5. Keep every behavioral contract intact: routes, URL state, budgets, scope isolation, keyboard focus outlines (now globally indigo), selection color, and all existing semantic classes (`sf-overview-*`, `sf-relationship-*`) are unchanged; only presentation tokens and shell/component styling move.
+6. Bilingual labels continue through the existing i18n keys; this refresh introduces no new user-facing strings except the decorative `Ctrl K` search hint, which is intentionally non-functional until a command palette is designed (tracked separately).
+
+## 约束与决策（中文覆盖）
+
+1. 在保持浅色主题为默认阅读界面的前提下采用富有表现力的"指挥台"设计语言：细网格背景上叠加分层极光渐变，卡片使用玻璃面板（`sf-glass`），侧栏与页面英雄头使用深海军蓝渐变甲板（`sf-deck`）。
+2. 扩展 Tailwind 令牌：新增与 `accent` 配对的 `accent2`（#7c3aed 紫色）、`glow`/`glow-strong`/`deck` 阴影，以及有界的关键帧动画（`sf-shimmer`、`sf-drift`）；所有新动画均纳入既有 `prefers-reduced-motion` 守卫。
+3. 重塑应用外壳：侧栏改为深色甲板，含玻璃品牌卡、带渐变边缘指示条的发光活动导航胶囊、大写字距分区标签和样式化搜索入口；顶栏改为白色玻璃并配渐变发丝线。
+4. 升级共享组件：`Card` 改为半透明玻璃卡并带悬浮抬升与蓝色辉光；`PageHeader` 改为带网格叠加、扫描线与渐变裁切标题的深色英雄横幅；`ButtonLink` 改为蓝→紫渐变按钮并带辉光与扫光高亮；`Badge` 增加色调描边与状态圆点；`DataTable` 获得圆角、半透明与更强的行悬停/聚焦状态。
+5. 行为契约保持不变：路由、URL 状态、预算、Scope 隔离、键盘焦点轮廓（现为全局靛色）、选择颜色及全部既有语义类（`sf-overview-*`、`sf-relationship-*`）均未改动；仅移动呈现令牌与外壳/组件样式。
+6. 双语标签继续走既有 i18n 键；本次刷新除装饰性的 `Ctrl K` 搜索提示外不新增任何面向用户的字符串，该提示在命令面板设计前有意保持非功能（另行跟踪）。
+
+## Consequences
+
+Positive: a distinctive, coherent visual identity across every page with one token/component change surface; motion remains reduced-motion safe; no server or contract impact. Negative: glass/backdrop effects cost some GPU compositing on low-end devices (bounded to shell and cards); the fake search affordance must become real or be removed once a command palette decision lands (deferred work stays visible here rather than silently dropped).
+
+积极影响：通过单一令牌/组件改动面让每个页面获得统一且有辨识度的视觉身份；动效仍尊重减弱动态偏好；不影响服务端与契约。代价：玻璃/背景模糊在低端设备上有一定合成开销（限定在外壳与卡片）；搜索入口在命令面板决策落地后必须转为真实功能或移除——该延期工作在此显式保留，不会被静默丢弃。
+
+## Evidence
+
+- `pnpm exec tsc --noEmit -p apps/web` → exit 0.
+- Full web suite (`apps/web`, vitest `--pool=threads`): 45 files / 198 tests passing after the restyle.
+- `$env:SPECFORGE_NEXT_STANDALONE='0'; pnpm build` in `apps/web` → exit 0; `/architecture/3a` emitted. Standalone packaging remains blocked only by the documented Windows/OneDrive symlink `EPERM`.
+- Exact-Scope implementation preflight opened `design-change-session:9b7d91a7-7db1-46ed-a8a2-91318a5e5029` (affected: `adr-architecture-overview-home`, `proposal-specforge-self-design`, `ctx-specforge-self-design`); the session closes `CONVERGED` in the same increment.
+
+### 中文证据
+
+- `pnpm exec tsc --noEmit -p apps/web` 退出 0。
+- 完整 Web 测试套件（`apps/web`，vitest `--pool=threads`）：重塑后 45 个文件 / 198 项测试全部通过。
+- `apps/web` 下 `$env:SPECFORGE_NEXT_STANDALONE='0'; pnpm build` 退出 0 并生成 `/architecture/3a`；standalone 打包仅受已记录的 Windows/OneDrive 符号链接 `EPERM` 限制。
+- 精确 Scope 实施预检打开 `design-change-session:9b7d91a7-7db1-46ed-a8a2-91318a5e5029`（受影响：`adr-architecture-overview-home`、`proposal-specforge-self-design`、`ctx-specforge-self-design`）；会话在同一增量内以 `CONVERGED` 关闭。
