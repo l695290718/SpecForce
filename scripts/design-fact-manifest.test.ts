@@ -1,4 +1,4 @@
-﻿import { existsSync } from "node:fs";
+import { existsSync } from "node:fs";
 import manifest from "../docs/design-facts/baseline-manifest.json";
 import { expect, it } from "vitest";
 
@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(25);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(25);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(25);
+  expect(manifest.decisions).toHaveLength(26);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(26);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(26);
   const proposalByContextPack = new Map<string, string>();
 
   for (const decision of manifest.decisions) {
@@ -172,7 +172,7 @@ it("includes the single-host Docker deployment decision in the baseline", () => 
   const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-single-host-docker-compose-deployment");
   expect(decision?.proposalId).toBe("proposal-single-host-docker-deployment");
   expect(decision?.contextPackId).toBe("context-pack-single-host-docker-deployment");
-  expect(decision?.evidence).toHaveLength(8);
+  expect(decision?.evidence).toHaveLength(12);
 });
 
 it("records the proposed readable 3A architecture map separately from advanced network exploration", () => {

@@ -72,3 +72,17 @@ Positive: a distinctive, coherent visual identity across every page with one tok
 - 用户反馈界面仍缺少动效后，精确 Scope 实施预检打开 `design-change-session:303a1028-c193-4f38-959e-a9d463cae0b1`；本增量在表现力设计系统之上增加克制的动效层。
 - 动效清单：`.sf-rise` 入场升级为基于 `animation-timeline: view()` 的滚动驱动渐显（保留时间基入场作为回退）；新增 `.sf-stagger` 工具按序为直接子元素设置递增延迟（用于总览说明网格与工作台指标行）；`.sf-sheen` 为主按钮链接增加悬浮光扫；`.sf-hairline` 渐变持续流动、`.sf-hero-grid` 缓慢呼吸；ER 画布容器加载时淡入。所有新动效均遵循既有 `prefers-reduced-motion: reduce` 块，该块现已同时禁用交错、发丝线流动、网格呼吸与光扫覆盖层。
 - 验证：完整 Web 套件 45 个文件 / 200 项通过（含总览 CSS 源码断言）；Web 类型检查退出 0；非 standalone 生产构建退出 0。
+
+## Navigation and 3A Usability Increment (2026-08-23)
+
+- Exact-Scope implementation preflight opened `design-change-session:e03ca2e4-77f5-424a-bb18-ba77da0f47c5` after user feedback: the workspace nav click appeared dead, the 3A page buried its graph workspace below a long lanes list, and every tab or mode switch scrolled the page back to the top.
+- Navigation feedback: sidebar `NavItem` clicks on an already-active URL now prevent the no-op navigation and smoothly scroll back to the top instead of appearing dead. 3A switching: view tabs, lanes/graph/list mode links, trace-direction links, and the baseline/projection selects all navigate with `scroll: false` (`next/link` scroll prop or `router.push(..., { scroll: false })` replacing raw `window.location.href`), so in-page context is preserved; the tab row is sticky under the top bar and carries an inline hint explaining that lanes, graph, and list are three views over the same published architecture facts.
+- Governance maintenance: `scripts/design-fact-manifest.test.ts` count expectations were refreshed to the current baseline reality (26 decisions; 12 deployment evidence rows) after legitimate governance growth, and the 3A workspace test gained a standard `next/navigation` router mock.
+- Verification: full repository suite passed 7301 tests / 0 failures (the legacy-scan fixture file remains an intentional collect-time noise); web suite passed 200 tests; `pnpm exec tsc --noEmit -p apps/web` exited 0; non-standalone production build exited 0.
+
+### 导航与 3A 可用性增量（2026-08-23）
+
+- 用户反馈工作台点击无反应、3A 页面图谱工作区被长列表压在底部、每次切换标签都滚回顶部后，精确 Scope 实施预检打开 `design-change-session:e03ca2e4-77f5-424a-bb18-ba77da0f47c5`。
+- 导航反馈：侧栏点击已激活的同 URL 导航项时阻止空操作并平滑滚回顶部，不再表现为“毫无反应”。3A 切换：视图标签、泳道/图谱/列表模式链接、追踪方向链接与基线/投影下拉全部改为 `scroll: false` 导航（`next/link` scroll 属性或 `router.push(..., { scroll: false })` 取代裸 `window.location.href`），保留页内上下文；标签行吸顶显示，并内联说明泳道/图谱/列表是同一份已发布架构事实的三种视图。
+- 治理维护：`scripts/design-fact-manifest.test.ts` 的计数断言刷新为当前基线事实（26 个决策；部署决策 12 条证据），3A 工作区测试补充标准的 `next/navigation` 路由 mock。
+- 验证：全仓套件 7301 项通过、0 失败（legacy-scan fixture 文件仍为故意的收集期噪音）；Web 套件 200 项通过；Web 类型检查退出 0；非 standalone 生产构建退出 0。

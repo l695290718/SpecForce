@@ -3,7 +3,7 @@
 import { Activity, Boxes, ClipboardList, FileCode2, Home, LayoutDashboard, ListChecks, Network, Search, Settings, Waypoints } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import type { ReactNode } from "react";
+import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { LanguageSwitcher, T } from "./language-provider";
 import { ArchitectureScopeSwitcher } from "./architecture-scope-switcher";
 import type { MessageKey } from "../lib/i18n";
@@ -89,11 +89,18 @@ export function AppShell({ children, readableScopes }: { children: ReactNode; re
 }
 
 function NavItem({ href, icon, isActive, labelKey }: { href: string; icon: ReactNode; isActive: boolean; labelKey: MessageKey }) {
+  const handleClick = (event: ReactMouseEvent<HTMLAnchorElement>) => {
+    if (window.location.pathname + window.location.search === href) {
+      event.preventDefault();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
   if (isActive) {
     return (
       <Link
         className="group relative flex items-center gap-2 rounded-lg bg-white/[0.09] px-3 py-2 font-semibold text-white ring-1 ring-inset ring-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_6px_18px_rgba(37,99,235,0.22)] transition"
         href={href}
+        onClick={handleClick}
       >
         <span aria-hidden="true" className="absolute -left-4 h-5 w-1 rounded-full bg-gradient-to-b from-blue-400 to-violet-500 shadow-[0_0_12px_rgba(99,102,241,0.9)]" />
         <span className="text-blue-300">{icon}</span>
@@ -105,6 +112,7 @@ function NavItem({ href, icon, isActive, labelKey }: { href: string; icon: React
     <Link
       className="group flex items-center gap-2 rounded-lg px-3 py-2 text-slate-300 transition hover:translate-x-1 hover:bg-white/[0.06] hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-300"
       href={href}
+      onClick={handleClick}
     >
       <span className="text-slate-500 transition group-hover:text-blue-300">{icon}</span>
       <span><T k={labelKey} /></span>

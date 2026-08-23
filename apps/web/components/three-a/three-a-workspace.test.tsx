@@ -5,6 +5,7 @@ import type { KnowledgeProjectionNode } from "@specforge/core";
 import { ThreeAWorkspace, type ThreeAWorkspaceData } from "./three-a-workspace";
 
 vi.mock("../language-provider", () => ({ T: ({ k }: { k: string }) => k }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, replace: () => {}, prefetch: async () => {} }) }));
 
 const scope = { applicationServiceId: "com.huawei.celon.desiner", scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner" };
 const nodes: KnowledgeProjectionNode[] = [
