@@ -110,9 +110,16 @@ export function DataModelErWorkspace({ responses, locale = "en", title }: DataMo
     rendererRef.current = renderer;
     let active = true;
     void renderer.mount(canvasRef.current).then(() => {
-      if (active) renderer.setGraph(state, layout, projection);
+      if (!active) return;
+      renderer.setGraph(state, layout, projection);
+      renderer.fitToView();
     });
-    return () => { active = false; renderer.destroy(); rendererRef.current = undefined; };
+    const canvas = canvasRef.current;
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(() => {
+      if (canvas.clientWidth > 0 && canvas.clientHeight > 0) renderer.resize(canvas.clientWidth, canvas.clientHeight);
+    }) : undefined;
+    observer?.observe(canvas);
+    return () => { active = false; observer?.disconnect(); renderer.destroy(); rendererRef.current = undefined; };
   }, [dataStatus, layout, locale, projection, retryKey, state]);
 
   useEffect(() => {
@@ -147,6 +154,7 @@ export function DataModelErWorkspace({ responses, locale = "en", title }: DataMo
                 ? copy("er.partial")
                 : undefined;
   const semanticFallback = Boolean(fallbackReason) || !status.ready || status.lod.lod === "SKELETON";
+  const relationsEmpty = !fallbackReason && (dataStatus === "READY" || dataStatus === "PARTIAL") && Boolean(projection?.entities.length) && (projection?.relations.length ?? 0) === 0;
   const showControls = Boolean(rendererRef.current && projection?.entities.length);
 
   return <section className="relative overflow-hidden rounded-lg border border-border bg-white" aria-label={title ?? copy("er.workspace")} data-testid="data-model-er-workspace">
@@ -166,6 +174,7 @@ export function DataModelErWorkspace({ responses, locale = "en", title }: DataMo
     </div>
     <div ref={canvasRef} className="relative min-h-[32rem] touch-none select-none bg-slate-50" data-testid="data-model-er-canvas">
       {fallbackReason ? <div className="absolute inset-x-4 top-4 z-10 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950" role="status"><strong>{semanticFallback ? copy("er.semanticFallback") : copy("er.status")}</strong><span className="ml-2">{fallbackReason}</span></div> : null}
+      {relationsEmpty ? <div className="pointer-events-none absolute inset-x-4 top-4 z-10 rounded-md border border-blue-200 bg-blue-50/95 px-3 py-2 text-sm text-blue-950" role="status" data-testid="data-model-er-relations-empty"><strong>{copy("er.relationsEmpty")}</strong><span className="ml-2">{copy("er.relationsEmptyHint")}</span></div> : null}
     </div>
     {semanticFallback ? <div className="border-t border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="status"><strong>{copy("er.semanticFallback")}</strong><span className="ml-2">{fallbackReason ?? copy("er.loading")}</span></div> : null}
     <div className="max-h-72 overflow-auto border-t border-border" aria-label={copy("er.semanticList")}>

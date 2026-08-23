@@ -58,6 +58,20 @@ The implementation evidence must record focused tests, web typecheck, web build,
 
 实现证据必须记录聚焦测试、Web 类型检查、Web 构建、manifest 校验、联邦校验，以及条件允许时的精确 Scope 浏览器检查。当前 3000 端口重启后的浏览器检查被 URL 安全策略阻塞；重建后的 3010 Docker 服务已健康，但浏览器交互验收仍待执行；应在应用内浏览器可以访问重启后的本地 URL 后重试。生产容量、外部身份、持续同步和图存储规模认证延期处理。
 
+## ER Usability Repair Increment (2026-08-23)
+
+- Exact-Scope implementation preflight opened `design-change-session:2cc881f1-d5f9-405c-90cc-9511adf0a6c8`. User-reported symptoms: blank canvas, missing field rows, overflowing entity names, and no relationship routes.
+- Root cause (data): all 12 v2 self-design models were persisted with empty `dataRelations`, so `projection.relations` was empty and the canvas legitimately drew zero routes. Authored three REFERENCE relations with field mappings through MCP `apply_data_model_change_set` in the exact Designer Scope (catalog version 651): `AssetGraphNode.node_id → data-specforge-assets DesignAsset.id`, `web-workspace AssetDraft.draft_key → DesignAsset.id`, and intra-model `AIProviderResponse.id → GeneratedDraft.id`. A Prisma read-back confirms 3 relations with 3 field mappings persisted.
+- Renderer repairs: pixel-aware bilingual label fitting (`estimateTextWidthPx`/`fitErLabelToWidth`; CJK glyphs measured at full em) applied to entity titles, subtitles, field names, and field type columns; the workspace now auto-fits the camera to the diagram after the initial `setGraph`; a `ResizeObserver` keeps the renderer viewport and hit area in sync with the container; an informational banner (`data-testid="data-model-er-relations-empty"`) explains when a model has no configured relations instead of leaving a silent empty region.
+- Verification: focused ER suite passed 10 files / 37 tests; the full web suite passed 45 files / 200 tests; `pnpm exec tsc --noEmit -p apps/web` exited 0; `$env:SPECFORGE_NEXT_STANDALONE='0'; pnpm build` exited 0. Fresh browser interaction acceptance on 3010 remains pending as before.
+
+### ER 可用性修复增量（2026-08-23）
+
+- 精确 Scope 实施预检打开 `design-change-session:2cc881f1-d5f9-405c-90cc-9511adf0a6c8`。用户报告症状：画布空白、字段行缺失、实体名超长、无关系连线。
+- 数据根因：12 个 v2 自设计模型落库时 `dataRelations` 全部为空，`projection.relations` 为空，画布因此合法地绘制零连线。已通过 MCP `apply_data_model_change_set` 在精确 Designer Scope 下编写三条带字段映射的 REFERENCE 关系（目录版本 651）：`AssetGraphNode.node_id → data-specforge-assets DesignAsset.id`、`web-workspace AssetDraft.draft_key → DesignAsset.id`，以及模型内 `AIProviderResponse.id → GeneratedDraft.id`。Prisma 回读确认 3 条关系与 3 个字段映射已持久化。
+- 渲染修复：像素感知的双语标签适配（`estimateTextWidthPx`/`fitErLabelToWidth`；CJK 字形按全宽测量）应用于实体标题、副标题、字段名与类型列；工作区在首次 `setGraph` 后自动适配视口；`ResizeObserver` 保持渲染器视口与命中区域随容器同步；新增信息横幅（`data-testid="data-model-er-relations-empty"`）在模型未配置关系时给出说明而非静默空白。
+- 验证：ER 聚焦套件 10 个文件 / 37 项通过；完整 Web 套件 45 个文件 / 200 项通过；`pnpm exec tsc --noEmit -p apps/web` 退出 0；`$env:SPECFORGE_NEXT_STANDALONE='0'; pnpm build` 退出 0。3010 的浏览器交互验收照旧待执行。
+
 ## 中文本地化覆盖
 
 ### 标题

@@ -22,7 +22,7 @@ import {
 import { layoutErDiagramWithFallback, type ErLayoutResult } from "./er-layout";
 import { createErPositionStore, ER_POSITION_SCHEMA_VERSION, type ErEntityPositions, type ErPositionKey, type ErPositionStore } from "./er-position-store";
 import { ErTextureCache } from "./er-texture-cache";
-import { fitErLabel, getErHeaderLabelWidths } from "./er-label-fitting";
+import { fitErLabelToWidth } from "./er-label-fitting";
 
 export type ErRendererFailure = "WEBGL_UNAVAILABLE" | "WEBGL_CONTEXT_LOST" | "LAYOUT_DEGRADED" | "CLIENT_CAPACITY_EXCEEDED";
 
@@ -326,9 +326,9 @@ export class ErPixiRenderer {
     header.roundRect(entity.x, entity.y, entity.width, entity.headerHeight, 6).fill(entity.selected ? 0xccfbf1 : 0xf0fdfa);
     header.rect(entity.x, entity.y + entity.headerHeight - 6, entity.width, 6).fill(entity.selected ? 0xccfbf1 : 0xf0fdfa);
     card.addChild(header);
-    const labelWidths = getErHeaderLabelWidths(entity.width);
-    card.addChild(this.text(fitErLabel(entity.entity.displayName, labelWidths.title), entity.x + 12, entity.y + 9, { fill: 0x0f172a, fontSize: 14, fontWeight: "600" }));
-    card.addChild(this.text(fitErLabel(entity.entity.physicalName ?? `${entity.entity.fields.length} fields`, labelWidths.subtitle), entity.x + 12, entity.y + 28, { fill: 0x475569, fontSize: 10 }));
+    const labelBudget = entity.width - 24;
+    card.addChild(this.text(fitErLabelToWidth(entity.entity.displayName, labelBudget, 14), entity.x + 12, entity.y + 9, { fill: 0x0f172a, fontSize: 14, fontWeight: "600" }));
+    card.addChild(this.text(fitErLabelToWidth(entity.entity.physicalName ?? `${entity.entity.fields.length} fields`, labelBudget, 10), entity.x + 12, entity.y + 28, { fill: 0x475569, fontSize: 10 }));
     if (showFields) for (const field of entity.fields) this.drawField(card, field);
     this.entityLayer.addChild(card);
   }
@@ -343,8 +343,9 @@ export class ErPixiRenderer {
     const marker = field.field.primaryKey ? "PK" : field.field.foreignKey ? "FK" : field.field.unique ? "UQ" : "";
     const markerWidth = marker ? 22 : 0;
     if (marker) card.addChild(this.text(marker, field.row.x + 8, field.row.y + 7, { fill: field.field.foreignKey ? 0x0e7490 : 0x7c3aed, fontSize: 9, fontWeight: "700" }));
-    card.addChild(this.text(field.field.displayName, field.row.x + 12 + markerWidth, field.row.y + 6, { fill: 0x1e293b, fontSize: 11 }));
-    card.addChild(this.text(`${field.field.dataType}${field.field.nullable ? "" : " !"}`, field.row.x + field.row.width - 84, field.row.y + 6, { fill: 0x64748b, fontSize: 10 }));
+    const nameBudget = Math.max(24, field.row.width - 24 - markerWidth - 88);
+    card.addChild(this.text(fitErLabelToWidth(field.field.displayName, nameBudget, 11), field.row.x + 12 + markerWidth, field.row.y + 6, { fill: 0x1e293b, fontSize: 11 }));
+    card.addChild(this.text(fitErLabelToWidth(`${field.field.dataType}${field.field.nullable ? "" : " !"}`, 80, 10), field.row.x + field.row.width - 84, field.row.y + 6, { fill: 0x64748b, fontSize: 10 }));
     const port = new Graphics();
     port.circle(field.row.x + field.row.width, field.row.center.y, field.selected ? 4 : 3).fill(field.selected ? SELECTED_COLOR : FIELD_PORT_COLOR);
     card.addChild(port);
