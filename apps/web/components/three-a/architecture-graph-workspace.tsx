@@ -17,6 +17,7 @@ import { summarizeRelations, toggleRelationCode } from "./architecture-graph-rel
 import { ArchitectureViewActions } from "./architecture-view-actions";
 import { createArchitectureGraphStore, type GraphStoreIdentity } from "./architecture-graph-store";
 import { ArchitectureImpactPanel } from "./architecture-impact-panel";
+import { defaultExpandedClusterIds, deriveVisibleArchitectureGraph } from "./architecture-graph-visibility";
 import type { ThreeAQueryIdentity } from "./catalog-state";
 import type { SigmaArchitectureGraphController } from "./sigma-architecture-graph";
 
@@ -40,20 +41,21 @@ export function ArchitectureGraphWorkspace({ state, identity, generationId, init
   const [selectedId, setSelectedId] = useState<string | undefined>(state.focus ? `fact:${state.focus}` : undefined);
   const [layoutLifecycle, setLayoutLifecycle] = useState<ArchitectureGraphLifecycle>("seeded");
   const [hiddenRelations, setHiddenRelations] = useState<ReadonlySet<string>>(new Set());
-  const [collapsedClusterIds, setCollapsedClusterIds] = useState<ReadonlySet<string>>(new Set());
+  const [expandedClusterIds, setExpandedClusterIds] = useState<ReadonlySet<string>>(new Set());
   const controllerRef = useRef<SigmaArchitectureGraphController>(createNoopController());
+  const expansionInitializedRef = useRef(false);
 
   useEffect(() => { if (typeof window === "undefined") return; const media = window.matchMedia("(prefers-reduced-motion: reduce)"); const sync = () => setReducedMotion(media.matches); sync(); media.addEventListener?.("change", sync); return () => media.removeEventListener?.("change", sync); }, []);
   useEffect(() => { setGraphLayout(state.graphLayout ?? "force"); }, [state.graphLayout]);
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true); setError(undefined); setImpact(undefined); setOverview(undefined); setAnalysisAvailability("UNAVAILABLE"); setCollapsedClusterIds(new Set()); store.clear();
+    setLoading(true); setError(undefined); setImpact(undefined); setOverview(undefined); setAnalysisAvailability("UNAVAILABLE"); setExpandedClusterIds(new Set()); expansionInitializedRef.current = false; store.clear();
     const load = async () => {
       try {
         if (graphView === "explore" && initialGraph) {
           store.mergeNeighborhood(initialGraph.trace);
         } else if (graphView === "overview") {
-          const result = await runUnitGraphQuery({ operation: "unitGraph", scope: identity.scope, baselineId: identity.baselineId, projectionManifestId: identity.projectionManifestId, generationId, includeMembers: true, filter: { layers }, budget: { maxUnitsPerLayer: 12, maxMembers: 500, maxMappings: 60, timeoutMs: 2_000, maxPayloadBytes: 524_288 } }, controller.signal);
+          const result = await runUnitGraphQuery({ operation: "unitGraph", scope: identity.scope, baselineId: identity.baselineId, projectionManifestId: identity.projectionManifestId, generationId, includeMembers: true, includeMemberRelations: true, filter: { layers }, budget: { maxUnitsPerLayer: 12, maxMembers: 500, maxMemberRelations: 120, maxMappings: 60, timeoutMs: 2_000, maxPayloadBytes: 524_288 } }, controller.signal);
           if (!controller.signal.aborted) {
             const unitOverview = unitGraphOverview(result);
             setOverview(unitOverview);
@@ -86,6 +88,12 @@ export function ArchitectureGraphWorkspace({ state, identity, generationId, init
   }, [graphView, state.focus, store]);
 
   const snapshot = useMemo(() => store.snapshot(), [store, version]);
+  const visibleGraph = useMemo(() => graphView === "overview" ? deriveVisibleArchitectureGraph(snapshot, expandedClusterIds) : { nodeIds: new Set(snapshot.nodes.map((node) => node.id)), edgeIds: new Set(snapshot.edges.map((edge) => edge.id)) }, [expandedClusterIds, graphView, snapshot]);
+  useEffect(() => {
+    if (graphView !== "overview" || expansionInitializedRef.current || !snapshot.nodes.length) return;
+    expansionInitializedRef.current = true;
+    setExpandedClusterIds(defaultExpandedClusterIds(snapshot.nodes, snapshot.edges));
+  }, [graphView, snapshot]);
   const relations = useMemo(() => summarizeRelations(snapshot.edges.map((edge) => edge.attributes.relationCode)), [snapshot]);
   const projectionCounts = useMemo(() => overview ? graphProjectionCounts(overview, coveredAssets) : undefined, [coveredAssets, overview]);
   const toggleRelation = (code: string) => setHiddenRelations((current) => toggleRelationCode(current, code));
@@ -96,16 +104,16 @@ export function ArchitectureGraphWorkspace({ state, identity, generationId, init
     const unitIdentity = id.startsWith("cluster:unit:") ? id.slice("cluster:".length) : undefined;
     const owningClusterId = snapshot.nodes.find((node) => node.id === id)?.attributes.clusterId;
     if (unitIdentity) {
-      setCollapsedClusterIds((current) => {
+      setExpandedClusterIds((current) => {
         const next = new Set(current);
-        if (next.has(unitIdentity)) next.delete(unitIdentity); else next.add(unitIdentity);
+        next.add(unitIdentity);
         return next;
       });
     } else if (owningClusterId) {
-      setCollapsedClusterIds((current) => {
-        if (!current.has(owningClusterId)) return current;
+      setExpandedClusterIds((current) => {
+        if (current.has(owningClusterId)) return current;
         const next = new Set(current);
-        next.delete(owningClusterId);
+        next.add(owningClusterId);
         return next;
       });
     }
@@ -115,14 +123,16 @@ export function ArchitectureGraphWorkspace({ state, identity, generationId, init
   const clearFocus = () => { setSelectedId(undefined); store.select(undefined); setVersion((value) => value + 1); if (typeof window !== "undefined") { const params = new URLSearchParams(window.location.search); params.delete("focus"); window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`); window.dispatchEvent(new Event("three-a-url-state-change")); } };
   const changeGraphLayout = (nextLayout: GraphLayoutMode) => { setGraphLayout(nextLayout); if (typeof window !== "undefined") { const nextState = { ...state, mode: "graph" as const, graphLayout: nextLayout }; window.history.replaceState(null, "", `/architecture/3a?${serializeThreeAUrlState(nextState)}`); window.dispatchEvent(new Event("three-a-url-state-change")); } };
   const viewHref = (nextView: NonNullable<ThreeAUrlState["graphView"]>) => `/architecture/3a?${serializeThreeAUrlState({ ...state, mode: "graph", graphView: nextView })}`;
-  const controlLabels = { toolbar: t("threeA.graphControls"), viewGroup: t("threeA.graphViewGroup"), forceView: t("threeA.forceView"), treeView: t("threeA.treeView"), circleView: t("threeA.circleView"), cameraGroup: t("threeA.cameraControls"), zoomIn: t("threeA.zoomIn"), zoomOut: t("threeA.zoomOut"), resetCamera: t("threeA.resetCamera"), selectionGroup: t("threeA.selectionControls"), focusSelection: t("threeA.focusSelection"), clearSelection: t("threeA.clearSelection"), layoutGroup: t("threeA.layoutControls"), startLayout: t("threeA.startLayout"), stopLayout: t("threeA.stopLayout"), restartLayout: t("threeA.restartLayout") };
+  const selectedClusterId = selectedId ? snapshot.nodes.find((node) => node.id === selectedId && node.attributes.kind === "cluster")?.attributes.clusterId : undefined;
+  const canCollapseSelection = Boolean(selectedClusterId && expandedClusterIds.has(selectedClusterId));
+  const controlLabels = { toolbar: t("threeA.graphControls"), viewGroup: t("threeA.graphViewGroup"), forceView: t("threeA.forceView"), treeView: t("threeA.treeView"), circleView: t("threeA.circleView"), cameraGroup: t("threeA.cameraControls"), zoomIn: t("threeA.zoomIn"), zoomOut: t("threeA.zoomOut"), resetCamera: t("threeA.resetCamera"), selectionGroup: t("threeA.selectionControls"), focusSelection: t("threeA.focusSelection"), clearSelection: t("threeA.clearSelection"), collapseSelectedUnit: t("threeA.collapseSelectedUnit"), layoutGroup: t("threeA.layoutControls"), startLayout: t("threeA.startLayout"), stopLayout: t("threeA.stopLayout"), restartLayout: t("threeA.restartLayout") };
   const graphViewLabels = { overview: t("threeA.graphOverview"), explore: t("threeA.graphExplore"), impact: t("threeA.graphImpact") };
   return <section className="space-y-3" data-testid="architecture-graph-workspace">
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-white p-3 shadow-panel"><div className="flex items-center gap-2 text-sm font-semibold text-ink"><Network className="text-accent" size={17} /><T k="threeA.graphWorkspace" /></div><ArchitectureGraphSearch nodes={snapshot.nodes} onSelect={focus} /><div className="flex items-center gap-1 rounded-md border border-border bg-chrome p-1">{(["overview", "explore", "impact"] as const).map((view) => <a aria-current={graphView === view ? "page" : undefined} className={`inline-flex h-7 items-center gap-1 rounded px-2 text-xs font-semibold ${graphView === view ? "bg-white text-ink shadow-sm" : "text-muted"}`} href={viewHref(view)} key={view}><Sparkles size={13} />{graphViewLabels[view]}</a>)}</div><ArchitectureGraphControls view={graphLayout} lifecycle={layoutLifecycle} hasSelection={Boolean(selectedId)} labels={controlLabels} onViewChange={changeGraphLayout} onZoomIn={() => controllerRef.current.zoomIn()} onZoomOut={() => controllerRef.current.zoomOut()} onResetCamera={() => controllerRef.current.resetCamera()} onFocusSelection={() => controllerRef.current.focusSelectedNode()} onStartLayout={() => controllerRef.current.startLayout()} onStopLayout={() => controllerRef.current.stopLayout()} onRestartLayout={() => controllerRef.current.restartLayout()} onClearSelection={() => { controllerRef.current.clearSelection(); clearFocus(); }} /><ArchitectureViewActions resetHref={resetViewHref} /></div>
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-white p-3 shadow-panel"><div className="flex items-center gap-2 text-sm font-semibold text-ink"><Network className="text-accent" size={17} /><T k="threeA.graphWorkspace" /></div><ArchitectureGraphSearch nodes={snapshot.nodes} onSelect={focus} /><div className="flex items-center gap-1 rounded-md border border-border bg-chrome p-1">{(["overview", "explore", "impact"] as const).map((view) => <a aria-current={graphView === view ? "page" : undefined} className={`inline-flex h-7 items-center gap-1 rounded px-2 text-xs font-semibold ${graphView === view ? "bg-white text-ink shadow-sm" : "text-muted"}`} href={viewHref(view)} key={view}><Sparkles size={13} />{graphViewLabels[view]}</a>)}</div><ArchitectureGraphControls view={graphLayout} lifecycle={layoutLifecycle} hasSelection={Boolean(selectedId)} canCollapseSelection={canCollapseSelection} labels={controlLabels} onViewChange={changeGraphLayout} onZoomIn={() => controllerRef.current.zoomIn()} onZoomOut={() => controllerRef.current.zoomOut()} onResetCamera={() => controllerRef.current.resetCamera()} onFocusSelection={() => controllerRef.current.focusSelectedNode()} onCollapseSelection={() => { if (!selectedClusterId) return; setExpandedClusterIds((current) => { const next = new Set(current); next.delete(selectedClusterId); return next; }); }} onStartLayout={() => controllerRef.current.startLayout()} onStopLayout={() => controllerRef.current.stopLayout()} onRestartLayout={() => controllerRef.current.restartLayout()} onClearSelection={() => { controllerRef.current.clearSelection(); clearFocus(); }} /><ArchitectureViewActions resetHref={resetViewHref} /></div>
     {projectionCounts ? <div className="grid grid-cols-2 divide-x divide-y divide-border overflow-hidden rounded-md border border-border bg-white sm:grid-cols-4 sm:divide-y-0" data-testid="architecture-graph-counts"><GraphMeasure value={projectionCounts.units} labelKey="threeA.governedUnits" /><GraphMeasure value={projectionCounts.directMembers} labelKey="threeA.directMembers" /><GraphMeasure value={projectionCounts.coveredAssets} labelKey="threeA.coveredAssets" /><GraphMeasure value={projectionCounts.mappings} labelKey="threeA.graphUnitMappings" /></div> : null}
     <div className="flex flex-wrap gap-2 text-xs text-muted"><span><Search className="mr-1 inline-block" size={13} />{snapshot.nodes.length} <T k="threeA.loadedNodes" /></span><span>{snapshot.edges.length} <T k="threeA.loadedEdges" /></span>{overview ? <><span className="rounded-full border border-border bg-chrome px-2 py-0.5 font-medium text-ink">{dataSource === "architecture-unit-projection" ? <T k="threeA.graphSourceUnitProjection" /> : dataSource === "projection" ? <T k="threeA.graphSourceProjection" /> : <T k="threeA.graphSourceFallback" />}</span><span className="rounded-full border border-border bg-chrome px-2 py-0.5 font-medium text-muted"><T k="threeA.analysisAvailability" />: {analysisAvailability}</span></> : null}</div>
     {error ? <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
-    <ArchitectureGraphRenderer store={store} view={graphView} layoutMode={graphLayout} selectedId={selectedId} reducedMotion={reducedMotion} hiddenRelations={hiddenRelations} collapsedClusterIds={collapsedClusterIds} overlay={legendOverlay} onNodeSelect={focus} onStageClick={clearFocus} onEdgeSelect={() => undefined} onRendererFailure={(reason) => { setLayoutLifecycle("failed"); setError(reason); }} onControllerReady={(controller) => { controllerRef.current = controller; }} onLayoutLifecycleChange={setLayoutLifecycle} />
+    <ArchitectureGraphRenderer store={store} view={graphView} layoutMode={graphLayout} selectedId={selectedId} reducedMotion={reducedMotion} hiddenRelations={hiddenRelations} visibleNodeIds={visibleGraph.nodeIds} visibleEdgeIds={visibleGraph.edgeIds} overlay={legendOverlay} onNodeSelect={focus} onStageClick={clearFocus} onEdgeSelect={() => undefined} onRendererFailure={(reason) => { setLayoutLifecycle("failed"); setError(reason); }} onControllerReady={(controller) => { controllerRef.current = controller; }} onLayoutLifecycleChange={setLayoutLifecycle} />
     {graphView === "impact" ? <ArchitectureImpactPanel result={impact} loading={loading} error={error} /> : null}
   </section>;
 }
@@ -163,7 +173,8 @@ export function unitGraphOverview(result: UnitGraphQueryResult): OverviewArchite
 
 export function graphProjectionCounts(result: OverviewArchitectureResult, coveredAssets: number) {
   const units = result.nodes.filter((node) => node.kind === "cluster");
-  return { units: units.length, directMembers: units.reduce((total, node) => total + node.memberCount, 0), coveredAssets, mappings: result.edges.filter((edge) => edge.relationCode !== "ARCHITECTURE_MEMBERSHIP").length };
+  const unitIds = new Set(units.map((unit) => unit.id));
+  return { units: units.length, directMembers: units.reduce((total, node) => total + node.memberCount, 0), coveredAssets, mappings: result.edges.filter((edge) => unitIds.has(edge.sourceId) && unitIds.has(edge.targetId)).length };
 }
 
 export function unitNeighborhoodOverview(result: ArchitectureUnitNeighborhoodResult): OverviewArchitectureResult {

@@ -38,6 +38,11 @@ describe("governed unit graph expansion", () => {
   it("keeps projection measures semantically distinct", () => {
     const result = overview(8, 6);
     result.nodes.forEach((node, index) => { node.kind = "cluster"; node.memberCount = index === 0 ? 7 : 5; });
+    result.nodes.push(
+      { ...envelope, id: "fact:api", kind: "fact", label: "orders.api", memberCount: 1, degree: 1, criticality: 0, positionSeed: { x: 0, y: 0 }, assertionId: "api" },
+      { ...envelope, id: "fact:model", kind: "fact", label: "orders.model", memberCount: 1, degree: 1, criticality: 0, positionSeed: { x: 1, y: 0 }, assertionId: "model" }
+    );
+    result.edges.push({ ...envelope, id: "relationship:api:model", sourceId: "fact:api", targetId: "fact:model", relationCode: "CALLS", confidence: 1, bridge: false });
     expect(graphProjectionCounts(result, 307)).toEqual({ units: 8, directMembers: 42, coveredAssets: 307, mappings: 6 });
   });
 

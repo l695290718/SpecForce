@@ -2,6 +2,7 @@
 
 import type Sigma from "sigma";
 import type { EdgeProgramType } from "sigma/rendering";
+import { MultiDirectedGraph } from "graphology";
 import FA2LayoutSupervisor from "graphology-layout-forceatlas2/worker";
 import noverlap from "graphology-layout-noverlap";
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
@@ -75,6 +76,8 @@ export interface SigmaArchitectureGraphProps {
   retryKey?: number;
   hiddenRelations?: ReadonlySet<string>;
   collapsedClusterIds?: ReadonlySet<string>;
+  visibleNodeIds?: ReadonlySet<string>;
+  visibleEdgeIds?: ReadonlySet<string>;
   overlay?: ReactNode;
   onNodeSelect(id: string): void;
   onNodeHover?(id?: string): void;
@@ -216,7 +219,7 @@ async function loadEdgeCurveProgram(): Promise<SigmaEdgeProgram | undefined> {
   }
 }
 
-export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, reducedMotion, semanticState, retryKey = 0, hiddenRelations, collapsedClusterIds, overlay, onNodeSelect, onNodeHover, onStageClick, onEdgeSelect, onRendererFailure, onRendererReady, onControllerReady, onLayoutLifecycleChange }: SigmaArchitectureGraphProps) {
+export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, reducedMotion, semanticState, retryKey = 0, hiddenRelations, collapsedClusterIds, visibleNodeIds, visibleEdgeIds, overlay, onNodeSelect, onNodeHover, onStageClick, onEdgeSelect, onRendererFailure, onRendererReady, onControllerReady, onLayoutLifecycleChange }: SigmaArchitectureGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sigmaRef = useRef<SigmaInstance | undefined>(undefined);
   const callbacksRef = useRef({ onNodeSelect, onNodeHover, onStageClick, onEdgeSelect, onRendererFailure, onRendererReady, onControllerReady, onLayoutLifecycleChange });
@@ -228,6 +231,7 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
   const pulseFrameRef = useRef<number | undefined>(undefined);
   const pulseRef = useRef<GraphPulseState | undefined>(undefined);
   const supervisorRef = useRef<FA2LayoutSupervisor<GraphNodeAttributes, GraphEdgeAttributes> | undefined>(undefined);
+  const layoutGraphRef = useRef<MultiDirectedGraph<GraphNodeAttributes, GraphEdgeAttributes> | undefined>(undefined);
   const layoutRefreshRef = useRef<number | undefined>(undefined);
   const layoutRunIdRef = useRef(0);
   const layoutLifecycleRef = useRef<LayoutLifecycle>("seeded");
@@ -236,10 +240,14 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
   hiddenRelationsRef.current = hiddenRelations ?? EMPTY_RELATION_FILTER;
   const collapsedClusterIdsRef = useRef<ReadonlySet<string>>(collapsedClusterIds ?? EMPTY_RELATION_FILTER);
   collapsedClusterIdsRef.current = collapsedClusterIds ?? EMPTY_RELATION_FILTER;
+  const visibleNodeIdsRef = useRef<ReadonlySet<string> | undefined>(visibleNodeIds);
+  visibleNodeIdsRef.current = visibleNodeIds;
+  const visibleEdgeIdsRef = useRef<ReadonlySet<string> | undefined>(visibleEdgeIds);
+  visibleEdgeIdsRef.current = visibleEdgeIds;
   callbacksRef.current = { onNodeSelect, onNodeHover, onStageClick, onEdgeSelect, onRendererFailure, onRendererReady, onControllerReady, onLayoutLifecycleChange };
   semanticStateRef.current = semanticState;
   const graphShape = `${store.graph.order}:${store.graph.size}`;
-  const layoutRequest = useMemo(() => createLayoutRequest(store, view, layoutMode, reducedMotion), [store, view, layoutMode, reducedMotion, graphShape]);
+  const layoutRequest = useMemo(() => createLayoutRequest(store, view, layoutMode, reducedMotion, visibleNodeIds, visibleEdgeIds), [store, view, layoutMode, reducedMotion, graphShape, visibleNodeIds, visibleEdgeIds]);
 
   const notifyLayoutLifecycle = (lifecycle: LayoutLifecycle) => {
     layoutLifecycleRef.current = lifecycle;
@@ -265,12 +273,17 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
   };
 
   const settleLayout = (lifecycle: LayoutLifecycle) => {
+    const layoutGraph = layoutGraphRef.current;
     cancelLayoutRun();
     try {
-      noverlap.assign(store.graph, NOVERLAP_PARAMETERS);
+      if (layoutGraph) {
+        noverlap.assign(layoutGraph, NOVERLAP_PARAMETERS);
+        applyLayoutGraphPositions(store, layoutGraph);
+      }
     } catch {
       // Noverlap is a readability cleanup; settled force positions remain usable.
     }
+    layoutGraphRef.current = undefined;
     sigmaRef.current?.refresh();
     if (!selectedRef.current) void sigmaRef.current?.getCamera().animatedReset({ duration: GRAPH_CAMERA_TRANSITION_MS });
     notifyLayoutLifecycle(lifecycle);
@@ -281,7 +294,7 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
     const runId = layoutRunIdRef.current;
     notifyLayoutLifecycle("running");
     const deterministic = deterministicLayout(layoutRequest);
-    if (reducedMotion || layoutRequest.layout === "tree" || layoutRequest.layout === "circles" || store.graph.order < 2) {
+    if (reducedMotion || layoutRequest.layout === "tree" || layoutRequest.layout === "circles" || layoutRequest.nodes.length < 2) {
       applyLayoutPositions(store, deterministic);
       layoutAnimatingRef.current = false;
       sigmaRef.current?.refresh();
@@ -290,15 +303,17 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
     }
     layoutAnimatingRef.current = true;
     try {
-      const supervisor = new FA2LayoutSupervisor<GraphNodeAttributes, GraphEdgeAttributes>(store.graph, {
-        settings: forceSettings(store.graph.order, layoutRequest.seed)
+      const layoutGraph = createLayoutGraph(layoutRequest);
+      layoutGraphRef.current = layoutGraph;
+      const supervisor = new FA2LayoutSupervisor<GraphNodeAttributes, GraphEdgeAttributes>(layoutGraph, {
+        settings: forceSettings(layoutGraph.order, layoutRequest.seed)
       });
       if (runId !== layoutRunIdRef.current) {
         supervisor.kill();
         return;
       }
       supervisorRef.current = supervisor;
-      layoutRefreshRef.current = window.setInterval(() => { sigmaRef.current?.refresh(); }, 60);
+      layoutRefreshRef.current = window.setInterval(() => { applyLayoutGraphPositions(store, layoutGraph); sigmaRef.current?.refresh(); }, 60);
       sigmaRef.current?.refresh();
       supervisor.start();
       if (!selectedRef.current) void sigmaRef.current?.getCamera().animatedReset({ duration: GRAPH_CAMERA_TRANSITION_MS });
@@ -387,7 +402,7 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
       if (disposed) return;
       const edgeCurveProgram = await loadEdgeCurveProgram();
       if (disposed) return;
-      const sigma = new SigmaRenderer(store.graph, container, createSigmaSettings(store, selectedRef, hoverRef, semanticStateRef, layoutAnimatingRef, pulseRef, highlightedRef, edgeCurveProgram, hiddenRelationsRef, collapsedClusterIdsRef));
+      const sigma = new SigmaRenderer(store.graph, container, createSigmaSettings(store, selectedRef, hoverRef, semanticStateRef, layoutAnimatingRef, pulseRef, highlightedRef, edgeCurveProgram, hiddenRelationsRef, collapsedClusterIdsRef, visibleNodeIdsRef, visibleEdgeIdsRef));
       sigmaRef.current = sigma;
       const clearSelection = () => {
         selectedRef.current = undefined;
@@ -446,7 +461,7 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
   }, [semanticState, store]);
   useEffect(() => {
     sigmaRef.current?.refresh();
-  }, [collapsedClusterIds, hiddenRelations]);
+  }, [collapsedClusterIds, hiddenRelations, visibleNodeIds, visibleEdgeIds]);
   const minimapCameraProvider = () => {
     const camera = sigmaRef.current?.getCamera();
     return camera ? { getState: () => camera.getState(), animate: (state: { x?: number; y?: number }, options?: { duration?: number }) => void camera.animate(state as never, options as never) } : undefined;
@@ -460,13 +475,41 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
   );
 }
 
-export function createLayoutRequest(store: ArchitectureGraphStore, _view: ArchitectureGraphView, layoutMode: LayoutRunMode, reducedMotion: boolean): LayoutWorkerRequest {
+export function createLayoutRequest(
+  store: ArchitectureGraphStore,
+  _view: ArchitectureGraphView,
+  layoutMode: LayoutRunMode,
+  reducedMotion: boolean,
+  visibleNodeIds?: ReadonlySet<string>,
+  visibleEdgeIds?: ReadonlySet<string>
+): LayoutWorkerRequest {
   const snapshot = store.snapshot();
-  return { type: "refine", layout: layoutMode, nodes: snapshot.nodes.map(({ id, attributes }) => ({ id, x: attributes.x, y: attributes.y, degree: attributes.degree, layer: attributes.layer })), edges: snapshot.edges.map(({ source, target, attributes }) => ({ source, target, weight: attributes.weight })), seed: stableSeed(`${store.identity.applicationServiceId}:${store.identity.baselineId}:${store.identity.projectionManifestId}:${layoutMode}`), maxRuntimeMs: LAYOUT_RUNTIME_MS, reducedMotion };
+  const nodeIds = visibleNodeIds ?? new Set(snapshot.nodes.map(({ id }) => id));
+  const nodes = snapshot.nodes
+    .filter(({ id }) => nodeIds.has(id))
+    .map(({ id, attributes }) => ({ id, x: attributes.x, y: attributes.y, degree: attributes.degree, layer: attributes.layer }));
+  const edges = snapshot.edges
+    .filter(({ id, source, target }) => (!visibleEdgeIds || visibleEdgeIds.has(id)) && nodeIds.has(source) && nodeIds.has(target))
+    .map(({ source, target, attributes }) => ({ source, target, weight: attributes.weight }));
+  return { type: "refine", layout: layoutMode, nodes, edges, seed: stableSeed(`${store.identity.applicationServiceId}:${store.identity.baselineId}:${store.identity.projectionManifestId}:${layoutMode}`), maxRuntimeMs: LAYOUT_RUNTIME_MS, reducedMotion };
 }
 
 export function applyLayoutPositions(store: ArchitectureGraphStore, positions: readonly { id: string; x: number; y: number }[]): void {
   for (const position of positions) if (store.graph.hasNode(position.id)) store.graph.mergeNodeAttributes(position.id, { x: position.x, y: position.y });
+}
+
+function createLayoutGraph(request: LayoutWorkerRequest): MultiDirectedGraph<GraphNodeAttributes, GraphEdgeAttributes> {
+  const graph = new MultiDirectedGraph<GraphNodeAttributes, GraphEdgeAttributes>();
+  for (const node of request.nodes) graph.addNode(node.id, { stableId: node.id, kind: "fact", label: node.id, layer: node.layer, memberCount: 1, degree: node.degree, criticality: 0, x: node.x, y: node.y });
+  request.edges.forEach((edge, index) => graph.addDirectedEdgeWithKey(`layout:${index}:${edge.source}:${edge.target}`, edge.source, edge.target, { stableId: `layout:${index}`, relationCode: "LAYOUT", confidence: 1, bridge: false, weight: edge.weight }));
+  return graph;
+}
+
+function applyLayoutGraphPositions(store: ArchitectureGraphStore, graph: MultiDirectedGraph<GraphNodeAttributes, GraphEdgeAttributes>): void {
+  applyLayoutPositions(store, graph.nodes().map((id) => {
+    const { x, y } = graph.getNodeAttributes(id);
+    return { id, x, y };
+  }));
 }
 
 export function createSigmaSettings(
@@ -479,7 +522,9 @@ export function createSigmaSettings(
   highlightedRef: React.RefObject<ReadonlySet<string> | undefined> = { current: undefined },
   edgeCurveProgram?: SigmaEdgeProgram,
   hiddenRelationsRef: React.RefObject<ReadonlySet<string>> = { current: EMPTY_RELATION_FILTER },
-  collapsedClusterIdsRef: React.RefObject<ReadonlySet<string>> = { current: EMPTY_RELATION_FILTER }
+  collapsedClusterIdsRef: React.RefObject<ReadonlySet<string>> = { current: EMPTY_RELATION_FILTER },
+  visibleNodeIdsRef: React.RefObject<ReadonlySet<string> | undefined> = { current: undefined },
+  visibleEdgeIdsRef: React.RefObject<ReadonlySet<string> | undefined> = { current: undefined }
 ) {
   const edgeProgramClasses: Record<string, SigmaEdgeProgram> = edgeCurveProgram ? { curved: edgeCurveProgram } : {};
   return {
@@ -495,6 +540,7 @@ export function createSigmaSettings(
       const semantic = semanticStateRef.current;
       const neighborhoodIds = highlightedRef.current ?? semantic?.neighborhoodIds ?? new Set<string>();
       const visual = createNodeVisualState(nodeId, data, { selectedId: selectedRef.current, hoveredId: hoverRef.current, neighborhoodIds });
+      if (visibleNodeIdsRef.current && !visibleNodeIdsRef.current.has(nodeId)) return { ...data, ...visual, hidden: true, size: 0, label: null, opacity: 0 };
       if (data.kind === "fact" && data.clusterId && collapsedClusterIdsRef.current.has(data.clusterId)) {
         return { ...data, ...visual, hidden: true, size: 0, label: null, opacity: 0 };
       }
@@ -509,6 +555,9 @@ export function createSigmaSettings(
       const semantic = semanticStateRef.current;
       const neighborhoodIds = highlightedRef.current ?? semantic?.neighborhoodIds ?? new Set<string>();
       const visual = createEdgeVisualState({ source, target, attributes: data }, { selectedId: selectedRef.current, hoveredId: hoverRef.current, neighborhoodIds, hiddenRelations: hiddenRelationsRef.current }, layoutAnimatingRef.current === true);
+      if ((visibleEdgeIdsRef.current && !visibleEdgeIdsRef.current.has(edgeId)) || (visibleNodeIdsRef.current && (!visibleNodeIdsRef.current.has(source) || !visibleNodeIdsRef.current.has(target)))) {
+        return { ...data, ...visual, hidden: true, size: 0, opacity: 0 };
+      }
       const sourceAttributes = store.graph.getNodeAttributes(source);
       const targetAttributes = store.graph.getNodeAttributes(target);
       const membershipCollapsed = data.relationCode === "ARCHITECTURE_MEMBERSHIP" && Boolean(

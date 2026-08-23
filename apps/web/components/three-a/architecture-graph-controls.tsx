@@ -4,6 +4,7 @@ import {
   CircleDot,
   Focus,
   GitBranch,
+  Minimize2,
   Network,
   Play,
   RotateCcw,
@@ -23,11 +24,13 @@ export interface ArchitectureGraphControlsProps {
   view: ArchitectureGraphView;
   lifecycle: ArchitectureGraphLifecycle;
   hasSelection: boolean;
+  canCollapseSelection?: boolean;
   onViewChange(view: ArchitectureGraphView): void;
   onZoomIn(): void;
   onZoomOut(): void;
   onResetCamera(): void;
   onFocusSelection(): void;
+  onCollapseSelection?(): void;
   onStartLayout(): void;
   onStopLayout(): void;
   onRestartLayout(): void;
@@ -48,6 +51,7 @@ export interface ArchitectureGraphControlLabels {
   selectionGroup: string;
   focusSelection: string;
   clearSelection: string;
+  collapseSelectedUnit: string;
   layoutGroup: string;
   startLayout: string;
   stopLayout: string;
@@ -81,6 +85,7 @@ const defaultLabels: ArchitectureGraphControlLabels = {
   selectionGroup: "Selection controls",
   focusSelection: "Focus selection",
   clearSelection: "Clear selection",
+  collapseSelectedUnit: "Collapse selected unit",
   layoutGroup: "Layout controls",
   startLayout: "Start layout",
   stopLayout: "Stop layout",
@@ -123,11 +128,13 @@ export function ArchitectureGraphControls({
   view,
   lifecycle,
   hasSelection,
+  canCollapseSelection = false,
   onViewChange,
   onZoomIn,
   onZoomOut,
   onResetCamera,
   onFocusSelection,
+  onCollapseSelection,
   onStartLayout,
   onStopLayout,
   onRestartLayout,
@@ -173,6 +180,7 @@ export function ArchitectureGraphControls({
         role="group"
       >
         <ControlButton label={labels.focusSelection} icon={Focus} disabled={!hasSelection} onClick={onFocusSelection} />
+        <ControlButton label={labels.collapseSelectedUnit} icon={Minimize2} disabled={!canCollapseSelection || !onCollapseSelection} onClick={onCollapseSelection ?? (() => undefined)} />
         <ControlButton label={labels.clearSelection} icon={X} disabled={!hasSelection} onClick={onClearSelection} />
       </div>
 
