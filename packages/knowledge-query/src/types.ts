@@ -158,6 +158,7 @@ export interface UnitGraphQueryInput extends QueryPrincipalInput {
   projectionManifestId: string;
   filter?: ArchitectureUnitFilter;
   includeMembers?: boolean;
+  includeMemberRelations?: boolean;
   budget?: Partial<UnitGraphBudget>;
   continuation?: string;
 }

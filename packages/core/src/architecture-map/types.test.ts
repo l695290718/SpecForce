@@ -107,5 +107,6 @@ describe("architecture-map contracts", () => {
   it("validates the dedicated unit graph member budget", () => {
     expect(validateUnitGraphBudget(DEFAULT_UNIT_GRAPH_BUDGET)).toEqual(DEFAULT_UNIT_GRAPH_BUDGET);
     expect(() => validateUnitGraphBudget({ ...DEFAULT_UNIT_GRAPH_BUDGET, maxMembers: 0 })).toThrow("UNIT_GRAPH_MEMBER_BUDGET_INVALID");
+    expect(() => validateUnitGraphBudget({ ...DEFAULT_UNIT_GRAPH_BUDGET, maxMemberRelations: 0 })).toThrow("UNIT_GRAPH_MEMBER_RELATION_BUDGET_INVALID");
   });
 });

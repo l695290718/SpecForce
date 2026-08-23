@@ -101,12 +101,14 @@ describe("handleThreeAQuery", () => {
 
   it("forwards bounded member mode to the exact-Scope unit graph service", async () => {
     const { service, dependencies } = makeDependencies();
-    const response = await handleThreeAQuery(request({ operation: "unitGraph", scope: scope.applicationServiceId, baselineId: "b1", projectionManifestId: "p1", generationId: "g1", includeMembers: true, budget: { maxMembers: 500 } }), dependencies);
+    const response = await handleThreeAQuery(request({ operation: "unitGraph", scope: scope.applicationServiceId, baselineId: "b1", projectionManifestId: "p1", generationId: "g1", includeMembers: true, includeMemberRelations: true, budget: { maxMembers: 500, maxMemberRelations: 120 } }), dependencies);
     expect(response.status).toBe(200);
-    expect(service.unitGraph).toHaveBeenCalledWith(expect.objectContaining({ architectureScope: scope, includeMembers: true, budget: { maxMembers: 500 } }));
+    expect(service.unitGraph).toHaveBeenCalledWith(expect.objectContaining({ architectureScope: scope, includeMembers: true, includeMemberRelations: true, budget: { maxMembers: 500, maxMemberRelations: 120 } }));
 
     const rejected = await handleThreeAQuery(request({ operation: "unitGraph", scope: scope.applicationServiceId, baselineId: "b1", projectionManifestId: "p1", generationId: "g1", budget: { maxMembers: 501 } }), dependencies);
     expect(rejected.status).toBe(400);
+    const relationRejected = await handleThreeAQuery(request({ operation: "unitGraph", scope: scope.applicationServiceId, baselineId: "b1", projectionManifestId: "p1", generationId: "g1", budget: { maxMemberRelations: 121 } }), dependencies);
+    expect(relationRejected.status).toBe(400);
   });
 
   it("collapses raw graph-provider failures to a safe unavailable response", async () => {

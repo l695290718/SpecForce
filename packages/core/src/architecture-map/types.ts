@@ -93,6 +93,7 @@ export interface ArchitectureUnitProjectionPage {
 export type ThreeAPartialReason =
   | "UNIT_BUDGET_EXCEEDED"
   | "MEMBER_BUDGET_EXCEEDED"
+  | "MEMBER_RELATION_BUDGET_EXCEEDED"
   | "MAPPING_BUDGET_EXCEEDED"
   | "QUERY_TIMEOUT"
   | "PAYLOAD_BUDGET_EXCEEDED"
@@ -114,11 +115,13 @@ export const DEFAULT_ARCHITECTURE_MAP_BUDGET: Readonly<ArchitectureMapBudget> = 
 
 export interface UnitGraphBudget extends ArchitectureMapBudget {
   maxMembers: number;
+  maxMemberRelations: number;
 }
 
 export const DEFAULT_UNIT_GRAPH_BUDGET: Readonly<UnitGraphBudget> = {
   ...DEFAULT_ARCHITECTURE_MAP_BUDGET,
   maxMembers: 500,
+  maxMemberRelations: 120,
   maxPayloadBytes: 524_288
 };
 
@@ -201,6 +204,7 @@ export function validateArchitectureMapBudget(budget: ArchitectureMapBudget): Ar
 export function validateUnitGraphBudget(budget: UnitGraphBudget): UnitGraphBudget {
   validateArchitectureMapBudget(budget);
   assertPositiveInteger(budget.maxMembers, "UNIT_GRAPH_MEMBER_BUDGET_INVALID");
+  assertPositiveInteger(budget.maxMemberRelations, "UNIT_GRAPH_MEMBER_RELATION_BUDGET_INVALID");
   return budget;
 }
 
