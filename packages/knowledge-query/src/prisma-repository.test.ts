@@ -52,4 +52,53 @@ describe("PrismaThreeAQueryRepository", () => {
       take: 501
     });
   });
+
+  it("reads bounded member relationships with both endpoints inside the exact identity", async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      edgeRow("relationship-1", "assertion-a", "assertion-b", "CALLS", 0.97),
+      edgeRow("relationship-2", "assertion-b", "assertion-a", "DEPENDS_ON", 0.91),
+      edgeRow("relationship-3", "assertion-a", "assertion-a", "REFERENCES", 0.9)
+    ]);
+    const repository = new PrismaThreeAQueryRepository({ knowledgeProjectionEdge: { findMany } } as never);
+    const identity = { ...scope, generationId: manifest.generationId, baselineId: manifest.baselineId, projectionManifestId: "manifest-1" };
+
+    const result = await repository.listArchitectureUnitMemberRelationships(identity, ["assertion-b", "assertion-a", "assertion-b"], 2);
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        ...scope,
+        generationId: manifest.generationId,
+        baselineId: manifest.baselineId,
+        sourceAssertionId: { in: ["assertion-a", "assertion-b"] },
+        targetAssertionId: { in: ["assertion-a", "assertion-b"] }
+      },
+      orderBy: [{ confidence: "desc" }, { relationCode: "asc" }, { sourceAssertionId: "asc" }, { targetAssertionId: "asc" }, { relationshipIdentity: "asc" }],
+      take: 3
+    });
+    expect(findMany.mock.calls[0]![0].where).not.toHaveProperty("projectionManifestId");
+    expect(result).toMatchObject({
+      hasMore: true,
+      edges: [
+        { relationshipIdentity: "relationship-1" },
+        { relationshipIdentity: "relationship-2" }
+      ]
+    });
+  });
 });
+
+function edgeRow(relationshipIdentity: string, sourceAssertionId: string, targetAssertionId: string, relationCode: string, confidence: number) {
+  return {
+    ...scope,
+    generationId: manifest.generationId,
+    baselineId: manifest.baselineId,
+    relationshipIdentity,
+    sourceAssertionId,
+    targetAssertionId,
+    sourceSemanticIdentity: `semantic:${sourceAssertionId}`,
+    targetSemanticIdentity: `semantic:${targetAssertionId}`,
+    relationCode,
+    confidence,
+    relationshipVersion: "relationship-version-1",
+    contentDigest: `digest:${relationshipIdentity}`
+  };
+}

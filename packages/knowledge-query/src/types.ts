@@ -235,6 +235,11 @@ export interface ArchitectureMapQueryRepository {
     unitIdentities: string[],
     limit: number
   ): Promise<{ members: ArchitectureUnitMemberProjection[]; hasMore: boolean }>;
+  listArchitectureUnitMemberRelationships(
+    identity: ArchitectureMapIdentity,
+    assertionIds: string[],
+    limit: number
+  ): Promise<{ edges: KnowledgeProjectionEdge[]; hasMore: boolean }>;
   listArchitectureUnitMappings(
     identity: ArchitectureMapIdentity,
     unitIdentities: string[],

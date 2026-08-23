@@ -144,6 +144,7 @@ function repositories() {
     getArchitectureUnitsByIdentity: vi.fn().mockResolvedValue([]),
     listArchitectureUnitMembers: vi.fn().mockResolvedValue({ members: [], hasMore: false }),
     listArchitectureUnitMembersByUnits: vi.fn().mockResolvedValue({ members: [], hasMore: false }),
+    listArchitectureUnitMemberRelationships: vi.fn().mockResolvedValue({ edges: [], hasMore: false }),
     listArchitectureUnitMappings: vi.fn().mockResolvedValue({ mappings: [], hasMore: false }),
     listArchitectureUnitNeighborhoodMappings: vi.fn().mockResolvedValue({ mappings: [], hasMore: false }),
     listSameLayerDependencies: vi.fn().mockResolvedValue({ edges: [], hasMore: false })
