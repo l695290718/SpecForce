@@ -143,6 +143,7 @@ function repositories() {
     }),
     getArchitectureUnitsByIdentity: vi.fn().mockResolvedValue([]),
     listArchitectureUnitMembers: vi.fn().mockResolvedValue({ members: [], hasMore: false }),
+    listArchitectureUnitMembersByUnits: vi.fn().mockResolvedValue({ members: [], hasMore: false }),
     listArchitectureUnitMappings: vi.fn().mockResolvedValue({ mappings: [], hasMore: false }),
     listArchitectureUnitNeighborhoodMappings: vi.fn().mockResolvedValue({ mappings: [], hasMore: false }),
     listSameLayerDependencies: vi.fn().mockResolvedValue({ edges: [], hasMore: false })
@@ -254,6 +255,26 @@ describe("bounded readable 3A architecture queries", () => {
     expect(result.sameLayerDependencies).toHaveLength(1);
     expect(result.evidenceRefs).toEqual(expect.arrayContaining([sys.contentDigest, bizToSys.contentDigest, "digest-assertion:api"]));
     expect(map.listArchitectureUnitNeighborhoodMappings).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns governed members and membership edges only when unit graph member mode is requested", async () => {
+    const { base, map } = repositories();
+    const biz = unit("unit:biz", "BIZ");
+    const sys = unit("unit:sys", "SYS");
+    vi.mocked(map.listArchitectureUnits).mockResolvedValue({ units: [biz, sys], totalByLayer: { BIZ: 1, SYS: 1, TECH: 0 }, unclassifiedCount: 0 });
+    vi.mocked(map.listArchitectureUnitMappings).mockResolvedValue({ mappings: [mapping(biz, sys)], hasMore: false });
+    vi.mocked(map.listArchitectureUnitMembersByUnits).mockResolvedValue({ members: [member(biz.unitIdentity, "assertion:biz"), member(sys.unitIdentity, "assertion:sys")], hasMore: false });
+    const service = createThreeAProjectionQueryService(base, store, keyring);
+
+    const compatible = await service.unitGraph(mapInput());
+    const withMembers = await service.unitGraph(mapInput({ includeMembers: true, budget: { maxMembers: 500 } }));
+
+    expect(compatible).toMatchObject({ fidelity: "UNIT" });
+    expect(compatible.nodes).toHaveLength(2);
+    expect(withMembers).toMatchObject({ fidelity: "UNIT_WITH_MEMBERS" });
+    expect(withMembers.nodes.map((node) => node.id)).toEqual(expect.arrayContaining(["unit:biz", "assertion:biz", "assertion:sys"]));
+    expect(withMembers.edges.map((edge) => edge.id)).toEqual(expect.arrayContaining(["membership:unit:biz:assertion:biz", "membership:unit:sys:assertion:sys"]));
+    expect(map.listArchitectureUnitMembersByUnits).toHaveBeenCalledWith(expect.objectContaining(scope), ["unit:biz", "unit:sys"], 500);
   });
 
   it("does not leak a unit from another Scope", async () => {

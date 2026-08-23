@@ -1567,16 +1567,16 @@
                               }
                           ],
                           "owner": "SpecForge Architecture and Product",
-      "status": "Implemented: the graph-first 3A workspace separates governed units, direct members, coverage assets, and unit mappings; bounded Coverage detail and exact-Scope on-demand member expansion are verified on ports 3000 and 3010.",
-      "reason": "Designer v6 publishes eight governed units, 42 direct members, 307 covered assets, and six unit mappings. Coverage rows previously pushed the graph roughly 6,862 pixels down the page, while direct members were available only through the neighborhood query. The Web now keeps the unit projection readable, paginates coverage independently, and expands authoritative members on demand.",
-      "retryTrigger": "Open a new exact-Scope session before adding TRACE coverage relationships to the graph, changing membership semantics, or introducing a new graph query operation; assertion-level impact analysis remains separately gated until a published assertion projection exists.",
+      "status": "Implemented: the graph-first 3A workspace separates governed units, direct members, coverage assets, and unit mappings; default Network requests now load all bounded direct members in one exact-Scope unitGraph response and locally collapse or expand each unit.",
+      "reason": "Designer v6 publishes eight governed units, 42 direct members, 307 covered assets, and six unit mappings. Coverage rows previously pushed the graph roughly 6,862 pixels down the page, while direct members required an extra neighborhood request. The Web now keeps coverage independent, loads direct members by default through one bounded query, and applies collapse locally without inventing relationships.",
+      "retryTrigger": "Open a new exact-Scope session before adding TRACE coverage relationships to the graph, changing the 500-member contract, adding a member continuation format, or introducing assertion-level topology beyond direct governed membership.",
       "localizedContent": {
         "en": {
-          "decision": "Make the governed unit graph the primary 3A workspace, isolate coverage detail behind a bounded shareable tab, display unit/member/coverage/mapping measures independently, and expand exact-Scope unit members on demand through the existing neighborhood query.",
+          "decision": "Make the governed unit graph the primary 3A workspace, isolate coverage detail behind a bounded shareable tab, display unit/member/coverage/mapping measures independently, and load exact-Scope direct unit members in the default bounded unitGraph response with local collapse and expand.",
           "constraints": [
             "PostgreSQL remains authoritative and the browser graph remains a read-only projection.",
             "TRACE-derived coverage is not injected into the default unit topology.",
-            "Unit expansion must preserve exact Scope, Baseline, Projection Manifest, and generation identity."
+            "Member graph reads and local collapse must preserve exact Scope, Baseline, Projection Manifest, and generation identity."
           ]
         },
         "zh": {

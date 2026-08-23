@@ -329,6 +329,39 @@ PostgreSQL 继续作为已编写事实和关系事件的权威来源。后续实
 - 会话状态：`design-change-session:34a1a99a-6026-4060-a858-46654b1630f3` 已针对书面设计增量收敛为 `CONVERGED`。
 
 
+## Default Member-Rich Unit Graph Increment (2026-08-23)
+
+The default Network view now requests `unitGraph(includeMembers=true)` and receives the governed architecture units, their authoritative direct members, cross-layer unit mappings, and directional `ARCHITECTURE_MEMBERSHIP` edges in one bounded exact-Scope response. The query remains additive: callers that omit the flag continue to receive `fidelity=UNIT`, while member mode reports `fidelity=UNIT_WITH_MEMBERS`.
+
+Member retrieval uses one PostgreSQL batch filtered by exact Scope, Baseline, Manifest, generation, and the returned unit identities. The hard response budget is 12 units per layer, 500 members, 60 unit mappings, 500 membership edges, 2 seconds, and 524,288 bytes. A truncated member prefix remains explicit through `MEMBER_BUDGET_EXCEEDED` and `CONTINUATION_REQUIRED`; TRACE coverage remains outside the default topology.
+
+The WebGL renderer loads the resulting member graph immediately. Selecting a unit now locally collapses or expands its direct fact nodes and membership edges without another network request. Selecting a fact reopens its owning unit before focusing it. Scope, Baseline, Manifest, generation, and graph-view changes reset collapse state. PostgreSQL remains authoritative; no direct mutation, schema migration, or graph-store write is introduced.
+
+### 默认成员图增量（2026-08-23）
+
+默认 Network 视图现在请求 `unitGraph(includeMembers=true)`，并在一次有界、精确 Scope 的响应中获得治理架构单元、其权威直接成员、跨层单元映射和有向 `ARCHITECTURE_MEMBERSHIP` 关系。该契约为增量兼容：未传入该开关的调用方继续获得 `fidelity=UNIT`，成员模式返回 `fidelity=UNIT_WITH_MEMBERS`。
+
+成员通过一次 PostgreSQL 批量查询读取，过滤条件包含精确 Scope、Baseline、Manifest、generation 和已返回的单元标识。响应上限为每层 12 个单元、500 个成员、60 条单元映射、500 条成员关系、2 秒和 524,288 字节。成员截断会明确返回 `MEMBER_BUDGET_EXCEEDED` 与 `CONTINUATION_REQUIRED`；TRACE 覆盖仍不进入默认拓扑。
+
+WebGL 渲染器会立即加载该成员图。选择单元时只在本地折叠或展开其直接事实节点和成员关系，不再发起额外网络请求；选择事实前会展开其所属单元。Scope、Baseline、Manifest、generation 或图视图变化会重置折叠状态。PostgreSQL 仍是权威数据源；本增量不引入直接写库、Schema 迁移或图数据库写入。
+
+### Increment Evidence
+
+- Exact-Scope preflight opened `design-change-session:e426e607-c660-4f43-8178-208fa70b1f7f`, read 357 assets, and returned an OPEN session with design-context digest `a02bac2c6a4e89072517bc2616b6708f6c7d63634e5cc10af4d655082bf06a9f`.
+- `pnpm --filter @specforge/knowledge-query typecheck` and `pnpm --filter @specforge/web typecheck` both exited 0.
+- `pnpm exec vitest run packages/core/src/architecture-map/types.test.ts packages/knowledge-query/src/prisma-repository.test.ts packages/knowledge-query/src/architecture-map.test.ts packages/knowledge-query/src/service.test.ts apps/web/lib/3a/query-handler.test.ts apps/web/components/three-a/architecture-graph-workspace.test.ts apps/web/components/three-a/sigma-architecture-graph.test.tsx` passed 7 files and 53 tests.
+- `pnpm exec vitest run --root . --exclude ".worktrees/**" --exclude ".pnpm-store/**" scripts/design-fact-manifest.test.ts scripts/sync-design-facts.test.ts` passed 2 files and 36 tests; `git diff --check` passed.
+- Browser verification on ports 3000 and 3010 returned 8 governed units, 42 direct members, 307 covered assets, 6 unit mappings, 50 loaded nodes, 48 loaded edges, 42 membership edges, and no console errors.
+- `docker compose -f deploy/compose.yaml build web` built `deploy-web`; `docker compose -f deploy/compose.yaml up -d --no-deps web` replaced only `deploy-web-1`; `http://localhost:3010/healthz` returned 200.
+
+### 增量证据
+
+- 精确 Scope 预检已创建会话 `design-change-session:e426e607-c660-4f43-8178-208fa70b1f7f`，并读取 357 项设计资产。
+- Knowledge Query 与 Web 类型检查均通过；聚焦测试通过 7 个文件和 53 项测试；设计事实测试通过 2 个文件和 36 项测试。
+- 3000 与 3010 页面均验证到 8 个治理单元、42 个直接成员、307 个覆盖资产、6 条单元映射、50 个节点、48 条边和 42 条成员关系，且无控制台错误。
+- 仅 `deploy-web-1` 已被替换，3010 健康检查返回 200。
+- `pnpm design-context:close -- --session design-change-session:e426e607-c660-4f43-8178-208fa70b1f7f --status CONVERGED` 已以类型检查、53 项聚焦测试、36 项设计事实测试、3000/3010 页面验证、容器构建和 MCP 回读证据收敛实现会话。
+
 ## Graph-First Coverage and Member Expansion Increment (2026-08-23)
 
 The 3A page now treats the governed architecture graph as the primary workspace. The compact coverage waterline remains visible, but coverage rows render only in a dedicated shareable Coverage tab with 25-row client pagination. This reduces the observed graph offset from approximately 6,862 pixels to 832 pixels and prevents the 307-row coverage report from creating a large architecture-page DOM.

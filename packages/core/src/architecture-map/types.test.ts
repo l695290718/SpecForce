@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_ARCHITECTURE_MAP_BUDGET,
+  DEFAULT_UNIT_GRAPH_BUDGET,
   validateArchitectureMapBudget,
+  validateUnitGraphBudget,
   validateArchitectureUnit,
   validateArchitectureUnitMapping,
   validateArchitectureUnitMember,
@@ -100,5 +102,10 @@ describe("architecture-map contracts", () => {
   it("validates the bounded default map budget", () => {
     expect(validateArchitectureMapBudget(DEFAULT_ARCHITECTURE_MAP_BUDGET)).toEqual(DEFAULT_ARCHITECTURE_MAP_BUDGET);
     expect(() => validateArchitectureMapBudget({ ...DEFAULT_ARCHITECTURE_MAP_BUDGET, maxMappings: 0 })).toThrow("ARCHITECTURE_MAP_MAPPING_BUDGET_INVALID");
+  });
+
+  it("validates the dedicated unit graph member budget", () => {
+    expect(validateUnitGraphBudget(DEFAULT_UNIT_GRAPH_BUDGET)).toEqual(DEFAULT_UNIT_GRAPH_BUDGET);
+    expect(() => validateUnitGraphBudget({ ...DEFAULT_UNIT_GRAPH_BUDGET, maxMembers: 0 })).toThrow("UNIT_GRAPH_MEMBER_BUDGET_INVALID");
   });
 });

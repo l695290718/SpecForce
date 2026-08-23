@@ -38,4 +38,18 @@ describe("PrismaThreeAQueryRepository", () => {
     }));
     expect(where).not.toHaveProperty("projectionManifestId");
   });
+
+  it("reads unit members in one deterministic exact-identity batch", async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const repository = new PrismaThreeAQueryRepository({ architectureUnitMemberProjection: { findMany } } as never);
+    const identity = { ...scope, generationId: manifest.generationId, baselineId: manifest.baselineId, projectionManifestId: "manifest-1" };
+
+    await repository.listArchitectureUnitMembersByUnits(identity, ["unit:sys:b", "unit:biz:a", "unit:sys:b"], 500);
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: { ...identity, unitIdentity: { in: ["unit:biz:a", "unit:sys:b"] } },
+      orderBy: [{ unitIdentity: "asc" }, { semanticIdentity: "asc" }, { assertionId: "asc" }],
+      take: 501
+    });
+  });
 });

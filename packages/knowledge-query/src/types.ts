@@ -1,5 +1,6 @@
 import type {
   ArchitectureMapBudget,
+  UnitGraphBudget,
   ArchitectureMapIdentity,
   ArchitectureScopeRef,
   ArchitectureUnitFilter,
@@ -156,7 +157,8 @@ export interface UnitGraphQueryInput extends QueryPrincipalInput {
   baselineId: string;
   projectionManifestId: string;
   filter?: ArchitectureUnitFilter;
-  budget?: Partial<ArchitectureMapBudget>;
+  includeMembers?: boolean;
+  budget?: Partial<UnitGraphBudget>;
   continuation?: string;
 }
 
@@ -226,6 +228,11 @@ export interface ArchitectureMapQueryRepository {
     limit: number,
     assetTypes?: string[],
     offset?: number
+  ): Promise<{ members: ArchitectureUnitMemberProjection[]; hasMore: boolean }>;
+  listArchitectureUnitMembersByUnits(
+    identity: ArchitectureMapIdentity,
+    unitIdentities: string[],
+    limit: number
   ): Promise<{ members: ArchitectureUnitMemberProjection[]; hasMore: boolean }>;
   listArchitectureUnitMappings(
     identity: ArchitectureMapIdentity,

@@ -187,7 +187,7 @@ it("records the governed graph-first 3A workspace separately from assertion anal
     "adr-webgl-3a-graph-exploration"
   ]);
   expect(decision?.reason).toContain("eight governed units, 42 direct members, 307 covered assets, and six unit mappings");
-  expect(decision?.localizedContent?.en.decision).toContain("expand exact-Scope unit members on demand");
+  expect(decision?.localizedContent?.en.decision).toContain("load exact-Scope direct unit members in the default bounded unitGraph response");
   expect(decision?.localizedContent?.zh.decision).toContain("按需展开精确 Scope 的单元成员");
   expect(decision?.managedRelationships).toEqual(expect.arrayContaining([
     expect.objectContaining({ sourceId: "proposal-readable-3a-architecture-mapping", targetId: "api-specforge-3a-architecture-query", relationType: "IMPACTS" }),

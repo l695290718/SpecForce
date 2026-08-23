@@ -74,6 +74,7 @@ export interface SigmaArchitectureGraphProps {
   semanticState?: ArchitectureGraphSemanticState;
   retryKey?: number;
   hiddenRelations?: ReadonlySet<string>;
+  collapsedClusterIds?: ReadonlySet<string>;
   overlay?: ReactNode;
   onNodeSelect(id: string): void;
   onNodeHover?(id?: string): void;
@@ -215,7 +216,7 @@ async function loadEdgeCurveProgram(): Promise<SigmaEdgeProgram | undefined> {
   }
 }
 
-export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, reducedMotion, semanticState, retryKey = 0, hiddenRelations, overlay, onNodeSelect, onNodeHover, onStageClick, onEdgeSelect, onRendererFailure, onRendererReady, onControllerReady, onLayoutLifecycleChange }: SigmaArchitectureGraphProps) {
+export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, reducedMotion, semanticState, retryKey = 0, hiddenRelations, collapsedClusterIds, overlay, onNodeSelect, onNodeHover, onStageClick, onEdgeSelect, onRendererFailure, onRendererReady, onControllerReady, onLayoutLifecycleChange }: SigmaArchitectureGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sigmaRef = useRef<SigmaInstance | undefined>(undefined);
   const callbacksRef = useRef({ onNodeSelect, onNodeHover, onStageClick, onEdgeSelect, onRendererFailure, onRendererReady, onControllerReady, onLayoutLifecycleChange });
@@ -233,6 +234,8 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
   const layoutActionsRef = useRef<SigmaArchitectureGraphLayoutActions>({ start: () => undefined, stop: () => undefined, restart: () => undefined });
   const hiddenRelationsRef = useRef<ReadonlySet<string>>(hiddenRelations ?? EMPTY_RELATION_FILTER);
   hiddenRelationsRef.current = hiddenRelations ?? EMPTY_RELATION_FILTER;
+  const collapsedClusterIdsRef = useRef<ReadonlySet<string>>(collapsedClusterIds ?? EMPTY_RELATION_FILTER);
+  collapsedClusterIdsRef.current = collapsedClusterIds ?? EMPTY_RELATION_FILTER;
   callbacksRef.current = { onNodeSelect, onNodeHover, onStageClick, onEdgeSelect, onRendererFailure, onRendererReady, onControllerReady, onLayoutLifecycleChange };
   semanticStateRef.current = semanticState;
   const graphShape = `${store.graph.order}:${store.graph.size}`;
@@ -384,7 +387,7 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
       if (disposed) return;
       const edgeCurveProgram = await loadEdgeCurveProgram();
       if (disposed) return;
-      const sigma = new SigmaRenderer(store.graph, container, createSigmaSettings(store, selectedRef, hoverRef, semanticStateRef, layoutAnimatingRef, pulseRef, highlightedRef, edgeCurveProgram, hiddenRelationsRef));
+      const sigma = new SigmaRenderer(store.graph, container, createSigmaSettings(store, selectedRef, hoverRef, semanticStateRef, layoutAnimatingRef, pulseRef, highlightedRef, edgeCurveProgram, hiddenRelationsRef, collapsedClusterIdsRef));
       sigmaRef.current = sigma;
       const clearSelection = () => {
         selectedRef.current = undefined;
@@ -443,7 +446,7 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
   }, [semanticState, store]);
   useEffect(() => {
     sigmaRef.current?.refresh();
-  }, [hiddenRelations]);
+  }, [collapsedClusterIds, hiddenRelations]);
   const minimapCameraProvider = () => {
     const camera = sigmaRef.current?.getCamera();
     return camera ? { getState: () => camera.getState(), animate: (state: { x?: number; y?: number }, options?: { duration?: number }) => void camera.animate(state as never, options as never) } : undefined;
@@ -475,7 +478,8 @@ export function createSigmaSettings(
   pulseRef: React.RefObject<GraphPulseState | undefined> = { current: undefined },
   highlightedRef: React.RefObject<ReadonlySet<string> | undefined> = { current: undefined },
   edgeCurveProgram?: SigmaEdgeProgram,
-  hiddenRelationsRef: React.RefObject<ReadonlySet<string>> = { current: EMPTY_RELATION_FILTER }
+  hiddenRelationsRef: React.RefObject<ReadonlySet<string>> = { current: EMPTY_RELATION_FILTER },
+  collapsedClusterIdsRef: React.RefObject<ReadonlySet<string>> = { current: EMPTY_RELATION_FILTER }
 ) {
   const edgeProgramClasses: Record<string, SigmaEdgeProgram> = edgeCurveProgram ? { curved: edgeCurveProgram } : {};
   return {
@@ -491,6 +495,9 @@ export function createSigmaSettings(
       const semantic = semanticStateRef.current;
       const neighborhoodIds = highlightedRef.current ?? semantic?.neighborhoodIds ?? new Set<string>();
       const visual = createNodeVisualState(nodeId, data, { selectedId: selectedRef.current, hoveredId: hoverRef.current, neighborhoodIds });
+      if (data.kind === "fact" && data.clusterId && collapsedClusterIdsRef.current.has(data.clusterId)) {
+        return { ...data, ...visual, hidden: true, size: 0, label: null, opacity: 0 };
+      }
       const pulse = pulseRef.current;
       const pulseProgress = pulse?.nodeId === nodeId && pulse.startedAt !== undefined ? Math.min(1, Math.max(0, (performance.now() - pulse.startedAt) / GRAPH_PULSE_MS)) : 0;
       const pulseScale = pulseProgress ? 1 + Math.sin(pulseProgress * Math.PI) * 0.28 : 1;
@@ -502,6 +509,13 @@ export function createSigmaSettings(
       const semantic = semanticStateRef.current;
       const neighborhoodIds = highlightedRef.current ?? semantic?.neighborhoodIds ?? new Set<string>();
       const visual = createEdgeVisualState({ source, target, attributes: data }, { selectedId: selectedRef.current, hoveredId: hoverRef.current, neighborhoodIds, hiddenRelations: hiddenRelationsRef.current }, layoutAnimatingRef.current === true);
+      const sourceAttributes = store.graph.getNodeAttributes(source);
+      const targetAttributes = store.graph.getNodeAttributes(target);
+      const membershipCollapsed = data.relationCode === "ARCHITECTURE_MEMBERSHIP" && Boolean(
+        (sourceAttributes.clusterId && collapsedClusterIdsRef.current.has(sourceAttributes.clusterId)) ||
+        (targetAttributes.clusterId && collapsedClusterIdsRef.current.has(targetAttributes.clusterId))
+      );
+      if (membershipCollapsed) return { ...data, ...visual, hidden: true, size: 0, opacity: 0 };
       return { ...data, ...visual };
     }
   };

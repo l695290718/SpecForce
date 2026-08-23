@@ -40,6 +40,17 @@ describe("SigmaArchitectureGraph adapters", () => {
     expect(createEdgeVisualState({ source: "fact:one", target: "fact:two", attributes: store.graph.getEdgeAttributes("relationship:one") }, { hiddenRelations: new Set(["CALLS"]) })).toMatchObject({ hidden: true, opacity: 0 });
   });
 
+  it("hides only a collapsed unit's member facts and membership edges", () => {
+    const store = createArchitectureGraphStore(identity);
+    store.graph.addNode("cluster:unit:sys", { stableId: "cluster:unit:sys", kind: "cluster", label: "System", layer: "SYS", clusterId: "unit:sys", memberCount: 1, degree: 1, criticality: 0, x: 0, y: 0 });
+    store.graph.addNode("fact:sys", { stableId: "fact:sys", kind: "fact", label: "System API", layer: "SYS", clusterId: "unit:sys", memberCount: 1, degree: 1, criticality: 0, x: 1, y: 0 });
+    store.graph.addDirectedEdgeWithKey("summary:membership", "cluster:unit:sys", "fact:sys", { stableId: "summary:membership", relationCode: "ARCHITECTURE_MEMBERSHIP", confidence: 1, bridge: false, weight: 1 });
+    const settings = createSigmaSettings(store, { current: undefined }, { current: undefined }, { current: undefined }, { current: false }, { current: undefined }, { current: undefined }, undefined, { current: new Set() }, { current: new Set(["unit:sys"]) });
+    expect(settings.nodeReducer("cluster:unit:sys", store.graph.getNodeAttributes("cluster:unit:sys")).hidden).toBe(false);
+    expect(settings.nodeReducer("fact:sys", store.graph.getNodeAttributes("fact:sys"))).toMatchObject({ hidden: true, size: 0, opacity: 0 });
+    expect(settings.edgeReducer("summary:membership", store.graph.getEdgeAttributes("summary:membership"))).toMatchObject({ hidden: true, size: 0, opacity: 0 });
+  });
+
   it("emphasizes the selected neighborhood and keeps edges visible while layout runs", () => {
     const store = createArchitectureGraphStore(identity);
     const node = { stableId: "fact:one", kind: "fact" as const, label: "one", layer: "SYS" as const, memberCount: 1, degree: 1, criticality: 0, x: 12, y: -4 };

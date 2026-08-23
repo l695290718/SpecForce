@@ -14,7 +14,8 @@ function makeDependencies() {
   const service = {
     searchArchitectureFacts: vi.fn().mockResolvedValue({ ...base, nodes: [] }),
     traceArchitecturePath: vi.fn().mockResolvedValue({ ...base, nodes: [], edges: [], paths: [] }),
-    getArchitectureFactDetail: vi.fn().mockResolvedValue({ ...base, node: {}, evidenceRefs: [], sourceObservationIds: [], unresolvedQuestions: [], counterEvidence: [], incoming: [], outgoing: [], warnings: [] })
+    getArchitectureFactDetail: vi.fn().mockResolvedValue({ ...base, node: {}, evidenceRefs: [], sourceObservationIds: [], unresolvedQuestions: [], counterEvidence: [], incoming: [], outgoing: [], warnings: [] }),
+    unitGraph: vi.fn().mockResolvedValue({ ...base, generationId: "g1", availability: "READY", source: "ARCHITECTURE_UNIT_PROJECTION", fidelity: "UNIT_WITH_MEMBERS", analysisAvailability: "READY", nodes: [], edges: [] })
   } as unknown as ThreeAProjectionQueryService;
   const graphProvider = {
     overview: vi.fn().mockResolvedValue({ ...base, nodes: [], edges: [] }),
@@ -96,6 +97,16 @@ describe("handleThreeAQuery", () => {
     });
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({ code: "GRAPH_ANALYSIS_UNAVAILABLE" });
+  });
+
+  it("forwards bounded member mode to the exact-Scope unit graph service", async () => {
+    const { service, dependencies } = makeDependencies();
+    const response = await handleThreeAQuery(request({ operation: "unitGraph", scope: scope.applicationServiceId, baselineId: "b1", projectionManifestId: "p1", generationId: "g1", includeMembers: true, budget: { maxMembers: 500 } }), dependencies);
+    expect(response.status).toBe(200);
+    expect(service.unitGraph).toHaveBeenCalledWith(expect.objectContaining({ architectureScope: scope, includeMembers: true, budget: { maxMembers: 500 } }));
+
+    const rejected = await handleThreeAQuery(request({ operation: "unitGraph", scope: scope.applicationServiceId, baselineId: "b1", projectionManifestId: "p1", generationId: "g1", budget: { maxMembers: 501 } }), dependencies);
+    expect(rejected.status).toBe(400);
   });
 
   it("collapses raw graph-provider failures to a safe unavailable response", async () => {
