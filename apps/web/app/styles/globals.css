@@ -97,6 +97,30 @@ body {
 
 .sf-hairline {
   background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.45) 30%, rgba(124, 58, 237, 0.4) 70%, transparent);
+  background-size: 220% 100%;
+  animation: sf-hairline-drift 8s ease-in-out infinite alternate;
+}
+
+@keyframes sf-hairline-drift {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 100% 50%;
+  }
+}
+
+.sf-hero-grid {
+  animation: sf-grid-breathe 9s ease-in-out infinite alternate;
+}
+
+@keyframes sf-grid-breathe {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 0.75;
+  }
 }
 
 .sf-section-title {
@@ -203,7 +227,56 @@ code {
 }
 
 .sf-rise {
-  animation: specforge-rise 420ms ease-out both;
+  animation-name: specforge-rise;
+  animation-duration: 480ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: both;
+}
+
+/* Scroll-driven enhancement: elements reveal as they enter the viewport where
+   scroll timelines are supported; the time-based entrance remains the fallback. */
+@supports (animation-timeline: view()) {
+  .sf-rise {
+    animation-duration: auto;
+    animation-timeline: view();
+    animation-range: entry 0% entry 42%;
+  }
+}
+
+.sf-stagger > * {
+  animation-name: specforge-rise;
+  animation-duration: 480ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: both;
+}
+
+.sf-stagger > *:nth-child(1) { animation-delay: 40ms; }
+.sf-stagger > *:nth-child(2) { animation-delay: 110ms; }
+.sf-stagger > *:nth-child(3) { animation-delay: 180ms; }
+.sf-stagger > *:nth-child(4) { animation-delay: 250ms; }
+.sf-stagger > *:nth-child(5) { animation-delay: 320ms; }
+.sf-stagger > *:nth-child(6) { animation-delay: 390ms; }
+.sf-stagger > *:nth-child(7) { animation-delay: 460ms; }
+.sf-stagger > *:nth-child(n + 8) { animation-delay: 520ms; }
+
+.sf-sheen {
+  position: relative;
+  overflow: hidden;
+}
+
+.sf-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-130%);
+  background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, 0.5) 50%, transparent 68%);
+  transition: transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+
+.sf-sheen:hover::after,
+.sf-sheen:focus-visible::after {
+  transform: translateX(130%);
 }
 
 .sf-flow {
@@ -424,6 +497,9 @@ code {
   .sf-border-live,
   .sf-pulse,
   .sf-rise,
+  .sf-stagger > *,
+  .sf-hairline,
+  .sf-hero-grid,
   .animate-sf-shimmer,
   .animate-sf-drift,
   .sf-overview-canvas [data-motion],
@@ -436,6 +512,10 @@ code {
     transition: none;
     transform: none;
     opacity: 1;
+  }
+
+  .sf-sheen::after {
+    display: none;
   }
 
   [data-testid="architecture-graph-canvas"] * {

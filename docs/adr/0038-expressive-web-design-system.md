@@ -60,3 +60,15 @@ Positive: a distinctive, coherent visual identity across every page with one tok
 - 用户反馈仅导航可见变化后，精确 Scope 实施预检打开 `design-change-session:e03011d7-1a3a-4b60-92a3-91cb17abf625`；本增量将设计语言延伸到页面内容区。
 - 总览首页现使用带渐变边缘强调的玻璃说明卡、含渐变编号芯片与辉光悬浮的玻璃流程瓦片，以及新的 `.sf-section-title` 工具类（在章节标题前渲染蓝紫渐变方块）；关系星座面板改为半透明极光玻璃面并配更轻的节点瓦片。外壳增量中对共享 Card、Badge、PageHeader、ButtonLink 的重塑会自动带到所有基于它们的列表与详情页。
 - 验证：聚焦套件（overview、data-model-er、three-a）29 个文件 / 129 项通过；完整 Web 套件 45 个文件 / 200 项通过；Web 类型检查退出 0；非 standalone 生产构建退出 0。总览路由隔离与本地化源码断言保持不变。
+
+## Motion Layer Increment (2026-08-23)
+
+- Exact-Scope implementation preflight opened `design-change-session:303a1028-c193-4f38-959e-a9d463cae0b1` after user feedback that the interface still lacked motion; this increment adds a restrained motion layer on top of the expressive design system.
+- Motion inventory: `.sf-rise` entrances upgrade to scroll-driven reveals via `animation-timeline: view()` with the time-based entrance kept as fallback; a new `.sf-stagger` utility sequences direct children with incremental delays (used by the overview explanation grid and workspace metric row); `.sf-sheen` adds a hover light sweep to primary `ButtonLink`; `.sf-hairline` now drifts its gradient continuously and `.sf-hero-grid` breathes slowly; the ER canvas container fades up on load. All new animation respects the existing `prefers-reduced-motion: reduce` block, which now also disables stagger, hairline drift, grid breathing, and the sheen overlay.
+- Verification: full web suite passed 45 files / 200 tests including overview CSS source assertions; `pnpm exec tsc --noEmit -p apps/web` exited 0; the non-standalone production build exited 0.
+
+### 动效层增量（2026-08-23）
+
+- 用户反馈界面仍缺少动效后，精确 Scope 实施预检打开 `design-change-session:303a1028-c193-4f38-959e-a9d463cae0b1`；本增量在表现力设计系统之上增加克制的动效层。
+- 动效清单：`.sf-rise` 入场升级为基于 `animation-timeline: view()` 的滚动驱动渐显（保留时间基入场作为回退）；新增 `.sf-stagger` 工具按序为直接子元素设置递增延迟（用于总览说明网格与工作台指标行）；`.sf-sheen` 为主按钮链接增加悬浮光扫；`.sf-hairline` 渐变持续流动、`.sf-hero-grid` 缓慢呼吸；ER 画布容器加载时淡入。所有新动效均遵循既有 `prefers-reduced-motion: reduce` 块，该块现已同时禁用交错、发丝线流动、网格呼吸与光扫覆盖层。
+- 验证：完整 Web 套件 45 个文件 / 200 项通过（含总览 CSS 源码断言）；Web 类型检查退出 0；非 standalone 生产构建退出 0。

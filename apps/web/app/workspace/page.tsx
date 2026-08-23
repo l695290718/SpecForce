@@ -70,7 +70,7 @@ export default async function WorkspaceDashboardPage({ searchParams }: { searchP
           </div>
         </div>
       </section>
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="sf-stagger grid gap-4 md:grid-cols-4">
         <MetricCard label={<T k="metric.designAssets" />} value={dashboard.designAssetCount} metaKey="metric.metaAssets" />
         <MetricCard label={<T k="metric.proposals" />} value={dashboard.proposalCount} metaKey="metric.metaProposals" />
         <MetricCard label={<T k="metric.contextPacks" />} value={dashboard.contextPackCount} metaKey="metric.metaContextPacks" />

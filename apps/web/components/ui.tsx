@@ -45,7 +45,7 @@ export function PageHeader({ title, description, action }: { title: ReactNode; d
 export function ButtonLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link
-      className="group relative inline-flex h-9 items-center gap-1.5 overflow-hidden rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 px-4 text-sm font-semibold text-white shadow-glow transition hover:-translate-y-0.5 hover:from-blue-500 hover:to-violet-500 hover:shadow-glow-strong focus:outline-none focus:ring-2 focus:ring-violet-300"
+      className="sf-sheen group relative inline-flex h-9 items-center gap-1.5 overflow-hidden rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 px-4 text-sm font-semibold text-white shadow-glow transition hover:-translate-y-0.5 hover:from-blue-500 hover:to-violet-500 hover:shadow-glow-strong focus:outline-none focus:ring-2 focus:ring-violet-300"
       href={href}
     >
       <span aria-hidden="true" className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-500 group-hover:translate-x-full" />

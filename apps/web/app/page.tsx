@@ -181,7 +181,7 @@ export default function ArchitectureOverviewPage() {
 
       <section aria-labelledby="architecture-concepts-title" className="space-y-4">
         <h2 className="sf-section-title text-xl font-semibold text-ink" id="architecture-concepts-title"><T k="overview.conceptsTitle" /></h2>
-        <div className="grid gap-4 xl:grid-cols-3">
+        <div className="sf-stagger grid gap-4 xl:grid-cols-3">
           {explanationSections.map(({ titleKey, descriptionKey, Icon, accentClassName, borderClassName }) => (
             <article className={`sf-glass rounded-xl border-l-[3px] px-5 py-5 shadow-panel transition duration-200 hover:-translate-y-1 hover:shadow-glow ${borderClassName}`} key={titleKey}>
               <div className={`flex items-center gap-2 ${accentClassName}`}>

@@ -172,7 +172,7 @@ export function DataModelErWorkspace({ responses, locale = "en", title }: DataMo
       <button className="ml-auto inline-flex items-center gap-1 rounded-md border border-border bg-white px-2 py-1.5 text-xs text-muted" onClick={retryRenderer} title={copy("er.retry")} type="button"><RefreshCw size={14} aria-hidden="true" />{copy("er.retry")}</button>
       <span className="text-[11px] text-muted">{copy("er.readOnly")}</span>
     </div>
-    <div ref={canvasRef} className="relative min-h-[32rem] touch-none select-none bg-slate-50" data-testid="data-model-er-canvas">
+    <div ref={canvasRef} className="sf-rise relative min-h-[32rem] touch-none select-none bg-slate-50" data-testid="data-model-er-canvas">
       {fallbackReason ? <div className="absolute inset-x-4 top-4 z-10 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950" role="status"><strong>{semanticFallback ? copy("er.semanticFallback") : copy("er.status")}</strong><span className="ml-2">{fallbackReason}</span></div> : null}
       {relationsEmpty ? <div className="pointer-events-none absolute inset-x-4 top-4 z-10 rounded-md border border-blue-200 bg-blue-50/95 px-3 py-2 text-sm text-blue-950" role="status" data-testid="data-model-er-relations-empty"><strong>{copy("er.relationsEmpty")}</strong><span className="ml-2">{copy("er.relationsEmptyHint")}</span></div> : null}
     </div>
