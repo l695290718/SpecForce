@@ -98,3 +98,17 @@ Positive: a distinctive, coherent visual identity across every page with one tok
 - 精确 Scope 实施预检打开 `design-change-session:9e4a59ca-08de-4fe5-9f5e-d5345eaea59d`。无头 Chrome CDP 探针以真实鼠标点击证明桌面宽度下工作台导航完全健康（URL 迁移、完整渲染、零 JS 异常），将残余的“点击无反应”指向容器多次重建期间持有的过期标签页；同时暴露出低于 `lg` 断点的视口完全没有导航入口。
 - 修复：顶栏新增紧凑快捷导航条（`lg:hidden`），经既有 scope 感知链接函数连接总览、工作台、3A、数据模型与治理，保证任意视口宽度都有可达的工作台入口。
 - 验证：Web 套件 200 项通过；类型检查退出 0；非 standalone 生产构建退出 0。
+
+## 3A Graph Projection Repair Increment (2026-08-23)
+
+- User report: the 3A architecture graph mode rendered nothing. In-frame framebuffer readback proved the ER pixi canvas draws correctly (earlier blank screenshots were a CDP compositing artifact) while the sigma graph layers contained only transparent black; network capture isolated the cause to HTTP 503 GRAPH_ANALYSIS_UNAVAILABLE from POST /api/architecture/3a/query.
+- Root cause chain in the deploy database: the active generation projection-generation:a5f2d9f6...:1 had a READY ProjectionBuildJob with zero KnowledgeProjectionNode/Edge rows, no fresh KnowledgeGraphAnalysis (v6 row stale at relationshipVersion none vs manifest 7648), and zero ArchitectureUnit projections for the current generation. Requeueing the job surfaced a publish-path P2002 (manifest create on an existing id), resolved by deleting only that derived manifest row and requeueing; the healthy projector then rebuilt 8 unit / 42 member / 6 mapping projections and republished an identical-content manifest (digest 064f9b0d6fb2).
+- Post-repair verification: CDP probe of /architecture/3a?...mode=graph with default map representation shows architecture-map-workspace with all 8 architecture-unit cards and the summary text 8 architecture units - 6 cross-layer mappings - 0 unclassified members.
+- Deferred (tracked backlog fact): the sigma assertion-level network view stays empty because eligibility for the projection build requires assertions under the baseline change set or listed revision ids, while all 277 accepted legacy relationship assertions carry changeset legacy-design-assets:changeset:e4131fc6191b39b6 and v6 carries architecture-fact-changeset:eb8a9ed6..., with zero id overlap. Owner: knowledge-projection pipeline design. Trigger: a baseline lineage decision that adopts legacy changesets or new authoring under the baseline change set. Rationale: PostgreSQL remains authoritative for authored relationship events; graph views are derived projections and must not fabricate edges.
+
+### 3A 图谱投影修复增量（2026-08-23）
+
+- 用户报告：3A 架构图谱模式无任何展示。帧行内帧缓冲读回证明 ER 的 pixi 画布绘制正常（此前空白截图是 CDP 合成读回伪影），而 sigma 图层只有全透明黑；网络捕获定位到 POST /api/architecture/3a/query 返回 503 GRAPH_ANALYSIS_UNAVAILABLE。
+- 部署库根因链：当前代 projection-generation:a5f2d9f6...:1 的 ProjectionBuildJob 处于 READY 但 KnowledgeProjectionNode/Edge 为零行、KnowledgeGraphAnalysis 无新快照（v6 行 relationshipVersion=none 而清单要求 7648）、当前代架构单元投影为零。重入队后暴露发布路径 P2002（对既有清单 id 执行 create），仅删除该派生清单行后重入队，健康的投影器重建出 8 单元/42 成员/6 映射并重新发布内容一致的清单（摘要 064f9b0d6fb2）。
+- 修复后验证：CDP 探针访问默认 map 表示的图谱模式，architecture-map-workspace 呈现全部 8 张架构单元卡片，汇总文案为 8 个架构单元 - 6 条跨层映射 - 0 个未分类成员。
+- 延期项（已登记待办事实）：sigma 断言级网络视图仍为空，因为投影构建资格要求断言属于基线变更集或列出的修订 id，而 277 条已接受的存量关系断言全部挂在 legacy-design-assets 变更集下，与 v6 基线的 architecture-fact-changeset 零交集。负责人：知识投影管线设计。触发条件：基线谱系决策采纳存量变更集，或在基线变更集下产生新编写。理由：PostgreSQL 对已编写关系事件保持权威；图视图是派生投影，不得伪造边。
