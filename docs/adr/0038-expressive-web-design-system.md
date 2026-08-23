@@ -86,3 +86,15 @@ Positive: a distinctive, coherent visual identity across every page with one tok
 - 导航反馈：侧栏点击已激活的同 URL 导航项时阻止空操作并平滑滚回顶部，不再表现为“毫无反应”。3A 切换：视图标签、泳道/图谱/列表模式链接、追踪方向链接与基线/投影下拉全部改为 `scroll: false` 导航（`next/link` scroll 属性或 `router.push(..., { scroll: false })` 取代裸 `window.location.href`），保留页内上下文；标签行吸顶显示，并内联说明泳道/图谱/列表是同一份已发布架构事实的三种视图。
 - 治理维护：`scripts/design-fact-manifest.test.ts` 的计数断言刷新为当前基线事实（26 个决策；部署决策 12 条证据），3A 工作区测试补充标准的 `next/navigation` 路由 mock。
 - 验证：全仓套件 7301 项通过、0 失败（legacy-scan fixture 文件仍为故意的收集期噪音）；Web 套件 200 项通过；Web 类型检查退出 0；非 standalone 生产构建退出 0。
+
+## Compact Topbar Navigation Increment (2026-08-23)
+
+- Exact-Scope implementation preflight opened `design-change-session:9e4a59ca-08de-4fe5-9f5e-d5345eaea59d`. A headless-Chrome CDP probe with a real mouse click proved workspace navigation healthy at desktop widths (URL transition, full render, zero JS exceptions), pointing remaining "dead click" reports at stale tabs held across container rebuilds; it also exposed that viewports under the `lg` breakpoint render no navigation surface at all.
+- Fix: the top bar now carries a compact quick-navigation strip (`lg:hidden`) linking overview, workspace, 3A, data models, and governance through the existing scope-aware href helper, guaranteeing a reachable workspace entry at every viewport width.
+- Verification: web suite passed 200 tests; typecheck exited 0; non-standalone production build exited 0.
+
+### 顶栏紧凑导航增量（2026-08-23）
+
+- 精确 Scope 实施预检打开 `design-change-session:9e4a59ca-08de-4fe5-9f5e-d5345eaea59d`。无头 Chrome CDP 探针以真实鼠标点击证明桌面宽度下工作台导航完全健康（URL 迁移、完整渲染、零 JS 异常），将残余的“点击无反应”指向容器多次重建期间持有的过期标签页；同时暴露出低于 `lg` 断点的视口完全没有导航入口。
+- 修复：顶栏新增紧凑快捷导航条（`lg:hidden`），经既有 scope 感知链接函数连接总览、工作台、3A、数据模型与治理，保证任意视口宽度都有可达的工作台入口。
+- 验证：Web 套件 200 项通过；类型检查退出 0；非 standalone 生产构建退出 0。

@@ -75,6 +75,11 @@ export function AppShell({ children, readableScopes }: { children: ReactNode; re
               <span className="inline-block h-2.5 w-2.5 rounded-sm bg-gradient-to-br from-blue-500 to-violet-500 shadow-glow sf-pulse" aria-hidden="true" />
               <T k="app.name" />
             </div>
+            <nav aria-label="Quick navigation" className="flex items-center gap-1 text-xs font-semibold text-slate-500 lg:hidden">
+              {([["nav.overview", "/"], ["nav.workspace", "/workspace"], ["nav.threeA", "/architecture/3a"], ["nav.dataModels", "/assets/data-models"], ["nav.governance", "/governance/checks"]] as const).map(([labelKey, href]) => (
+                <Link key={href} className={`rounded-md px-2 py-1.5 transition hover:bg-slate-900/[0.05] hover:text-ink ${pathname === href ? "bg-slate-900/[0.06] text-accent" : ""}`} href={withScope(href)}><T k={labelKey} /></Link>
+              ))}
+            </nav>
             <div className="flex min-w-0 items-center gap-3">
               <ArchitectureScopeSwitcher readableScopes={readableScopes} />
               <div className="hidden font-mono text-[11px] uppercase tracking-wider text-muted md:block"><T k="app.topline" /></div>
