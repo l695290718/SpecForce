@@ -69,12 +69,13 @@ export function createThreeAProjectionQueryService(repository: ThreeAQueryReposi
     },
     async unitGraph(input: UnitGraphQueryInput): Promise<UnitGraphQueryResult> {
       const unitBudget = normalizeUnitGraphBudget(input.budget);
-      const { maxMembers, ...mapBudget } = unitBudget;
+      const { maxMembers, maxMemberRelations, ...mapBudget } = unitBudget;
       const map = await service.architectureMap({ ...input, filter: input.filter ?? {}, budget: mapBudget });
       const scope = authorize(input);
       const manifest = await manifestFor(scope, input.baselineId, input.projectionManifestId);
       const mapRepository = repository as ThreeAQueryRepository & Partial<ArchitectureMapQueryRepository>;
       if (input.includeMembers && !mapRepository.listArchitectureUnitMembersByUnits) throw new ThreeAQueryError("ARCHITECTURE_MAP_UNAVAILABLE");
+      if (input.includeMembers && input.includeMemberRelations && !mapRepository.listArchitectureUnitMemberRelationships) throw new ThreeAQueryError("ARCHITECTURE_MAP_UNAVAILABLE");
       const analysis = graphRepository
         ? await graphRepository.loadOverview(scope, manifest, { layers: [], assetTypes: [], relationTypes: [], budget: defaultGraphAnalysisBudget })
         : undefined;
@@ -120,6 +121,14 @@ export function createThreeAProjectionQueryService(repository: ThreeAQueryReposi
           assertionId: member.assertionId
         }];
       });
+      const returnedMemberAssertionIds = new Set(memberNodes.flatMap((node) => node.assertionId ? [node.assertionId] : []));
+      const relationPage = input.includeMembers && input.includeMemberRelations
+        ? await mapRepository.listArchitectureUnitMemberRelationships!(
+            { ...scope, generationId: manifest.generationId, baselineId: manifest.baselineId, projectionManifestId: manifest.id },
+            [...returnedMemberAssertionIds].sort(),
+            maxMemberRelations
+          )
+        : { edges: [], hasMore: false };
       const mappingEdges = map.mappings.map((mapping) => ({
         applicationServiceId: mapping.applicationServiceId,
         scopePath: mapping.scopePath,
@@ -140,18 +149,32 @@ export function createThreeAProjectionQueryService(repository: ThreeAQueryReposi
         confidence: 1,
         bridge: false
       }));
+      const memberRelationshipEdges = relationPage.edges.flatMap((edge) => {
+        if (!returnedMemberAssertionIds.has(edge.sourceAssertionId) || !returnedMemberAssertionIds.has(edge.targetAssertionId)) return [];
+        return [{
+          applicationServiceId: edge.applicationServiceId,
+          scopePath: edge.scopePath,
+          id: edge.relationshipIdentity,
+          sourceId: edge.sourceAssertionId,
+          targetId: edge.targetAssertionId,
+          relationCode: edge.relationCode,
+          confidence: edge.confidence,
+          bridge: false
+        }];
+      });
       const reasons = [
         ...(map.partial?.reasons ?? []),
-        ...(memberPage.hasMore ? ["MEMBER_BUDGET_EXCEEDED", "CONTINUATION_REQUIRED"] as const : [])
+        ...(memberPage.hasMore ? ["MEMBER_BUDGET_EXCEEDED", "CONTINUATION_REQUIRED"] as const : []),
+        ...(relationPage.hasMore ? ["MEMBER_RELATION_BUDGET_EXCEEDED", "CONTINUATION_REQUIRED"] as const : [])
       ];
       const value = {
         generationId: map.generationId,
         availability: map.availability,
         source: "ARCHITECTURE_UNIT_PROJECTION" as const,
-        fidelity: input.includeMembers ? "UNIT_WITH_MEMBERS" as const : "UNIT" as const,
+        fidelity: input.includeMembers && input.includeMemberRelations ? "UNIT_WITH_MEMBERS_AND_RELATIONS" as const : input.includeMembers ? "UNIT_WITH_MEMBERS" as const : "UNIT" as const,
         analysisAvailability: assertionProbe.nodes.length === 0 ? "EMPTY" as const : analysis?.availability ?? "UNAVAILABLE" as const,
         nodes: [...unitNodes, ...memberNodes],
-        edges: [...mappingEdges, ...membershipEdges],
+        edges: [...mappingEdges, ...membershipEdges, ...memberRelationshipEdges],
         ...(map.continuation ? { continuation: map.continuation } : {}),
         ...(reasons.length ? { partial: { code: "RESULT_PARTIAL" as const, reasons: uniqueArchitectureMapReasons(reasons) } } : {})
       };
@@ -213,10 +236,10 @@ function normalizedGraphFilters(input: Pick<OverviewArchitectureInput, "layers" 
 }
 function graphFingerprint(operation: "overview" | "impact", scope: ArchitectureScopeRef, manifest: ProjectionManifestV2, value: unknown): string { return contentDigest({ operation, scopeDigest: contentDigest(scope), baselineId: manifest.baselineId, projectionManifestId: manifest.id, value }); }
 function normalizeArchitectureMapBudget(input: Partial<ArchitectureMapBudget> | undefined): ArchitectureMapBudget { const budget = { ...DEFAULT_ARCHITECTURE_MAP_BUDGET, ...input }; try { validateArchitectureMapBudget(budget); if (budget.maxUnitsPerLayer > 12 || budget.maxMappings > 60 || budget.timeoutMs > 2_000 || budget.maxPayloadBytes > 524_288) throw new Error(); } catch { throw new ThreeAQueryError("QUERY_BUDGET_INVALID"); } return budget; }
-function normalizeUnitGraphBudget(input: Partial<UnitGraphBudget> | undefined): UnitGraphBudget { const budget = { ...DEFAULT_UNIT_GRAPH_BUDGET, ...input }; try { validateUnitGraphBudget(budget); if (budget.maxUnitsPerLayer > 12 || budget.maxMappings > 60 || budget.maxMembers > 500 || budget.timeoutMs > 2_000 || budget.maxPayloadBytes > 524_288) throw new Error(); } catch { throw new ThreeAQueryError("QUERY_BUDGET_INVALID"); } return budget; }
+function normalizeUnitGraphBudget(input: Partial<UnitGraphBudget> | undefined): UnitGraphBudget { const budget = { ...DEFAULT_UNIT_GRAPH_BUDGET, ...input }; try { validateUnitGraphBudget(budget); if (budget.maxUnitsPerLayer > 12 || budget.maxMappings > 60 || budget.maxMembers > 500 || budget.maxMemberRelations > 120 || budget.timeoutMs > 2_000 || budget.maxPayloadBytes > 524_288) throw new Error(); } catch { throw new ThreeAQueryError("QUERY_BUDGET_INVALID"); } return budget; }
 function normalizeArchitectureUnitFilter(input: ArchitectureMapQueryInput["filter"]): NonNullable<ArchitectureMapQueryInput["filter"]> { const filter = input ?? {}; if ((filter.layers?.length ?? 0) > 3 || (filter.kinds?.length ?? 0) > 20 || (filter.mappingFamilies?.length ?? 0) > 20 || (filter.query?.length ?? 0) > 256) throw new ThreeAQueryError("ARCHITECTURE_MAP_QUERY_INVALID"); return { ...filter, ...(filter.query?.trim() ? { query: filter.query.trim() } : {}) }; }
 function countByLayer(units: { layer: ArchitectureLayer }[]): Record<ArchitectureLayer, number> { return units.reduce((counts, unit) => { counts[unit.layer] += 1; return counts; }, { BIZ: 0, SYS: 0, TECH: 0 }); }
-function uniqueArchitectureMapReasons(reasons: string[]): ("UNIT_BUDGET_EXCEEDED" | "MEMBER_BUDGET_EXCEEDED" | "MAPPING_BUDGET_EXCEEDED" | "QUERY_TIMEOUT" | "PAYLOAD_BUDGET_EXCEEDED" | "CONTINUATION_REQUIRED")[] { return [...new Set(reasons)].filter((reason): reason is "UNIT_BUDGET_EXCEEDED" | "MEMBER_BUDGET_EXCEEDED" | "MAPPING_BUDGET_EXCEEDED" | "QUERY_TIMEOUT" | "PAYLOAD_BUDGET_EXCEEDED" | "CONTINUATION_REQUIRED" => ["UNIT_BUDGET_EXCEEDED", "MEMBER_BUDGET_EXCEEDED", "MAPPING_BUDGET_EXCEEDED", "QUERY_TIMEOUT", "PAYLOAD_BUDGET_EXCEEDED", "CONTINUATION_REQUIRED"].includes(reason)); }
+function uniqueArchitectureMapReasons(reasons: string[]): ("UNIT_BUDGET_EXCEEDED" | "MEMBER_BUDGET_EXCEEDED" | "MEMBER_RELATION_BUDGET_EXCEEDED" | "MAPPING_BUDGET_EXCEEDED" | "QUERY_TIMEOUT" | "PAYLOAD_BUDGET_EXCEEDED" | "CONTINUATION_REQUIRED")[] { return [...new Set(reasons)].filter((reason): reason is "UNIT_BUDGET_EXCEEDED" | "MEMBER_BUDGET_EXCEEDED" | "MEMBER_RELATION_BUDGET_EXCEEDED" | "MAPPING_BUDGET_EXCEEDED" | "QUERY_TIMEOUT" | "PAYLOAD_BUDGET_EXCEEDED" | "CONTINUATION_REQUIRED" => ["UNIT_BUDGET_EXCEEDED", "MEMBER_BUDGET_EXCEEDED", "MEMBER_RELATION_BUDGET_EXCEEDED", "MAPPING_BUDGET_EXCEEDED", "QUERY_TIMEOUT", "PAYLOAD_BUDGET_EXCEEDED", "CONTINUATION_REQUIRED"].includes(reason)); }
 function compareArchitectureUnits(left: { parentUnitIdentity?: string; criticality: number; canonicalName: string; unitIdentity: string }, right: { parentUnitIdentity?: string; criticality: number; canonicalName: string; unitIdentity: string }): number { return (left.parentUnitIdentity ?? "").localeCompare(right.parentUnitIdentity ?? "", "en") || right.criticality - left.criticality || left.canonicalName.localeCompare(right.canonicalName, "en") || left.unitIdentity.localeCompare(right.unitIdentity, "en"); }
 function compareArchitectureMappings(left: { sourceUnitIdentity: string; targetUnitIdentity: string; mappingFamily: string; mappingIdentity: string }, right: { sourceUnitIdentity: string; targetUnitIdentity: string; mappingFamily: string; mappingIdentity: string }): number { return left.sourceUnitIdentity.localeCompare(right.sourceUnitIdentity, "en") || left.targetUnitIdentity.localeCompare(right.targetUnitIdentity, "en") || left.mappingFamily.localeCompare(right.mappingFamily, "en") || left.mappingIdentity.localeCompare(right.mappingIdentity, "en"); }
 async function mapContinuation(input: ArchitectureMapQueryInput, queryFingerprint: string, keyring: CursorKeyring, store: TraceContinuationStore, now: () => Date): Promise<ArchitectureUnitPageCursor> {

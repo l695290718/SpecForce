@@ -107,17 +107,17 @@ function mapping(source: ArchitectureUnitProjection, target: ArchitectureUnitPro
   };
 }
 
-function dependency(sourceAssertionId: string, targetAssertionId: string): KnowledgeProjectionEdge {
+function dependency(sourceAssertionId: string, targetAssertionId: string, relationCode = "DEPENDS_ON"): KnowledgeProjectionEdge {
   return {
     ...scope,
     generationId: manifest.generationId,
     baselineId: manifest.baselineId,
-    relationshipIdentity: `${sourceAssertionId}:DEPENDS_ON:${targetAssertionId}`,
+    relationshipIdentity: `${sourceAssertionId}:${relationCode}:${targetAssertionId}`,
     sourceAssertionId,
     targetAssertionId,
     sourceSemanticIdentity: sourceAssertionId,
     targetSemanticIdentity: targetAssertionId,
-    relationCode: "DEPENDS_ON",
+    relationCode,
     confidence: 1,
     relationshipVersion: manifest.relationshipVersion,
     contentDigest: `digest-${sourceAssertionId}-${targetAssertionId}`
@@ -276,6 +276,85 @@ describe("bounded readable 3A architecture queries", () => {
     expect(withMembers.nodes.map((node) => node.id)).toEqual(expect.arrayContaining(["unit:biz", "assertion:biz", "assertion:sys"]));
     expect(withMembers.edges.map((edge) => edge.id)).toEqual(expect.arrayContaining(["membership:unit:biz:assertion:biz", "membership:unit:sys:assertion:sys"]));
     expect(map.listArchitectureUnitMembersByUnits).toHaveBeenCalledWith(expect.objectContaining(scope), ["unit:biz", "unit:sys"], 500);
+  });
+
+  it("composes direct member relationships only in active member relation mode", async () => {
+    const { base, map } = repositories();
+    const biz = unit("unit:biz", "BIZ");
+    const sys = unit("unit:sys", "SYS");
+    const members = [member(biz.unitIdentity, "assertion:biz"), member(sys.unitIdentity, "assertion:sys")];
+    const directRelation = dependency("assertion:biz", "assertion:sys", "CALLS");
+    vi.mocked(map.listArchitectureUnits).mockResolvedValue({ units: [biz, sys], totalByLayer: { BIZ: 1, SYS: 1, TECH: 0 }, unclassifiedCount: 0 });
+    vi.mocked(map.listArchitectureUnitMembersByUnits).mockResolvedValue({ members, hasMore: false });
+    vi.mocked(map.listArchitectureUnitMemberRelationships).mockResolvedValue({ edges: [directRelation], hasMore: false });
+    const service = createThreeAProjectionQueryService(base, store, keyring);
+
+    const result = await service.unitGraph(mapInput({ includeMembers: true, includeMemberRelations: true, budget: { maxMembers: 10, maxMemberRelations: 1 } }));
+
+    expect(result.fidelity).toBe("UNIT_WITH_MEMBERS_AND_RELATIONS");
+    expect(result.edges).toEqual(expect.arrayContaining([expect.objectContaining({
+      id: directRelation.relationshipIdentity,
+      sourceId: directRelation.sourceAssertionId,
+      targetId: directRelation.targetAssertionId,
+      relationCode: "CALLS"
+    })]));
+    expect(map.listArchitectureUnitMemberRelationships).toHaveBeenCalledWith(
+      expect.objectContaining({ ...scope, generationId: manifest.generationId, baselineId: manifest.baselineId, projectionManifestId: manifest.id }),
+      ["assertion:biz", "assertion:sys"],
+      1
+    );
+  });
+
+  it("excludes member relationships unless both endpoints are returned direct members", async () => {
+    const { base, map } = repositories();
+    const biz = unit("unit:biz", "BIZ");
+    const sys = unit("unit:sys", "SYS");
+    vi.mocked(map.listArchitectureUnits).mockResolvedValue({ units: [biz, sys], totalByLayer: { BIZ: 1, SYS: 1, TECH: 0 }, unclassifiedCount: 0 });
+    vi.mocked(map.listArchitectureUnitMembersByUnits).mockResolvedValue({ members: [member(biz.unitIdentity, "assertion:biz"), member(sys.unitIdentity, "assertion:sys")], hasMore: false });
+    vi.mocked(map.listArchitectureUnitMemberRelationships).mockResolvedValue({
+      edges: [dependency("assertion:biz", "assertion:sys", "CALLS"), dependency("assertion:biz", "assertion:outside", "CALLS")],
+      hasMore: false
+    });
+    const service = createThreeAProjectionQueryService(base, store, keyring);
+
+    const result = await service.unitGraph(mapInput({ includeMembers: true, includeMemberRelations: true }));
+
+    expect(result.edges.filter((edge) => edge.relationCode === "CALLS")).toEqual([
+      expect.objectContaining({ sourceId: "assertion:biz", targetId: "assertion:sys" })
+    ]);
+  });
+
+  it("marks member relation overflow as partial and requires continuation", async () => {
+    const { base, map } = repositories();
+    const biz = unit("unit:biz", "BIZ");
+    const sys = unit("unit:sys", "SYS");
+    vi.mocked(map.listArchitectureUnits).mockResolvedValue({ units: [biz, sys], totalByLayer: { BIZ: 1, SYS: 1, TECH: 0 }, unclassifiedCount: 0 });
+    vi.mocked(map.listArchitectureUnitMembersByUnits).mockResolvedValue({ members: [member(biz.unitIdentity, "assertion:biz"), member(sys.unitIdentity, "assertion:sys")], hasMore: false });
+    vi.mocked(map.listArchitectureUnitMemberRelationships).mockResolvedValue({ edges: [dependency("assertion:biz", "assertion:sys", "CALLS")], hasMore: true });
+    const service = createThreeAProjectionQueryService(base, store, keyring);
+
+    const result = await service.unitGraph(mapInput({ includeMembers: true, includeMemberRelations: true, budget: { maxMemberRelations: 1 } }));
+
+    expect(result.partial).toEqual({ code: "RESULT_PARTIAL", reasons: ["MEMBER_RELATION_BUDGET_EXCEEDED", "CONTINUATION_REQUIRED"] });
+  });
+
+  it("rejects a member relationship budget above the bounded graph limit", async () => {
+    const { base } = repositories();
+    const service = createThreeAProjectionQueryService(base, store, keyring);
+
+    await expect(service.unitGraph(mapInput({ budget: { maxMemberRelations: 121 } }))).rejects.toMatchObject({ code: "QUERY_BUDGET_INVALID" });
+  });
+
+  it("does not read member relationships without member mode", async () => {
+    const { base, map } = repositories();
+    const biz = unit("unit:biz", "BIZ");
+    vi.mocked(map.listArchitectureUnits).mockResolvedValue({ units: [biz], totalByLayer: { BIZ: 1, SYS: 0, TECH: 0 }, unclassifiedCount: 0 });
+    const service = createThreeAProjectionQueryService(base, store, keyring);
+
+    const result = await service.unitGraph(mapInput({ includeMemberRelations: true }));
+
+    expect(result.fidelity).toBe("UNIT");
+    expect(map.listArchitectureUnitMemberRelationships).not.toHaveBeenCalled();
   });
 
   it("does not leak a unit from another Scope", async () => {
