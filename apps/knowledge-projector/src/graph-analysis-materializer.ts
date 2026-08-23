@@ -1,7 +1,7 @@
-import { contentDigest, type ArchitectureScopeRef, type KnowledgeProjectionEdge, type KnowledgeProjectionNode } from "@specforge/core";
+import { contentDigest, THREE_A_GRAPH_ANALYSIS_VERSION, type ArchitectureScopeRef, type KnowledgeProjectionEdge, type KnowledgeProjectionNode } from "@specforge/core";
 import type { GraphAnalysisPublication, GraphAnalysisCluster, GraphAnalysisNodeMetric, GraphAnalysisSummaryEdge } from "./repository.js";
 
-export const DEFAULT_GRAPH_ANALYSIS_VERSION = "3a.graph-analysis.v1";
+export const DEFAULT_GRAPH_ANALYSIS_VERSION = THREE_A_GRAPH_ANALYSIS_VERSION;
 export const DEFAULT_GRAPH_ANALYSIS_POLICY_VERSION = "impact-v1";
 
 export interface GraphAnalysisMaterializer {

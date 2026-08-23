@@ -1567,10 +1567,26 @@
                               }
                           ],
                           "owner": "SpecForge Architecture and Product",
-                          "status": "Read-only Map and Network implementation complete; governed 3A architecture-fact authoring and Designer fact onboarding are designed and pending explicit implementation approval",
-                          "reason": "The current published Designer generation has no canonical source facts for authored semantic BIZ, SYS, and TECH units. First-class immutable revisions must enter the existing review, ChangeSet, Baseline, and deterministic projection lifecycle through MCP before a real BIZ-to-SYS-to-TECH chain can be published.",
-                          "retryTrigger": "User approves the two 2026-08-15 implementation plans, then a new exact-Scope implementation preflight session is opened before code changes.",
+                          "status": "Implemented: Map and normal Network read the exact-Scope architecture-unit projection; assertion-level impact analysis remains separate and currently EMPTY for Designer v6.",
+                          "reason": "Designer v6 publishes eight governed 3A units and six realization mappings. Its assertion projection remains empty under the current Baseline eligibility, so the normal Network must read the authoritative architecture-unit projection and report assertion analysis availability explicitly instead of failing with a 503.",
+                          "retryTrigger": "After governed assertion facts are eligible for the published Baseline and a fresh assertion projection plus graph analysis is published, re-run the unit-graph verifier and impact-analysis verification in a new exact-Scope session.",
                           "evidence": [
+                              {
+                                  "command": "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Repair 3A graph availability by separating unit graph rendering from assertion analysis, aligning the shared graph-analysis contract, and exposing source/fidelity readiness.",
+                                  "result": "Opened design-change-session:0ca85bc2-9683-40a2-918c-ab88130e72b0 in the exact Designer Scope; the catalog and typed relationship digest were read before implementation."
+                              },
+                              {
+                                  "command": "pnpm exec tsx scripts/verify-designer-3a-unit-graph.ts; pnpm typecheck",
+                                  "result": "The exact-Scope verifier returned ARCHITECTURE_UNIT_PROJECTION/UNIT with 8 nodes, 6 edges, and analysisAvailability=EMPTY; all workspace TypeScript checks passed."
+                              },
+                              {
+                                  "command": "POST http://localhost:3000/api/architecture/3a/query operation=unitGraph for Designer v6 identity",
+                                  "result": "HTTP 200 returned source=ARCHITECTURE_UNIT_PROJECTION, fidelity=UNIT, nodes=8, edges=6, and analysisAvailability=EMPTY."
+                              },
+                              {
+                                  "command": "pnpm design-context:close -- --session design-change-session:0ca85bc2-9683-40a2-918c-ab88130e72b0 --status CONVERGED",
+                                  "result": "Closed the exact-Scope graph resilience session after the unit-graph verifier, full typecheck, HTTP read-back, MCP synchronization, and reconciliation succeeded."
+                              },
                               {
                                   "command": "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Design-readable-3A-architecture-mapping",
                                   "result": "Opened design-change-session:34a1a99a-6026-4060-a858-46654b1630f3, read 254 exact-Scope assets, and returned design digest d8bb3389e8eb85559f46c8a111b7c3abcda61725aec3b39690be43c02fe139d1 with relationship digest dbb387eee30c0f19ba7dd8015d3e06dd971eab35464a4784ddfaef63b2d95055."

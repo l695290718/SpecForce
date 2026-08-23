@@ -17,6 +17,7 @@
 - Coverage Evidence: `docs/evidence/designer-3a-coverage-expansion-evidence.md`
 - Planned v5 Membership Spec: `docs/superpowers/specs/2026-08-15-designer-3a-v5-membership-expansion-design.md`
 - Parent decisions: `adr-3a-architecture-navigation-workspace`, `adr-scalable-3a-exploration`, `adr-webgl-3a-graph-exploration`
+- Graph Resilience Session: `design-change-session:0ca85bc2-9683-40a2-918c-ab88130e72b0`
 
 ## Context
 
@@ -74,6 +75,29 @@ The first Designer Scope data increment is a separate governed operation after t
 - English canonical fields are mandatory; complete Chinese overlays are mandatory for human-facing content.
 - The Web remains read-only. Architecture semantics are authored through MCP.
 - This ADR cannot be marked implemented without exact-Scope query, projection, isolation, accessibility, browser, MCP read-back, and session-closure evidence.
+
+## Graph Resilience Increment (2026-08-23)
+
+The normal WebGL Network view is an architecture-unit visualization, not an assertion-analysis visualization. It now reads the same exact-Scope, Baseline-bound, generation-qualified `ArchitectureUnitProjection` and `ArchitectureUnitMappingProjection` data as the Map and exposes it through the `unitGraph` query operation. The response declares `source=ARCHITECTURE_UNIT_PROJECTION` and `fidelity=UNIT`.
+
+Assertion-level graph analysis remains a separate optional capability for impact ranking and advanced topology. Its canonical shared version is `3a.graph-analysis.v1`; the persisted publication status is `PUBLISHED`, while `READY` is a query-time availability state. For the current Designer v6 Baseline, the assertion projection has no nodes, so the unit graph reports `analysisAvailability=EMPTY` without failing the normal graph request. Impact continues to fail closed until an assertion-level analysis is genuinely available.
+
+This separation keeps PostgreSQL architecture-unit projections authoritative for the readable graph, preserves exact Scope and generation identity on every response, and avoids inventing assertion relationships from architecture-unit mappings.
+
+### 3A 图谱韧性增量（2026-08-23）
+
+常规 WebGL Network 视图是架构单元可视化，而不是断言分析可视化。它现在读取与 Map 相同的、精确 Scope、绑定 Baseline 且带 Generation 身份的 `ArchitectureUnitProjection` 与 `ArchitectureUnitMappingProjection`，并通过 `unitGraph` 查询操作返回。响应明确声明 `source=ARCHITECTURE_UNIT_PROJECTION` 和 `fidelity=UNIT`。
+
+断言级图分析仍是影响排序和高级拓扑探索的独立可选能力。其共享规范版本为 `3a.graph-analysis.v1`，持久化发布状态为 `PUBLISHED`，而 `READY` 仅表示查询时的可用状态。当前 Designer v6 Baseline 没有断言投影节点，因此单元图返回 `analysisAvailability=EMPTY`，但不会使常规图请求失败。影响分析在真实断言级分析可用前仍保持失败关闭。
+
+该拆分使 PostgreSQL 架构单元投影继续作为可读图的权威来源，保留每个响应上的精确 Scope 与 Generation 身份，并避免从架构单元映射虚构断言关系。
+
+### Graph Resilience Evidence
+
+- Preflight: `design-change-session:0ca85bc2-9683-40a2-918c-ab88130e72b0` opened in the exact Designer Scope with the current design catalog and reconciliation digest.
+- `pnpm exec tsx scripts/verify-designer-3a-unit-graph.ts` returned `ARCHITECTURE_UNIT_PROJECTION`, `UNIT`, 8 nodes, 6 edges, and `EMPTY` analysis availability for Designer v6.
+- `pnpm typecheck` exited 0 across core, knowledge-query, knowledge-projector, MCP server, and Web.
+- HTTP read-back: `POST /api/architecture/3a/query` with the v6 identity returned HTTP 200, 8 nodes, 6 edges, and `analysisAvailability=EMPTY`.
 
 ## Implemented v5 Membership Expansion
 

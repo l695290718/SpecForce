@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { createThreeAProjectionQueryService, PrismaThreeAQueryRepository, PrismaTraceContinuationStore, type ThreeAProjectionQueryService } from "@specforge/knowledge-query";
+import { createGraphAnalysisRepository, createThreeAProjectionQueryService, PrismaThreeAQueryRepository, PrismaTraceContinuationStore, type ThreeAProjectionQueryService } from "@specforge/knowledge-query";
 import type { CursorKeyring } from "@specforge/knowledge-query";
 import { prisma as defaultPrisma } from "../db";
 
@@ -14,7 +14,8 @@ export function createWebThreeAQueryService(options: ThreeAQueryServiceOptions =
     new PrismaThreeAQueryRepository(options.prisma ?? defaultPrisma),
     new PrismaTraceContinuationStore(options.prisma ?? defaultPrisma),
     options.keyring ?? readCursorKeyring(),
-    options.now
+    options.now,
+    createGraphAnalysisRepository(options.prisma ?? defaultPrisma)
   );
 }
 

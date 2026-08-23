@@ -1,11 +1,11 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import type { ArchitectureScopeRef, KnowledgeProjectionEdge, ProjectionManifestV2 } from "@specforge/core";
+import { THREE_A_GRAPH_ANALYSIS_VERSION, type ArchitectureScopeRef, type KnowledgeProjectionEdge, type ProjectionManifestV2, type ThreeAGraphAnalysisAvailability } from "@specforge/core";
 import type { ArchitectureLayer, GraphAnalysisBudget, GraphSummaryEdge, GraphSummaryNode, ThreeAPartialReason, TraceDirection } from "./types";
 
-export const defaultGraphAnalysisVersion = "graph-analysis-v1";
+export const defaultGraphAnalysisVersion = THREE_A_GRAPH_ANALYSIS_VERSION;
 export const graphAnalysisWriteBatchSize = 1_000;
 
-export type GraphAnalysisAvailability = "READY" | "STALE" | "VERSION_MISMATCH" | "UNAVAILABLE";
+export type GraphAnalysisAvailability = ThreeAGraphAnalysisAvailability;
 
 export interface GraphAnalysisReference extends ArchitectureScopeRef {
   id: string;
@@ -54,7 +54,7 @@ export interface GraphAnalysisPublicationInput {
   clusterCount: number;
   nodeMetricCount: number;
   bridgeEdgeCount: number;
-  status?: "READY" | "UNAVAILABLE";
+  status?: "PUBLISHED" | "UNAVAILABLE";
   publishedAt?: Date;
 }
 
@@ -152,7 +152,7 @@ class PrismaGraphAnalysisRepository implements GraphAnalysisRepository {
     const data = {
       baselineId: manifest.baselineId,
       policyVersion: input.policyVersion,
-      status: input.status ?? "READY",
+      status: input.status ?? "PUBLISHED",
       sourceContentDigest: manifest.contentDigest,
       relationshipVersion: manifest.relationshipVersion,
       contentDigest: input.contentDigest,
@@ -286,11 +286,11 @@ class PrismaGraphAnalysisRepository implements GraphAnalysisRepository {
     return { availability: "READY", analysis: analysisResult.analysis, members, ...(hasMore && members.at(-1) ? { nextAfterSemanticIdentity: members.at(-1)!.semanticIdentity } : {}) };
   }
 
-  private async loadReadyAnalysis(scope: ArchitectureScopeRef, manifest: ProjectionManifestV2, requestedVersion = defaultGraphAnalysisVersion): Promise<{ availability: GraphAnalysisAvailability; analysis?: GraphAnalysisReference; row?: any; partialReasons: ThreeAPartialReason[] }> {
+  private async loadReadyAnalysis(scope: ArchitectureScopeRef, manifest: ProjectionManifestV2, requestedVersion: string = defaultGraphAnalysisVersion): Promise<{ availability: GraphAnalysisAvailability; analysis?: GraphAnalysisReference; row?: any; partialReasons: ThreeAPartialReason[] }> {
     assertManifestScope(scope, manifest);
     assertAnalysisVersion(requestedVersion);
     const row = await this.prisma.knowledgeGraphAnalysis.findFirst({
-      where: { ...scope, generationId: manifest.generationId, baselineId: manifest.baselineId, projectionManifestId: manifest.id, analysisVersion: requestedVersion, status: "READY" },
+      where: { ...scope, generationId: manifest.generationId, baselineId: manifest.baselineId, projectionManifestId: manifest.id, analysisVersion: requestedVersion, status: "PUBLISHED" },
       orderBy: [{ publishedAt: "desc" }, { dbId: "asc" }],
       take: 1
     });
@@ -298,6 +298,7 @@ class PrismaGraphAnalysisRepository implements GraphAnalysisRepository {
     assertRowScope(scope, row);
     if (row.analysisVersion !== requestedVersion) return { availability: "VERSION_MISMATCH", partialReasons: [] };
     if (row.sourceContentDigest !== manifest.contentDigest || row.relationshipVersion !== manifest.relationshipVersion) return { availability: "STALE", partialReasons: uniquePartialReasons(arrayOfStrings(row.partialReasons) as ThreeAPartialReason[]) };
+    if (row.nodeMetricCount === 0) return { availability: "EMPTY", partialReasons: uniquePartialReasons(arrayOfStrings(row.partialReasons) as ThreeAPartialReason[]) };
     return { availability: "READY", analysis: analysisFromRow(row), row, partialReasons: uniquePartialReasons(arrayOfStrings(row.partialReasons) as ThreeAPartialReason[]) };
   }
 }

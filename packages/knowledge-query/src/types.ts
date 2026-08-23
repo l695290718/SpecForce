@@ -12,6 +12,9 @@ import type {
   ProjectionManifestV2,
   PublishedBaselineDrift,
   ScopedPrincipal,
+  ThreeAGraphAnalysisAvailability,
+  ThreeAGraphFidelity,
+  ThreeAGraphSource,
   ThreeAPartialReason as ArchitectureMapPartialReason
 } from "@specforge/core";
 
@@ -148,6 +151,27 @@ export interface ArchitectureMapQueryResult extends QueryResultEnvelope {
   partial?: { code: "RESULT_PARTIAL"; reasons: ArchitectureMapPartialReason[] };
 }
 
+export interface UnitGraphQueryInput extends QueryPrincipalInput {
+  generationId: string;
+  baselineId: string;
+  projectionManifestId: string;
+  filter?: ArchitectureUnitFilter;
+  budget?: Partial<ArchitectureMapBudget>;
+  continuation?: string;
+}
+
+export interface UnitGraphQueryResult extends QueryResultEnvelope {
+  generationId: string;
+  availability: "READY" | "NO_GOVERNED_ARCHITECTURE_UNITS";
+  source: ThreeAGraphSource;
+  fidelity: ThreeAGraphFidelity;
+  analysisAvailability: ThreeAGraphAnalysisAvailability;
+  nodes: GraphSummaryNode[];
+  edges: GraphSummaryEdge[];
+  continuation?: string;
+  partial?: { code: "RESULT_PARTIAL"; reasons: ArchitectureMapPartialReason[] };
+}
+
 export interface ArchitectureUnitNeighborhoodInput extends QueryPrincipalInput {
   generationId: string;
   baselineId: string;
@@ -175,6 +199,7 @@ export interface ArchitectureUnitNeighborhoodResult extends QueryResultEnvelope 
 
 export interface ArchitectureMapQueryProvider {
   architectureMap(input: ArchitectureMapQueryInput): Promise<ArchitectureMapQueryResult>;
+  unitGraph(input: UnitGraphQueryInput): Promise<UnitGraphQueryResult>;
   architectureUnitNeighborhood(input: ArchitectureUnitNeighborhoodInput): Promise<ArchitectureUnitNeighborhoodResult>;
 }
 

@@ -67,6 +67,9 @@ export async function handleThreeAQuery(request: Request, dependencies: ThreeAQu
     if (parsed.operation === "architectureMap") {
       return Response.json(await dependencies.createService().architectureMap({ ...identity, generationId: parsed.generationId, filter: parsed.filter ?? {}, budget: parsed.budget, continuation: parsed.continuation }));
     }
+    if (parsed.operation === "unitGraph") {
+      return Response.json(await dependencies.createService().unitGraph({ ...identity, generationId: parsed.generationId, filter: parsed.filter ?? {}, budget: parsed.budget, continuation: parsed.continuation }));
+    }
     if (parsed.operation === "architectureUnitNeighborhood") {
       return Response.json(await dependencies.createService().architectureUnitNeighborhood({ ...identity, generationId: parsed.generationId, unitIdentity: parsed.unitIdentity, direction: parsed.direction, depth: parsed.depth, memberAssetTypes: parsed.memberAssetTypes, mappingFamilies: parsed.mappingFamilies, continuation: parsed.continuation, budget: parsed.budget }));
     }

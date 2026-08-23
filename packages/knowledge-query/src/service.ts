@@ -4,7 +4,7 @@ import { createTraversalCursor, signSearchCursor, verifySearchCursor, verifyTrav
 import { classifyImpactBand, defaultGraphAnalysisBudget, defaultImpactGraphAnalysisBudget, normalizeGraphAnalysisBudget, normalizeImpactPolicyVersion, scoreImpact, sortImpactItems } from "./graph-analysis";
 import type { GraphAnalysisRepository } from "./graph-analysis-repository";
 import { defaultThreeABudget, hardThreeABudget } from "./types";
-import type { ArchitectureAlignmentInput, ArchitectureAlignmentResult, ArchitectureFactDetail, ArchitectureFactDetailInput, ArchitectureGraphQueryProvider, ArchitectureLayer, ArchitectureMapQueryInput, ArchitectureMapQueryRepository, ArchitectureMapQueryResult, ArchitectureUnitNeighborhoodInput, ArchitectureUnitNeighborhoodResult, BaselineQueryInput, ComparePublishedBaselinesInput, ContinuationState, GraphAnalysisBudget, GraphSummaryEdge, GraphSummaryNode, ImpactArchitectureInput, ImpactArchitectureItem, ImpactArchitectureResult, OverviewArchitectureInput, OverviewArchitectureResult, SearchArchitectureFactsInput, SearchArchitectureFactsResult, ThreeAProjectionQueryService, TraceArchitecturePathInput, TraceArchitecturePathResult, TraceContinuationStore, ScopedQueryInput, QueryResultEnvelope, ThreeABudget, ThreeAPartialReason, ThreeAQueryRepository, TraceDirection, ArchitectureUnitPageCursor } from "./types";
+import type { ArchitectureAlignmentInput, ArchitectureAlignmentResult, ArchitectureFactDetail, ArchitectureFactDetailInput, ArchitectureGraphQueryProvider, ArchitectureLayer, ArchitectureMapQueryInput, ArchitectureMapQueryRepository, ArchitectureMapQueryResult, ArchitectureUnitNeighborhoodInput, ArchitectureUnitNeighborhoodResult, BaselineQueryInput, ComparePublishedBaselinesInput, ContinuationState, GraphAnalysisBudget, GraphSummaryEdge, GraphSummaryNode, ImpactArchitectureInput, ImpactArchitectureItem, ImpactArchitectureResult, OverviewArchitectureInput, OverviewArchitectureResult, SearchArchitectureFactsInput, SearchArchitectureFactsResult, ThreeAProjectionQueryService, TraceArchitecturePathInput, TraceArchitecturePathResult, TraceContinuationStore, ScopedQueryInput, QueryResultEnvelope, ThreeABudget, ThreeAPartialReason, ThreeAQueryRepository, TraceDirection, ArchitectureUnitPageCursor, UnitGraphQueryInput, UnitGraphQueryResult } from "./types";
 
 export function createThreeAProjectionQueryService(repository: ThreeAQueryRepository, continuationStore: TraceContinuationStore, keyring: CursorKeyring, now = () => new Date(), graphRepository?: GraphAnalysisRepository): ThreeAProjectionQueryService & ArchitectureGraphQueryProvider {
   const authorize = (input: { principal: Parameters<typeof authorizePrincipalScope>[0]; architectureScope: ArchitectureScopeRef }): ArchitectureScopeRef => { try { return authorizePrincipalScope(input.principal, input.architectureScope, "read"); } catch { throw new ThreeAQueryError("SCOPE_ACCESS_DENIED"); } };
@@ -65,6 +65,50 @@ export function createThreeAProjectionQueryService(repository: ThreeAQueryReposi
       const reasons = [...(page.nextCursor ? ["CONTINUATION_REQUIRED", "UNIT_BUDGET_EXCEEDED"] as const : []), ...(mappingPage.hasMore ? ["MAPPING_BUDGET_EXCEEDED"] as const : [])];
       const nextContinuation = page.nextCursor ? await createMapContinuation(input, queryFingerprint, page.nextCursor, (cursor.BIZ + cursor.SYS + cursor.TECH) + 1, keyring, continuationStore, now) : undefined;
       const value = { generationId: manifest.generationId, availability: units.length ? "READY" as const : "NO_GOVERNED_ARCHITECTURE_UNITS" as const, units, mappings, totalByLayer: page.totalByLayer, returnedByLayer: countByLayer(units), unclassifiedCount: page.unclassifiedCount, mappingCompleteness: units.length ? mappedIds.size / units.length : 0, evidenceCoverage: evidenceDenominator ? Number((evidenceTotal / evidenceDenominator).toFixed(6)) : 0, ...(nextContinuation ? { continuation: nextContinuation } : {}), ...(reasons.length ? { partial: { code: "RESULT_PARTIAL" as const, reasons: uniqueArchitectureMapReasons(reasons) } } : {}) };
+      return { ...envelope(scope, manifest, value), ...value };
+    },
+    async unitGraph(input: UnitGraphQueryInput): Promise<UnitGraphQueryResult> {
+      const map = await service.architectureMap({ ...input, filter: input.filter ?? {} });
+      const scope = authorize(input);
+      const manifest = await manifestFor(scope, input.baselineId, input.projectionManifestId);
+      const analysis = graphRepository
+        ? await graphRepository.loadOverview(scope, manifest, { layers: [], assetTypes: [], relationTypes: [], budget: defaultGraphAnalysisBudget })
+        : undefined;
+      const assertionProbe = await repository.searchNodes(scope, manifest, { limit: 1 });
+      const nodes = map.units.map((unit, index) => ({
+        applicationServiceId: unit.applicationServiceId,
+        scopePath: unit.scopePath,
+        id: unit.unitIdentity,
+        kind: "cluster" as const,
+        label: unit.canonicalName,
+        layer: unit.layer,
+        clusterId: unit.unitIdentity,
+        memberCount: unit.memberCount,
+        degree: map.mappings.filter((mapping) => mapping.sourceUnitIdentity === unit.unitIdentity || mapping.targetUnitIdentity === unit.unitIdentity).length,
+        criticality: unit.criticality,
+        positionSeed: { x: Math.cos((index / Math.max(map.units.length, 1)) * Math.PI * 2), y: Math.sin((index / Math.max(map.units.length, 1)) * Math.PI * 2) }
+      }));
+      const edges = map.mappings.map((mapping) => ({
+        applicationServiceId: mapping.applicationServiceId,
+        scopePath: mapping.scopePath,
+        id: mapping.mappingIdentity,
+        sourceId: mapping.sourceUnitIdentity,
+        targetId: mapping.targetUnitIdentity,
+        relationCode: mapping.mappingFamily,
+        confidence: mapping.confidence,
+        bridge: mapping.sourceLayer !== mapping.targetLayer
+      }));
+      const value = {
+        generationId: map.generationId,
+        availability: map.availability,
+        source: "ARCHITECTURE_UNIT_PROJECTION" as const,
+        fidelity: "UNIT" as const,
+        analysisAvailability: assertionProbe.nodes.length === 0 ? "EMPTY" as const : analysis?.availability ?? "UNAVAILABLE" as const,
+        nodes,
+        edges,
+        ...(map.continuation ? { continuation: map.continuation } : {}),
+        ...(map.partial ? { partial: map.partial } : {})
+      };
       return { ...envelope(scope, manifest, value), ...value };
     },
     async architectureUnitNeighborhood(input: ArchitectureUnitNeighborhoodInput): Promise<ArchitectureUnitNeighborhoodResult> {

@@ -26,7 +26,7 @@
 - `apps/web/lib/3a/query-protocol.ts` and `query-handler.ts`: expose `unitGraph`.
 - `apps/web/components/three-a/architecture-graph-workspace.tsx`: use the unit graph for normal overview.
 - `scripts/verify-designer-3a-unit-graph.ts`: exact-Scope operational verifier.
-- `docs/adr/0035-asset-to-3a-mapping-semantics.md` and `docs/design-facts/baseline-manifest.json`: dual records.
+- `docs/adr/0025-readable-3a-architecture-mapping.md` and `docs/design-facts/baseline-manifest.json`: dual records.
 
 ### Task 1: Establish the shared analysis contract
 
@@ -197,7 +197,7 @@ git commit -m "fix: render 3a graph from unit projection"
 **Files:**
 - Create: `scripts/verify-designer-3a-unit-graph.ts`
 - Create: `scripts/verify-designer-3a-unit-graph.test.ts`
-- Modify: `docs/adr/0035-asset-to-3a-mapping-semantics.md`
+- Modify: `docs/adr/0025-readable-3a-architecture-mapping.md`
 - Modify: `docs/design-facts/baseline-manifest.json`
 
 **Interfaces:**
@@ -247,4 +247,3 @@ Expected: selected design facts reconcile with `missing=[]`, `mismatched=[]`, `o
 - Spec coverage: Task 1 repairs the shared contract; Task 2 establishes the identity-qualified unit graph; Task 3 changes the user-facing normal Graph; Task 4 verifies live behavior and closes dual records.
 - Placeholder scan: no deferred implementation wording or unspecified paths remain. The prepared session ID is the receipt returned by the required preflight before code changes.
 - Type consistency: `UnitGraphResult`, `unitGraph`, and `runUnitGraphQuery` are introduced in Task 2 and consumed after that in Task 3.
-
