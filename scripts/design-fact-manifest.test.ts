@@ -175,18 +175,20 @@ it("includes the single-host Docker deployment decision in the baseline", () => 
   expect(decision?.evidence).toHaveLength(12);
 });
 
-it("records the proposed readable 3A architecture map separately from advanced network exploration", () => {
+it("records the governed graph-first 3A workspace separately from assertion analysis", () => {
   const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-readable-3a-architecture-mapping");
   expect(decision?.proposalId).toBe("proposal-readable-3a-architecture-mapping");
   expect(decision?.proposalStatus).toBe("implemented");
   expect(decision?.contextPackId).toBe("ctx-readable-3a-architecture-mapping");
-  expect(decision?.status).toBe("Read-only Map and Network implementation complete; governed 3A architecture-fact authoring and Designer fact onboarding are designed and pending explicit implementation approval");
+  expect(decision?.status).toContain("graph-first 3A workspace");
   expect(decision?.relatedAssetIds).toEqual([
     "api-specforge-3a-architecture-query",
     "data-specforge-3a-projection-read-model",
     "adr-webgl-3a-graph-exploration"
   ]);
-  expect(decision?.reason).toContain("semantic BIZ, SYS, and TECH units");
+  expect(decision?.reason).toContain("eight governed units, 42 direct members, 307 covered assets, and six unit mappings");
+  expect(decision?.localizedContent?.en.decision).toContain("expand exact-Scope unit members on demand");
+  expect(decision?.localizedContent?.zh.decision).toContain("按需展开精确 Scope 的单元成员");
   expect(decision?.managedRelationships).toEqual(expect.arrayContaining([
     expect.objectContaining({ sourceId: "proposal-readable-3a-architecture-mapping", targetId: "api-specforge-3a-architecture-query", relationType: "IMPACTS" }),
     expect.objectContaining({ sourceId: "proposal-readable-3a-architecture-mapping", targetId: "data-specforge-3a-projection-read-model", relationType: "IMPACTS" })

@@ -1567,10 +1567,48 @@
                               }
                           ],
                           "owner": "SpecForge Architecture and Product",
-                          "status": "Implemented: Map and normal Network read the exact-Scope architecture-unit projection; assertion-level impact analysis remains separate and currently EMPTY for Designer v6.",
-                          "reason": "Designer v6 publishes eight governed 3A units and six realization mappings. Its assertion projection remains empty under the current Baseline eligibility, so the normal Network must read the authoritative architecture-unit projection and report assertion analysis availability explicitly instead of failing with a 503.",
-                          "retryTrigger": "After governed assertion facts are eligible for the published Baseline and a fresh assertion projection plus graph analysis is published, re-run the unit-graph verifier and impact-analysis verification in a new exact-Scope session.",
-                          "evidence": [
+      "status": "Implemented: the graph-first 3A workspace separates governed units, direct members, coverage assets, and unit mappings; bounded Coverage detail and exact-Scope on-demand member expansion are verified on ports 3000 and 3010.",
+      "reason": "Designer v6 publishes eight governed units, 42 direct members, 307 covered assets, and six unit mappings. Coverage rows previously pushed the graph roughly 6,862 pixels down the page, while direct members were available only through the neighborhood query. The Web now keeps the unit projection readable, paginates coverage independently, and expands authoritative members on demand.",
+      "retryTrigger": "Open a new exact-Scope session before adding TRACE coverage relationships to the graph, changing membership semantics, or introducing a new graph query operation; assertion-level impact analysis remains separately gated until a published assertion projection exists.",
+      "localizedContent": {
+        "en": {
+          "decision": "Make the governed unit graph the primary 3A workspace, isolate coverage detail behind a bounded shareable tab, display unit/member/coverage/mapping measures independently, and expand exact-Scope unit members on demand through the existing neighborhood query.",
+          "constraints": [
+            "PostgreSQL remains authoritative and the browser graph remains a read-only projection.",
+            "TRACE-derived coverage is not injected into the default unit topology.",
+            "Unit expansion must preserve exact Scope, Baseline, Projection Manifest, and generation identity."
+          ]
+        },
+        "zh": {
+          "decision": "将治理单元图作为 3A 主要工作区，把覆盖明细隔离到有界、可分享的标签页，分别展示单元、成员、覆盖和映射计数，并通过现有邻域查询按需展开精确 Scope 的单元成员。",
+          "constraints": [
+            "PostgreSQL 保持权威，浏览器图保持只读派生投影。",
+            "TRACE 派生覆盖不进入默认单元拓扑。",
+            "单元展开必须保持精确 Scope、Baseline、Projection Manifest 和 Generation 身份。"
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "command": "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Prioritize-the-3A-graph-and-expand-governed-unit-members-on-demand",
+          "result": "Opened design-change-session:ca477e2d-9fa3-469c-b5af-e5957b357466, read 352 exact-Scope assets, and returned OPEN with design-context digest 6e3281554193f1a50d6b4354f20d72b4a647ce6a9c310417f6a997895c209431."
+        },
+        {
+          "command": "pnpm --filter @specforge/web test -- apps/web/lib/3a/url-state.test.ts apps/web/components/three-a/three-a-workspace.test.tsx apps/web/components/three-a/coverage-detail.test.tsx apps/web/components/three-a/architecture-graph-workspace.test.ts apps/web/components/three-a/architecture-graph-store.test.ts; pnpm --filter @specforge/web typecheck",
+          "result": "Focused Web tests and TypeScript validation exited 0."
+        },
+        {
+          "command": "In-app browser validation on ports 3000 and 3010",
+          "result": "Both runtimes showed graph top 831.75 pixels, measures 8/42/307/6, no Architecture-tab coverage detail, 9-node/7-edge member expansion with ARCHITECTURE_MEMBERSHIP, 25-row Coverage pagination, exact URL identity preservation, and no error."
+        },
+        {
+          "command": "docker compose -f deploy/compose.yaml build web; docker compose -f deploy/compose.yaml up -d --no-deps web; Invoke-WebRequest http://localhost:3010/healthz",
+          "result": "The production Next.js image built successfully, only deploy-web-1 was replaced, and health returned HTTP 200."
+        },
+        {
+          "command": "SPECFORGE_DESIGN_FACT_IDS=adr-readable-3a-architecture-mapping pnpm design-facts:sync; pnpm design-facts:check; pnpm design-context:close -- --session design-change-session:ca477e2d-9fa3-469c-b5af-e5957b357466 --status CONVERGED",
+          "result": "Synchronization returned complete; read-back returned empty missing, mismatched, outOfScope, and blocked lists; the exact Designer-Scope session closed as CONVERGED with all focused evidence."
+        },
                               {
                                   "command": "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Repair 3A graph availability by separating unit graph rendering from assertion analysis, aligning the shared graph-analysis contract, and exposing source/fidelity readiness.",
                                   "result": "Opened design-change-session:0ca85bc2-9683-40a2-918c-ab88130e72b0 in the exact Designer Scope; the catalog and typed relationship digest were read before implementation."

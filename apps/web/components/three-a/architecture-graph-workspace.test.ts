@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { OverviewArchitectureResult } from "@specforge/knowledge-query";
-import { graphFocusLoadKey, selectOverviewResult } from "./architecture-graph-workspace";
+import type { ArchitectureUnitNeighborhoodResult, OverviewArchitectureResult } from "@specforge/knowledge-query";
+import { graphFocusLoadKey, graphProjectionCounts, selectOverviewResult, unitNeighborhoodOverview } from "./architecture-graph-workspace";
 
 const envelope = { applicationServiceId: "com.huawei.celon.desiner", scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner", baselineId: "baseline-1", projectionManifestId: "projection-1", profileId: "profile", profileVersion: "v1", relationshipVersion: "r1", resultDigest: "digest" };
 const overview = (nodes: number, edges: number): OverviewArchitectureResult => ({ ...envelope, nodes: Array.from({ length: nodes }, (_, index) => ({ ...envelope, id: `fact:${index}`, kind: "fact", label: `fact-${index}`, memberCount: 1, degree: edges ? 1 : 0, criticality: 0, positionSeed: { x: index, y: 0 }, assertionId: `assertion-${index}` })), edges: Array.from({ length: edges }, (_, index) => ({ ...envelope, id: `edge:${index}`, sourceId: "fact:0", targetId: "fact:1", relationCode: "REALIZED_BY", confidence: 1, bridge: true })) });
@@ -31,5 +31,22 @@ describe("graphFocusLoadKey", () => {
 
   it("reloads impact analysis when its focus changes", () => {
     expect(graphFocusLoadKey("impact", "assertion-1")).toBe("assertion-1");
+  });
+});
+
+describe("governed unit graph expansion", () => {
+  it("keeps projection measures semantically distinct", () => {
+    const result = overview(8, 6);
+    result.nodes.forEach((node, index) => { node.kind = "cluster"; node.memberCount = index === 0 ? 7 : 5; });
+    expect(graphProjectionCounts(result, 307)).toEqual({ units: 8, directMembers: 42, coveredAssets: 307, mappings: 6 });
+  });
+
+  it("converts authoritative members into typed unit membership edges", () => {
+    const unit = { applicationServiceId: envelope.applicationServiceId, scopePath: envelope.scopePath, generationId: "generation-1", baselineId: envelope.baselineId, projectionManifestId: envelope.projectionManifestId, unitIdentity: "unit:sys:design", layer: "SYS" as const, kind: "SERVICE" as const, canonicalName: "Design service", aliases: [], memberCount: 2, criticality: 0.8, completeness: 1, evidenceCount: 2, unclassifiedMemberCount: 0, contentDigest: "unit-digest" };
+    const result: ArchitectureUnitNeighborhoodResult = { ...envelope, generationId: "generation-1", unit, adjacentUnits: [], members: ["api-1", "data-1"].map((assertionId) => ({ applicationServiceId: envelope.applicationServiceId, scopePath: envelope.scopePath, generationId: "generation-1", baselineId: envelope.baselineId, projectionManifestId: envelope.projectionManifestId, unitIdentity: unit.unitIdentity, assertionId, assetType: "api", semanticIdentity: assertionId, contentDigest: `digest-${assertionId}` })), mappings: [], sameLayerDependencies: [], evidenceRefs: [] };
+    const converted = unitNeighborhoodOverview(result);
+    expect(converted.nodes.filter((node) => node.kind === "cluster")).toHaveLength(1);
+    expect(converted.nodes.filter((node) => node.kind === "fact").map((node) => [node.assertionId, node.layer])).toEqual([["api-1", "SYS"], ["data-1", "SYS"]]);
+    expect(converted.edges.map((edge) => [edge.sourceId, edge.targetId, edge.relationCode])).toEqual([[unit.unitIdentity, "api-1", "ARCHITECTURE_MEMBERSHIP"], [unit.unitIdentity, "data-1", "ARCHITECTURE_MEMBERSHIP"]]);
   });
 });

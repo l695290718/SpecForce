@@ -329,6 +329,32 @@ PostgreSQL 继续作为已编写事实和关系事件的权威来源。后续实
 - 会话状态：`design-change-session:34a1a99a-6026-4060-a858-46654b1630f3` 已针对书面设计增量收敛为 `CONVERGED`。
 
 
+## Graph-First Coverage and Member Expansion Increment (2026-08-23)
+
+The 3A page now treats the governed architecture graph as the primary workspace. The compact coverage waterline remains visible, but coverage rows render only in a dedicated shareable Coverage tab with 25-row client pagination. This reduces the observed graph offset from approximately 6,862 pixels to 832 pixels and prevents the 307-row coverage report from creating a large architecture-page DOM.
+
+The normal Network still begins with the authoritative Designer v6 unit projection: 8 governed units and 6 unit mappings. Its header reports four distinct measures: 8 governed units, 42 direct members, 307 covered assets, and 6 unit mappings. Direct membership and TRACE-derived coverage are intentionally not combined.
+
+Selecting a governed unit reuses the exact-Scope `architectureUnitNeighborhood` query at depth 1. Returned direct members are merged as stable fact nodes connected by directional `ARCHITECTURE_MEMBERSHIP` edges. The default graph remains readable, while authoritative members become visible on demand without inventing relationships or introducing a new backend operation.
+
+### 图谱优先、覆盖分页与成员展开增量（2026-08-23）
+
+3A 页面现在将治理架构图作为主要工作区。页面保留紧凑的覆盖水位，但覆盖明细仅在独立、可分享的“覆盖”标签页中按每页 25 条呈现。实测图谱起始位置由约 6,862 像素缩短到 832 像素，307 条覆盖记录不再造成超长架构页面和大型 DOM。
+
+常规关系网络仍从 Designer v6 的权威单元投影开始：8 个治理单元和 6 条单元映射。图谱标题区分别展示 8 个治理单元、42 个直接成员、307 个覆盖资产和 6 条单元映射；直接归属与 TRACE 派生覆盖不合并计数。
+
+选择治理单元时，系统复用精确 Scope、深度为 1 的 `architectureUnitNeighborhood` 查询。返回的直接成员以稳定事实节点合并到当前图中，并通过有方向的 `ARCHITECTURE_MEMBERSHIP` 关系连接。默认图保持可读，权威成员可按需查看，不虚构关系，也不新增后端操作。
+
+### Increment Evidence
+
+- Exact-Scope preflight opened `design-change-session:ca477e2d-9fa3-469c-b5af-e5957b357466`, read 352 assets, and returned design-context digest `6e3281554193f1a50d6b4354f20d72b4a647ce6a9c310417f6a997895c209431` with status `OPEN`.
+- `pnpm --filter @specforge/web test -- apps/web/lib/3a/url-state.test.ts apps/web/components/three-a/three-a-workspace.test.tsx apps/web/components/three-a/coverage-detail.test.tsx apps/web/components/three-a/architecture-graph-workspace.test.ts apps/web/components/three-a/architecture-graph-store.test.ts` exited 0.
+- `pnpm --filter @specforge/web typecheck` exited 0.
+- Browser validation on port 3000 observed graph top 831.75 pixels, no Architecture-tab coverage detail, measures 8/42/307/6, and a selected unit expanding the graph from 8 nodes/6 edges to 9 nodes/7 edges with `ARCHITECTURE_MEMBERSHIP` and no error.
+- `docker compose -f deploy/compose.yaml build web` completed the production Next.js build; `docker compose -f deploy/compose.yaml up -d --no-deps web` replaced only the Web container; `http://localhost:3010/healthz` returned 200.
+- Browser validation on port 3010 repeated the 8/42/307/6 measures, 9/7 member expansion, 25-row Coverage page, and exact Scope/Baseline/Projection URL preservation without an error.
+- Selected MCP synchronization returned `complete`; read-back verified `missing=[]`, `mismatched=[]`, `outOfScope=[]`, and `blocked=[]`; `design-change-session:ca477e2d-9fa3-469c-b5af-e5957b357466` closed as `CONVERGED` with all focused evidence.
+
 ## 3A Neighborhood Query Identity Repair
 
 Implementation preflight opened `design-change-session:0b9f92e9-2a22-48e3-a058-104a67017590` in the exact Designer Scope before code changes. It read 298 scoped assets and returned design-context digest `b3022bb4167b88291985082aacef9aa7ebbb7127992b05f852ea2431b46c5bf7`, relationship digest `86f22fca81d050efd28827d54545df5cff3ce91fab549aa25445963fbefc6a37`, and reconciliation status `UNVERIFIED` without a blocking status. Receipt: `.specforge/design-context/design-change-session_0b9f92e9-2a22-48e3-a058-104a67017590.json`.

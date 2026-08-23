@@ -1,11 +1,11 @@
 "use client";
 
-import type { ImpactArchitectureResult, OverviewArchitectureResult, GraphSummaryEdge, GraphSummaryNode, UnitGraphQueryResult } from "@specforge/knowledge-query";
+import type { ArchitectureUnitNeighborhoodResult, ImpactArchitectureResult, OverviewArchitectureResult, GraphSummaryEdge, GraphSummaryNode, UnitGraphQueryResult } from "@specforge/knowledge-query";
 import type { KnowledgeProjectionEdge, KnowledgeProjectionNode } from "@specforge/core";
 import { scopeById } from "@specforge/core";
 import { Network, Search, Sparkles } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { runImpactArchitectureQuery, runUnitGraphQuery } from "../../lib/3a/query-client";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { runArchitectureUnitNeighborhoodQuery, runImpactArchitectureQuery, runUnitGraphQuery } from "../../lib/3a/query-client";
 import { serializeThreeAUrlState, type ThreeAUrlState } from "../../lib/3a/url-state";
 import type { InitialGraphPage } from "../../lib/3a/workspace-loader";
 import { T, useLanguage } from "../language-provider";
@@ -20,7 +20,7 @@ import { ArchitectureImpactPanel } from "./architecture-impact-panel";
 import type { ThreeAQueryIdentity } from "./catalog-state";
 import type { SigmaArchitectureGraphController } from "./sigma-architecture-graph";
 
-export function ArchitectureGraphWorkspace({ state, identity, generationId, initialGraph, fallbackNodes = [], fallbackEdges = [], onFocus }: { state: ThreeAUrlState; identity: ThreeAQueryIdentity; generationId: string; initialGraph?: InitialGraphPage; fallbackNodes?: readonly KnowledgeProjectionNode[]; fallbackEdges?: readonly KnowledgeProjectionEdge[]; onFocus(id: string): void }) {
+export function ArchitectureGraphWorkspace({ state, identity, generationId, initialGraph, fallbackNodes = [], fallbackEdges = [], coveredAssets = 0, onFocus }: { state: ThreeAUrlState; identity: ThreeAQueryIdentity; generationId: string; initialGraph?: InitialGraphPage; fallbackNodes?: readonly KnowledgeProjectionNode[]; fallbackEdges?: readonly KnowledgeProjectionEdge[]; coveredAssets?: number; onFocus(id: string): void }) {
   const graphView = state.graphView ?? "overview";
   const { t } = useLanguage();
   const [graphLayout, setGraphLayout] = useState<GraphLayoutMode>(state.graphLayout ?? "force");
@@ -39,14 +39,18 @@ export function ArchitectureGraphWorkspace({ state, identity, generationId, init
   const [analysisAvailability, setAnalysisAvailability] = useState<UnitGraphQueryResult["analysisAvailability"]>("UNAVAILABLE");
   const [selectedId, setSelectedId] = useState<string | undefined>(state.focus ? `fact:${state.focus}` : undefined);
   const [layoutLifecycle, setLayoutLifecycle] = useState<ArchitectureGraphLifecycle>("seeded");
+  const [expandingUnit, setExpandingUnit] = useState<string>();
   const [hiddenRelations, setHiddenRelations] = useState<ReadonlySet<string>>(new Set());
+  const loadedUnitsRef = useRef(new Set<string>());
+  const expansionAbortRef = useRef<AbortController | undefined>(undefined);
   const controllerRef = useRef<SigmaArchitectureGraphController>(createNoopController());
 
   useEffect(() => { if (typeof window === "undefined") return; const media = window.matchMedia("(prefers-reduced-motion: reduce)"); const sync = () => setReducedMotion(media.matches); sync(); media.addEventListener?.("change", sync); return () => media.removeEventListener?.("change", sync); }, []);
   useEffect(() => { setGraphLayout(state.graphLayout ?? "force"); }, [state.graphLayout]);
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true); setError(undefined); setImpact(undefined); setOverview(undefined); setAnalysisAvailability("UNAVAILABLE"); store.clear();
+    expansionAbortRef.current?.abort();
+    setLoading(true); setError(undefined); setImpact(undefined); setOverview(undefined); setAnalysisAvailability("UNAVAILABLE"); setExpandingUnit(undefined); loadedUnitsRef.current.clear(); store.clear();
     const load = async () => {
       try {
         if (graphView === "explore" && initialGraph) {
@@ -73,7 +77,7 @@ export function ArchitectureGraphWorkspace({ state, identity, generationId, init
       finally { if (!controller.signal.aborted) setLoading(false); }
     };
     void load();
-    return () => controller.abort();
+    return () => { controller.abort(); expansionAbortRef.current?.abort(); };
   }, [fallbackEdges, fallbackNodes, focusLoadKey, generationId, graphView, identity, initialGraph, layers, relationTypes, state.direction, store]);
 
   useEffect(() => {
@@ -86,10 +90,32 @@ export function ArchitectureGraphWorkspace({ state, identity, generationId, init
 
   const snapshot = useMemo(() => store.snapshot(), [store, version]);
   const relations = useMemo(() => summarizeRelations(snapshot.edges.map((edge) => edge.attributes.relationCode)), [snapshot]);
+  const projectionCounts = useMemo(() => overview ? graphProjectionCounts(overview, coveredAssets) : undefined, [coveredAssets, overview]);
   const toggleRelation = (code: string) => setHiddenRelations((current) => toggleRelationCode(current, code));
   const legendOverlay = <ArchitectureGraphLegend hiddenCodes={hiddenRelations} relations={relations} onToggle={toggleRelation} />;
   const resetViewHref = `/architecture/3a?${serializeThreeAUrlState({ ...state, mode: "graph", graphView: "overview", graphLayout: "force", focus: undefined, layers: [], relationTypes: [] })}`;
-  const focus = (id: string) => { const assertionId = id.startsWith("fact:") ? id.slice(5) : undefined; setSelectedId(id); store.select(id); setVersion((value) => value + 1); if (assertionId) onFocus(assertionId); };
+  const expandUnit = useCallback(async (unitIdentity: string) => {
+    if (loadedUnitsRef.current.has(unitIdentity)) return;
+    expansionAbortRef.current?.abort();
+    const controller = new AbortController();
+    expansionAbortRef.current = controller;
+    setExpandingUnit(unitIdentity);
+    setError(undefined);
+    try {
+      const result = await runArchitectureUnitNeighborhoodQuery({ operation: "architectureUnitNeighborhood", scope: identity.scope, baselineId: identity.baselineId, projectionManifestId: identity.projectionManifestId, generationId, unitIdentity, direction: state.direction, depth: 1, budget: { maxUnitsPerLayer: 12, maxMappings: 60, timeoutMs: 2_000, maxPayloadBytes: 524_288 } }, controller.signal);
+      if (controller.signal.aborted) return;
+      store.mergeOverview(unitNeighborhoodOverview(result), `unit:${unitIdentity}`);
+      loadedUnitsRef.current.add(unitIdentity);
+      store.select(`cluster:${unitIdentity}`);
+      setVersion((value) => value + 1);
+      controllerRef.current.restartLayout();
+    } catch (cause) {
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "ARCHITECTURE_UNIT_EXPANSION_UNAVAILABLE");
+    } finally {
+      if (expansionAbortRef.current === controller) { expansionAbortRef.current = undefined; setExpandingUnit(undefined); }
+    }
+  }, [generationId, identity.baselineId, identity.projectionManifestId, identity.scope, state.direction, store]);
+  const focus = (id: string) => { const assertionId = id.startsWith("fact:") ? id.slice(5) : undefined; const unitIdentity = id.startsWith("cluster:unit:") ? id.slice("cluster:".length) : undefined; setSelectedId(id); store.select(id); setVersion((value) => value + 1); if (assertionId) onFocus(assertionId); if (unitIdentity) void expandUnit(unitIdentity); };
   const clearFocus = () => { setSelectedId(undefined); store.select(undefined); setVersion((value) => value + 1); if (typeof window !== "undefined") { const params = new URLSearchParams(window.location.search); params.delete("focus"); window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`); window.dispatchEvent(new Event("three-a-url-state-change")); } };
   const changeGraphLayout = (nextLayout: GraphLayoutMode) => { setGraphLayout(nextLayout); if (typeof window !== "undefined") { const nextState = { ...state, mode: "graph" as const, graphLayout: nextLayout }; window.history.replaceState(null, "", `/architecture/3a?${serializeThreeAUrlState(nextState)}`); window.dispatchEvent(new Event("three-a-url-state-change")); } };
   const viewHref = (nextView: NonNullable<ThreeAUrlState["graphView"]>) => `/architecture/3a?${serializeThreeAUrlState({ ...state, mode: "graph", graphView: nextView })}`;
@@ -97,7 +123,8 @@ export function ArchitectureGraphWorkspace({ state, identity, generationId, init
   const graphViewLabels = { overview: t("threeA.graphOverview"), explore: t("threeA.graphExplore"), impact: t("threeA.graphImpact") };
   return <section className="space-y-3" data-testid="architecture-graph-workspace">
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-white p-3 shadow-panel"><div className="flex items-center gap-2 text-sm font-semibold text-ink"><Network className="text-accent" size={17} /><T k="threeA.graphWorkspace" /></div><ArchitectureGraphSearch nodes={snapshot.nodes} onSelect={focus} /><div className="flex items-center gap-1 rounded-md border border-border bg-chrome p-1">{(["overview", "explore", "impact"] as const).map((view) => <a aria-current={graphView === view ? "page" : undefined} className={`inline-flex h-7 items-center gap-1 rounded px-2 text-xs font-semibold ${graphView === view ? "bg-white text-ink shadow-sm" : "text-muted"}`} href={viewHref(view)} key={view}><Sparkles size={13} />{graphViewLabels[view]}</a>)}</div><ArchitectureGraphControls view={graphLayout} lifecycle={layoutLifecycle} hasSelection={Boolean(selectedId)} labels={controlLabels} onViewChange={changeGraphLayout} onZoomIn={() => controllerRef.current.zoomIn()} onZoomOut={() => controllerRef.current.zoomOut()} onResetCamera={() => controllerRef.current.resetCamera()} onFocusSelection={() => controllerRef.current.focusSelectedNode()} onStartLayout={() => controllerRef.current.startLayout()} onStopLayout={() => controllerRef.current.stopLayout()} onRestartLayout={() => controllerRef.current.restartLayout()} onClearSelection={() => { controllerRef.current.clearSelection(); clearFocus(); }} /><ArchitectureViewActions resetHref={resetViewHref} /></div>
-    <div className="flex flex-wrap gap-2 text-xs text-muted"><span><Search className="mr-1 inline-block" size={13} />{snapshot.nodes.length} <T k="threeA.loadedNodes" /></span>{overview ? <><span>{overview.edges.length} <T k="threeA.loadedEdges" /></span><span className="rounded-full border border-border bg-chrome px-2 py-0.5 font-medium text-ink">{dataSource === "architecture-unit-projection" ? <T k="threeA.graphSourceUnitProjection" /> : dataSource === "projection" ? <T k="threeA.graphSourceProjection" /> : <T k="threeA.graphSourceFallback" />}</span><span className="rounded-full border border-border bg-chrome px-2 py-0.5 font-medium text-muted"><T k="threeA.analysisAvailability" />: {analysisAvailability}</span></> : null}</div>
+    {projectionCounts ? <div className="grid grid-cols-2 divide-x divide-y divide-border overflow-hidden rounded-md border border-border bg-white sm:grid-cols-4 sm:divide-y-0" data-testid="architecture-graph-counts"><GraphMeasure value={projectionCounts.units} labelKey="threeA.governedUnits" /><GraphMeasure value={projectionCounts.directMembers} labelKey="threeA.directMembers" /><GraphMeasure value={projectionCounts.coveredAssets} labelKey="threeA.coveredAssets" /><GraphMeasure value={projectionCounts.mappings} labelKey="threeA.graphUnitMappings" /></div> : null}
+    <div className="flex flex-wrap gap-2 text-xs text-muted"><span><Search className="mr-1 inline-block" size={13} />{snapshot.nodes.length} <T k="threeA.loadedNodes" /></span><span>{snapshot.edges.length} <T k="threeA.loadedEdges" /></span>{overview ? <><span className="rounded-full border border-border bg-chrome px-2 py-0.5 font-medium text-ink">{dataSource === "architecture-unit-projection" ? <T k="threeA.graphSourceUnitProjection" /> : dataSource === "projection" ? <T k="threeA.graphSourceProjection" /> : <T k="threeA.graphSourceFallback" />}</span><span className="rounded-full border border-border bg-chrome px-2 py-0.5 font-medium text-muted"><T k="threeA.analysisAvailability" />: {analysisAvailability}</span></> : null}{expandingUnit ? <span className="font-medium text-accent"><T k="threeA.expandingUnitMembers" /></span> : null}</div>
     {error ? <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
     <ArchitectureGraphRenderer store={store} view={graphView} layoutMode={graphLayout} selectedId={selectedId} reducedMotion={reducedMotion} hiddenRelations={hiddenRelations} overlay={legendOverlay} onNodeSelect={focus} onStageClick={clearFocus} onEdgeSelect={() => undefined} onRendererFailure={(reason) => { setLayoutLifecycle("failed"); setError(reason); }} onControllerReady={(controller) => { controllerRef.current = controller; }} onLayoutLifecycleChange={setLayoutLifecycle} />
     {graphView === "impact" ? <ArchitectureImpactPanel result={impact} loading={loading} error={error} /> : null}
@@ -138,6 +165,24 @@ export function unitGraphOverview(result: UnitGraphQueryResult): OverviewArchite
   };
 }
 
+export function graphProjectionCounts(result: OverviewArchitectureResult, coveredAssets: number) {
+  const units = result.nodes.filter((node) => node.kind === "cluster");
+  return { units: units.length, directMembers: units.reduce((total, node) => total + node.memberCount, 0), coveredAssets, mappings: result.edges.length };
+}
+
+export function unitNeighborhoodOverview(result: ArchitectureUnitNeighborhoodResult): OverviewArchitectureResult {
+  const units = [result.unit, ...result.adjacentUnits];
+  const nodes: GraphSummaryNode[] = [
+    ...units.map((unit, index) => ({ applicationServiceId: unit.applicationServiceId, scopePath: unit.scopePath, id: unit.unitIdentity, kind: "cluster" as const, label: unit.canonicalName, layer: unit.layer, clusterId: unit.unitIdentity, memberCount: unit.memberCount, degree: result.mappings.filter((mapping) => mapping.sourceUnitIdentity === unit.unitIdentity || mapping.targetUnitIdentity === unit.unitIdentity).length, criticality: unit.criticality, positionSeed: { x: Math.cos((index / Math.max(units.length, 1)) * Math.PI * 2), y: Math.sin((index / Math.max(units.length, 1)) * Math.PI * 2) } })),
+    ...result.members.map((member, index) => ({ applicationServiceId: member.applicationServiceId, scopePath: member.scopePath, id: member.assertionId, kind: "fact" as const, label: member.semanticIdentity, layer: result.unit.layer, clusterId: result.unit.unitIdentity, memberCount: 1, degree: 1, criticality: result.unit.criticality, positionSeed: { x: Math.cos((index / Math.max(result.members.length, 1)) * Math.PI * 2) * 0.35, y: Math.sin((index / Math.max(result.members.length, 1)) * Math.PI * 2) * 0.35 }, assertionId: member.assertionId }))
+  ];
+  const edges: GraphSummaryEdge[] = [
+    ...result.mappings.map((mapping) => ({ applicationServiceId: mapping.applicationServiceId, scopePath: mapping.scopePath, id: mapping.mappingIdentity, sourceId: mapping.sourceUnitIdentity, targetId: mapping.targetUnitIdentity, relationCode: mapping.mappingFamily, confidence: mapping.confidence, bridge: mapping.sourceLayer !== mapping.targetLayer })),
+    ...result.members.map((member) => ({ applicationServiceId: member.applicationServiceId, scopePath: member.scopePath, id: `membership:${result.unit.unitIdentity}:${member.assertionId}`, sourceId: result.unit.unitIdentity, targetId: member.assertionId, relationCode: "ARCHITECTURE_MEMBERSHIP", confidence: 1, bridge: false }))
+  ];
+  return { applicationServiceId: result.applicationServiceId, scopePath: result.scopePath, baselineId: result.baselineId, projectionManifestId: result.projectionManifestId, profileId: "architecture-unit-neighborhood", profileVersion: result.generationId, relationshipVersion: result.relationshipVersion, resultDigest: result.resultDigest, nodes, edges };
+}
+
 function fallbackOverview(identity: ThreeAQueryIdentity, nodes: readonly KnowledgeProjectionNode[], edges: readonly KnowledgeProjectionEdge[]): OverviewArchitectureResult {
   const scope = scopeById(identity.scope);
   const scopePath = scope?.scopePath ?? identity.scope;
@@ -158,4 +203,8 @@ function createNoopController(): SigmaArchitectureGraphController {
     restartLayout: () => undefined,
     clearSelection: () => undefined
   };
+}
+
+function GraphMeasure({ value, labelKey }: { value: number; labelKey: "threeA.governedUnits" | "threeA.directMembers" | "threeA.coveredAssets" | "threeA.graphUnitMappings" }) {
+  return <div className="px-3 py-2.5"><strong className="block font-mono text-lg leading-none text-ink">{value}</strong><span className="mt-1 block text-[11px] text-muted"><T k={labelKey} /></span></div>;
 }

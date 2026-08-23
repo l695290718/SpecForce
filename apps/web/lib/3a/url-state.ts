@@ -3,7 +3,7 @@ export interface ThreeAUrlState {
   baseline?: string;
   projection?: string;
   focus?: string;
-  tab: "architecture" | "alignment" | "drift";
+  tab: "architecture" | "alignment" | "drift" | "coverage";
   mode: "lanes" | "graph" | "list";
   direction: "upstream" | "downstream" | "both";
   graphRepresentation?: "map" | "network";
@@ -26,7 +26,7 @@ const defaultState = { tab: "architecture", mode: "lanes", direction: "both", gr
 
 export function parseThreeAUrlState(params: URLSearchParams): ThreeAUrlState {
   const scope = nonEmpty(params.get("scope")) ?? "com.huawei.celon.desiner";
-  const tab = enumValue(params.get("tab"), ["architecture", "alignment", "drift"] as const) ?? defaultState.tab;
+  const tab = enumValue(params.get("tab"), ["architecture", "alignment", "drift", "coverage"] as const) ?? defaultState.tab;
   const mode = enumValue(params.get("mode"), ["lanes", "graph", "list"] as const) ?? defaultState.mode;
   const direction = enumValue(params.get("direction"), ["upstream", "downstream", "both"] as const) ?? defaultState.direction;
   const graphRepresentation = enumValue(params.get("graphRepresentation"), ["map", "network"] as const) ?? defaultState.graphRepresentation;

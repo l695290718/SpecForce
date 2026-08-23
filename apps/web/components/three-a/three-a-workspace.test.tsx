@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { KnowledgeProjectionNode } from "@specforge/core";
 import { ThreeAWorkspace, type ThreeAWorkspaceData } from "./three-a-workspace";
 
-vi.mock("../language-provider", () => ({ T: ({ k }: { k: string }) => k }));
+vi.mock("../language-provider", () => ({ T: ({ k }: { k: string }) => k, useLanguage: () => ({ t: (key: string) => key }) }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, replace: () => {}, prefetch: async () => {} }) }));
 
 const scope = { applicationServiceId: "com.huawei.celon.desiner", scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner" };
@@ -16,6 +16,7 @@ const nodes: KnowledgeProjectionNode[] = [
 const data: ThreeAWorkspaceData = { state: { scope: scope.applicationServiceId, baseline: "baseline-1", projection: "projection-1", tab: "architecture", mode: "lanes", direction: "both", graphView: "overview", layers: [], relationTypes: [] }, nodes, edges: [], alignmentEdges: [], baselines: [], manifests: [{ id: "projection-1", profileVersion: "1", publishedAt: "2026-08-10T00:00:00.000Z" }] };
 const lanePage = (layer: "BIZ" | "SYS" | "TECH") => ({ ...scope, baselineId: "baseline-1", projectionManifestId: "projection-1", profileId: "profile", profileVersion: "1", relationshipVersion: "r1", resultDigest: "digest", nodes: nodes.filter((node) => node.layer === layer) });
 const laneData: ThreeAWorkspaceData = { ...data, initialCatalog: { BIZ: lanePage("BIZ"), SYS: lanePage("SYS"), TECH: lanePage("TECH") } };
+const coverage = { freshness: "CURRENT" as const, manifest: { id: "coverage-1", generationId: "generation-1", inputDigest: "input", contentDigest: "content", catalogVersion: "catalog", relationshipVersion: "relations", rowCount: 1, coveredCount: 1, blockedCount: 0, notEvaluatedCount: 0 }, rows: [{ assetType: "api", assetId: "orders-api", role: "MEMBERSHIP", status: "COVERED", rowDigest: "row-1" }] };
 
 describe("ThreeAWorkspace", () => {
   it("preserves the same node IDs in lanes and list mode", () => {
@@ -44,5 +45,18 @@ describe("ThreeAWorkspace", () => {
   it("opens the bounded graph workspace without choosing a first node", () => {
     const markup = renderToStaticMarkup(<ThreeAWorkspace data={{ ...data, state: { ...data.state, mode: "graph" }, nodes: [], edges: [] }} />);
     expect(markup).not.toContain("architecture-graph-canvas");
+  });
+
+  it("keeps coverage detail out of the architecture workspace", () => {
+    const markup = renderToStaticMarkup(<ThreeAWorkspace data={{ ...laneData, coverage }} />);
+    expect(markup).toContain("coverage-summary");
+    expect(markup).not.toContain("coverage-detail");
+  });
+
+  it("renders coverage detail only in the independent coverage tab", () => {
+    const markup = renderToStaticMarkup(<ThreeAWorkspace data={{ ...data, coverage, state: { ...data.state, tab: "coverage" } }} />);
+    expect(markup).toContain("coverage-summary");
+    expect(markup).toContain("coverage-detail");
+    expect(markup).toContain("orders-api");
   });
 });

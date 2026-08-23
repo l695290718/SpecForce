@@ -85,6 +85,8 @@ export async function loadThreeAWorkspaceData(
     projectionManifestId: selectedManifest.id
   };
 
+  if (state.tab === "coverage") return base;
+
   if (state.tab === "alignment") {
     const alignment = await service.getArchitectureAlignment(queryIdentity);
     return { ...base, alignmentEdges: alignment.edges };

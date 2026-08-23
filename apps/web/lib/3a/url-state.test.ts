@@ -17,6 +17,11 @@ describe("3A URL state", () => {
     expect(parseThreeAUrlState(new URLSearchParams(serializeThreeAUrlState(state)))).toEqual(state);
   });
 
+  it("round-trips the independent coverage view", () => {
+    const state = { scope: "demo", baseline: "b-1", projection: "p-1", tab: "coverage" as const, mode: "graph" as const, direction: "both" as const, graphRepresentation: "network" as const, graphView: "overview" as const, graphLayout: "force" as const, layers: [], relationTypes: [], mapLayers: [], mapKinds: [], mappingFamilies: [] };
+    expect(parseThreeAUrlState(new URLSearchParams(serializeThreeAUrlState(state)))).toEqual(state);
+  });
+
   it("round-trips graph mode without changing legacy list state", () => {
     const state = { scope: "demo", baseline: "b-1", projection: "p-1", focus: "a-1", tab: "architecture" as const, mode: "graph" as const, direction: "downstream" as const, graphRepresentation: "network" as const, graphView: "explore" as const, graphLayout: "circles" as const, layers: ["SYS"] as Array<"BIZ" | "SYS" | "TECH">, relationTypes: ["CALLS"], mapLayers: [], mapKinds: [], mappingFamilies: [] };
     expect(parseThreeAUrlState(new URLSearchParams(serializeThreeAUrlState(state)))).toEqual(state);
