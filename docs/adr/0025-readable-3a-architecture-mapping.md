@@ -190,6 +190,35 @@ v6 选定语义单元切片已经在精确 Designer Scope 中实现并发布；�
 
 ## MCP Record
 
+## Member Relationship Readability Increment (2026-08-23)
+
+### Decision
+
+The bounded 3A Network Overview now has a third fidelity: `UNIT_WITH_MEMBERS_AND_RELATIONS`. It returns direct member-to-member relationships only when both endpoints are already inside the exact-Scope direct-member result. The PostgreSQL read is deterministic, exact to Scope, Baseline, and generation, and bounded to 120 relationship rows plus a continuation signal.
+
+The browser retains the full bounded graph in memory but renders an initially readable subset: all eight architecture units plus up to 36 direct members. The subset is selected deterministically by architecture layer, relationship presence, member count, degree, and stable identifier. Hidden members and edges are omitted both from Sigma rendering and its layout input, so invisible facts cannot distort the visible layout. Selecting a collapsed unit expands it; selecting an expanded unit focuses it; a separate control collapses the selected unit.
+
+This increment does not infer relationships, add TRACE coverage edges, or change the authority boundary. PostgreSQL remains authoritative for authored facts and graph rendering remains a read-only projection.
+
+### Evidence
+
+- Exact-Scope preflight: `design-change-session:4db9560e-0497-4f8d-9968-3c9705dca77c`; design-context digest `aaf17384538e7dafc3d259418a8baaaebac8af5f6ed267f9954c008e1ec34f97`; relationship digest `a68e80b76bd4399259f5d42d824508f1645554d36f8aa36ada8cb638b9b101e4`.
+- Focused suite: `pnpm exec vitest run packages/core/src/architecture-map/types.test.ts packages/knowledge-query/src/prisma-repository.test.ts packages/knowledge-query/src/architecture-map.test.ts apps/web/lib/3a/query-handler.test.ts apps/web/components/three-a/architecture-graph-visibility.test.ts apps/web/components/three-a/sigma-architecture-graph.test.tsx apps/web/components/three-a/architecture-graph-workspace.test.ts` passed.
+- Type checks: `pnpm --filter @specforge/core typecheck`, `pnpm --filter @specforge/knowledge-query typecheck`, and `pnpm --filter @specforge/web typecheck` passed; `git diff --check` passed.
+- Runtime: `docker compose -f deploy/compose.yaml build web; docker compose -f deploy/compose.yaml up -d --no-deps web; Invoke-WebRequest http://localhost:3010/healthz` built the web image and returned HTTP 200.
+- Browser: exact Designer Scope, Baseline v6, and its Projection loaded the Relationship Network with 50 loaded nodes, 48 loaded edges, the `8 / 42 / 307 / 6` governed measures, and no browser console errors.
+- MCP synchronization completed for `adr-readable-3a-architecture-mapping`; reconciliation reported `missing=[]`, `mismatched=[]`, `outOfScope=[]`, and `blocked=[]`. The authoritative session `design-change-session:4db9560e-0497-4f8d-9968-3c9705dca77c` and delegated session `design-change-session:3cf4a7fd-afdb-424b-ba22-28d3a19b2fd7` both closed as `CONVERGED`.
+
+### 中文说明
+
+受限的 3A 关系网络总览新增 `UNIT_WITH_MEMBERS_AND_RELATIONS` 完整度。只有当关系两端都位于同一精确 Scope 的直接成员结果中时，才返回成员到成员的关系。PostgreSQL 查询绑定 Scope、Baseline 和 generation，排序确定，并将关系行限制为 120 条，同时提供继续读取信号。
+
+浏览器保留完整的受限图，但默认只渲染可读子集：全部八个架构单元和最多 36 个直接成员。子集按架构层、是否具有关系、成员数、度数和稳定标识确定。隐藏成员和边同时从 Sigma 渲染与布局输入中排除，避免不可见事实影响可见布局。选择折叠单元会展开，选择已展开单元只聚焦，折叠必须使用独立控件。
+
+本增量不推断关系、不加入 TRACE 覆盖边，也不改变权威边界。PostgreSQL 继续是已编写事实的权威来源，图形界面仍是只读投影。
+
+MCP 已完成 `adr-readable-3a-architecture-mapping` 同步；对账结果为 `missing=[]`、`mismatched=[]`、`outOfScope=[]` 和 `blocked=[]`。权威会话 `design-change-session:4db9560e-0497-4f8d-9968-3c9705dca77c` 与委派会话 `design-change-session:3cf4a7fd-afdb-424b-ba22-28d3a19b2fd7` 均已以 `CONVERGED` 关闭。
+
 - Matching MCP ADR ID: `adr-readable-3a-architecture-mapping`
 - Matching Proposal ID: `proposal-readable-3a-architecture-mapping`
 - Matching Context Pack ID: `ctx-readable-3a-architecture-mapping`
