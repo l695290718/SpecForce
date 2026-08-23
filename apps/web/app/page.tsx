@@ -180,12 +180,12 @@ export default function ArchitectureOverviewPage() {
       </section>
 
       <section aria-labelledby="architecture-concepts-title" className="space-y-4">
-        <h2 className="text-xl font-semibold text-ink" id="architecture-concepts-title"><T k="overview.conceptsTitle" /></h2>
+        <h2 className="sf-section-title text-xl font-semibold text-ink" id="architecture-concepts-title"><T k="overview.conceptsTitle" /></h2>
         <div className="grid gap-4 xl:grid-cols-3">
           {explanationSections.map(({ titleKey, descriptionKey, Icon, accentClassName, borderClassName }) => (
-            <article className={`border-l-2 bg-panel px-5 py-5 shadow-panel ${borderClassName}`} key={titleKey}>
+            <article className={`sf-glass rounded-xl border-l-[3px] px-5 py-5 shadow-panel transition duration-200 hover:-translate-y-1 hover:shadow-glow ${borderClassName}`} key={titleKey}>
               <div className={`flex items-center gap-2 ${accentClassName}`}>
-                <Icon size={18} />
+                <span aria-hidden="true" className="grid h-7 w-7 place-items-center rounded-lg bg-slate-900/[0.04]"><Icon size={16} /></span>
                 <h3 className="text-base font-semibold text-ink"><T k={titleKey} /></h3>
               </div>
               <p className="mt-3 max-w-xl text-sm leading-6 text-muted"><T k={descriptionKey} /></p>
@@ -197,16 +197,16 @@ export default function ArchitectureOverviewPage() {
       <section aria-label={t("overview.flowAriaLabel")} className="border-y border-border py-7">
         <div className="mb-5 flex items-end justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold text-ink"><T k="overview.flowTitle" /></h2>
+            <h2 className="sf-section-title text-xl font-semibold text-ink"><T k="overview.flowTitle" /></h2>
             <p className="mt-2 text-sm text-muted"><T k="overview.flowCaption" /></p>
           </div>
           <span className="hidden font-mono text-xs text-muted sm:block">{t("overview.flowLegend")}</span>
         </div>
         <ol className="sf-overview-flow" data-testid="architecture-fact-flow">
           {factFlow.map(([labelKey, Icon], index) => (
-            <li className="sf-overview-flow-step sf-overview-stage relative border border-border bg-white px-4 py-4 shadow-sm" data-motion key={labelKey} style={{ "--stage-delay": `${index * 80}ms` } as CSSProperties}>
-              <span className="font-mono text-[11px] font-semibold text-rule">0{index + 1}</span>
-              <Icon className="mt-5 text-accent" size={20} />
+            <li className="sf-overview-flow-step sf-overview-stage sf-glass relative rounded-xl border border-white/70 px-4 py-4 shadow-panel transition duration-200 hover:-translate-y-1 hover:shadow-glow" data-motion key={labelKey} style={{ "--stage-delay": `${index * 80}ms` } as CSSProperties}>
+              <span aria-hidden="true" className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-blue-600 to-violet-600 font-mono text-[11px] font-bold text-white shadow-glow">0{index + 1}</span>
+              <Icon className="mt-4 text-accent" size={20} />
               <div className="mt-3 text-sm font-semibold text-ink"><T k={labelKey} /></div>
               {index < factFlow.length - 1 ? <ArrowRight aria-hidden className="sf-overview-flow-connector absolute -right-2 top-1/2 z-10 hidden -translate-y-1/2 bg-surface text-rule xl:block" data-motion size={16} /> : null}
             </li>
@@ -217,7 +217,7 @@ export default function ArchitectureOverviewPage() {
       <section aria-label={t("overview.relationshipAriaLabel")} className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div>
           <p className="font-mono text-[11px] font-semibold uppercase text-rule">{t("overview.relationshipEyebrow")}</p>
-          <h2 className="mt-2 text-xl font-semibold text-ink"><T k="overview.relationshipTitle" /></h2>
+          <h2 className="sf-section-title mt-2 text-xl font-semibold text-ink"><T k="overview.relationshipTitle" /></h2>
           <p className="mt-3 max-w-xl text-sm leading-6 text-muted"><T k="overview.relationshipDescription" /></p>
           <p className="mt-5 border-l-2 border-amber-400 pl-3 text-sm leading-6 text-muted"><T k="overview.scopeNotice" /></p>
         </div>

@@ -49,3 +49,14 @@ Positive: a distinctive, coherent visual identity across every page with one tok
 - 完整 Web 测试套件（`apps/web`，vitest `--pool=threads`）：重塑后 45 个文件 / 198 项测试全部通过。
 - `apps/web` 下 `$env:SPECFORGE_NEXT_STANDALONE='0'; pnpm build` 退出 0 并生成 `/architecture/3a`；standalone 打包仅受已记录的 Windows/OneDrive 符号链接 `EPERM` 限制。
 - 精确 Scope 实施预检打开 `design-change-session:9b7d91a7-7db1-46ed-a8a2-91318a5e5029`（受影响：`adr-architecture-overview-home`、`proposal-specforge-self-design`、`ctx-specforge-self-design`）；会话在同一增量内以 `CONVERGED` 关闭。
+## Page Content Coverage Increment (2026-08-23)
+
+- Exact-Scope implementation preflight opened `design-change-session:e03011d7-1a3a-4b60-92a3-91cb17abf625` after user feedback that only the navigation had visibly changed; this increment extends the design language into page content areas.
+- The overview home now uses glass explanation cards with gradient edge accents, glass flow tiles with gradient number chips and glow hovers, and a new `.sf-section-title` utility that prefixes section headings with a blue-to-violet gradient square; the relationship constellation surface became a translucent aurora-glass panel with lighter node tiles. Shared `Card`, `Badge`, `PageHeader`, and `ButtonLink` restyling from the shell increment automatically carries to every list and detail page built on them.
+- Verification: focused suites (overview, data-model-er, three-a) passed 29 files / 129 tests; the full web suite passed 45 files / 200 tests; `pnpm exec tsc --noEmit -p apps/web` exited 0; the non-standalone production build exited 0. Overview route-isolation and localization source assertions still hold unchanged.
+
+### 页面内容覆盖增量（2026-08-23）
+
+- 用户反馈仅导航可见变化后，精确 Scope 实施预检打开 `design-change-session:e03011d7-1a3a-4b60-92a3-91cb17abf625`；本增量将设计语言延伸到页面内容区。
+- 总览首页现使用带渐变边缘强调的玻璃说明卡、含渐变编号芯片与辉光悬浮的玻璃流程瓦片，以及新的 `.sf-section-title` 工具类（在章节标题前渲染蓝紫渐变方块）；关系星座面板改为半透明极光玻璃面并配更轻的节点瓦片。外壳增量中对共享 Card、Badge、PageHeader、ButtonLink 的重塑会自动带到所有基于它们的列表与详情页。
+- 验证：聚焦套件（overview、data-model-er、three-a）29 个文件 / 129 项通过；完整 Web 套件 45 个文件 / 200 项通过；Web 类型检查退出 0；非 standalone 生产构建退出 0。总览路由隔离与本地化源码断言保持不变。
