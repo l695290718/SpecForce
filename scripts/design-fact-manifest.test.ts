@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(26);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(26);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(26);
+  expect(manifest.decisions).toHaveLength(28);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(28);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(28);
   const proposalByContextPack = new Map<string, string>();
 
   for (const decision of manifest.decisions) {
@@ -86,6 +86,21 @@ it("includes the local Git Hook change-attestation decision", () => {
   expect(decision?.proposalId).toBe("proposal-local-git-hook-change-attestation");
   expect(decision?.contextPackId).toBe("context-pack-local-git-hook-change-attestation");
   expect(decision?.status).toContain("Local enforcement increment implemented");
+});
+
+it("includes provider-neutral Agent bootstrap governance and its bounded context contracts", () => {
+  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-provider-neutral-agent-bootstrap-governance");
+  expect(decision?.proposalId).toBe("proposal-agent-bootstrap-governance");
+  expect(decision?.contextPackId).toBe("context-pack-agent-bootstrap-governance");
+  expect(decision?.managedAssets?.map((managed) => managed.asset.id)).toEqual([
+    "api-specforge-agent-bootstrap-context",
+    "data-specforge-agent-bootstrap-envelope",
+    "rule-specforge-agent-bootstrap-fail-closed"
+  ]);
+  expect(decision?.managedRelationships).toEqual(expect.arrayContaining([
+    expect.objectContaining({ sourceId: "api-specforge-agent-bootstrap-context", targetId: "data-specforge-agent-bootstrap-envelope", relationType: "READS" }),
+    expect.objectContaining({ sourceId: "rule-specforge-agent-bootstrap-fail-closed", targetId: "api-specforge-agent-bootstrap-context", relationType: "GOVERNS" })
+  ]));
 });
 
 it("includes the parallel governance workstreams decision", () => {
@@ -186,8 +201,8 @@ it("records the governed graph-first 3A workspace separately from assertion anal
     "data-specforge-3a-projection-read-model",
     "adr-webgl-3a-graph-exploration"
   ]);
-  expect(decision?.reason).toContain("eight governed units, 42 direct members, 307 covered assets, and six unit mappings");
-  expect(decision?.localizedContent?.en.decision).toContain("load exact-Scope direct unit members in the default bounded unitGraph response");
+  expect(decision?.reason).toContain("eight governed units, 42 direct members, 307 covered assets, and six mappings");
+  expect(decision?.localizedContent?.en.decision).toContain("load exact-Scope direct unit members plus bounded relationships in Overview");
   expect(decision?.localizedContent?.zh.decision).toContain("按需展开精确 Scope 的单元成员");
   expect(decision?.managedRelationships).toEqual(expect.arrayContaining([
     expect.objectContaining({ sourceId: "proposal-readable-3a-architecture-mapping", targetId: "api-specforge-3a-architecture-query", relationType: "IMPACTS" }),

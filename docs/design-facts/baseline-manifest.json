@@ -2238,6 +2238,240 @@
                       ]
                   },
                   {
+                      "id": "adr-provider-neutral-agent-bootstrap-governance",
+                      "repositoryAdr": "docs/adr/0040-provider-neutral-agent-bootstrap-governance.md",
+                      "mcpAdrId": "adr-provider-neutral-agent-bootstrap-governance",
+                      "scope": {
+                          "applicationServiceId": "com.huawei.celon.desiner",
+                          "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                      },
+                      "proposalId": "proposal-agent-bootstrap-governance",
+                      "proposalStatus": "approved",
+                      "proposalNonGoal": {
+                          "en": "CodeHub protected-branch enforcement, vendor model behavior, full-catalog prompt injection, and offline non-trivial development remain outside this increment.",
+                          "zh": "CodeHub 受保护分支门禁、供应商模型行为、完整目录提示注入和离线非平凡开发均不在本增量范围内。"
+                      },
+                      "contextPackId": "context-pack-agent-bootstrap-governance",
+                      "relatedAssetIds": [
+                          "api-specforge-agent-bootstrap-context",
+                          "data-specforge-agent-bootstrap-envelope",
+                          "rule-specforge-agent-bootstrap-fail-closed",
+                          "api-specforge-mcp-tools",
+                          "adr-design-context-preflight-gate",
+                          "adr-local-git-hook-change-attestation"
+                      ],
+                      "managedAssets": [
+                          {
+                              "assetType": "api",
+                              "asset": {
+                                  "id": "api-specforge-agent-bootstrap-context",
+                                  "name": "SpecForge Agent Bootstrap Context Contract",
+                                  "title": "SpecForge Agent Bootstrap Context Contract",
+                                  "description": "Provider-neutral read-only MCP contract for bounded L0 governance, task-specific L1 preflight context, and session-bound L2 design detail reads.",
+                                  "method": "MCP",
+                                  "path": "get_agent_bootstrap_context | prepare_design_change | read_design_context",
+                                  "providerSystem": "SpecForge MCP",
+                                  "authType": "Bearer token with exact application-service Scope grant",
+                                  "requestSchema": {
+                                      "applicationServiceId": "exact authorized application-service id",
+                                      "scopePath": "canonical exact scope path",
+                                      "intent": "required for L1",
+                                      "affectedFactIds": "required for L1",
+                                      "sessionId": "required for L2",
+                                      "assetIds": "explicit bounded references for L2",
+                                      "cursor": "optional opaque continuation cursor"
+                                  },
+                                  "responseSchema": {
+                                      "state": "READY|PARTIAL|BLOCKED|UNAUTHORIZED|STALE|UNAVAILABLE",
+                                      "governanceProfile": "immutable profile identity, revision and digest",
+                                      "context": "bounded L0, L1 or L2 envelope",
+                                      "coverage": "asset, relationship and byte counts",
+                                      "receipt": "Design Change Session receipt for L1",
+                                      "cursor": "opaque continuation cursor when partial"
+                                  },
+                                  "errorCodes": ["SCOPE_FORBIDDEN", "PROFILE_STALE", "CONTEXT_BLOCKED", "CONTEXT_LIMIT_REACHED", "SESSION_MISMATCH", "MCP_UNAVAILABLE"],
+                                  "createdAt": "2026-08-24T00:00:00.000Z",
+                                  "updatedAt": "2026-08-24T00:00:00.000Z",
+                                  "localizedContent": {
+                                      "en": {
+                                          "name": "SpecForge Agent Bootstrap Context Contract",
+                                          "description": "Provider-neutral read-only MCP contract for bounded L0 governance, task-specific L1 preflight context, and session-bound L2 design detail reads.",
+                                          "authType": "Bearer token with exact application-service Scope grant"
+                                      },
+                                      "zh": {
+                                          "name": "SpecForge Agent 引导上下文契约",
+                                          "description": "供应商无关的只读 MCP 契约，提供有界 L0 治理、任务相关 L1 预检上下文和会话绑定 L2 设计详情读取。",
+                                          "authType": "具备精确应用服务 Scope 授权的 Bearer Token"
+                                      }
+                                  }
+                              }
+                          },
+                          {
+                              "assetType": "dataModel",
+                              "asset": {
+                                  "id": "data-specforge-agent-bootstrap-envelope",
+                                  "name": "SpecForge Agent Bootstrap Envelope Model",
+                                  "description": "Authoritative model for immutable Governance Profile revisions, bounded context envelopes, adapter compatibility, and attestation bindings.",
+                                  "code": "AgentBootstrapEnvelope",
+                                  "modelType": "logical",
+                                  "domainId": "domain-specforge-platform",
+                                  "tables": ["GovernanceProfileRevision", "AgentBootstrapAudit"],
+                                  "entities": ["Governance Profile Revision", "Bootstrap Envelope", "Context Coverage", "Adapter Contract", "Attestation Binding"],
+                                  "schemaVersion": 2,
+                                  "entityDefinitions": [
+                                      { "id": "governance-profile-revision", "name": "Governance Profile Revision", "physicalName": "GovernanceProfileRevision", "ordinal": 0 },
+                                      { "id": "bootstrap-envelope", "name": "Bootstrap Envelope", "ordinal": 1 },
+                                      { "id": "context-coverage", "name": "Context Coverage", "ordinal": 2 },
+                                      { "id": "adapter-contract", "name": "Adapter Contract", "ordinal": 3 },
+                                      { "id": "attestation-binding", "name": "Attestation Binding", "ordinal": 4 }
+                                  ],
+                                  "fields": [],
+                                  "dataRelations": [],
+                                  "relationships": [
+                                      "One exact application service resolves one active Governance Profile revision at a time.",
+                                      "One L1 envelope is bound to one Design Change Session and one exact Scope.",
+                                      "One Change Attestation binds one profile digest and one design-context digest."
+                                  ],
+                                  "constraints": [
+                                      "Repository files cannot mutate server-owned Governance Profile revisions.",
+                                      "L2 reads cannot cross the actor, Scope, session, or referenced-asset boundary.",
+                                      "Partial envelopes preserve every blocking rule and expose continuation state."
+                                  ],
+                                  "dataClassification": "internal governance metadata",
+                                  "lifecycle": "Governance Profile revisions are immutable; assignment moves to a newer revision while attestations retain their original revision and digest.",
+                                  "lineage": "MCP-authored governance policy, exact-Scope design facts, Context Packs, typed relationships, reconciliation, sessions, and attestations.",
+                                  "createdAt": "2026-08-24T00:00:00.000Z",
+                                  "updatedAt": "2026-08-24T00:00:00.000Z",
+                                  "localizedContent": {
+                                      "en": {
+                                          "name": "SpecForge Agent Bootstrap Envelope Model",
+                                          "description": "Authoritative model for immutable Governance Profile revisions, bounded context envelopes, adapter compatibility, and attestation bindings.",
+                                          "relationships": [
+                                              "One exact application service resolves one active Governance Profile revision at a time.",
+                                              "One L1 envelope is bound to one Design Change Session and one exact Scope.",
+                                              "One Change Attestation binds one profile digest and one design-context digest."
+                                          ],
+                                          "constraints": [
+                                              "Repository files cannot mutate server-owned Governance Profile revisions.",
+                                              "L2 reads cannot cross the actor, Scope, session, or referenced-asset boundary.",
+                                              "Partial envelopes preserve every blocking rule and expose continuation state."
+                                          ],
+                                          "lifecycle": "Governance Profile revisions are immutable; assignment moves to a newer revision while attestations retain their original revision and digest.",
+                                          "lineage": "MCP-authored governance policy, exact-Scope design facts, Context Packs, typed relationships, reconciliation, sessions, and attestations.",
+                                          "entities": {
+                                              "governance-profile-revision": { "displayName": "Governance Profile Revision" },
+                                              "bootstrap-envelope": { "displayName": "Bootstrap Envelope" },
+                                              "context-coverage": { "displayName": "Context Coverage" },
+                                              "adapter-contract": { "displayName": "Adapter Contract" },
+                                              "attestation-binding": { "displayName": "Attestation Binding" }
+                                          },
+                                          "fields": {}
+                                      },
+                                      "zh": {
+                                          "name": "SpecForge Agent 引导信封模型",
+                                          "description": "面向不可变治理档案修订、有界上下文信封、适配器兼容性和证明绑定的权威模型。",
+                                          "relationships": [
+                                              "一个精确应用服务同一时刻解析一个活动治理档案修订。",
+                                              "一个 L1 信封绑定一个设计变更会话和一个精确 Scope。",
+                                              "一个变更证明绑定一个治理档案摘要和一个设计上下文摘要。"
+                                          ],
+                                          "constraints": [
+                                              "仓库文件不能修改服务端治理档案修订。",
+                                              "L2 读取不能跨越操作者、Scope、会话或引用资产边界。",
+                                              "部分信封必须保留全部阻断规则并暴露续读状态。"
+                                          ],
+                                          "lifecycle": "治理档案修订不可变；分配关系可以移动到新修订，已有证明保留其原始修订和摘要。",
+                                          "lineage": "来自 MCP 编写的治理策略、精确 Scope 设计事实、Context Pack、有类型关系、对账、会话和证明。",
+                                          "entities": {
+                                              "governance-profile-revision": { "displayName": "治理档案修订" },
+                                              "bootstrap-envelope": { "displayName": "引导信封" },
+                                              "context-coverage": { "displayName": "上下文覆盖" },
+                                              "adapter-contract": { "displayName": "适配器契约" },
+                                              "attestation-binding": { "displayName": "证明绑定" }
+                                          },
+                                          "fields": {}
+                                      }
+                                  }
+                              }
+                          },
+                          {
+                              "assetType": "businessRule",
+                              "asset": {
+                                  "id": "rule-specforge-agent-bootstrap-fail-closed",
+                                  "name": "Agent Bootstrap Fail-Closed Rule",
+                                  "description": "Blocks non-trivial work unless the Agent has current exact-Scope governance context, a valid session, converged design state, and enforceable attestation coverage.",
+                                  "code": "SPECFORGE_AGENT_BOOTSTRAP_FAIL_CLOSED",
+                                  "domainId": "domain-specforge-platform",
+                                  "ruleType": "validation",
+                                  "condition": "An Agent or Hook classifies a repository change for an exact application-service Scope.",
+                                  "action": "Require a current Governance Profile, bounded design context, affected-fact coverage, valid Design Change Session, reconciliation, evidence, and matching signed attestation before allowing a governed commit.",
+                                  "exception": "Only deterministic server-policy-approved whitespace, generated-file, non-governance-documentation, or parser-proven comment-only changes may proceed offline; ambiguity remains governed.",
+                                  "examples": [
+                                      "An expired profile digest blocks a code commit even when an adapter file exists.",
+                                      "A whitespace-only change may proceed offline when the active signed policy explicitly permits it."
+                                  ],
+                                  "relatedAssets": [
+                                      { "type": "api", "id": "api-specforge-agent-bootstrap-context", "label": "SpecForge Agent Bootstrap Context Contract" },
+                                      { "type": "dataModel", "id": "data-specforge-agent-bootstrap-envelope", "label": "SpecForge Agent Bootstrap Envelope Model" }
+                                  ],
+                                  "severity": "critical",
+                                  "createdAt": "2026-08-24T00:00:00.000Z",
+                                  "updatedAt": "2026-08-24T00:00:00.000Z",
+                                  "localizedContent": {
+                                      "en": {
+                                          "name": "Agent Bootstrap Fail-Closed Rule",
+                                          "description": "Blocks non-trivial work unless the Agent has current exact-Scope governance context, a valid session, converged design state, and enforceable attestation coverage.",
+                                          "condition": "An Agent or Hook classifies a repository change for an exact application-service Scope.",
+                                          "action": "Require a current Governance Profile, bounded design context, affected-fact coverage, valid Design Change Session, reconciliation, evidence, and matching signed attestation before allowing a governed commit.",
+                                          "exception": "Only deterministic server-policy-approved whitespace, generated-file, non-governance-documentation, or parser-proven comment-only changes may proceed offline; ambiguity remains governed.",
+                                          "examples": [
+                                              "An expired profile digest blocks a code commit even when an adapter file exists.",
+                                              "A whitespace-only change may proceed offline when the active signed policy explicitly permits it."
+                                          ]
+                                      },
+                                      "zh": {
+                                          "name": "Agent 引导失败关闭规则",
+                                          "description": "除非 Agent 拥有当前精确 Scope 治理上下文、有效会话、已收敛设计状态和可执行证明覆盖，否则阻止非平凡工作。",
+                                          "condition": "Agent 或 Hook 为精确应用服务 Scope 分类仓库变更。",
+                                          "action": "允许受治理提交前，要求当前治理档案、有界设计上下文、受影响事实覆盖、有效设计变更会话、对账、证据和匹配的签名证明。",
+                                          "exception": "仅服务端策略批准且可确定验证的空白、生成文件、非治理文档或解析器证明的纯注释变更可离线继续；歧义仍按受治理处理。",
+                                          "examples": [
+                                              "即使适配器文件存在，治理档案摘要过期仍会阻止代码提交。",
+                                              "活动签名策略明确允许时，纯空白变更可以离线继续。"
+                                          ]
+                                      }
+                                  }
+                              }
+                          }
+                      ],
+                      "managedRelationships": [
+                          { "sourceType": "api", "sourceId": "api-specforge-agent-bootstrap-context", "targetType": "dataModel", "targetId": "data-specforge-agent-bootstrap-envelope", "relationType": "READS" },
+                          { "sourceType": "businessRule", "sourceId": "rule-specforge-agent-bootstrap-fail-closed", "targetType": "api", "targetId": "api-specforge-agent-bootstrap-context", "relationType": "GOVERNS" },
+                          { "sourceType": "businessRule", "sourceId": "rule-specforge-agent-bootstrap-fail-closed", "targetType": "dataModel", "targetId": "data-specforge-agent-bootstrap-envelope", "relationType": "GOVERNS" },
+                          { "sourceType": "proposal", "sourceId": "proposal-agent-bootstrap-governance", "targetType": "api", "targetId": "api-specforge-agent-bootstrap-context", "relationType": "IMPACTS" }
+                      ],
+                      "owner": "SpecForge Architecture and Enterprise Integration",
+                      "status": "Accepted design; MCP synchronization and read-back complete; implementation remains a separate governed step",
+                      "reason": "Provider-specific prompt files cannot guarantee that every coding Agent reads current exact-Scope governance and task-relevant design intent before changing code.",
+                      "retryTrigger": "After the written spec is reviewed, open a new exact-Scope implementation session and deliver the profile, APIs, CLI adapters, Hook bindings, tests, and MCP evidence as separate tasks.",
+                      "localizedContent": {
+                          "en": {
+                              "decision": "Reuse .specforge.yaml and the existing preflight/attestation lifecycle; add MCP-authoritative Governance Profiles, bounded L0/L1/L2 context, thin versioned Agent adapters, and fail-closed proof of the context used.",
+                              "constraints": ["One operation targets one exact Scope.", "Repository prompts cannot override MCP policy.", "Non-trivial offline work is forbidden."]
+                          },
+                          "zh": {
+                              "decision": "复用 .specforge.yaml 与现有预检/证明生命周期；新增 MCP 权威治理档案、有界 L0/L1/L2 上下文、轻量版本化 Agent 适配器，以及对实际采用上下文的失败关闭证明。",
+                              "constraints": ["一次操作只面向一个精确 Scope。", "仓库 Prompt 不能覆盖 MCP 策略。", "禁止离线进行非平凡工作。"]
+                          }
+                      },
+                      "evidence": [
+                          { "command": "User design review", "result": "Approved the provider-neutral bootstrap, layered MCP context, local enforcement, and fail-closed policy for non-trivial changes." },
+                          { "command": "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Design-provider-neutral-Agent-bootstrap-and-layered-governance-context-discovery-for-external-coding-tools --affected adr-design-context-preflight-gate,adr-local-git-hook-change-attestation,api-specforge-mcp-tools,context-pack-design-context-preflight-gate --evidence user-approved-fail-closed-bootstrap-direction,existing-ADR-0016-and-ADR-0017-review", "result": "Opened exact-Scope design-change-session:0e4fcc3b-05f0-4358-8cd0-845484229433 after reading the current scoped catalog and relationships." },
+                          { "command": "pnpm exec vitest run scripts/design-fact-manifest.test.ts --exclude .worktrees/** --exclude .pnpm-store/**", "result": "Passed the complete manifest suite after refreshing stale committed 3A wording assertions to match the canonical six-mappings and bounded-Overview baseline." },
+                          { "command": "SPECFORGE_DESIGN_FACT_IDS=adr-provider-neutral-agent-bootstrap-governance pnpm design-facts:sync; pnpm design-facts:check", "result": "Passed: the exact-Scope ADR, Proposal, Context Pack, three managed assets, typed relationships, and evidence synchronized and read back with no missing, mismatched, out-of-Scope, or blocked facts." }
+                      ]
+                  },
+                  {
                       "id":  "adr-expressive-web-design-system",
                       "repositoryAdr":  "docs/adr/0038-expressive-web-design-system.md",
                       "mcpAdrId":  "adr-expressive-web-design-system",
