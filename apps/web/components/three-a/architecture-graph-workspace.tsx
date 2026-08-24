@@ -62,6 +62,11 @@ export function ArchitectureGraphWorkspace({ state, identity, generationId, init
             setDataSource("architecture-unit-projection");
             setAnalysisAvailability(result.analysisAvailability);
             store.mergeOverview(unitOverview);
+            // Bold-by-default canvas: layer the governed fact assertions and their typed
+            // relationships on top of the unit skeleton so the graph shows breadth without
+            // requiring one-click-per-node exploration. mergeOverview dedupes stable ids.
+            const factOverview = fallbackOverview(identity, fallbackNodes, fallbackEdges);
+            if (factOverview.nodes.length) store.mergeOverview(factOverview, "overview-facts");
           }
         } else if (graphView === "impact" && state.focus) {
           const result = await runImpactArchitectureQuery({ operation: "impact", scope: identity.scope, baselineId: identity.baselineId, projectionManifestId: identity.projectionManifestId, focusAssertionId: state.focus, direction: state.direction, layers, relationTypes, budget: { maxNodes: 150, maxEdges: 300, maxPaths: 100, timeoutMs: 3_000, maxPayloadBytes: 1_048_576 } }, controller.signal);
@@ -193,9 +198,9 @@ export function unitNeighborhoodOverview(result: ArchitectureUnitNeighborhoodRes
 function fallbackOverview(identity: ThreeAQueryIdentity, nodes: readonly KnowledgeProjectionNode[], edges: readonly KnowledgeProjectionEdge[]): OverviewArchitectureResult {
   const scope = scopeById(identity.scope);
   const scopePath = scope?.scopePath ?? identity.scope;
-  const summaryNodes: GraphSummaryNode[] = nodes.slice(0, 250).map((node, index) => ({ applicationServiceId: identity.scope, scopePath, id: node.assertionId, kind: "fact", label: node.semanticIdentity, layer: node.layer, clusterId: node.layer, memberCount: 1, degree: 0, criticality: 0, positionSeed: { x: Math.cos(index), y: Math.sin(index) }, assertionId: node.assertionId }));
+  const summaryNodes: GraphSummaryNode[] = nodes.slice(0, 600).map((node, index) => ({ applicationServiceId: identity.scope, scopePath, id: node.assertionId, kind: "fact", label: node.semanticIdentity, layer: node.layer, clusterId: node.layer, memberCount: 1, degree: 0, criticality: 0, positionSeed: { x: Math.cos(index), y: Math.sin(index) }, assertionId: node.assertionId }));
   const ids = new Set(summaryNodes.map((node) => node.assertionId));
-  const summaryEdges: GraphSummaryEdge[] = edges.filter((edge) => ids.has(edge.sourceAssertionId) && ids.has(edge.targetAssertionId)).slice(0, 500).map((edge) => ({ applicationServiceId: identity.scope, scopePath, id: edge.relationshipIdentity, sourceId: edge.sourceAssertionId, targetId: edge.targetAssertionId, relationCode: edge.relationCode, confidence: edge.confidence, bridge: true }));
+  const summaryEdges: GraphSummaryEdge[] = edges.filter((edge) => ids.has(edge.sourceAssertionId) && ids.has(edge.targetAssertionId)).slice(0, 1500).map((edge) => ({ applicationServiceId: identity.scope, scopePath, id: edge.relationshipIdentity, sourceId: edge.sourceAssertionId, targetId: edge.targetAssertionId, relationCode: edge.relationCode, confidence: edge.confidence, bridge: true }));
   return { applicationServiceId: identity.scope, scopePath, baselineId: identity.baselineId, projectionManifestId: identity.projectionManifestId, profileId: "fallback", profileVersion: "fallback", relationshipVersion: "fallback", resultDigest: "fallback", nodes: summaryNodes, edges: summaryEdges };
 }
 

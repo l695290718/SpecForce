@@ -18,7 +18,9 @@ interface ClusterCandidate {
 }
 
 const ARCHITECTURE_LAYERS = ["BIZ", "SYS", "TECH"] as const;
-const DEFAULT_VISIBLE_MEMBER_LIMIT = 36;
+// Bold-by-default: sigma stays smooth well past this size, and a wide-open canvas
+// removes the need to click cluster after cluster just to see the governed facts.
+const DEFAULT_VISIBLE_MEMBER_LIMIT = 150;
 
 export function defaultExpandedClusterIds(
   nodes: readonly GraphSemanticNode[],

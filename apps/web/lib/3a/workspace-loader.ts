@@ -131,8 +131,8 @@ export async function loadThreeAWorkspaceData(
     }
     if (!state.focus) {
       const [layers, alignment] = await Promise.all([
-        Promise.all((["BIZ", "SYS", "TECH"] as const).map(async (layer) => [layer, await service.searchArchitectureFacts({ ...queryIdentity, layer, limit: 84 })] as const)),
-        service.getArchitectureAlignment({ ...queryIdentity, limit: 500 })
+        Promise.all((["BIZ", "SYS", "TECH"] as const).map(async (layer) => [layer, await service.searchArchitectureFacts({ ...queryIdentity, layer, limit: 200 })] as const)),
+        service.getArchitectureAlignment({ ...queryIdentity, limit: 1200 })
       ]);
       return { ...base, initialCatalog: Object.fromEntries(layers) as LayerPages, initialGraphEdges: alignment.edges };
     }

@@ -53,10 +53,10 @@ describe("loadThreeAWorkspaceData", () => {
     const service = serviceMock();
     const result = await loadThreeAWorkspaceData(service, request, state({ mode: "graph", focus: undefined }));
     expect(service.searchArchitectureFacts).toHaveBeenCalledTimes(3);
-    expect(service.searchArchitectureFacts).toHaveBeenCalledWith(expect.objectContaining({ layer: "BIZ", limit: 84 }));
-    expect(service.searchArchitectureFacts).toHaveBeenCalledWith(expect.objectContaining({ layer: "SYS", limit: 84 }));
-    expect(service.searchArchitectureFacts).toHaveBeenCalledWith(expect.objectContaining({ layer: "TECH", limit: 84 }));
-    expect(service.getArchitectureAlignment).toHaveBeenCalledWith(expect.objectContaining({ limit: 500 }));
+    expect(service.searchArchitectureFacts).toHaveBeenCalledWith(expect.objectContaining({ layer: "BIZ", limit: 200 }));
+    expect(service.searchArchitectureFacts).toHaveBeenCalledWith(expect.objectContaining({ layer: "SYS", limit: 200 }));
+    expect(service.searchArchitectureFacts).toHaveBeenCalledWith(expect.objectContaining({ layer: "TECH", limit: 200 }));
+    expect(service.getArchitectureAlignment).toHaveBeenCalledWith(expect.objectContaining({ limit: 1200 }));
     expect(result.initialGraphEdges).toHaveLength(1);
     expect(service.traceArchitecturePath).not.toHaveBeenCalled();
   });

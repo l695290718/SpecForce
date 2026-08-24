@@ -247,7 +247,14 @@ export function SigmaArchitectureGraph({ store, view, layoutMode, selectedId, re
   callbacksRef.current = { onNodeSelect, onNodeHover, onStageClick, onEdgeSelect, onRendererFailure, onRendererReady, onControllerReady, onLayoutLifecycleChange };
   semanticStateRef.current = semanticState;
   const graphShape = `${store.graph.order}:${store.graph.size}`;
-  const layoutRequest = useMemo(() => createLayoutRequest(store, view, layoutMode, reducedMotion, visibleNodeIds, visibleEdgeIds), [store, view, layoutMode, reducedMotion, graphShape, visibleNodeIds, visibleEdgeIds]);
+  // Selection bumps the workspace version and re-derives visibility Sets with identical
+  // contents; keying the layout request on content (not Set identity) keeps a pure node
+  // selection from restarting the force-layout supervisor, which read as canvas jitter.
+  const visibleNodesKey = useMemo(() => (visibleNodeIds ? [...visibleNodeIds].sort().join("\n") : ""), [visibleNodeIds]);
+  const visibleEdgesKey = useMemo(() => (visibleEdgeIds ? [...visibleEdgeIds].sort().join("\n") : ""), [visibleEdgeIds]);
+  const layoutRequest = useMemo(() => createLayoutRequest(store, view, layoutMode, reducedMotion, visibleNodeIds, visibleEdgeIds),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- content keys stand in for the Set identities on purpose
+    [store, view, layoutMode, reducedMotion, graphShape, visibleNodesKey, visibleEdgesKey]);
 
   const notifyLayoutLifecycle = (lifecycle: LayoutLifecycle) => {
     layoutLifecycleRef.current = lifecycle;

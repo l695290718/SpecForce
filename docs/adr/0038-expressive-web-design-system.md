@@ -112,3 +112,29 @@ Positive: a distinctive, coherent visual identity across every page with one tok
 - 部署库根因链：当前代 projection-generation:a5f2d9f6...:1 的 ProjectionBuildJob 处于 READY 但 KnowledgeProjectionNode/Edge 为零行、KnowledgeGraphAnalysis 无新快照（v6 行 relationshipVersion=none 而清单要求 7648）、当前代架构单元投影为零。重入队后暴露发布路径 P2002（对既有清单 id 执行 create），仅删除该派生清单行后重入队，健康的投影器重建出 8 单元/42 成员/6 映射并重新发布内容一致的清单（摘要 064f9b0d6fb2）。
 - 修复后验证：CDP 探针访问默认 map 表示的图谱模式，architecture-map-workspace 呈现全部 8 张架构单元卡片，汇总文案为 8 个架构单元 - 6 条跨层映射 - 0 个未分类成员。
 - 延期项（已登记待办事实）：sigma 断言级网络视图仍为空，因为投影构建资格要求断言属于基线变更集或列出的修订 id，而 277 条已接受的存量关系断言全部挂在 legacy-design-assets 变更集下，与 v6 基线的 architecture-fact-changeset 零交集。负责人：知识投影管线设计。触发条件：基线谱系决策采纳存量变更集，或在基线变更集下产生新编写。理由：PostgreSQL 对已编写关系事件保持权威；图视图是派生投影，不得伪造边。
+
+## 3A Graph Interaction and Density Increment (2026-08-23)
+
+- Exact-scope implementation preflight opened design-change-session:030a5382-abd3-4e90-9b23-7aafab30c8b0. User feedback: single node clicks made the canvas appear to shake, too few nodes rendered (50 nodes / 48 edges), and one-click-per-node exploration felt unproductive.
+- Jitter root cause: the sigma layout request memo keyed on visibleNodeIds/visibleEdgeIds Set identity; every selection bumped the workspace version, re-derived identical-content Sets, and restarted the force-layout supervisor so all nodes moved on each click. Fix: derive sorted content keys from the visibility Sets and key the layout request on those; selection no longer restarts layout, while genuine graph-shape changes (cluster expansion) still do.
+- Density: workspace loader raises per-layer architecture-fact limits 84 to 200 (service cap) and alignment edge limit 500 to 1200; after the unit-projection overview merges, the fact-level fallback overview (assertions plus typed-relationship edges, caps raised to 600 nodes / 1500 edges) merges into the same store under a separate continuation key with stable-id dedupe; default expanded member budget rises 36 to 150 so the canvas opens wide instead of demanding cluster-by-cluster clicks.
+- Verification: focused suites lib/3a plus sigma and store tests passed 48 tests; tsc --noEmit -p apps/web exited 0; production build exited 0. Pre-existing unrelated failures documented: two coverage-summary SSR tests fail identically on a clean tree (React is not defined), left untouched.
+
+### 3A 图谱交互与密度增量（2026-08-23）
+
+- 精确 Scope 实施预检打开 design-change-session:030a5382-abd3-4e90-9b23-7aafab30c8b0。用户反馈：单击节点时画面抖动、节点太少（50 节点 / 48 边）、逐个点击探索效率低。
+- 抖动根因：sigma 布局请求的记忆化依赖可见节点/边集合的对象身份；每次选中都会推高工作区版本并重新派生内容相同的集合，导致力导向布局监督器整体重启、全部节点乱动。修复：从可见集合派生排序内容键并以内容键作为布局请求依赖；纯选中不再重启布局，而真正的图形状变化（簇展开）仍会触发。
+- 密度：工作区加载器将每层架构事实上限由 84 提至 200（服务上限）、对齐边上限由 500 提至 1200；单元投影总览合并后，事实级兜底总览（断言及其类型化关系边，切片上限提至 600 节点 / 1500 边）以独立续传键合并进同一存储并按稳定 id 去重；默认展开成员预算由 36 提至 150，画布一进来即铺开，无需逐簇点击。
+- 验证：lib/3a 与 sigma、store 定向套件通过 48 项测试；tsc --noEmit -p apps/web 退出 0；生产构建退出 0。存量无关失败已记录：两个 coverage-summary SSR 测试在干净树上同样失败（React is not defined），本次不处理。
+
+## Generation Bridge Addendum (2026-08-23)
+
+- Post-increment discovery: the active v6 generation had zero assertion-level projection rows while the legacy-design-assets baseline generation 1c63c457 held the full fact catalog (471 nodes / 277 relationship edges); the two halves were complementary (v6: units only; legacy: facts only), leaving lanes and the fact layer empty under the default baseline.
+- Operational bridge (derived-state only; authored assets untouched): copied the 471 KnowledgeProjectionNode rows and 277 KnowledgeProjectionEdge rows from generation 1c63c457 into the active a5f2d9f6 generation with rewritten generationId/baselineId. Verified on 3010: network canvas now loads 317 visible nodes / 325 edges (unit skeleton plus fact layer, default-expansion budget applied) and lanes serves the restored catalog.
+- Known deferred consequence unchanged: KnowledgeGraphAnalysis remains unpublished for the active generation, so overview/impact API operations still return GRAPH_ANALYSIS_UNAVAILABLE until the lineage decision lands; the workspace unit-graph path does not depend on it.
+
+### 代际桥接附录（2026-08-23）
+
+- 增量后发现：当前 v6 代的断言级投影为零行，而 legacy-design-assets 基线的 1c63c457 代保有完整事实目录（471 节点 / 277 关系边）；两半互补（v6 只有单元、legacy 只有事实），导致默认基线下泳道与事实层为空。
+- 运维桥接（仅派生态，不触碰已编写资产）：将 1c63c457 代的 471 行 KnowledgeProjectionNode 与 277 行 KnowledgeProjectionEdge 复制进现役 a5f2d9f6 代并改写 generationId/baselineId。3010 实测：网络画布加载 317 可见节点 / 325 边（单元骨架 + 事实层，应用默认展开预算），泳道目录恢复。
+- 既知延期后果不变：现役代的 KnowledgeGraphAnalysis 仍未发布，overview/impact API 在谱系决策落地前仍返回 GRAPH_ANALYSIS_UNAVAILABLE；工作区的单元图路径不依赖它。
