@@ -2201,6 +2201,43 @@
                       ]
                   },
                   {
+                      "id": "adr-cross-scope-integration-contracts",
+                      "repositoryAdr": "docs/adr/0039-cross-scope-integration-contracts.md",
+                      "mcpAdrId": "adr-cross-scope-integration-contracts",
+                      "scope": {
+                          "applicationServiceId": "com.huawei.celon.desiner",
+                          "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                      },
+                      "proposalId": "proposal-specforge-self-design",
+                      "proposalStatus": "reviewing",
+                      "contextPackId": "ctx-specforge-self-design",
+                      "relatedAssetIds": [
+                          "api-specforge-mcp-tools",
+                          "data-specforge-assets"
+                      ],
+                      "managedRelationships": [],
+                      "owner": "SpecForge Architecture",
+                      "status": "Accepted V1 design; exact-Scope MCP registration and read-back completed before implementation. No integration Atlas feature behavior is claimed.",
+                      "reason": "Cross-Scope integration facts need consumer ownership, target identity, authorization-projected reads, and bounded aggregation before a product surface can be trusted.",
+                      "retryTrigger": "Open independent exact-Scope sessions after ADR registration succeeds; retry any blocked synchronization when the exact Scope catalog accepts this stable ADR ID.",
+                      "localizedContent": {
+                          "en": {
+                              "decision": "Use consumer-owned, target-bound integration facts with independent Scope sessions, authorization-projected reads, and a bounded resumable Atlas.",
+                              "constraints": ["PostgreSQL is authoritative.", "Cross-Scope writes are forbidden.", "The Atlas is a bounded projection, not a complete inventory."]
+                          },
+                          "zh": {
+                              "decision": "采用消费方归属、目标绑定的集成事实、独立 Scope 会话、授权投影读取和有界可续读的 Atlas。",
+                              "constraints": ["PostgreSQL 保持权威。", "禁止跨 Scope 写入。", "Atlas 是有界投影，不是完整清单。"]
+                          }
+                      },
+                      "evidence": [
+                          { "command": "Design review of docs/adr/0039-cross-scope-integration-contracts.md", "result": "Rewritten V1 design closes session ownership, target identity, authorization-redaction, and bounded aggregation gaps; no feature implementation claimed." },
+                          { "command": "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Revise-cross-scope-integration-contract-design --affected adr-cross-scope-integration-contracts --evidence adr-0039-design-review", "result": "MCP synchronization was initially blocked: DESIGN_CONTEXT_FACT_NOT_FOUND before ADR registration." },
+                          { "command": "SPECFORGE_DESIGN_FACT_IDS=adr-cross-scope-integration-contracts pnpm design-facts:sync; pnpm design-facts:check", "result": "Passed: exact-Scope MCP ADR registration completed and reconciliation read-back reported no missing, mismatched, out-of-scope, or blocked facts." },
+                          { "command": "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Finalize-ADR-0039-MCP-registration-evidence-and-implementation-gate --affected adr-cross-scope-integration-contracts,proposal-specforge-self-design,ctx-specforge-self-design --evidence design-facts-sync=complete,design-facts-check=verified", "result": "Opened exact-Scope design-change-session:4c717c05-02ba-43bd-b413-cccd331d5a44 for evidence finalization." }
+                      ]
+                  },
+                  {
                       "id":  "adr-expressive-web-design-system",
                       "repositoryAdr":  "docs/adr/0038-expressive-web-design-system.md",
                       "mcpAdrId":  "adr-expressive-web-design-system",
