@@ -22,7 +22,80 @@ const publication: GraphAnalysisPublication = {
   partialReasons: []
 };
 
+function projectionPublishPrisma(existing: Record<string, unknown> | null, calls: string[]) {
+  const stored = existing ?? {
+    ...manifest,
+    projectionType: "3A",
+    projectionSchemaVersion: job.projectionSchemaVersion,
+    inputDigest: "input",
+    contentDigest: "manifest-digest",
+    nodeCount: 2,
+    edgeCount: 1,
+    publishedAt: new Date(manifest.publishedAt)
+  };
+  const transaction = {
+    projectionBuildJob: {
+      findFirst: async () => ({ status: "BUILDING", leaseOwner: "projector-1" }),
+      update: async () => { calls.push("job-update"); }
+    },
+    knowledgeProjectionNode: { count: async () => 2 },
+    knowledgeProjectionEdge: { count: async () => 1 },
+    projectionManifest: {
+      findUnique: async () => existing,
+      create: async () => { calls.push("manifest-create"); return stored; }
+    },
+    $queryRawUnsafe: async () => [{ count: 0n }]
+  };
+  return { $transaction: async <T>(callback: (value: typeof transaction) => Promise<T>) => callback(transaction) } as unknown as PrismaClient;
+}
+
 describe("graph analysis projection repository", () => {
+  it("creates a projection manifest on first publication", async () => {
+    const calls: string[] = [];
+    const result = await new PrismaProjectionBuildRepository(projectionPublishPrisma(null, calls)).publish(job, "projector-1", {
+      sourceRevisionIds: [], relationshipVersion: "r1", query: {}, inputDigest: "input", contentDigest: "manifest-digest", nodeCount: 2, edgeCount: 1
+    });
+
+    expect(result.id).toBe(manifest.id);
+    expect(calls).toEqual(["manifest-create", "job-update"]);
+  });
+
+  it("reuses an identical projection manifest on retry", async () => {
+    const calls: string[] = [];
+    const result = await new PrismaProjectionBuildRepository(projectionPublishPrisma({
+      ...manifest,
+      projectionType: "3A",
+      projectionSchemaVersion: job.projectionSchemaVersion,
+      inputDigest: "input",
+      contentDigest: "manifest-digest",
+      nodeCount: 2,
+      edgeCount: 1,
+      publishedAt: new Date(manifest.publishedAt)
+    }, calls)).publish(job, "projector-1", {
+      sourceRevisionIds: [], relationshipVersion: "r1", query: {}, inputDigest: "input", contentDigest: "manifest-digest", nodeCount: 2, edgeCount: 1
+    });
+
+    expect(result.id).toBe(manifest.id);
+    expect(calls).toEqual(["job-update"]);
+  });
+
+  it("rejects a retry whose content differs from the immutable manifest", async () => {
+    const calls: string[] = [];
+    await expect(new PrismaProjectionBuildRepository(projectionPublishPrisma({
+      ...manifest,
+      projectionType: "3A",
+      projectionSchemaVersion: job.projectionSchemaVersion,
+      inputDigest: "input",
+      contentDigest: "old-digest",
+      nodeCount: 2,
+      edgeCount: 1,
+      publishedAt: new Date(manifest.publishedAt)
+    }, calls)).publish(job, "projector-1", {
+      sourceRevisionIds: [], relationshipVersion: "r1", query: {}, inputDigest: "input", contentDigest: "new-digest", nodeCount: 2, edgeCount: 1
+    })).rejects.toThrow("PROJECTION_MANIFEST_IMMUTABLE_CONFLICT");
+    expect(calls).toEqual([]);
+  });
+
   it("rejects a graph analysis publication outside the projection Scope", () => {
     expect(() => validateGraphAnalysisPublication(job, manifest, { ...publication, scope: { ...scope, scopePath: "other/scope" } })).toThrow("GRAPH_ANALYSIS_SCOPE_MISMATCH");
   });

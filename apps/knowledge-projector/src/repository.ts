@@ -346,7 +346,25 @@ export class PrismaProjectionBuildRepository implements ProjectionBuildRepositor
       const dangling = await transaction.$queryRawUnsafe<Array<{ count: bigint }>>(ENDPOINT_CLOSURE_SQL, job.applicationServiceId, job.scopePath, job.generationId);
       if (Number(dangling[0]?.count ?? 0) > 0) throw new Error("PROJECTION_ENDPOINT_CLOSURE_FAILED");
       const publishedAt = new Date();
-      const manifest = await transaction.projectionManifest.create({ data: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, id: `projection-manifest:${job.generationId}`, baselineId: job.baselineId, projectionType: "3A", projectionSchemaVersion: job.projectionSchemaVersion, sourceRevisionIds: result.sourceRevisionIds, relationshipVersion: result.relationshipVersion, query: result.query as Prisma.InputJsonValue, digest: result.contentDigest, generatedAt: publishedAt, profileId: job.profileId, profileVersion: job.profileVersion, generationId: job.generationId, inputDigest: result.inputDigest, contentDigest: result.contentDigest, nodeCount, edgeCount, publishedAt } });
+      const manifestId = `projection-manifest:${job.generationId}`;
+      const manifestData = { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, id: manifestId, baselineId: job.baselineId, projectionType: "3A" as const, projectionSchemaVersion: job.projectionSchemaVersion, sourceRevisionIds: result.sourceRevisionIds, relationshipVersion: result.relationshipVersion, query: result.query as Prisma.InputJsonValue, digest: result.contentDigest, generatedAt: publishedAt, profileId: job.profileId, profileVersion: job.profileVersion, generationId: job.generationId, inputDigest: result.inputDigest, contentDigest: result.contentDigest, nodeCount, edgeCount, publishedAt };
+      const existing = await transaction.projectionManifest.findUnique({ where: { applicationServiceId_scopePath_id: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, id: manifestId } } });
+      if (existing) {
+        const identical = existing.baselineId === manifestData.baselineId
+          && existing.projectionType === manifestData.projectionType
+          && existing.projectionSchemaVersion === manifestData.projectionSchemaVersion
+          && existing.profileId === manifestData.profileId
+          && existing.profileVersion === manifestData.profileVersion
+          && existing.generationId === manifestData.generationId
+          && existing.inputDigest === manifestData.inputDigest
+          && existing.contentDigest === manifestData.contentDigest
+          && existing.nodeCount === manifestData.nodeCount
+          && existing.edgeCount === manifestData.edgeCount;
+        if (!identical) throw new Error("PROJECTION_MANIFEST_IMMUTABLE_CONFLICT");
+        await transaction.projectionBuildJob.update({ where: { applicationServiceId_scopePath_id: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, id: job.id } }, data: { status: "READY", nodeCount, edgeCount, completedAt: existing.publishedAt, leaseOwner: null, leaseExpiresAt: null } });
+        return manifestFromRow(existing);
+      }
+      const manifest = await transaction.projectionManifest.create({ data: manifestData });
       await transaction.projectionBuildJob.update({ where: { applicationServiceId_scopePath_id: { applicationServiceId: job.applicationServiceId, scopePath: job.scopePath, id: job.id } }, data: { status: "READY", nodeCount, edgeCount, completedAt: publishedAt, leaseOwner: null, leaseExpiresAt: null } });
       return manifestFromRow(manifest);
     });

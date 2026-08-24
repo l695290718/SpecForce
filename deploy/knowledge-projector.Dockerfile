@@ -2,6 +2,10 @@ FROM node:22-bookworm-slim AS builder
 
 WORKDIR /workspace
 
+ARG NPM_REGISTRY=https://registry.npmjs.org
+ENV NPM_CONFIG_REGISTRY=${NPM_REGISTRY}
+ENV COREPACK_NPM_REGISTRY=${NPM_REGISTRY}
+
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/* \

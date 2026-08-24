@@ -99,6 +99,28 @@ This separation keeps PostgreSQL architecture-unit projections authoritative for
 - `pnpm typecheck` exited 0 across core, knowledge-query, knowledge-projector, MCP server, and Web.
 - HTTP read-back: `POST /api/architecture/3a/query` with the v6 identity returned HTTP 200, 8 nodes, 6 edges, and `analysisAvailability=EMPTY`.
 
+## Idempotent Projection Publication Increment (2026-08-24)
+
+The projection publisher now treats `ProjectionManifest` as an immutable, exact-Scope content identity. Before inserting a manifest, it looks up the unique `(applicationServiceId, scopePath, id)` key. An identical retry reuses the existing manifest and marks the build `READY`; a retry with a different baseline, generation, input digest, content digest, profile, schema, or counts fails closed with `PROJECTION_MANIFEST_IMMUTABLE_CONFLICT`. The publisher never overwrites or deletes a published manifest.
+
+This closes the duplicate-publication failure that previously left historical projection jobs in `FAILED` state with Prisma `P2002`. Historical failures remain observable in health diagnostics, so the projector may report `degraded` while the current v6 manifest and build are `READY`. The Web 3A `unitGraph` query remains independently available from the authoritative architecture-unit projection and must return HTTP 200 for the current v6 identity.
+
+### Idempotent Publication Evidence
+
+- Exact-Scope implementation session: `design-change-session:9a29d910-4fca-4c94-beaa-f2fa96fbc512`.
+- `pnpm exec vitest run apps/knowledge-projector/src/repository.test.ts` -> 1 file, 7 tests passed.
+- `pnpm --filter @specforge/knowledge-projector typecheck` -> exit 0.
+- `git diff --check` -> exit 0.
+- `docker build --build-arg NPM_REGISTRY=https://registry.npmmirror.com -f deploy/knowledge-projector.Dockerfile -t deploy-knowledge-projector .` -> exit 0; the projector container was recreated from the image and became healthy.
+- Projector health -> HTTP 200; `failed=4` is historical failure count, while the current v6 build is `READY` and no new duplicate `P2002` was logged after restart.
+- HTTP read-back -> `POST http://localhost:3010/api/architecture/3a/query` with the exact v6 Scope, Baseline, Manifest, and Generation returned HTTP 200, `availability=READY`, `source=ARCHITECTURE_UNIT_PROJECTION`, and BIZ/SYS/TECH unit/member data.
+
+### 幂等投影发布增量（2026-08-24）
+
+投影发布器现在把 `ProjectionManifest` 视为精确 Scope 下不可变的内容身份。写入前先按唯一键 `(applicationServiceId, scopePath, id)` 查询：完全相同的重试复用已有 Manifest 并将构建标记为 `READY`；Baseline、Generation、输入摘要、内容摘要、Profile、Schema 或计数不同的重试以 `PROJECTION_MANIFEST_IMMUTABLE_CONFLICT` 失败关闭。发布器不会覆盖或删除已发布 Manifest。
+
+这修复了此前重复发布导致 Prisma `P2002`、历史投影任务进入 `FAILED` 的问题。历史失败仍会在健康诊断中保留，因此投影器可能显示 `degraded`，但当前 v6 Manifest 和构建已经是 `READY`。3A Web 的 `unitGraph` 仍直接读取权威架构单元投影；当前 v6 的精确身份请求必须返回 HTTP 200。
+
 ## Implemented v5 Membership Expansion
 
 The approved v5 design is implemented as a conservative membership-only increment. It preserves the 4 v4 units and 3 mappings, adds exactly 10 directly evidenced facts to the existing MCP governance gateway, and publishes 38 memberships in a complete immutable snapshot. v4 remains immutable and published as the prior Baseline.
