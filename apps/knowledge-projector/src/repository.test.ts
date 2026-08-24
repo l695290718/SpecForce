@@ -50,6 +50,32 @@ function projectionPublishPrisma(existing: Record<string, unknown> | null, calls
 }
 
 describe("graph analysis projection repository", () => {
+  it("does not report historical failures superseded by a later ready projection", async () => {
+    let healthSql = "";
+    const prisma = {
+      $queryRawUnsafe: async (sql: string) => {
+        healthSql = sql;
+        return [{ queued: 0, building: 0, failed: 0, oldest_queued_age_seconds: null, last_published_at: new Date("2026-08-23T09:33:43.430Z") }];
+      }
+    } as unknown as PrismaClient;
+
+    const result = await new PrismaProjectionBuildRepository(prisma).health(scope, new Date("2026-08-24T00:00:00.000Z"));
+
+    expect(result).toMatchObject({ status: "ok", code: "OK", failed: 0 });
+    expect(healthSql).toContain("COUNT(DISTINCT \"buildKey\")");
+    expect(healthSql).toContain("ready.status = 'READY'");
+  });
+
+  it("keeps health degraded when an unresolved build failure remains", async () => {
+    const prisma = {
+      $queryRawUnsafe: async () => [{ queued: 0, building: 0, failed: 1, oldest_queued_age_seconds: null, last_published_at: null }]
+    } as unknown as PrismaClient;
+
+    const result = await new PrismaProjectionBuildRepository(prisma).health(scope, new Date("2026-08-24T00:00:00.000Z"));
+
+    expect(result).toMatchObject({ status: "degraded", code: "PROJECTION_BUILDS_FAILED", failed: 1 });
+  });
+
   it("creates a projection manifest on first publication", async () => {
     const calls: string[] = [];
     const result = await new PrismaProjectionBuildRepository(projectionPublishPrisma(null, calls)).publish(job, "projector-1", {

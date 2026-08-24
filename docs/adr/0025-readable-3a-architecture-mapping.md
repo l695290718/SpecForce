@@ -121,6 +121,14 @@ This closes the duplicate-publication failure that previously left historical pr
 
 这修复了此前重复发布导致 Prisma `P2002`、历史投影任务进入 `FAILED` 的问题。历史失败仍会在健康诊断中保留，因此投影器可能显示 `degraded`，但当前 v6 Manifest 和构建已经是 `READY`。3A Web 的 `unitGraph` 仍直接读取权威架构单元投影；当前 v6 的精确身份请求必须返回 HTTP 200。
 
+## Projection Health Supersession Increment (2026-08-24)
+
+Projection health now reports unresolved failures rather than every historical failed attempt. Failed jobs are counted once per `buildKey` only when no later `READY` job exists in the same exact Scope, profile, profile version, and projection schema. This preserves a degraded signal for a genuinely current failed build while allowing a later successful Baseline publication to clear an obsolete failure signal. The health endpoint remains diagnostic; 3A read availability is still determined by the exact Baseline/Manifest/Generation-bound query.
+
+### 投影健康状态替代规则增量（2026-08-24）
+
+投影健康状态现在只报告尚未解决的失败，而不是永久累计所有历史失败尝试。仅当同一精确 Scope、Profile、Profile 版本和投影 Schema 下不存在后续 `READY` 构建时，失败才会按 `buildKey` 计数。这样真正当前的失败仍会保持 `degraded`，而后续成功发布的 Baseline 可以清除已经过时的失败信号。健康接口仍是诊断接口；3A 的读取可用性仍由精确绑定 Baseline、Manifest 和 Generation 的查询决定。
+
 ## Implemented v5 Membership Expansion
 
 The approved v5 design is implemented as a conservative membership-only increment. It preserves the 4 v4 units and 3 mappings, adds exactly 10 directly evidenced facts to the existing MCP governance gateway, and publishes 38 memberships in a complete immutable snapshot. v4 remains immutable and published as the prior Baseline.
