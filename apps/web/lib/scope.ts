@@ -26,8 +26,9 @@ export function scopeDatabaseWhere(scope: ResolvedApplicationServiceScope) {
 }
 
 export function buildScopedHref(href: string, scopeId: string): string {
-  const separator = href.includes("?") ? "&" : "?";
-  return `${href}${separator}scope=${encodeURIComponent(scopeId)}`;
+  const url = new URL(href, "http://specforge.local");
+  url.searchParams.set("scope", scopeId);
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 function localDevelopmentPrincipal(): ScopedPrincipal {

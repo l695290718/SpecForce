@@ -8,6 +8,7 @@ import { LanguageSwitcher, T } from "./language-provider";
 import { ArchitectureScopeSwitcher } from "./architecture-scope-switcher";
 import type { MessageKey } from "../lib/i18n";
 import type { ResolvedApplicationServiceScope } from "../lib/scope";
+import { buildScopedHref } from "../lib/scope";
 
 const assetLinks = [
   ["nav.domains", "/assets/domains"],
@@ -18,14 +19,15 @@ const assetLinks = [
   ["nav.stateMachines", "/assets/state-machines"],
   ["nav.integrations", "/assets/integrations"],
   ["nav.quality", "/assets/quality"],
-  ["nav.observability", "/assets/observability"]
+  ["nav.observability", "/assets/observability"],
+  ["nav.briefing", "/governance/briefing"]
 ] as const;
 
 export function AppShell({ children, readableScopes }: { children: ReactNode; readableScopes: ResolvedApplicationServiceScope[] }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const scope = searchParams.get("scope");
-  const withScope = (href: string) => scope ? `${href}${href.includes("?") ? "&" : "?"}scope=${encodeURIComponent(scope)}` : href;
+  const withScope = (href: string) => scope ? buildScopedHref(href, scope) : href;
 
   return (
     <div className="min-h-screen bg-surface">
@@ -54,7 +56,7 @@ export function AppShell({ children, readableScopes }: { children: ReactNode; re
           </button>
         </div>
         <nav className="space-y-1 text-sm">
-          <NavItem href="/" icon={<Home size={16} />} isActive={pathname === "/"} labelKey="nav.overview" />
+          <NavItem href={withScope("/")} icon={<Home size={16} />} isActive={pathname === "/"} labelKey="nav.overview" />
           <NavItem href={withScope("/workspace")} icon={<LayoutDashboard size={16} />} isActive={pathname === "/workspace"} labelKey="nav.workspace" />
           <NavItem href={withScope("/architecture/3a")} icon={<Waypoints size={16} />} isActive={pathname.startsWith("/architecture/3a")} labelKey="nav.threeA" />
           <div className="px-3 pt-4 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500"><T k="nav.designAssets" /></div>
