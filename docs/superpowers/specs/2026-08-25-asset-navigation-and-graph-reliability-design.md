@@ -90,3 +90,17 @@ The graph page and `/api/graph` must return a usable empty/partial graph or a lo
 - 新增 App Router 全局 `apps/web/app/loading.tsx`，提供可访问状态区、旋转加载图标、骨架屏和双语文案 `nav.loading`，覆盖工作台、设计资产、ADR、提案、上下文包、关系图谱及详情路由。
 - Web 类型检查、生产构建、Scope 链接回归测试和 3010 Docker 重建均通过；重建后点击事件契约可到达目标 URL，约 472ms，未发现新的浏览器或 Web 容器错误。
 - 精确 Scope 会话 `design-change-session:0731c44d-0e48-4769-8815-67161acab752` 已通过 MCP 回读并以 `CONVERGED` 关闭。
+
+### Persistent navigation progress increment (2026-08-26)
+
+- Browser verification showed the three requested links reached their exact scoped routes, but client transitions took approximately 3.08–3.12 seconds even though direct HTTP responses remained healthy. The missing feedback was in the persistent navigation shell, not in asset data or authorization.
+- `apps/web/components/app-shell.tsx` now uses `useTransition` and `router.push` for internal navigation. The top progress bar and bilingual status pill are bound to the transition pending state; same-URL clicks still only restore scroll position. The existing App Router fallback remains as a second loading boundary.
+- Web typecheck passed; the rebuilt 3010 Docker topology passed `/healthz`; Data Models, API Contracts, and Business Rules each reached their scoped URLs with HTTP 200 and no new Web-container errors.
+- Exact-scope session `design-change-session:49a60f44-eb7a-4694-b716-de2a3ce049c3` was closed as `CONVERGED` after MCP readback.
+
+### 常驻导航进度增量（2026-08-26）
+
+- 三个入口均可到达精确 Scope 路由，但浏览器端切换约需 3.08–3.12 秒；直接 HTTP 请求健康，问题是导航壳没有持续反馈。
+- `apps/web/components/app-shell.tsx` 改为使用 `useTransition` 和 `router.push` 管理内部导航，顶部进度条和双语状态提示直接绑定 pending 状态；点击当前页面仍只回到顶部。原有 App Router 加载边界继续保留。
+- Web 类型检查、3010 Docker 重建、健康检查和三个目标路由验证均通过，未发现新的 Web 容器错误。
+- 精确 Scope 会话 `design-change-session:49a60f44-eb7a-4694-b716-de2a3ce049c3` 已通过 MCP 回读并以 `CONVERGED` 关闭。

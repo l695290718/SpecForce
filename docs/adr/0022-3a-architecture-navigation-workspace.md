@@ -206,3 +206,8 @@ Web 和 MCP 复用新的查询包。每个请求必须先解析标准化 `Scoped
 - Direct endpoint checks were healthy (`200`, approximately 64–261ms); the perceived click failure came from a browser-side transition with no pending feedback, not from an unavailable asset API.
 - The Web App Router now exposes a global accessible loading fallback at `apps/web/app/loading.tsx`, with bilingual status copy and skeleton content for slow transitions. It does not alter Scope authorization, API contracts, or authored data.
 - Session `design-change-session:0731c44d-0e48-4769-8815-67161acab752` closed as `CONVERGED` after Web typecheck, production build, Scope-link regression, Docker rebuild, HTTP route checks, and browser click verification.
+
+### Persistent navigation progress increment (2026-08-26)
+
+- The persistent AppShell now uses React `useTransition` with `router.push` for scoped internal navigation, so a slow client transition exposes an immediate top progress bar and bilingual status pill. Same-URL navigation keeps the existing scroll-to-top behavior.
+- Data Models, API Contracts, and Business Rules all reached their scoped routes after the rebuilt 3010 deployment; browser transitions measured approximately 3.08–3.12 seconds, while direct HTTP endpoints remained healthy. Session `design-change-session:49a60f44-eb7a-4694-b716-de2a3ce049c3` closed as `CONVERGED`.

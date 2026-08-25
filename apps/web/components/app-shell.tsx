@@ -1,9 +1,9 @@
 "use client";
 
-import { Activity, Boxes, ClipboardList, FileCode2, Home, LayoutDashboard, ListChecks, Network, Search, Settings, Waypoints } from "lucide-react";
+import { Activity, Boxes, ClipboardList, FileCode2, Home, LayoutDashboard, ListChecks, LoaderCircle, Network, Search, Settings, Waypoints } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTransition, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { LanguageSwitcher, T } from "./language-provider";
 import { ArchitectureScopeSwitcher } from "./architecture-scope-switcher";
 import type { MessageKey } from "../lib/i18n";
@@ -25,9 +25,18 @@ const assetLinks = [
 
 export function AppShell({ children, readableScopes }: { children: ReactNode; readableScopes: ResolvedApplicationServiceScope[] }) {
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const scope = searchParams.get("scope");
   const withScope = (href: string) => scope ? buildScopedHref(href, scope) : href;
+  const [isPending, startTransition] = useTransition();
+  const startNavigation = (href: string) => {
+    if (window.location.pathname + window.location.search === href) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    startTransition(() => router.push(href));
+  };
 
   return (
     <div className="min-h-screen bg-surface">
@@ -56,18 +65,18 @@ export function AppShell({ children, readableScopes }: { children: ReactNode; re
           </button>
         </div>
         <nav className="space-y-1 text-sm">
-          <NavItem href={withScope("/")} icon={<Home size={16} />} isActive={pathname === "/"} labelKey="nav.overview" />
-          <NavItem href={withScope("/workspace")} icon={<LayoutDashboard size={16} />} isActive={pathname === "/workspace"} labelKey="nav.workspace" />
-          <NavItem href={withScope("/architecture/3a")} icon={<Waypoints size={16} />} isActive={pathname.startsWith("/architecture/3a")} labelKey="nav.threeA" />
+          <NavItem href={withScope("/")} icon={<Home size={16} />} isActive={pathname === "/"} labelKey="nav.overview" onNavigate={startNavigation} />
+          <NavItem href={withScope("/workspace")} icon={<LayoutDashboard size={16} />} isActive={pathname === "/workspace"} labelKey="nav.workspace" onNavigate={startNavigation} />
+          <NavItem href={withScope("/architecture/3a")} icon={<Waypoints size={16} />} isActive={pathname.startsWith("/architecture/3a")} labelKey="nav.threeA" onNavigate={startNavigation} />
           <div className="px-3 pt-4 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500"><T k="nav.designAssets" /></div>
-          {assetLinks.map(([labelKey, href]) => <NavItem href={withScope(href)} icon={<Boxes size={16} />} isActive={pathname.startsWith(href)} key={href} labelKey={labelKey} />)}
-          <NavItem href={withScope("/assets/adrs")} icon={<FileCode2 size={16} />} isActive={pathname.startsWith("/assets/adrs")} labelKey="nav.adrs" />
+          {assetLinks.map(([labelKey, href]) => <NavItem href={withScope(href)} icon={<Boxes size={16} />} isActive={pathname.startsWith(href)} key={href} labelKey={labelKey} onNavigate={startNavigation} />)}
+          <NavItem href={withScope("/assets/adrs")} icon={<FileCode2 size={16} />} isActive={pathname.startsWith("/assets/adrs")} labelKey="nav.adrs" onNavigate={startNavigation} />
           <div className="px-3 pt-4 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500"><T k="nav.workflows" /></div>
-          <NavItem href={withScope("/proposals")} icon={<ClipboardList size={16} />} isActive={pathname.startsWith("/proposals")} labelKey="nav.proposals" />
-          <NavItem href={withScope("/context-packs")} icon={<Activity size={16} />} isActive={pathname.startsWith("/context-packs")} labelKey="nav.contextPacks" />
-          <NavItem href={withScope("/graph")} icon={<Network size={16} />} isActive={pathname.startsWith("/graph")} labelKey="nav.graph" />
-          <NavItem href={withScope("/governance/checks")} icon={<ListChecks size={16} />} isActive={pathname.startsWith("/governance")} labelKey="nav.governance" />
-          <NavItem href={withScope("/settings")} icon={<Settings size={16} />} isActive={pathname.startsWith("/settings")} labelKey="nav.settings" />
+          <NavItem href={withScope("/proposals")} icon={<ClipboardList size={16} />} isActive={pathname.startsWith("/proposals")} labelKey="nav.proposals" onNavigate={startNavigation} />
+          <NavItem href={withScope("/context-packs")} icon={<Activity size={16} />} isActive={pathname.startsWith("/context-packs")} labelKey="nav.contextPacks" onNavigate={startNavigation} />
+          <NavItem href={withScope("/graph")} icon={<Network size={16} />} isActive={pathname.startsWith("/graph")} labelKey="nav.graph" onNavigate={startNavigation} />
+          <NavItem href={withScope("/governance/checks")} icon={<ListChecks size={16} />} isActive={pathname.startsWith("/governance")} labelKey="nav.governance" onNavigate={startNavigation} />
+          <NavItem href={withScope("/settings")} icon={<Settings size={16} />} isActive={pathname.startsWith("/settings")} labelKey="nav.settings" onNavigate={startNavigation} />
         </nav>
       </aside>
       <main className="lg:pl-72">
@@ -79,7 +88,7 @@ export function AppShell({ children, readableScopes }: { children: ReactNode; re
             </div>
             <nav aria-label="Quick navigation" className="flex items-center gap-1 text-xs font-semibold text-slate-500 lg:hidden">
               {([["nav.overview", "/"], ["nav.workspace", "/workspace"], ["nav.threeA", "/architecture/3a"], ["nav.dataModels", "/assets/data-models"], ["nav.governance", "/governance/checks"]] as const).map(([labelKey, href]) => (
-                <Link key={href} className={`rounded-md px-2 py-1.5 transition hover:bg-slate-900/[0.05] hover:text-ink ${pathname === href ? "bg-slate-900/[0.06] text-accent" : ""}`} href={withScope(href)}><T k={labelKey} /></Link>
+                <Link key={href} className={`rounded-md px-2 py-1.5 transition hover:bg-slate-900/[0.05] hover:text-ink ${pathname === href ? "bg-slate-900/[0.06] text-accent" : ""}`} href={withScope(href)} onClick={(event) => { event.preventDefault(); startNavigation(withScope(href)); }}><T k={labelKey} /></Link>
               ))}
             </nav>
             <div className="flex min-w-0 items-center gap-3">
@@ -91,15 +100,21 @@ export function AppShell({ children, readableScopes }: { children: ReactNode; re
         </div>
         <div className="mx-auto max-w-7xl px-5 py-6 lg:px-8">{children}</div>
       </main>
+      {isPending ? <div aria-busy="true" aria-live="polite" className="pointer-events-none fixed inset-x-0 top-0 z-50" role="status"><div className="h-1 animate-pulse bg-gradient-to-r from-blue-500 via-violet-500 to-blue-500" /><div className="absolute right-4 top-3 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-lg backdrop-blur"><LoaderCircle className="animate-spin text-accent" size={14} aria-hidden="true" /><T k="nav.loading" /></div></div> : null}
     </div>
   );
 }
 
-function NavItem({ href, icon, isActive, labelKey }: { href: string; icon: ReactNode; isActive: boolean; labelKey: MessageKey }) {
+function NavItem({ href, icon, isActive, labelKey, onNavigate }: { href: string; icon: ReactNode; isActive: boolean; labelKey: MessageKey; onNavigate?: (href: string) => void }) {
   const handleClick = (event: ReactMouseEvent<HTMLAnchorElement>) => {
     if (window.location.pathname + window.location.search === href) {
       event.preventDefault();
       window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (onNavigate) {
+      event.preventDefault();
+      onNavigate(href);
     }
   };
   if (isActive) {
