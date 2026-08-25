@@ -240,6 +240,13 @@ PostgreSQL 继续作为已编写事实和关系事件的权威存储。图谱摘
 - GitNexus 风格实现会话 `design-change-session:b4d9e57e-5a45-4b44-b581-dc94e2116752` 已关闭为 `BLOCKED`，唯一原因是现有 In-app Browser 标签页无法执行真正的强制刷新；重试触发条件是对精确 Scope 的新标签页执行视觉验收，检查新控件和交互。
 - `pnpm design-facts:sync` 返回 `complete`；`SPECFORGE_DESIGN_FACT_IDS=adr-webgl-3a-graph-exploration pnpm design-facts:check` 返回 `missing=[]`、`mismatched=[]`、`outOfScope=[]`、`blocked=[]`。
 
+### Scoped graph reliability repair (2026-08-25)
+
+- The graph read boundary now treats omitted, null, or malformed legacy `relatedAssets` and `impactedAssets` collections as empty typed reference lists. Authored PostgreSQL payloads are not rewritten and Scope isolation is unchanged.
+- The exact-scope implementation session `design-change-session:124680b6-c9b7-4a8a-ac13-ce305d806e3a` closed as `CONVERGED` after MCP readback, focused regression tests, Core/Web type checks, and Docker verification.
+- `pnpm exec vitest run packages/core/src/__tests__/core.test.ts apps/web/lib/__tests__/scope-links.test.ts apps/web/lib/__tests__/derived-routes.test.ts` passed with 35 files and 198 tests. `GET /api/graph?scope=com.huawei.celon.desiner` returned HTTP 200 with 331 nodes and 742 edges on the rebuilt `http://localhost:3010` service; no new Web graph exception was observed.
+- The implementation evidence is recorded in `docs/superpowers/specs/2026-08-25-asset-navigation-and-graph-reliability-design.md`.
+
 ### 持续 ForceAtlas2 Supervisor 增量（2026-08-13）
 
 - 精确 Scope 实施预检在 `com.huawei.celon.desiner` 打开 `design-change-session:42c82e52-5b6f-460a-9675-b95c8cde75cc`，读取 280 个 Scope 内资产，返回设计上下文摘要 `a8a7aa57e3cfbf9efc34c4403aab665553b02cbfa2587d37c4347d753754ce33` 与关系摘要 `ddb816e608c662842db21fedc5db5ab37cec0069e51cf022c8bccc54b9448bc1`；对账状态为 `UNVERIFIED`，未阻塞。

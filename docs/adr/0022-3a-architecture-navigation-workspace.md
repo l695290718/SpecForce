@@ -194,3 +194,9 @@ Web 和 MCP 复用新的查询包。每个请求必须先解析标准化 `Scoped
 - 匹配 Context Pack：`ctx-3a-architecture-navigation-workspace`
 - 必需管理资产：`api-specforge-3a-architecture-query`、`data-specforge-3a-projection-read-model`、`rule-specforge-3a-projection-publication`
 - 当前同步状态：实现后的 Proposal、ADR、Context Pack、管理资产、Evidence 和有向类型关系已在精确所属 Scope 完成 MCP 同步与回读；PostgreSQL 集成与浏览器验收已完成，生产身份和 Nebula 3A 仍是延期能力。
+
+### Scoped asset navigation repair (2026-08-25)
+
+- Internal navigation now uses one URL-based Scope helper that replaces the existing `scope` parameter while preserving view, filter, selection, and hash state. Workbench, Event Contracts, Business Rules, Quality Requirements, ADRs, Proposals, Context Packs, and graph detail links remain bound to the selected application service.
+- The exact-scope session `design-change-session:124680b6-c9b7-4a8a-ac13-ce305d806e3a` closed as `CONVERGED` after route tests, Core/Web type checks, Docker route checks, and MCP readback.
+- On `http://localhost:3010`, all affected list pages and sampled detail routes returned HTTP 200 with `scope=com.huawei.celon.desiner`. The implementation evidence is recorded in `docs/superpowers/specs/2026-08-25-asset-navigation-and-graph-reliability-design.md`.
