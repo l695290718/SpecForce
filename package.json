@@ -32,7 +32,9 @@
     "design-context:status": "tsx scripts/design-context.ts status",
     "design-facts:federation:check": "tsx scripts/reconcile-federated-facts.ts",
     "graph-outbox:archive": "tsx scripts/archive-legacy-graph-outbox.ts",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "design:query": "tsx scripts/design-query.mts",
+    "governance:briefing": "tsx scripts/governance-briefing.mts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
