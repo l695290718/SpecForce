@@ -336,6 +336,18 @@ export interface IntegrationContract extends BaseAsset<IntegrationContractLocali
   fallbackStrategy: string;
   circuitBreaker: string;
   owner: string;
+  /** V1 governed fields. Absent means a legacy record that stays target-unresolved. */
+  integrationCallKey?: string;
+  consumerScopeId?: string;
+  targetKind?: "SPEC_FORGE_SCOPE" | "EXTERNAL";
+  protocolKind?: "REST_API" | "GRPC" | "MESSAGE_EVENT" | "FILE" | "UNNORMALIZED";
+  /** Mandatory whenever protocolKind is a normalized value; REST method+path/operationId, gRPC service+method, message direction+topic, file channel+exchange. */
+  protocolLocator?: string;
+  lifecycle?: "ACTIVE" | "DEPRECATED" | "RETIRED";
+  targetResolution?:
+    | { status: "RESOLVED"; providerScopeId: string; targetType: string; targetId: string; revisionLabel: string }
+    | { status: "EXTERNAL"; externalName?: string }
+    | { status: "UNRESOLVED"; reason?: string };
 }
 
 export interface QualityRequirement extends BaseAsset<QualityRequirementLocalizedFields> {

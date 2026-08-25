@@ -95,3 +95,27 @@ Huawei internal landscapes contain many application services that call each othe
 - 设计审查已重写 V1 设计，补齐会话归属、目标身份、授权脱敏和有界聚合缺口；未声明功能实现。
 - ADR 注册前预检曾返回 `DESIGN_CONTEXT_FACT_NOT_FOUND`；随后精确 Scope 清单同步与回读成功，无缺失、错配、越界或阻塞事实，并打开恢复会话 `design-change-session:4c717c05-02ba-43bd-b413-cccd331d5a44`。
 - 实现关闭时必须追加精确 schema 迁移、聚焦 API/查询、授权/脱敏、游标/预算测试、类型检查、构建及浏览器实测；本地测试不推断提供方确认或生产规模。
+
+## Evidence — Implementation Close (2026-08-24, session 4981705f)
+
+Implemented under the Designer-scope preflight `design-change-session:4981705f-958b-4a08-8d2b-81494f82a66f` (web/app increment; no consumer-scope seed writes occurred, so no additional per-scope sessions were required). Commands and results:
+
+- `pnpm --filter @specforge/mcp-server exec vitest run --pool=threads src/tools.integration-v1.test.ts` → **5 passed** (legacy passthrough, incomplete V1 identity rejected, missing locator rejected, incomplete RESOLVED target rejected, complete contract accepted).
+- `node node_modules/vitest/vitest.mjs run --pool=threads lib/integrations` (apps/web) → **6 passed** (explicit empty page, provider redaction with no identity leak, inbound derivation from readable consumers only, legacy record stays UNRESOLVED, MAX_EDGES partial + cursor emitted, tampered cursor rejected).
+- `pnpm exec tsc --noEmit -p apps/web` (repo root) → **exit 0**.
+- `pnpm --filter @specforge/core test` → 7336 passed, 3 failed — the 3 failures are the pre-existing `three-a-workspace` coverage tests (`ReferenceError: React is not defined` at coverage-summary.tsx) that fail on a clean tree; unrelated to this increment.
+- `pnpm --filter @specforge/web build` (SPECFORGE_NEXT_STANDALONE=0) → production build succeeded; dedicated `/assets/integrations` route present in `.next/server/app/assets/integrations`.
+- Deploy: `docker compose build web && docker compose up -d --no-deps --force-recreate web` (deploy/); default web principal grants extended with read on all four application services in `deploy/.env` SPECFORGE_WEB_PRINCIPAL_CLAIMS plus core `defaultHuaweiActor` (write remains designer-only).
+- CDP verification (headless Chrome against http://127.0.0.1:3010/assets/integrations?scope=com.huawei.celon.desiner): title rendered; coverage chips "Scopes inspected: 4 / Contracts scanned: 1 / Restricted targets: 0 / Unresolved targets: 1"; atlas SVG present with protocol-labeled edge; edge click opened the contract drawer (call key, locator placeholder "—", lifecycle ACTIVE); outbound row shows the legacy `integration-specforge-mcp-agent` as UNRESOLVED with locator "—"; no partial banner. Screenshot saved to `.tmp/atlas-verify.png`.
+- MCP sync via `.tmp/upsert-integration-atlas.mts` after fresh dump (guards SHAPE_DRIFT at 15/51 and ALREADY_APPLIED marker "cross-scope integration contracts increment") → Proposal `proposal-specforge-self-design` now **16 specChanges**, Context Pack `ctx-specforge-self-design` now **52 instructions**, both EN canonical + ZH overlays, exact Designer scope.
+
+Honest-state classification per AGENTS.md: **implemented and locally verified** — V1 typed fields, MCP boundary validation, bounded cursor aggregation, authorization redaction logic, integrations page with atlas canvas, four-scope read grants for the default deployment principal. **Deferred (backlog facts, not implemented)** — dual-side registration, reconciliation/drift detection, federation candidate promotion, per-contract versioning UI, and any seeded realistic call facts. No provider confirmation is implied by any edge shown.
+
+**实现关闭证据（2026-08-24，会话 4981705f）：**
+
+- 在 Designer Scope 预检 `design-change-session:4981705f-958b-4a08-8d2b-81494f82a66f` 下完成（Web/应用增量；未发生消费方种子写入，故无需额外按 Scope 会话）。
+- MCP 校验器测试 5 通过；Atlas 聚合测试 6 通过（空态、提供方脱敏零泄露、入向仅来自可读消费方、旧记录保持未解析、MAX_EDGES 截断+游标、篡改游标拒绝）。
+- Web 类型检查 exit 0；生产构建成功且专属路由存在；core 测试除 3 个干净树上同样失败的存量 coverage 用例外全部通过。
+- 部署后 CDP 实测：覆盖芯片"检查 4 个 Scope / 扫描 1 条契约 / 受限 0 / 未解析 1"，画布含协议标注连线，点边打开契约抽屉，出向行显示旧记录 UNRESOLVED 且定位器为"—"，无截断横幅。
+- MCP 同步经守卫后写入：Proposal 16 条 specChanges、Context Pack 52 条 instructions，英文规范 + 中文覆盖，精确 Designer Scope。
+- 状态区分：已实现并本地验证——V1 类型字段、MCP 边界校验、有界游标聚合、授权脱敏、集成页面与图谱画布、默认主体四应用读授权；延期待办——双边登记、对账与漂移检测、联邦候选提升、契约版本化界面、任何仿真调用种子数据。图中任何边均不暗示提供方确认。

@@ -153,8 +153,25 @@ const semanticCandidateSchema = z.object({
   identityDecision: z.enum(["UNMATCHED", "UNAMBIGUOUS", "AMBIGUOUS"])
 });
 
-function assertMatchingApplicationService(input: { applicationServiceId: string; architectureScope: { applicationServiceId: string } }): void {
-  if (input.applicationServiceId !== input.architectureScope.applicationServiceId) {
+/** ADR-0039 V1 guard: an integration contract that claims V1 governance must carry the full stable identity, and a resolved target requires its provider binding plus locator. */
+export function validateIntegrationContractV1(asset: Record<string, unknown>): void {
+  const v1Fields = ["integrationCallKey", "consumerScopeId", "targetKind", "protocolKind", "protocolLocator", "lifecycle", "targetResolution"] as const;
+  const present = v1Fields.filter((field) => asset[field] !== undefined);
+  if (present.length === 0) return; // legacy record: stays unresolved by design
+  const missing = v1Fields.filter((field) => field !== "targetResolution" && field !== "protocolLocator" && asset[field] === undefined);
+  if (missing.length > 0) throw new Error(`INTEGRATION_CONTRACT_V1_INCOMPLETE: missing ${missing.join(", ")}`);
+  const protocolKind = String(asset.protocolKind);
+  const resolution = asset.targetResolution as { status?: string } | undefined;
+  if (protocolKind !== "UNNORMALIZED" && !asset.protocolLocator) throw new Error("INTEGRATION_CONTRACT_LOCATOR_REQUIRED");
+  if (resolution?.status === "RESOLVED") {
+    const required = ["providerScopeId", "targetType", "targetId", "revisionLabel"];
+    const missingProvider = required.filter((field) => !(resolution as Record<string, unknown>)[field]);
+    if (missingProvider.length > 0) throw new Error(`INTEGRATION_CONTRACT_TARGET_INCOMPLETE: missing ${missingProvider.join(", ")}`);
+    if (!asset.protocolLocator) throw new Error("INTEGRATION_CONTRACT_LOCATOR_REQUIRED");
+  }
+}
+
+function assertMatchingApplicationService(input: { applicationServiceId: string; architectureScope: { applicationServiceId: string } }): void {  if (input.applicationServiceId !== input.architectureScope.applicationServiceId) {
     throw new Error("applicationServiceId must match architectureScope.applicationServiceId.");
   }
 }
@@ -209,7 +226,10 @@ export function registerTools(server: McpServer): void {
       permissions: ["asset:write"],
       readOnly: false
     },
-    async (input) => upsertDesignAsset({ ...input, asset: { ...input.asset, architectureScope: input.architectureScope } } as unknown as Parameters<typeof upsertDesignAsset>[0])
+    async (input) => {
+      if (input.assetType === "integration") validateIntegrationContractV1(input.asset);
+      return upsertDesignAsset({ ...input, asset: { ...input.asset, architectureScope: input.architectureScope } } as unknown as Parameters<typeof upsertDesignAsset>[0]);
+    }
   );
 
   registerJsonTool(

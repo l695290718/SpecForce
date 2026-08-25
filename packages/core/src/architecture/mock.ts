@@ -130,6 +130,11 @@ export const defaultHuaweiActor: ScopedActor = {
   grants: [
     { scopeId: "com.huawei.celon.desiner", action: "read" },
     { scopeId: "com.huawei.celon.desiner", action: "write" },
+    // ADR-0039: cross-scope integration facts are read-aggregated across the four real
+    // application services; write stays exact-scope (designer only) by these grants.
+    { scopeId: "com.huawei.celon.integrationgateway", action: "read" },
+    { scopeId: "com.huawei.celon.specstudio", action: "read" },
+    { scopeId: "com.huawei.celon.policyhub", action: "read" },
     { scopeId: "module-celon-designer", action: "read" }
   ]
 };
