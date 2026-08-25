@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted as a V1 design, but not yet accepted for implementation. This ADR was registered and read back through MCP in the exact Designer Scope under `design-change-session:4c717c05-02ba-43bd-b413-cccd331d5a44`. Each later consumer-scope implementation session must independently pass preflight, write its own facts, verify behavior, and close with evidence. No feature behavior is claimed by this ADR.
+Accepted as a V1 design. The Designer-owned Atlas and MCP contract-boundary increment is locally implemented and verified under `design-change-session:bf43d980-f32c-4440-ab35-557390e08c03`, but completion is blocked pending MCP synchronization because the local PostgreSQL service is unavailable. Every later consumer-scope contract write still requires its own exact-Scope session, facts, verification, and closure. Provider acknowledgement, bidirectional reconciliation, scanner ingestion, and automated external apply remain deferred.
 
 ## Context
 
@@ -45,6 +45,12 @@ Huawei internal landscapes contain many application services that call each othe
 - `pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Revise-cross-scope-integration-contract-design --affected adr-cross-scope-integration-contracts --evidence adr-0039-design-review` was blocked with `DESIGN_CONTEXT_FACT_NOT_FOUND` before ADR registration. Retry follows exact-Scope manifest synchronization and read-back.
 - `SPECFORGE_DESIGN_FACT_IDS=adr-cross-scope-integration-contracts pnpm design-facts:sync` completed; `pnpm design-facts:check` read back this ADR with no missing, mismatched, out-of-scope, or blocked facts. The exact-Scope recovery preflight opened `design-change-session:4c717c05-02ba-43bd-b413-cccd331d5a44`.
 - The implementation close must append exact schema migration, focused API/query tests, authorization/redaction tests, cursor/budget tests, typecheck, build, and live browser checks. Provider-confirmation and production-scale evidence are not implied by local tests.
+- `pnpm db:push --accept-data-loss` passed against `localhost:15433/specforge_canonical`; it added only nullable Integration Atlas query projection columns and their Scope-bound indexes/uniqueness constraint, with no duplicate call-key conflict.
+- `pnpm --filter @specforge/mcp-server exec vitest run src/tools.integration-v1.test.ts` passed (5 tests): V1 marker, ownership, source, tuple, and canonical-call-key validation.
+- `pnpm --filter @specforge/web exec vitest run lib/integrations/atlas.test.ts` passed (5 tests): whole-response provider redaction, bounded continuation, cursor tampering/subject/waterline rejection, and readable inbound derivation.
+- `pnpm --filter @specforge/mcp-server typecheck` and `pnpm --filter @specforge/web typecheck` passed. Container rebuild and live-browser verification are required before claiming deployment evidence.
+- Deployment verification is externally blocked: `docker compose --env-file deploy/.env -f deploy/compose.yaml up -d --build --quiet-build` returned `Docker Desktop is unable to start` on 2026-08-25. Retry trigger: Docker Desktop is healthy, then rerun the existing `deploy/scripts/start.ps1` and verify `http://localhost:3010/assets/integrations`.
+- **MCP synchronization blocked:** `SPECFORGE_DESIGN_FACT_IDS=adr-cross-scope-integration-contracts pnpm design-facts:sync` failed with `Can't reach database server at localhost:15433` after Docker Desktop stopped. Owner: deployment operator. Retry trigger: Docker Desktop and the bundled PostgreSQL service are healthy, then rerun design-fact synchronization, reconciliation, and the open session closure. Rationale: SpecForge's MCP write boundary cannot persist authored operational records while its authoritative PostgreSQL store is unavailable.
 
 ## MCP Record
 
@@ -95,6 +101,11 @@ Huawei internal landscapes contain many application services that call each othe
 - 设计审查已重写 V1 设计，补齐会话归属、目标身份、授权脱敏和有界聚合缺口；未声明功能实现。
 - ADR 注册前预检曾返回 `DESIGN_CONTEXT_FACT_NOT_FOUND`；随后精确 Scope 清单同步与回读成功，无缺失、错配、越界或阻塞事实，并打开恢复会话 `design-change-session:4c717c05-02ba-43bd-b413-cccd331d5a44`。
 - 实现关闭时必须追加精确 schema 迁移、聚焦 API/查询、授权/脱敏、游标/预算测试、类型检查、构建及浏览器实测；本地测试不推断提供方确认或生产规模。
+- `pnpm db:push --accept-data-loss` 已在 `localhost:15433/specforge_canonical` 通过；仅新增可空的 Atlas 查询投影列、Scope 索引和调用键唯一约束，未发现重复调用键冲突。
+- MCP V1 校验与 Web Atlas 定向测试各 5 项通过，覆盖 V1 标记、归属/来源、目标元组、规范调用键、整包脱敏、续读及游标绑定。
+- MCP 与 Web 类型检查通过。容器重建和浏览器实测完成前，不得声明部署证据。
+- 部署验证受外部运行时阻塞：Docker Desktop 当前无法启动。恢复后执行既有 `deploy/scripts/start.ps1`，并验证 `http://localhost:3010/assets/integrations`。
+- **MCP 同步被阻塞：** Docker Desktop 停止后，更新 ADR 的 MCP 写入无法连接 `localhost:15433`。负责人为部署运维；恢复 Docker Desktop 与 PostgreSQL 后，重新执行设计事实同步、对账和当前会话关闭。由于权威 PostgreSQL 不可用，当前不得宣称本次变更已完成。
 
 ## Evidence — Implementation Close (2026-08-24, session 4981705f)
 

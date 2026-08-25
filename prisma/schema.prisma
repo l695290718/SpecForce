@@ -18,6 +18,12 @@ model DesignAsset {
   applicationServiceId String
   scopePath   String
   payload     String
+  integrationCallKey       String?
+  integrationSortKey       String?
+  integrationTargetBinding String?
+  integrationProtocolKind  String?
+  integrationProtocolLocator String?
+  integrationResolutionStatus String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -25,7 +31,9 @@ model DesignAsset {
   @@index([domainId])
   @@index([applicationServiceId])
   @@index([scopePath])
+  @@index([applicationServiceId, scopePath, type, integrationSortKey])
   @@unique([applicationServiceId, scopePath, id])
+  @@unique([applicationServiceId, scopePath, integrationCallKey])
 }
 
 model Proposal {

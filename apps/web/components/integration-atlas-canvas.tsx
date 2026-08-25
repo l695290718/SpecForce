@@ -120,7 +120,7 @@ export function IntegrationAtlasCanvas({ nodes, edges, partialReason, language }
           <div className="flex items-center justify-between"><strong className="text-ink">{selected.contractId}</strong><button className="underline" onClick={() => setSelectedEdgeId(undefined)}>{labels.close}</button></div>
           <div className="mt-1 grid gap-x-6 gap-y-1 sm:grid-cols-2">
             <span>{labels.callKey}: <code>{selected.contractId}</code></span>
-            <span>{labels.locator}: <code>{selected.protocolLocator || "—"}</code></span>
+            <span>{labels.locator}: <code>{selected.restricted ? "—" : selected.protocolLocator || "—"}</code></span>
             <span>protocol: {selected.protocolKind}</span>
             <span>{labels.lifecycle}: {selected.lifecycle}</span>
           </div>

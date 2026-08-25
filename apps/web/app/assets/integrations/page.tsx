@@ -1,4 +1,5 @@
 import { Card, PageHeader } from "../../../components/ui";
+import Link from "next/link";
 import { IntegrationAtlasCanvas } from "../../../components/integration-atlas-canvas";
 import { T } from "../../../components/language-provider";
 import { getRequestLocale } from "../../../lib/locale";
@@ -7,8 +8,8 @@ import { listReadableApplicationServices, requireReadableApplicationService } fr
 import { loadIntegrationAtlas } from "../../../lib/integrations/atlas";
 import type { MessageKey } from "../../../lib/i18n";
 
-export default async function IntegrationsPage({ searchParams }: { searchParams: Promise<{ scope?: string }> }) {
-  const { scope = "" } = await searchParams;
+export default async function IntegrationsPage({ searchParams }: { searchParams: Promise<{ scope?: string; cursor?: string }> }) {
+  const { scope = "", cursor } = await searchParams;
   const locale = await getRequestLocale();
   const principal = await getRequestPrincipal();
   const readable = listReadableApplicationServices(principal);
@@ -16,9 +17,9 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
   try {
     activeScopeId = scope ? requireReadableApplicationService(scope, principal).id : undefined;
   } catch {
-    activeScopeId = undefined;
+    return <><PageHeader title={<T k="integrations.atlasTitle" />} description={<T k="integrations.atlasDescription" />} /><Card className="p-6 text-sm text-red-700"><T k="integrations.scopeDenied" /></Card></>;
   }
-  const atlas = await loadIntegrationAtlas(readable, activeScopeId, { language: locale });
+  const atlas = await loadIntegrationAtlas(readable, activeScopeId, { subject: principal.subject, cursor, language: locale });
   const empty = atlas.contracts.length === 0;
 
   return (
@@ -31,16 +32,17 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
         <span className="rounded-full border border-border bg-amber-50 px-2.5 py-1 font-medium text-amber-700"><T k="integrations.unresolvedTargets" />: {atlas.coverage.unresolvedTargets}</span>
         {atlas.partial ? <span className="rounded-full bg-red-50 px-2.5 py-1 font-semibold text-red-700" data-testid="integrations-partial"><T k="integrations.partialNotice" /> · {atlas.partial.reason}</span> : null}
       </div>
-      <IntegrationAtlasCanvas nodes={atlas.nodes} edges={atlas.edges} partialReason={atlas.partial?.reason ?? null} language={locale === "zh" ? "zh" : "en"} />
+      <IntegrationAtlasCanvas nodes={atlas.nodes} edges={atlas.edges} partialReason={atlas.canvasPartial?.reason ?? atlas.partial?.reason ?? null} language={locale === "zh" ? "zh" : "en"} />
       {empty ? (
         <Card className="mt-4 p-6 text-center text-sm text-muted"><T k="integrations.emptyContracts" /></Card>
-      ) : (
+      ) : activeScopeId ? (
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <ContractSection titleKey="integrations.outbound" contracts={activeScopeId ? atlas.outbound : []} showOwnerScope={false} />
           <ContractSection titleKey="integrations.inbound" contracts={atlas.inbound} showOwnerScope />
         </div>
-      )}
+      ) : <div className="mt-4"><ContractSection titleKey="integrations.allContracts" contracts={atlas.contracts} showOwnerScope /></div>}
       {!empty && activeScopeId ? <p className="mt-3 text-xs text-muted"><T k="integrations.inboundCoverageNote" /></p> : null}
+      {atlas.cursor ? <div className="mt-4"><Link className="inline-flex items-center rounded-md bg-ink px-3 py-2 text-sm font-semibold text-white" href={`/assets/integrations${scope ? `?scope=${encodeURIComponent(scope)}&` : "?"}cursor=${encodeURIComponent(atlas.cursor)}`}><T k="integrations.loadNext" /></Link></div> : null}
     </>
   );
 }
@@ -64,8 +66,8 @@ function ContractSection({ titleKey, contracts, showOwnerScope }: { titleKey: Me
                 {contract.lifecycle !== "ACTIVE" ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{contract.lifecycle}</span> : null}
               </div>
               <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] text-muted">
-                <span><T k="integrations.callKey" />: <code>{contract.integrationCallKey}</code></span>
-                <span><T k="integrations.locator" />: <code>{contract.protocolLocator || "—"}</code></span>
+                <span><T k="integrations.callKey" />: <code>{contract.restricted ? "—" : contract.integrationCallKey}</code></span>
+                <span><T k="integrations.locator" />: <code>{contract.restricted ? "—" : contract.protocolLocator || "—"}</code></span>
                 <span><T k="integrations.resolution" />: {contract.resolutionStatus}</span>
               </div>
             </li>

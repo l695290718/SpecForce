@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Permission } from "@specforge/core";
 import { z } from "zod";
 import { auditToolCall } from "./audit";
+import { validateIntegrationContractV1 as validateIntegrationContractEnvelope } from "./integration-contract";
 import { allowAllPolicy, getDefaultActor, principalFromAuthInfo, withRequestPrincipal, type McpAuthInfo } from "./auth";
 import { archiveSeedGraphOutbox, deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, prepareDataModelUpgrade, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
 import { applyDataModelChangeSet } from "./data-models/change-set";
@@ -154,22 +155,7 @@ const semanticCandidateSchema = z.object({
 });
 
 /** ADR-0039 V1 guard: an integration contract that claims V1 governance must carry the full stable identity, and a resolved target requires its provider binding plus locator. */
-export function validateIntegrationContractV1(asset: Record<string, unknown>): void {
-  const v1Fields = ["integrationCallKey", "consumerScopeId", "targetKind", "protocolKind", "protocolLocator", "lifecycle", "targetResolution"] as const;
-  const present = v1Fields.filter((field) => asset[field] !== undefined);
-  if (present.length === 0) return; // legacy record: stays unresolved by design
-  const missing = v1Fields.filter((field) => field !== "targetResolution" && field !== "protocolLocator" && asset[field] === undefined);
-  if (missing.length > 0) throw new Error(`INTEGRATION_CONTRACT_V1_INCOMPLETE: missing ${missing.join(", ")}`);
-  const protocolKind = String(asset.protocolKind);
-  const resolution = asset.targetResolution as { status?: string } | undefined;
-  if (protocolKind !== "UNNORMALIZED" && !asset.protocolLocator) throw new Error("INTEGRATION_CONTRACT_LOCATOR_REQUIRED");
-  if (resolution?.status === "RESOLVED") {
-    const required = ["providerScopeId", "targetType", "targetId", "revisionLabel"];
-    const missingProvider = required.filter((field) => !(resolution as Record<string, unknown>)[field]);
-    if (missingProvider.length > 0) throw new Error(`INTEGRATION_CONTRACT_TARGET_INCOMPLETE: missing ${missingProvider.join(", ")}`);
-    if (!asset.protocolLocator) throw new Error("INTEGRATION_CONTRACT_LOCATOR_REQUIRED");
-  }
-}
+export const validateIntegrationContractV1 = validateIntegrationContractEnvelope;
 
 function assertMatchingApplicationService(input: { applicationServiceId: string; architectureScope: { applicationServiceId: string } }): void {  if (input.applicationServiceId !== input.architectureScope.applicationServiceId) {
     throw new Error("applicationServiceId must match architectureScope.applicationServiceId.");
@@ -227,7 +213,7 @@ export function registerTools(server: McpServer): void {
       readOnly: false
     },
     async (input) => {
-      if (input.assetType === "integration") validateIntegrationContractV1(input.asset);
+      if (input.assetType === "integration") validateIntegrationContractV1(input.asset, input.architectureScope);
       return upsertDesignAsset({ ...input, asset: { ...input.asset, architectureScope: input.architectureScope } } as unknown as Parameters<typeof upsertDesignAsset>[0]);
     }
   );

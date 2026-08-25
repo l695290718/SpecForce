@@ -1,11 +1,12 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { assertWritableApplicationService, assetLabel, authorizePrincipalScope, defaultHuaweiActor, hasScopeAccess, huaweiArchitectureScopes, isStructuredDataModel, localizeAsset, normalizeAssetType, relationshipOntology, scopeById, seedHuaweiActor, upgradeLegacyDataModel, validateAssetLocalization, validateDataModelV2 } from "@specforge/core";
-import type { ArchitectureScopeRef, Asset, AssetLocale, AssetType, ContextPack, DataModel, Proposal, RelationshipCode, ScopedActor, ScopedPrincipal } from "@specforge/core";
+import type { ArchitectureScopeRef, Asset, AssetLocale, AssetType, ContextPack, DataModel, IntegrationContract, Proposal, RelationshipCode, ScopedActor, ScopedPrincipal } from "@specforge/core";
 import { createHash } from "node:crypto";
 import { createTrustedRelationshipExecutionContext, RelationshipCommandService, type DeleteLegacyRelationshipCommand, type UpsertRelationshipCommand } from "./relationships/command-service";
 import { PrismaRelationshipRepository, type RelationshipScope } from "./relationships/repository";
 import { currentRequestPrincipal } from "./auth";
 import { appendAuthoredAssetRevision } from "./knowledge/catalog-revision";
+import { isGovernedIntegrationContract, validateIntegrationContractV1, type IntegrationContractProjection } from "./integration-contract";
 
 const globalForPrisma = globalThis as unknown as { specforgeMcpPrisma?: PrismaClient };
 const legacyContextPackFallbackSymbol = Symbol("legacyContextPackFallback");
@@ -163,6 +164,19 @@ async function initializeMcpPersistenceSchema() {
   `);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DesignAsset_type_idx" ON "DesignAsset"(type)`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DesignAsset_domainId_idx" ON "DesignAsset"("domainId")`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "DesignAsset" ADD COLUMN IF NOT EXISTS "integrationCallKey" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "DesignAsset" ADD COLUMN IF NOT EXISTS "integrationSortKey" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "DesignAsset" ADD COLUMN IF NOT EXISTS "integrationTargetBinding" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "DesignAsset" ADD COLUMN IF NOT EXISTS "integrationProtocolKind" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "DesignAsset" ADD COLUMN IF NOT EXISTS "integrationProtocolLocator" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "DesignAsset" ADD COLUMN IF NOT EXISTS "integrationResolutionStatus" TEXT`);
+  await prisma.$executeRawUnsafe(`
+    UPDATE "DesignAsset"
+    SET "integrationSortKey" = concat("applicationServiceId", E'\\x1f', 'UNRESOLVED', E'\\x1f', 'UNNORMALIZED', E'\\x1f', '', E'\\x1f', id)
+    WHERE type = 'integration' AND "integrationSortKey" IS NULL
+  `);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "DesignAsset_scope_integrationCallKey_key" ON "DesignAsset"("applicationServiceId", "scopePath", "integrationCallKey") WHERE "integrationCallKey" IS NOT NULL`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DesignAsset_scope_integration_sort_idx" ON "DesignAsset"("applicationServiceId", "scopePath", type, "integrationSortKey")`);
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Proposal" (
       "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
@@ -825,6 +839,10 @@ export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
   assertString(canonicalAsset.name ?? canonicalAsset.title, "asset.name");
   await ensureMcpPersistenceSchema();
 
+  const integrationProjection = input.assetType === "integration"
+    ? await resolveIntegrationContractProjection(canonicalAsset as unknown as IntegrationContract, scope)
+    : undefined;
+
   if (input.assetType === "dataModel") {
     const dataModel = canonicalAsset as unknown as DataModel;
     if (isStructuredDataModel(dataModel)) validateDataModelV2(dataModel);
@@ -856,6 +874,12 @@ export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
         applicationServiceId: scope.applicationServiceId,
         scopePath: scope.scopePath,
         payload: JSON.stringify(canonicalAsset),
+        integrationCallKey: integrationProjection?.integrationCallKey ?? null,
+        integrationSortKey: integrationProjection?.integrationSortKey ?? legacyIntegrationSortKey(scope, String(canonicalAsset.id)),
+        integrationTargetBinding: integrationProjection?.integrationTargetBinding ?? null,
+        integrationProtocolKind: integrationProjection?.integrationProtocolKind ?? null,
+        integrationProtocolLocator: integrationProjection?.integrationProtocolLocator ?? null,
+        integrationResolutionStatus: integrationProjection?.integrationResolutionStatus ?? null,
         createdAt: optionalDate(canonicalAsset.createdAt),
         updatedAt: optionalDate(canonicalAsset.updatedAt)
       },
@@ -868,6 +892,12 @@ export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
         applicationServiceId: scope.applicationServiceId,
         scopePath: scope.scopePath,
         payload: JSON.stringify(canonicalAsset),
+        integrationCallKey: integrationProjection?.integrationCallKey ?? null,
+        integrationSortKey: integrationProjection?.integrationSortKey ?? legacyIntegrationSortKey(scope, String(canonicalAsset.id)),
+        integrationTargetBinding: integrationProjection?.integrationTargetBinding ?? null,
+        integrationProtocolKind: integrationProjection?.integrationProtocolKind ?? null,
+        integrationProtocolLocator: integrationProjection?.integrationProtocolLocator ?? null,
+        integrationResolutionStatus: integrationProjection?.integrationResolutionStatus ?? null,
         updatedAt: optionalDate(canonicalAsset.updatedAt)
       }
     });
@@ -894,6 +924,59 @@ export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
   });
 
   return { id: canonicalAsset.id, type: input.assetType, status: "upserted" };
+}
+
+async function resolveIntegrationContractProjection(asset: IntegrationContract, scope: ArchitectureScopeRef): Promise<IntegrationContractProjection | undefined> {
+  const existing = await prisma.designAsset.findUnique({
+    where: { applicationServiceId_scopePath_id: { ...scope, id: asset.id } },
+    select: { payload: true, integrationCallKey: true }
+  });
+  const projection = validateIntegrationContractV1(asset as unknown as Record<string, unknown>, scope);
+  if (!projection) {
+    // Seed mode imports the versioned legacy baseline only; interactive and production
+    // MCP callers cannot introduce a new ungoverned contract.
+    if (!existing && !isSeedMode()) throw new Error("INTEGRATION_CONTRACT_V1_REQUIRED");
+    if (!existing) return undefined;
+    const existingPayload = parsePersistedIntegration(existing.payload);
+    if (isGovernedIntegrationContract(existingPayload)) throw new Error("INTEGRATION_CONTRACT_V1_DOWNGRADE_FORBIDDEN");
+    return undefined;
+  }
+
+  const existingCaller = await prisma.designAsset.findFirst({
+    where: {
+      applicationServiceId: scope.applicationServiceId,
+      scopePath: scope.scopePath,
+      integrationCallKey: projection.integrationCallKey,
+      NOT: { id: asset.id }
+    },
+    select: { id: true }
+  });
+  if (existingCaller) throw new Error("INTEGRATION_CONTRACT_CALL_KEY_CONFLICT");
+
+  if (projection.integrationResolutionStatus === "RESOLVED") {
+    const providerScope = scopeById(projection.providerScopeId!);
+    if (!providerScope || providerScope.level !== "applicationService") throw new Error("INTEGRATION_CONTRACT_PROVIDER_SCOPE_UNKNOWN");
+    const target = await prisma.designAsset.findUnique({
+      where: { applicationServiceId_scopePath_id: { applicationServiceId: providerScope.id, scopePath: providerScope.scopePath, id: projection.targetId! } },
+      select: { type: true }
+    });
+    if (!target || target.type !== projection.targetType) throw new Error("INTEGRATION_CONTRACT_TARGET_NOT_FOUND");
+  }
+  return projection;
+}
+
+function legacyIntegrationSortKey(scope: ArchitectureScopeRef, assetId: string): string {
+  return [scope.applicationServiceId, "UNRESOLVED", "UNNORMALIZED", "", assetId].join("\u001f");
+}
+
+function parsePersistedIntegration(value: unknown): Record<string, unknown> {
+  if (typeof value !== "string") return value && typeof value === "object" ? value as Record<string, unknown> : {};
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
 }
 
 export interface DataModelUpgradeInput {

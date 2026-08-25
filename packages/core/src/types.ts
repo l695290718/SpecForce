@@ -336,6 +336,8 @@ export interface IntegrationContract extends BaseAsset<IntegrationContractLocali
   fallbackStrategy: string;
   circuitBreaker: string;
   owner: string;
+  /** Explicit marker for the governed cross-scope contract envelope. */
+  contractSchemaVersion?: 1;
   /** V1 governed fields. Absent means a legacy record that stays target-unresolved. */
   integrationCallKey?: string;
   consumerScopeId?: string;

@@ -1,247 +1,144 @@
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import type { IntegrationContract } from "@specforge/core";
-import { scopeById } from "@specforge/core";
 import { prisma } from "../db";
 
-export const ATLAS_LIMITS = {
-  maxScopes: 50,
-  maxContracts: 500,
-  maxNodes: 100,
-  maxEdges: 200,
-  maxPayloadBytes: 524_288,
-  timeoutMs: 2_000
-} as const;
-
+export const ATLAS_LIMITS = { maxScopes: 50, maxContracts: 500, maxNodes: 100, maxEdges: 200, maxPayloadBytes: 524_288, timeoutMs: 2_000 } as const;
 export type AtlasPartialReason = "MAX_SCOPES" | "MAX_CONTRACTS" | "MAX_NODES" | "MAX_EDGES" | "MAX_PAYLOAD" | "TIMEOUT";
+export type AtlasResolutionStatus = "RESOLVED" | "EXTERNAL" | "UNRESOLVED" | "RESTRICTED";
+
+export class IntegrationAtlasReadError extends Error {
+  constructor(readonly code: "ATLAS_CURSOR_INVALID" | "ATLAS_CURSOR_STALE" | "ATLAS_SCOPE_UNAUTHORIZED" | "ATLAS_SUBJECT_REQUIRED" | "ATLAS_CURSOR_KEY_REQUIRED" | "ATLAS_CURSOR_KEY_INVALID") { super(code); }
+}
 
 export interface AtlasContractView {
-  contractId: string;
-  consumerScopeId: string;
-  integrationCallKey: string;
-  sourceSystem: string;
-  targetSystem: string;
-  protocolKind: string;
-  protocolLocator: string;
-  lifecycle: string;
-  resolutionStatus: "RESOLVED" | "EXTERNAL" | "UNRESOLVED";
-  /** Present only when the viewer may read the provider scope. */
-  providerScopeId?: string;
-  targetType?: string;
-  targetId?: string;
-  revisionLabel?: string;
+  contractId: string; consumerScopeId: string; integrationCallKey: string; sourceSystem: string; targetSystem: string;
+  protocolKind: string; protocolLocator: string; lifecycle: string; resolutionStatus: AtlasResolutionStatus; restricted: boolean;
+  providerScopeId?: string; targetType?: string; targetId?: string; revisionLabel?: string;
 }
-
-export interface AtlasNode {
-  id: string;
-  kind: "scope" | "external" | "restricted";
-  label: string;
-  scopeId?: string;
-}
-
+export interface AtlasNode { id: string; kind: "scope" | "external" | "restricted"; label: string; scopeId?: string; }
 export interface AtlasEdge {
-  id: string;
-  sourceNodeId: string;
-  targetNodeId: string;
-  protocolKind: string;
-  protocolLocator: string;
-  contractId: string;
-  lifecycle: string;
-  resolutionStatus: AtlasContractView["resolutionStatus"];
+  id: string; sourceNodeId: string; targetNodeId: string; protocolKind: string; protocolLocator: string;
+  contractId: string; lifecycle: string; resolutionStatus: AtlasResolutionStatus; restricted: boolean;
 }
-
 export interface IntegrationAtlasPage {
-  nodes: AtlasNode[];
-  edges: AtlasEdge[];
-  contracts: AtlasContractView[];
-  outbound: AtlasContractView[];
-  inbound: AtlasContractView[];
+  nodes: AtlasNode[]; edges: AtlasEdge[]; contracts: AtlasContractView[]; outbound: AtlasContractView[]; inbound: AtlasContractView[];
   coverage: { scopesInspected: number; contractsScanned: number; restrictedTargets: number; unresolvedTargets: number };
   partial: { reason: AtlasPartialReason } | null;
+  canvasPartial: { reason: Extract<AtlasPartialReason, "MAX_NODES" | "MAX_EDGES" | "MAX_PAYLOAD"> } | null;
   cursor?: string;
 }
+interface AtlasCursorPayload { v: 2; kid: string; subject: string; activeScopeId: string; readableScopeDigest: string; waterline: string; scopeIndex: number; lastSortKey: string; }
+interface CursorKeyring { activeKeyId: string; keys: Record<string, Buffer>; }
+interface RawAtlasContract { view: AtlasContractView; internalProviderScopeId?: string; }
+const RESTRICTED = "__RESTRICTED__";
+const UNRESOLVED = "__UNRESOLVED__";
 
-interface AtlasCursorPayload {
-  v: 1;
-  waterline: string;
-  scopesDone: string[];
-  lastKey: string;
-  activeScopeId: string;
+function digest(value: unknown): string { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
+function readCursorKeyring(): CursorKeyring {
+  const raw = process.env.SPECFORGE_3A_CURSOR_KEYS?.trim();
+  const activeKeyId = process.env.SPECFORGE_3A_CURSOR_ACTIVE_KEY_ID ?? "local-development";
+  if (!raw) {
+    if (process.env.NODE_ENV === "production" && process.env.SPECFORGE_MCP_SEED !== "1") throw new IntegrationAtlasReadError("ATLAS_CURSOR_KEY_REQUIRED");
+    return { activeKeyId, keys: { [activeKeyId]: Buffer.from("specforge-local-development-cursor-key", "utf8") } };
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid");
+    const keys = Object.fromEntries(Object.entries(parsed).flatMap(([key, value]) => typeof value === "string" && value ? [[key, Buffer.from(value, "base64")]] : [])) as Record<string, Buffer>;
+    if (!keys[activeKeyId]?.length) throw new Error("active missing");
+    return { activeKeyId, keys };
+  } catch { throw new IntegrationAtlasReadError("ATLAS_CURSOR_KEY_INVALID"); }
 }
-
-function canonicalIntegrationOrder(contract: IntegrationContract, contractId: string): string {
-  const binding = contract.targetResolution?.status === "RESOLVED" ? `${contract.targetKind}:${contract.targetResolution.providerScopeId}` : `EXTERNAL:${contract.targetSystem}`;
-  return [contract.consumerScopeId ?? "", binding, contract.protocolKind ?? "", contract.protocolLocator ?? "", contractId].join("\u001f");
+function encodeCursor(payload: Omit<AtlasCursorPayload, "v" | "kid">, keyring = readCursorKeyring()): string {
+  const body = Buffer.from(JSON.stringify({ ...payload, v: 2, kid: keyring.activeKeyId }), "utf8").toString("base64url");
+  return `${body}.${createHmac("sha256", keyring.keys[keyring.activeKeyId]!).update(body).digest("base64url")}`;
 }
-
-function atlasSignature(payload: AtlasCursorPayload): string {
-  return createHmac("sha256", process.env.SPECFORGE_3A_CURSOR_ACTIVE_KEY_ID ?? "integrations-atlas-cursor").update(JSON.stringify(payload)).digest("base64url").slice(0, 24);
-}
-
-function encodeCursor(payload: AtlasCursorPayload): string {
-  return Buffer.from(JSON.stringify({ ...payload, sig: atlasSignature(payload) }), "utf8").toString("base64url");
-}
-
-function decodeCursor(raw: string | undefined): AtlasCursorPayload | undefined {
+function decodeCursor(raw: string | undefined, keyring = readCursorKeyring()): AtlasCursorPayload | undefined {
   if (!raw) return undefined;
   try {
-    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as AtlasCursorPayload & { sig?: string };
-    if (!parsed || parsed.v !== 1 || !parsed.sig || parsed.sig !== atlasSignature(parsed)) return undefined;
-    return parsed;
-  } catch {
-    return undefined;
-  }
+    const [body, signature] = raw.split(".", 2);
+    if (!body || !signature) throw new Error("format");
+    const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as AtlasCursorPayload;
+    const key = payload?.kid ? keyring.keys[payload.kid] : undefined;
+    if (!key || payload.v !== 2) throw new Error("key");
+    const expected = createHmac("sha256", key).update(body).digest("base64url");
+    if (signature.length !== expected.length || !timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) throw new Error("signature");
+    return payload;
+  } catch { throw new IntegrationAtlasReadError("ATLAS_CURSOR_INVALID"); }
 }
-
-function parseV1(contract: IntegrationContract, contractId: string, consumerScopeId: string): AtlasContractView {
+function parseContract(contract: IntegrationContract, contractId: string, consumerScopeId: string): RawAtlasContract {
   const resolution = contract.targetResolution;
   const status = resolution?.status ?? (contract.targetKind === "EXTERNAL" ? "EXTERNAL" : "UNRESOLVED");
-  return {
-    contractId,
-    consumerScopeId,
-    integrationCallKey: contract.integrationCallKey ?? contract.id,
-    sourceSystem: contract.sourceSystem,
-    targetSystem: contract.targetSystem,
-    protocolKind: contract.protocolKind ?? "UNNORMALIZED",
-    protocolLocator: contract.protocolLocator ?? "",
-    lifecycle: contract.lifecycle ?? "ACTIVE",
-    resolutionStatus: status,
-    ...(status === "RESOLVED" && resolution && "providerScopeId" in resolution ? { providerScopeId: resolution.providerScopeId, targetType: resolution.targetType, targetId: resolution.targetId, revisionLabel: resolution.revisionLabel } : {})
-  };
+  const providerScopeId = status === "RESOLVED" && resolution && "providerScopeId" in resolution ? resolution.providerScopeId : undefined;
+  return { view: {
+    contractId, consumerScopeId, integrationCallKey: contract.integrationCallKey ?? contractId, sourceSystem: consumerScopeId,
+    targetSystem: contract.targetSystem, protocolKind: contract.protocolKind ?? "UNNORMALIZED", protocolLocator: contract.protocolLocator ?? "",
+    lifecycle: contract.lifecycle ?? "ACTIVE", resolutionStatus: status, restricted: false,
+    ...(providerScopeId ? { providerScopeId, targetType: resolution.targetType, targetId: resolution.targetId, revisionLabel: resolution.revisionLabel } : {})
+  }, internalProviderScopeId: providerScopeId };
+}
+function redactProvider(view: AtlasContractView): AtlasContractView {
+  return { ...view, integrationCallKey: RESTRICTED, targetSystem: RESTRICTED, protocolLocator: "", resolutionStatus: "RESTRICTED", restricted: true, providerScopeId: undefined, targetType: undefined, targetId: undefined, revisionLabel: undefined };
+}
+function localizeNode(node: AtlasNode, language: string | undefined): AtlasNode {
+  if (node.label === RESTRICTED) return { ...node, label: language === "zh" ? "受限目标（无提供方读取权限）" : "Restricted target (provider not readable)" };
+  if (node.label === UNRESOLVED) return { ...node, label: language === "zh" ? "未解析目标（缺少定位器）" : "Unresolved target (no locator)" };
+  return node;
+}
+async function currentWaterline(scopes: Array<{ id: string; scopePath: string }>): Promise<string> {
+  const aggregate = await prisma.designAsset.aggregate({ where: { type: "integration", OR: scopes.map((scope) => ({ applicationServiceId: scope.id, scopePath: scope.scopePath })) }, _count: { _all: true }, _max: { updatedAt: true } });
+  return digest({ count: aggregate._count._all, updatedAt: aggregate._max.updatedAt?.toISOString() ?? null });
 }
 
-function canReadScope(scopeId: string | undefined, readableIds: Set<string>): boolean {
-  return typeof scopeId === "string" && readableIds.has(scopeId);
-}
+export async function loadIntegrationAtlas(readableScopes: Array<{ id: string; name: string; scopePath: string }>, activeScopeId: string | undefined, options: { subject: string; cursor?: string; language?: string }): Promise<IntegrationAtlasPage> {
+  if (!options.subject?.trim()) throw new IntegrationAtlasReadError("ATLAS_SUBJECT_REQUIRED");
+  const orderedScopes = [...readableScopes].sort((left, right) => left.id.localeCompare(right.id));
+  const readableScopeDigest = digest(orderedScopes.map((scope) => [scope.id, scope.scopePath]));
+  if (activeScopeId && !orderedScopes.some((scope) => scope.id === activeScopeId)) throw new IntegrationAtlasReadError("ATLAS_SCOPE_UNAUTHORIZED");
+  const keyring = readCursorKeyring();
+  const cursor = decodeCursor(options.cursor, keyring);
+  const waterline = await currentWaterline(orderedScopes);
+  if (cursor && (cursor.subject !== options.subject || cursor.activeScopeId !== (activeScopeId ?? "") || cursor.readableScopeDigest !== readableScopeDigest)) throw new IntegrationAtlasReadError("ATLAS_CURSOR_INVALID");
+  if (cursor && cursor.waterline !== waterline) throw new IntegrationAtlasReadError("ATLAS_CURSOR_STALE");
 
-export async function loadIntegrationAtlas(
-  readableScopes: Array<{ id: string; name: string; scopePath: string }>,
-  activeScopeId: string | undefined,
-  options: { cursor?: string; language?: string }
-): Promise<IntegrationAtlasPage> {
-  const startedAt = Date.now();
-  const cursor = decodeCursor(options.cursor);
-  if (options.cursor && !cursor) throw new Error("ATLAS_CURSOR_INVALID");
-
-  const readableIds = new Set(readableScopes.map((scope) => scope.id));
-  const orderedScopes = [...readableScopes].sort((left, right) => left.id.localeCompare(right.id)).filter((scope) => !cursor?.scopesDone.includes(scope.id));
-  if (orderedScopes.length > ATLAS_LIMITS.maxScopes) orderedScopes.length = ATLAS_LIMITS.maxScopes;
-
-  const collected: Array<{ view: AtlasContractView; raw: IntegrationContract }> = [];
-  const scopesDone = [...(cursor?.scopesDone ?? [])];
-  let partial: { reason: AtlasPartialReason } | null = null;
-  let scanned = 0;
-
-  for (const scope of orderedScopes) {
+  const startedAt = Date.now(); let scopeIndex = cursor?.scopeIndex ?? 0; let lastSortKey = cursor?.lastSortKey ?? ""; let inspectedScopes = 0; let scanned = 0;
+  const rawContracts: RawAtlasContract[] = []; let continuation: { scopeIndex: number; lastSortKey: string; reason: AtlasPartialReason } | undefined;
+  while (scopeIndex < orderedScopes.length && inspectedScopes < ATLAS_LIMITS.maxScopes) {
+    if (Date.now() - startedAt > ATLAS_LIMITS.timeoutMs) { continuation = { scopeIndex, lastSortKey, reason: "TIMEOUT" }; break; }
+    const scope = orderedScopes[scopeIndex]!; const remaining = ATLAS_LIMITS.maxContracts - rawContracts.length;
+    if (remaining <= 0) { continuation = { scopeIndex, lastSortKey, reason: "MAX_CONTRACTS" }; break; }
     const rows = await prisma.designAsset.findMany({
-      where: { applicationServiceId: scope.id, scopePath: scope.scopePath, type: "integration" },
-      orderBy: [{ id: "asc" }],
-      select: { id: true, payload: true, updatedAt: true }
+      where: { applicationServiceId: scope.id, scopePath: scope.scopePath, type: "integration", ...(lastSortKey ? { integrationSortKey: { gt: lastSortKey } } : {}) },
+      orderBy: [{ integrationSortKey: "asc" }, { id: "asc" }], take: remaining + 1, select: { id: true, payload: true, integrationSortKey: true }
     });
-    scanned += rows.length;
-    for (const row of rows) {
-      const payload = typeof row.payload === "string" ? (JSON.parse(row.payload) as IntegrationContract) : (row.payload as unknown as IntegrationContract);
-      collected.push({ view: parseV1(payload, row.id, scope.id), raw: payload });
-    }
-    scopesDone.push(scope.id);
-    if (collected.length >= ATLAS_LIMITS.maxContracts) { partial = { reason: "MAX_CONTRACTS" }; break; }
-    if (scopesDone.length >= ATLAS_LIMITS.maxScopes && scopesDone.length < readableIds.size) partial = { reason: "MAX_SCOPES" };
-    if (Date.now() - startedAt > ATLAS_LIMITS.timeoutMs) { partial = { reason: "TIMEOUT" }; break; }
+    inspectedScopes += 1; scanned += Math.min(rows.length, remaining);
+    const pageRows = rows.slice(0, remaining);
+    for (const row of pageRows) rawContracts.push(parseContract(typeof row.payload === "string" ? JSON.parse(row.payload) as IntegrationContract : row.payload as unknown as IntegrationContract, row.id, scope.id));
+    if (rows.length > remaining) { continuation = { scopeIndex, lastSortKey: String(pageRows.at(-1)?.integrationSortKey ?? pageRows.at(-1)?.id ?? lastSortKey), reason: "MAX_CONTRACTS" }; break; }
+    scopeIndex += 1; lastSortKey = "";
   }
+  if (!continuation && scopeIndex < orderedScopes.length) continuation = { scopeIndex, lastSortKey, reason: "MAX_SCOPES" };
 
-  collected.sort((left, right) => canonicalIntegrationOrder(left.raw, left.view.contractId).localeCompare(canonicalIntegrationOrder(right.raw, right.view.contractId)));
-
-  const nodeIndex = new Map<string, AtlasNode>();
-  const ensureScopeNode = (scopeId: string): AtlasNode => {
-    const existing = nodeIndex.get(`scope:${scopeId}`);
-    if (existing) return existing;
-    const scopeName = scopeById(scopeId)?.name ?? scopeId;
-    const node: AtlasNode = { id: `scope:${scopeId}`, kind: "scope", label: scopeName, scopeId };
-    nodeIndex.set(node.id, node);
-    return node;
-  };
-  const ensureExternalNode = (label: string): AtlasNode => {
-    const id = `external:${createHash("sha256").update(label).digest("hex").slice(0, 16)}`;
-    const existing = nodeIndex.get(id);
-    if (existing) return existing;
-    const node: AtlasNode = { id, kind: "external", label };
-    nodeIndex.set(node.id, node);
-    return node;
-  };
-
-  let restrictedCount = 0;
-  let unresolvedCount = 0;
-  const edges: AtlasEdge[] = [];
-  const contractViews: AtlasContractView[] = [];
-
-  for (const { view } of collected) {
-    const providerReadable = view.resolutionStatus === "RESOLVED" && canReadScope(view.providerScopeId, readableIds);
-    if (view.resolutionStatus === "RESOLVED" && !providerReadable) {
-      // ADR-0039 authorization projection: without provider read access the viewer gets no
-      // provider identity or asset detail at all — only the deterministic restricted node.
-      delete view.providerScopeId;
-      delete view.targetType;
-      delete view.targetId;
-      delete view.revisionLabel;
-    }
-    contractViews.push(view);
-    if (view.resolutionStatus === "UNRESOLVED") unresolvedCount += 1;
-    const sourceNode = ensureScopeNode(view.consumerScopeId);
-    let targetNode: AtlasNode;
-    if (view.resolutionStatus === "RESOLVED") {
-      if (providerReadable && view.providerScopeId) {
-        targetNode = ensureScopeNode(view.providerScopeId);
-      } else {
-        restrictedCount += 1;
-        targetNode = { id: `restricted:${createHash("sha256").update(`${view.consumerScopeId}:${view.integrationCallKey}`).digest("hex").slice(0, 16)}`, kind: "restricted", label: "__RESTRICTED__" };
-        nodeIndex.set(targetNode.id, targetNode);
-      }
-    } else if (view.resolutionStatus === "EXTERNAL") {
-      targetNode = ensureExternalNode(view.targetSystem);
-    } else {
-      targetNode = { id: `unresolved:${createHash("sha256").update(`${view.consumerScopeId}:${view.integrationCallKey}`).digest("hex").slice(0, 16)}`, kind: "restricted", label: "__UNRESOLVED__" };
-      nodeIndex.set(targetNode.id, targetNode);
-    }
-    if (edges.length < ATLAS_LIMITS.maxEdges) {
-      edges.push({ id: `edge:${view.contractId}`, sourceNodeId: sourceNode.id, targetNodeId: targetNode.id, protocolKind: view.protocolKind, protocolLocator: view.protocolLocator, contractId: view.contractId, lifecycle: view.lifecycle, resolutionStatus: view.resolutionStatus });
-    }
-    if (Date.now() - startedAt > ATLAS_LIMITS.timeoutMs && !partial) partial = { reason: "TIMEOUT" };
+  const readableIds = new Set(orderedScopes.map((scope) => scope.id)); const scopeNames = new Map(orderedScopes.map((scope) => [scope.id, scope.name]));
+  const nodeIndex = new Map<string, AtlasNode>(); const edges: AtlasEdge[] = []; const contractViews: AtlasContractView[] = []; const outbound: AtlasContractView[] = []; const inbound: AtlasContractView[] = [];
+  let restrictedTargets = 0; let unresolvedTargets = 0; let canvasReason: IntegrationAtlasPage["canvasPartial"] extends { reason: infer R } | null ? R : never;
+  const addNode = (node: AtlasNode): AtlasNode | undefined => { const existing = nodeIndex.get(node.id); if (existing) return existing; if (nodeIndex.size >= ATLAS_LIMITS.maxNodes) { canvasReason ??= "MAX_NODES"; return undefined; } nodeIndex.set(node.id, node); return node; };
+  const scopeNode = (scopeId: string) => addNode({ id: `scope:${scopeId}`, kind: "scope", label: scopeNames.get(scopeId) ?? scopeId, scopeId });
+  const externalNode = (label: string) => addNode({ id: `external:${digest(label).slice(0, 16)}`, kind: "external", label });
+  const restrictedNode = (consumerScopeId: string, contractId: string, label: string) => addNode({ id: `restricted:${digest([consumerScopeId, contractId]).slice(0, 16)}`, kind: "restricted", label });
+  for (const raw of rawContracts) {
+    const providerReadable = Boolean(raw.internalProviderScopeId && readableIds.has(raw.internalProviderScopeId));
+    const view = raw.view.resolutionStatus === "RESOLVED" && !providerReadable ? redactProvider(raw.view) : raw.view;
+    if (view.restricted) restrictedTargets += 1; if (view.resolutionStatus === "UNRESOLVED") unresolvedTargets += 1;
+    contractViews.push(view); if (activeScopeId && view.consumerScopeId === activeScopeId) outbound.push(view); if (activeScopeId && raw.internalProviderScopeId === activeScopeId) inbound.push(view);
+    const source = scopeNode(view.consumerScopeId);
+    const target = view.restricted ? restrictedNode(view.consumerScopeId, view.contractId, RESTRICTED) : view.resolutionStatus === "RESOLVED" && view.providerScopeId ? scopeNode(view.providerScopeId) : view.resolutionStatus === "EXTERNAL" ? externalNode(view.targetSystem) : restrictedNode(view.consumerScopeId, view.contractId, UNRESOLVED);
+    if (!source || !target) continue;
+    if (edges.length >= ATLAS_LIMITS.maxEdges) { canvasReason ??= "MAX_EDGES"; continue; }
+    edges.push({ id: `edge:${view.contractId}`, sourceNodeId: source.id, targetNodeId: target.id, protocolKind: view.protocolKind, protocolLocator: view.protocolLocator, contractId: view.contractId, lifecycle: view.lifecycle, resolutionStatus: view.resolutionStatus, restricted: view.restricted });
   }
-
-  if (!partial && collected.length > ATLAS_LIMITS.maxContracts) partial = { reason: "MAX_CONTRACTS" };
-  if (edges.length >= ATLAS_LIMITS.maxEdges && collected.length > 0 && !partial) partial = { reason: "MAX_EDGES" };
-
-  const outbound = activeScopeId ? contractViews.filter((view) => view.consumerScopeId === activeScopeId) : [];
-  const inbound = activeScopeId
-    ? contractViews.filter(
-        (view) =>
-          view.consumerScopeId !== activeScopeId &&
-          ((view.resolutionStatus === "RESOLVED" && view.providerScopeId === activeScopeId) || (view.resolutionStatus !== "RESOLVED" && view.targetSystem === scopeById(activeScopeId)?.name))
-      )
-    : [];
-
   let payloadBytes = Buffer.byteLength(JSON.stringify({ nodes: [...nodeIndex.values()], edges, contracts: contractViews }));
-  if (payloadBytes > ATLAS_LIMITS.maxPayloadBytes && !partial) partial = { reason: "MAX_PAYLOAD" };
-  while (payloadBytes > ATLAS_LIMITS.maxPayloadBytes && contractViews.length > 1) {
-    contractViews.pop();
-    payloadBytes = Buffer.byteLength(JSON.stringify({ nodes: [...nodeIndex.values()], edges, contracts: contractViews }));
-  }
-
-  const nextCursor = partial ? encodeCursor({ v: 1, waterline: new Date().toISOString(), scopesDone, lastKey: contractViews.at(-1)?.contractId ?? "", activeScopeId: activeScopeId ?? "" }) : undefined;
-
-  const localizedLabel = (node: AtlasNode): AtlasNode => {
-    if (node.label === "__RESTRICTED__") return { ...node, label: options.language === "zh" ? "受限目标（无提供方读取权限）" : "Restricted target (provider not readable)" };
-    if (node.label === "__UNRESOLVED__") return { ...node, label: options.language === "zh" ? "未解析目标（缺少定位器）" : "Unresolved target (no locator)" };
-    return node;
-  };
-
-  return {
-    nodes: [...nodeIndex.values()].map(localizedLabel),
-    edges,
-    contracts: contractViews,
-    outbound,
-    inbound,
-    coverage: { scopesInspected: scopesDone.length, contractsScanned: scanned, restrictedTargets: restrictedCount, unresolvedTargets: unresolvedCount },
-    partial,
-    ...(nextCursor ? { cursor: nextCursor } : {})
-  };
+  if (payloadBytes > ATLAS_LIMITS.maxPayloadBytes) { canvasReason ??= "MAX_PAYLOAD"; while (edges.length > 1 && payloadBytes > ATLAS_LIMITS.maxPayloadBytes) { edges.pop(); payloadBytes = Buffer.byteLength(JSON.stringify({ nodes: [...nodeIndex.values()], edges, contracts: contractViews })); } }
+  const nextCursor = continuation ? encodeCursor({ subject: options.subject, activeScopeId: activeScopeId ?? "", readableScopeDigest, waterline, scopeIndex: continuation.scopeIndex, lastSortKey: continuation.lastSortKey }, keyring) : undefined;
+  return { nodes: [...nodeIndex.values()].map((node) => localizeNode(node, options.language)), edges, contracts: contractViews, outbound, inbound, coverage: { scopesInspected: inspectedScopes, contractsScanned: scanned, restrictedTargets, unresolvedTargets }, partial: continuation ? { reason: continuation.reason } : null, canvasPartial: canvasReason ? { reason: canvasReason } : null, ...(nextCursor ? { cursor: nextCursor } : {}) };
 }
