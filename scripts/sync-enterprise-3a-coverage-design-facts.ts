@@ -84,7 +84,11 @@ const contextPack = {
   proposalId,
   targetAgent: "codex",
   summary: "Implementation context for the exact-Scope generic-system@2 coverage projection.",
-  includedAssets: [adrId, proposalId, evidenceId],
+  includedAssets: [
+    { type: "adr", id: adrId, label: "Enterprise 3A semantic coverage projection" },
+    { type: "proposal", id: proposalId, label: "Enterprise 3A semantic coverage rollout" },
+    { type: "evidence", id: evidenceId, label: "Enterprise 3A semantic coverage verification evidence" }
+  ],
   constraints: ["Read and write only the exact Designer Scope", "PostgreSQL is authoritative; graph stores are derived", "Never infer architecture units or relationships from names", "Keep v6 8/42/6 unchanged"],
   instructions: ["Run the design-context preflight before changing coverage behavior", "Use MCP for authored design facts and typed links", "Pin builds to catalog and relationship waterlines", "Verify CURRENT freshness and row closure before completion"],
   generatedMarkdown: "# Enterprise 3A semantic coverage\n\nUse generic-system@2 over the exact Designer Scope. Preserve v6 8/42/6 and keep PostgreSQL authoritative.\n",

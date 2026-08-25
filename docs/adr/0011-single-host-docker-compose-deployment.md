@@ -14,7 +14,7 @@ SpecForge needs a repeatable first deployment profile that can run the Web appli
 
 ## Decision
 
-Use a five-service Docker Compose topology: a Next.js Web container, PostgreSQL 16, a one-shot direct database Bootstrap container, the asynchronous Knowledge Projector, and a one-shot governed 3A Bootstrap MCP client. PostgreSQL persists data in the `specforge_pgdata` named volume and is reachable only through the Compose network. Direct Bootstrap applies the schema, authored catalog, and canonical relationship event seed in one guarded transaction on a fresh database; the governed 3A Bootstrap then calls the MCP design-change, baseline, projection-build, status, and close tools. Web waits for both one-shot services and the `READY` projection before starting. PowerShell lifecycle scripts validate Docker readiness, required credentials, and 3A cursor key configuration before starting; stop preserves the named volume.
+Use a five-service Docker Compose topology: a Next.js Web container, PostgreSQL 16, a one-shot direct database Bootstrap container, the asynchronous Knowledge Projector, and a one-shot governed 3A Bootstrap MCP client. PostgreSQL persists data in the `specforge_pgdata` named volume and is reachable only through the Compose network. Before normal Prisma synchronization, Direct Bootstrap runs a narrow idempotent compatibility step for the Atlas query projection: it may add the six nullable `integration*` columns, backfill only a deterministic legacy sort key, and create scoped indexes after rejecting duplicate non-null call keys. It never deletes authored payloads or seeds a non-empty database. On a fresh database, Bootstrap then initializes the authored catalog and canonical relationship events in one guarded transaction; the governed 3A Bootstrap calls the MCP design-change, baseline, projection-build, status, and close tools. Web waits for both one-shot services and the `READY` projection before starting. PowerShell lifecycle scripts validate Docker readiness, required credentials, and 3A cursor key configuration before starting; stop preserves the named volume.
 
 The same Web image supports external PostgreSQL through `DATABASE_URL` and a Compose override that removes the bundled database service. MCP is not a network service in this topology; authorized Agents continue to launch it through stdio with the appropriate database connection.
 
@@ -66,6 +66,7 @@ Existing SpecForge databases are adopted only through the explicit `SPECFORGE_BO
 - **Verified:** Implementation session `design-change-session:09033091-9bf3-454b-bb19-466c9e26973c` fixed Windows PowerShell native-argument quoting in `status.ps1`, `bootstrap-status.ps1`, and `verify-compose.ps1` by piping SQL through `psql -f -`; the Bootstrap status now reads `COMPLETED` instead of reporting a false missing-table error.
 - **Verified:** `pnpm exec vitest run apps/mcp-server/src/seed-localization.test.ts --exclude ".worktrees/**" --exclude ".pnpm-store/**"` passed 6 tests after completing the audit data model Chinese constraint overlay; the Docker Bootstrap `TRANSLATION_STRUCTURE_MISMATCH` failure is resolved.
 - **Verified:** `deploy/scripts/start.ps1` rebuilt and started the complete Compose topology; `bootstrap` and `three-a-bootstrap` exited 0, PostgreSQL, Knowledge Projector, Connector Worker, and Web were healthy, and Web `/healthz` returned `200 {"status":"ok"}` on port 3010.
+- **Verified:** `docker compose --env-file deploy/.env -f deploy/compose.yaml build bootstrap; docker compose --env-file deploy/.env -f deploy/compose.yaml run --rm -e SPECFORGE_BOOTSTRAP_ADOPT_EXISTING=1 bootstrap` emitted `ATLAS_SCHEMA_COMPATIBILITY_COMPLETE`, then synchronized Prisma schema and adopted the non-empty database without resetting its 303 design assets, 29 Proposals, 27 Context Packs, or 490 asset links.
 - **Verified:** Fresh-browser checks passed for the data model page on both port 3010 (Docker) and port 3000 (local development); neither page reported a Runtime Error or browser error log.
 
 ## 中文本地化 / Chinese Localization
@@ -80,7 +81,7 @@ SpecForge 需要一个可重复的首个部署形态，在单台 Linux 主机运
 
 ### 决策
 
-采用双服务 Docker Compose 拓扑：一个 Next.js Web 容器和一个 PostgreSQL 16 容器。PostgreSQL 使用命名卷 `specforge_pgdata` 持久化，仅能通过 Compose 网络访问。Web 容器等待数据库 TCP 可用，幂等执行 `prisma db push --skip-generate`，再启动独立输出的 Next.js 服务；启动时不运行种子或清理操作。
+采用五服务 Docker Compose 拓扑：Next.js Web、PostgreSQL 16、一次性直接 Bootstrap、异步 Knowledge Projector 和一次性受治理的 3A Bootstrap MCP 客户端。PostgreSQL 使用命名卷 `specforge_pgdata` 持久化，仅能通过 Compose 网络访问。直接 Bootstrap 在常规 Prisma 同步前执行范围极小、幂等的 Atlas 查询投影兼容步骤：只允许补齐 6 个可空 `integration*` 字段、为历史记录回填确定性排序键，并在拒绝重复非空调用键后创建范围索引；不得删除已编写 payload，也不得向非空数据库铺底。
 
 同一 Web 镜像通过 `DATABASE_URL` 和移除内置数据库的 Compose 覆盖文件支持外部 PostgreSQL。MCP 不是此拓扑中的网络服务；授权 Agent 继续使用适当数据库连接通过 stdio 启动 MCP。
 
@@ -121,4 +122,5 @@ SpecForge 需要一个可重复的首个部署形态，在单台 Linux 主机运
 - **已验证：** 实现会话 `design-change-session:09033091-9bf3-454b-bb19-466c9e26973c` 修复了 `status.ps1`、`bootstrap-status.ps1` 与 `verify-compose.ps1` 在 Windows PowerShell 原生参数传递中的 SQL 引号问题，改为通过 `psql -f -` 管道传入 SQL；Bootstrap 状态现在正确读取为 `COMPLETED`，不再误报表缺失。
 - **已验证：** `pnpm exec vitest run apps/mcp-server/src/seed-localization.test.ts --exclude ".worktrees/**" --exclude ".pnpm-store/**"` 在补齐审计数据模型中文约束覆盖后通过 6 个测试；Docker Bootstrap 的 `TRANSLATION_STRUCTURE_MISMATCH` 失败已修复。
 - **已验证：** `deploy/scripts/start.ps1` 已成功重新构建并启动完整 Compose 拓扑；`bootstrap` 与 `three-a-bootstrap` 均以 0 退出，PostgreSQL、Knowledge Projector、Connector Worker 和 Web 均健康，Web 在 3010 端口的 `/healthz` 返回 `200 {"status":"ok"}`。
+- **已验证：** 构建 Bootstrap 后以 `SPECFORGE_BOOTSTRAP_ADOPT_EXISTING=1` 运行，日志输出 `ATLAS_SCHEMA_COMPATIBILITY_COMPLETE`；随后 Prisma 同步与非空库接管成功，未重置 303 条设计资产、29 个 Proposal、27 个 Context Pack 或 490 条资产链接。
 - **已验证：** 在干净浏览器标签中检查 3010 端口 Docker 服务和 3000 端口本地开发服务的数据模型页面均通过；两者都没有 Runtime Error 或浏览器错误日志。

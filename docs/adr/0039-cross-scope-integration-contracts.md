@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted as a V1 design. The Designer-owned Atlas and MCP contract-boundary increment is locally implemented and verified under `design-change-session:bf43d980-f32c-4440-ab35-557390e08c03`, but completion is blocked pending MCP synchronization because the local PostgreSQL service is unavailable. Every later consumer-scope contract write still requires its own exact-Scope session, facts, verification, and closure. Provider acknowledgement, bidirectional reconciliation, scanner ingestion, and automated external apply remain deferred.
+Accepted as a V1 design. The Designer-owned Atlas and MCP contract-boundary increment is implemented, synchronized, and verified under `design-change-session:bf43d980-f32c-4440-ab35-557390e08c03`. Every later consumer-scope contract write still requires its own exact-Scope session, facts, verification, and closure. Provider acknowledgement, bidirectional reconciliation, scanner ingestion, and automated external apply remain deferred.
 
 ## Context
 
@@ -48,9 +48,11 @@ Huawei internal landscapes contain many application services that call each othe
 - `pnpm db:push --accept-data-loss` passed against `localhost:15433/specforge_canonical`; it added only nullable Integration Atlas query projection columns and their Scope-bound indexes/uniqueness constraint, with no duplicate call-key conflict.
 - `pnpm --filter @specforge/mcp-server exec vitest run src/tools.integration-v1.test.ts` passed (5 tests): V1 marker, ownership, source, tuple, and canonical-call-key validation.
 - `pnpm --filter @specforge/web exec vitest run lib/integrations/atlas.test.ts` passed (5 tests): whole-response provider redaction, bounded continuation, cursor tampering/subject/waterline rejection, and readable inbound derivation.
-- `pnpm --filter @specforge/mcp-server typecheck` and `pnpm --filter @specforge/web typecheck` passed. Container rebuild and live-browser verification are required before claiming deployment evidence.
-- Deployment verification is externally blocked: `docker compose --env-file deploy/.env -f deploy/compose.yaml up -d --build --quiet-build` returned `Docker Desktop is unable to start` on 2026-08-25. Retry trigger: Docker Desktop is healthy, then rerun the existing `deploy/scripts/start.ps1` and verify `http://localhost:3010/assets/integrations`.
-- **MCP synchronization blocked:** `SPECFORGE_DESIGN_FACT_IDS=adr-cross-scope-integration-contracts pnpm design-facts:sync` failed with `Can't reach database server at localhost:15433` after Docker Desktop stopped. Owner: deployment operator. Retry trigger: Docker Desktop and the bundled PostgreSQL service are healthy, then rerun design-fact synchronization, reconciliation, and the open session closure. Rationale: SpecForge's MCP write boundary cannot persist authored operational records while its authoritative PostgreSQL store is unavailable.
+- `pnpm --filter @specforge/mcp-server typecheck` and `pnpm --filter @specforge/web typecheck` passed. The production `docker compose ... build web` completed after strict-build fixes for resolved targets and canvas partial state.
+- Docker Desktop and Compose recovered on 2026-08-25. The deployed PostgreSQL schema received six nullable Atlas projection columns plus the scoped call-key and sort indexes without deleting authored payloads; named Bootstrap then exited `0` with `303` design assets, `29` Proposals, `27` Context Packs, and `490` asset links.
+- Three legacy Context Packs were repaired through a production-connected MCP client, never by a direct authored-data write: `ctx-enterprise-3a-semantic-coverage`, `context-pack-asset-to-3a-mapping-semantics`, and `context-pack-delta-connector-run-completion` now use typed `includedAssets` references. The governed 3A bootstrap converged and published `471` nodes and `277` edges.
+- `http://127.0.0.1:3010/healthz`, `GET /api/integrations/atlas?scope=com.huawei.celon.desiner&limit=50`, and `/architecture/3a?scope=com.huawei.celon.desiner` all returned HTTP `200`; the 3A page no longer rendered the unavailable state.
+- MCP synchronization recovered: `SPECFORGE_DESIGN_FACT_IDS=adr-cross-scope-integration-contracts pnpm design-facts:sync; pnpm design-facts:check` completed against the developer canonical store after its PostgreSQL tunnel returned. The same selected ADR is synchronized through a production-connected MCP client before closing this session.
 
 ## MCP Record
 
@@ -103,9 +105,10 @@ Huawei internal landscapes contain many application services that call each othe
 - 实现关闭时必须追加精确 schema 迁移、聚焦 API/查询、授权/脱敏、游标/预算测试、类型检查、构建及浏览器实测；本地测试不推断提供方确认或生产规模。
 - `pnpm db:push --accept-data-loss` 已在 `localhost:15433/specforge_canonical` 通过；仅新增可空的 Atlas 查询投影列、Scope 索引和调用键唯一约束，未发现重复调用键冲突。
 - MCP V1 校验与 Web Atlas 定向测试各 5 项通过，覆盖 V1 标记、归属/来源、目标元组、规范调用键、整包脱敏、续读及游标绑定。
-- MCP 与 Web 类型检查通过。容器重建和浏览器实测完成前，不得声明部署证据。
-- 部署验证受外部运行时阻塞：Docker Desktop 当前无法启动。恢复后执行既有 `deploy/scripts/start.ps1`，并验证 `http://localhost:3010/assets/integrations`。
-- **MCP 同步被阻塞：** Docker Desktop 停止后，更新 ADR 的 MCP 写入无法连接 `localhost:15433`。负责人为部署运维；恢复 Docker Desktop 与 PostgreSQL 后，重新执行设计事实同步、对账和当前会话关闭。由于权威 PostgreSQL 不可用，当前不得宣称本次变更已完成。
+- MCP 与 Web 类型检查通过，生产 Web 镜像也已完成严格构建。
+- Docker Desktop 与 Compose 已恢复；部署 PostgreSQL 以非破坏性方式补齐 6 个 Atlas 查询投影列和范围索引。Bootstrap 以 0 退出，保留 303 条设计资产、29 个 Proposal、27 个 Context Pack 和 490 条资产链接。
+- 三条历史 Context Pack 已通过连接生产 `specforge` 数据库的 MCP 客户端修复为结构化 `includedAssets`：`ctx-enterprise-3a-semantic-coverage`、`context-pack-asset-to-3a-mapping-semantics` 与 `context-pack-delta-connector-run-completion`。受治理 3A 引导已收敛并发布 471 个节点、277 条边。
+- `3010` 上的健康检查、Atlas API 与 3A 页面均返回 HTTP 200，3A 页面不再显示不可用状态。开发规范库的 ADR 同步与对账也已恢复；本 ADR 同时同步到生产连接后再关闭会话。
 
 ## Evidence — Implementation Close (2026-08-24, session 4981705f)
 

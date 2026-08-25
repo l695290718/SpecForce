@@ -93,7 +93,14 @@ export async function bootstrapThreeAFromDesignAssets(input: BootstrapThreeAInpu
     "bilingual-canonical-content"
   ];
   const now = new Date().toISOString();
-  const assetAssertions = uniqueRecords.map(({ type, asset }) => assertionForAsset({ type, asset, scope, changeSetId, sourceDigest, now }));
+  const assetAssertions = uniqueRecords.map(({ type, asset }) => {
+    try {
+      return assertionForAsset({ type, asset, scope, changeSetId, sourceDigest, now });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`THREE_A_BOOTSTRAP_ASSET_INVALID:${type}:${asset.id}:${reason}`);
+    }
+  });
   const byAssetKey = new Map(uniqueRecords.map(({ type, asset }, index) => [assetKey(type, asset.id), assetAssertions[index]!]));
   const relationshipAssertions = usableLinks.map((link) => assertionForLink({ link, scope, changeSetId, sourceDigest, byAssetKey, now }));
   const assertions = [...assetAssertions, ...relationshipAssertions];

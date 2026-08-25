@@ -14,6 +14,7 @@ COPY prisma ./prisma
 COPY apps/knowledge-projector/src/bootstrap-initializer.ts apps/knowledge-projector/src/bootstrap-initializer.ts
 COPY apps/mcp-server/src/localization-report.ts apps/mcp-server/src/localization-report.ts
 COPY apps/mcp-server/src/relationships apps/mcp-server/src/relationships
+COPY deploy/bootstrap-schema-compatibility.mjs /app/deploy/bootstrap-schema-compatibility.mjs
 
 RUN corepack enable \
   && pnpm install --frozen-lockfile \

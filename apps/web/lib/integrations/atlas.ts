@@ -69,12 +69,13 @@ function decodeCursor(raw: string | undefined, keyring = readCursorKeyring()): A
 function parseContract(contract: IntegrationContract, contractId: string, consumerScopeId: string): RawAtlasContract {
   const resolution = contract.targetResolution;
   const status = resolution?.status ?? (contract.targetKind === "EXTERNAL" ? "EXTERNAL" : "UNRESOLVED");
-  const providerScopeId = status === "RESOLVED" && resolution && "providerScopeId" in resolution ? resolution.providerScopeId : undefined;
+  const resolvedTarget = status === "RESOLVED" && resolution && "providerScopeId" in resolution ? resolution : undefined;
+  const providerScopeId = resolvedTarget?.providerScopeId;
   return { view: {
     contractId, consumerScopeId, integrationCallKey: contract.integrationCallKey ?? contractId, sourceSystem: consumerScopeId,
     targetSystem: contract.targetSystem, protocolKind: contract.protocolKind ?? "UNNORMALIZED", protocolLocator: contract.protocolLocator ?? "",
     lifecycle: contract.lifecycle ?? "ACTIVE", resolutionStatus: status, restricted: false,
-    ...(providerScopeId ? { providerScopeId, targetType: resolution.targetType, targetId: resolution.targetId, revisionLabel: resolution.revisionLabel } : {})
+    ...(providerScopeId ? { providerScopeId, targetType: resolvedTarget!.targetType, targetId: resolvedTarget!.targetId, revisionLabel: resolvedTarget!.revisionLabel } : {})
   }, internalProviderScopeId: providerScopeId };
 }
 function redactProvider(view: AtlasContractView): AtlasContractView {
@@ -121,7 +122,8 @@ export async function loadIntegrationAtlas(readableScopes: Array<{ id: string; n
 
   const readableIds = new Set(orderedScopes.map((scope) => scope.id)); const scopeNames = new Map(orderedScopes.map((scope) => [scope.id, scope.name]));
   const nodeIndex = new Map<string, AtlasNode>(); const edges: AtlasEdge[] = []; const contractViews: AtlasContractView[] = []; const outbound: AtlasContractView[] = []; const inbound: AtlasContractView[] = [];
-  let restrictedTargets = 0; let unresolvedTargets = 0; let canvasReason: IntegrationAtlasPage["canvasPartial"] extends { reason: infer R } | null ? R : never;
+  let restrictedTargets = 0; let unresolvedTargets = 0;
+  let canvasReason: Extract<AtlasPartialReason, "MAX_NODES" | "MAX_EDGES" | "MAX_PAYLOAD"> | undefined = undefined;
   const addNode = (node: AtlasNode): AtlasNode | undefined => { const existing = nodeIndex.get(node.id); if (existing) return existing; if (nodeIndex.size >= ATLAS_LIMITS.maxNodes) { canvasReason ??= "MAX_NODES"; return undefined; } nodeIndex.set(node.id, node); return node; };
   const scopeNode = (scopeId: string) => addNode({ id: `scope:${scopeId}`, kind: "scope", label: scopeNames.get(scopeId) ?? scopeId, scopeId });
   const externalNode = (label: string) => addNode({ id: `external:${digest(label).slice(0, 16)}`, kind: "external", label });

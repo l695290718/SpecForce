@@ -267,7 +267,7 @@ async function ensureCanonicalRelationshipProjection(prisma: PrismaClient): Prom
         await service.upsertLegacyRelationship(legacyRelationshipCommand(normalized, row.id));
       }
     }
-  });
+  }, { maxWait: 10_000, timeout: 120_000 });
 }
 
 function buildSeedEntries(): SeedEntry[] {

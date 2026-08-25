@@ -84,7 +84,11 @@ const contextPack = {
   proposalId,
   targetAgent: "codex",
   summary: "Use asset-to-3A mapping as the primary classification model and call unit-to-unit records realizations.",
-  includedAssets: [adrId, proposalId, evidenceId],
+  includedAssets: [
+    { type: "adr", id: adrId, label: "Asset-to-3A mapping semantics" },
+    { type: "proposal", id: proposalId, label: "Asset-to-3A mapping semantics rollout" },
+    { type: "evidence", id: evidenceId, label: "Asset-to-3A mapping semantics verification evidence" }
+  ],
   constraints: ["Read and write only the exact Designer Scope", "PostgreSQL is authoritative", "MCP is the authored design-fact write boundary", "Never infer direct assignments from names or graph proximity"],
   instructions: ["Read the ADR and Proposal before changing 3A mapping behavior", "Keep DIRECT and TRACE distinct", "Use exact Baseline and Projection identities", "Run focused checks and read back MCP evidence before completion"],
   generatedMarkdown: "# Asset-to-3A mapping semantics\n\nUse asset-to-3A assignments as the primary mapping. Treat unit-to-unit records as architecture realizations.\n",

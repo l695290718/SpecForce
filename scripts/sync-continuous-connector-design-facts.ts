@@ -95,7 +95,11 @@ const contextPack = {
   proposalId,
   targetAgent: "codex",
   summary: "Exact-Scope implementation context for terminal DELTA runs and snapshot safety.",
-  includedAssets: [adrId, proposalId, evidenceId],
+  includedAssets: [
+    { type: "adr", id: adrId, label: "Delta connector run completion" },
+    { type: "proposal", id: proposalId, label: "Delta connector run completion rollout" },
+    { type: "evidence", id: evidenceId, label: "Delta connector run completion verification evidence" }
+  ],
   constraints: ["Read and write only the exact Designer Scope", "PostgreSQL is authoritative", "Do not infer deletion from incomplete or changed-boundary snapshots", "Do not promote source observations automatically"],
   instructions: ["Read ADR and Proposal before changing connector persistence", "Run the v2 PostgreSQL integration test", "Verify DELTA SUCCEEDED state and lease cleanup", "Keep Chinese overlays aligned with English canonical fields"],
   generatedMarkdown: "# Delta connector run completion\n\nDELTA last pages complete the run atomically. FULL_SNAPSHOT deletion inference remains completeness- and boundary-gated.\n",
