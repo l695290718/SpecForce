@@ -7,7 +7,6 @@ import type {
   AssetRef,
   AssetType,
   DerivedViewOptions,
-  AssetRef,
   SpecForgeDataStore
 } from "../types";
 
