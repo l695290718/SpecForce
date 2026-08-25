@@ -7,12 +7,22 @@ import type {
   AssetRef,
   AssetType,
   DerivedViewOptions,
+  AssetRef,
   SpecForgeDataStore
 } from "../types";
 
 type GraphAsset = Asset & { architectureScope?: { applicationServiceId: string; scopePath: string } };
 
 const graphAssetTypes = (Object.keys(assetCollections) as AssetType[]).filter((type) => type !== "contextPack");
+
+function referenceArray(value: unknown): AssetRef[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is AssetRef => {
+    if (!item || typeof item !== "object") return false;
+    const candidate = item as { type?: unknown; id?: unknown };
+    return typeof candidate.type === "string" && typeof candidate.id === "string";
+  });
+}
 
 function graphAssets(store: SpecForgeDataStore): Array<{ type: AssetType; asset: GraphAsset }> {
   return graphAssetTypes.flatMap((type) => (
@@ -126,7 +136,7 @@ export async function buildAssetGraph(domainId?: string, assetType?: AssetType, 
   store.businessRules.filter(inDomain).forEach((canonical) => {
     const rule = localizeCatalogAsset("businessRule", canonical, locale, options.catalog);
     addNode("businessRule", canonical, rule.name, rule.description, rule.domainId);
-    addRefEdges("businessRule", canonical, rule.relatedAssets, "governs");
+    addRefEdges("businessRule", canonical, referenceArray(rule.relatedAssets), "governs");
   });
   store.stateMachines.filter(inDomain).forEach((canonical) => {
     const machine = localizeCatalogAsset("stateMachine", canonical, locale, options.catalog);
@@ -151,12 +161,12 @@ export async function buildAssetGraph(domainId?: string, assetType?: AssetType, 
   store.adrs.filter(inDomain).forEach((canonical) => {
     const adr = localizeCatalogAsset("adr", canonical, locale, options.catalog);
     addNode("adr", canonical, adr.title, adr.decision, adr.domainId);
-    addRefEdges("adr", canonical, adr.relatedAssets, "decides");
+    addRefEdges("adr", canonical, referenceArray(adr.relatedAssets), "decides");
   });
   store.proposals.filter(inDomain).forEach((canonical) => {
     const proposal = localizeCatalogAsset("proposal", canonical, locale, options.catalog);
     addNode("proposal", canonical, proposal.title, proposal.description, proposal.domainId);
-    addRefEdges("proposal", canonical, proposal.impactedAssets, "impacts");
+    addRefEdges("proposal", canonical, referenceArray(proposal.impactedAssets), "impacts");
   });
   store.evidence.filter(inDomain).forEach((canonical) => {
     const evidence = localizeCatalogAsset("evidence", canonical, locale, options.catalog);

@@ -72,6 +72,18 @@ describe("SpecForge core services", () => {
     expect(graph.nodes).toContainEqual(expect.objectContaining({ id: "evidence-graph-test", type: "evidence" }));
   });
 
+  it("keeps the graph readable when legacy reference arrays are missing or malformed", async () => {
+    const catalog = structuredClone(seedData);
+    delete (catalog.adrs[0] as unknown as Record<string, unknown>).relatedAssets;
+    (catalog.businessRules[0] as unknown as Record<string, unknown>).relatedAssets = null;
+    delete (catalog.proposals[0] as unknown as Record<string, unknown>).impactedAssets;
+
+    const graph = await buildAssetGraph(undefined, undefined, { catalog });
+
+    expect(graph.nodes.length).toBeGreaterThan(0);
+    expect(graph.edges.every((edge) => graph.nodes.some((node) => node.id === edge.source) && graph.nodes.some((node) => node.id === edge.target))).toBe(true);
+  });
+
   it("analyzes proposal impact across assets and risks", async () => {
     const impact = await analyzeProposalImpact("proposal-partial-refund");
 
