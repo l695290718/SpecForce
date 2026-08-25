@@ -75,3 +75,18 @@ The graph page and `/api/graph` must return a usable empty/partial graph or a lo
 - 定向回归通过 35 个测试文件、198 项测试； Core/Web 类型检查和差异检查均返回 0。
 - 3010 Docker 服务验证通过，受影响页面和抽样详情入口均返回 200；图谱 API 返回 331 个节点、742 条边，未再出现图谱 500。
 - MCP 会话以 `CONVERGED` 关闭，临时数据库转发容器已清理。PostgreSQL 仍是权威存储，图谱仍是派生读取投影。
+
+### Navigation loading feedback increment (2026-08-25)
+
+- Direct HTTP checks showed the affected pages were healthy and fast (`200`, approximately 64–261ms), while the first browser-side navigation took approximately 3311ms and exposed no pending UI. The issue was missing route-transition feedback, not a failed asset endpoint.
+- Added the App Router global `apps/web/app/loading.tsx` fallback with an accessible status region, spinner, skeleton content, and bilingual `nav.loading` copy. This covers Workbench, asset lists, ADRs, Proposals, Context Packs, Graph, and their detail routes without changing API or authorization behavior.
+- `pnpm --filter @specforge/web typecheck`, `$env:SPECFORGE_NEXT_STANDALONE='0'; pnpm --filter @specforge/web build`, and `pnpm exec vitest run apps/web/lib/__tests__/scope-links.test.ts` passed. Docker was rebuilt with `powershell -ExecutionPolicy Bypass -File .\deploy\scripts\start.ps1`; `/healthz` and all affected routes returned HTTP 200.
+- Browser verification after rebuild clicked `Event Contracts`, reached `/assets/events?scope=com.huawei.celon.desiner` in 472ms, and found no new browser or Web-container errors.
+- Exact-scope session `design-change-session:0731c44d-0e48-4769-8815-67161acab752` was closed as `CONVERGED` after the checks above and MCP readback.
+
+### 导航加载反馈增量（2026-08-25）
+
+- 接口本身没有异常：受影响页面直接请求均为 `200`，约 64–261ms；首轮浏览器端导航约 3311ms，期间没有 pending 反馈，因此用户会感觉点击无响应。
+- 新增 App Router 全局 `apps/web/app/loading.tsx`，提供可访问状态区、旋转加载图标、骨架屏和双语文案 `nav.loading`，覆盖工作台、设计资产、ADR、提案、上下文包、关系图谱及详情路由。
+- Web 类型检查、生产构建、Scope 链接回归测试和 3010 Docker 重建均通过；重建后点击事件契约可到达目标 URL，约 472ms，未发现新的浏览器或 Web 容器错误。
+- 精确 Scope 会话 `design-change-session:0731c44d-0e48-4769-8815-67161acab752` 已通过 MCP 回读并以 `CONVERGED` 关闭。

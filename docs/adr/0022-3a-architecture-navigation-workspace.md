@@ -200,3 +200,9 @@ Web 和 MCP 复用新的查询包。每个请求必须先解析标准化 `Scoped
 - Internal navigation now uses one URL-based Scope helper that replaces the existing `scope` parameter while preserving view, filter, selection, and hash state. Workbench, Event Contracts, Business Rules, Quality Requirements, ADRs, Proposals, Context Packs, and graph detail links remain bound to the selected application service.
 - The exact-scope session `design-change-session:124680b6-c9b7-4a8a-ac13-ce305d806e3a` closed as `CONVERGED` after route tests, Core/Web type checks, Docker route checks, and MCP readback.
 - On `http://localhost:3010`, all affected list pages and sampled detail routes returned HTTP 200 with `scope=com.huawei.celon.desiner`. The implementation evidence is recorded in `docs/superpowers/specs/2026-08-25-asset-navigation-and-graph-reliability-design.md`.
+
+### Navigation loading feedback increment (2026-08-25)
+
+- Direct endpoint checks were healthy (`200`, approximately 64–261ms); the perceived click failure came from a browser-side transition with no pending feedback, not from an unavailable asset API.
+- The Web App Router now exposes a global accessible loading fallback at `apps/web/app/loading.tsx`, with bilingual status copy and skeleton content for slow transitions. It does not alter Scope authorization, API contracts, or authored data.
+- Session `design-change-session:0731c44d-0e48-4769-8815-67161acab752` closed as `CONVERGED` after Web typecheck, production build, Scope-link regression, Docker rebuild, HTTP route checks, and browser click verification.
