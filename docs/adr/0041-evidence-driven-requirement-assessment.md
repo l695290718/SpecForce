@@ -60,6 +60,12 @@ Design evidence must remain distinct from implementation evidence. Code ownershi
 - `pnpm exec prisma validate`: passed; `pnpm db:generate` had a transient Windows `EPERM` while replacing a locked Prisma query-engine binary, with the already-generated client remaining usable and retry triggered after the dev process releases the file.
 - Commits: `3447d16`, `7feaf94`, `ec53829`, `2613ec4`, `662e80a`.
 - `pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session design-change-session:8c6a52d3-859f-4714-a93c-8dfbe377a6b4 --status CONVERGED ...`: returned `CONVERGED`; the first retry without the `design-change-session:` prefix returned `DESIGN_CHANGE_SESSION_NOT_FOUND` and was corrected without changing Scope or data.
+- Continuation preflight: `design-change-session:c208579f-03a0-46c7-aac5-260daf1da0ac`, exact Scope, design digest `a5d8ff3c6947d8ad45ee7e536d1b51ba755351e336464c5485f97600aa3476e2`.
+- `pnpm --filter @specforge/core typecheck; pnpm --filter @specforge/mcp-server typecheck; pnpm --filter @specforge/requirement-assessment-worker typecheck`: passed.
+- `pnpm exec vitest run packages/core/src/requirement-assessment apps/requirement-assessment-worker/src apps/mcp-server/src/tools.test.ts apps/mcp-server/src/tools.integration-v1.test.ts --exclude .worktrees/** --exclude .pnpm-store/**`: 10 files, 55 tests passed.
+- `docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet`: passed; `docker compose ... build requirement-assessment-worker`: image built successfully, including Prisma generate and Worker compilation.
+- Worker operation is explicit and fail-closed: `SPECFORGE_ASSESSMENT_RECONCILIATION_STATUS` defaults to `UNVERIFIED`; only an operator-verified `CONVERGED` value permits a non-blocked assessment.
+- `pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session design-change-session:c208579f-03a0-46c7-aac5-260daf1da0ac --status CONVERGED ...`: returned `CONVERGED` after synchronization, focused checks, Compose validation, and Worker image build.
 
 ## MCP Record
 
@@ -121,3 +127,8 @@ SpecForge 已经维护按 Scope 隔离的设计资产、有类型关系、3A 映
 - `pnpm exec prisma validate`：通过；`pnpm db:generate` 因 Windows Prisma query-engine 文件被占用出现一次临时 `EPERM`，释放开发进程文件句柄后触发重试；已有生成客户端可用。
 - 提交：`3447d16`、`7feaf94`、`ec53829`、`2613ec4`、`662e80a`。
 - 使用完整的 `design-change-session:` 前缀和精确 Scope 运行关闭命令后，实施会话返回 `CONVERGED`；首次省略前缀导致 `DESIGN_CHANGE_SESSION_NOT_FOUND`，已纠正，未改变 Scope 或数据。
+- 续作预检：`design-change-session:c208579f-03a0-46c7-aac5-260daf1da0ac`，精确 Scope，设计摘要为 `a5d8ff3c6947d8ad45ee7e536d1b51ba755351e336464c5485f97600aa3476e2`。
+- Core、MCP Server、Requirement Assessment Worker 类型检查通过；同一聚焦命令下 10 个文件、55 项测试通过。
+- `docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet` 通过；需求评估 Worker 镜像构建成功，包含 Prisma generate 和 Worker 编译。
+- Worker 的对账门禁显式失败关闭：`SPECFORGE_ASSESSMENT_RECONCILIATION_STATUS` 默认是 `UNVERIFIED`，只有运维确认后设置为 `CONVERGED` 才允许非阻塞评估。
+- 使用精确 Scope 关闭续作会话 `design-change-session:c208579f-03a0-46c7-aac5-260daf1da0ac`，同步、聚焦检查、Compose 校验和 Worker 镜像构建后返回 `CONVERGED`。
