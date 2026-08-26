@@ -123,6 +123,7 @@ export function IntegrationAtlasCanvas({ nodes, edges, partialReason, language }
             <span>{labels.locator}: <code>{selected.restricted ? "—" : selected.protocolLocator || "—"}</code></span>
             <span>protocol: {selected.protocolKind}</span>
             <span>{labels.lifecycle}: {selected.lifecycle}</span>
+            <span data-testid="integration-drawer-verification">verification: {selected.verificationState}</span>
           </div>
         </div>
       ) : null}

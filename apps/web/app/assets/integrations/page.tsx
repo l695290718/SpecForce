@@ -30,6 +30,8 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
         <span className="rounded-full border border-border bg-chrome px-2.5 py-1 font-medium text-ink"><T k="integrations.coverageContracts" />: {atlas.coverage.contractsScanned}</span>
         <span className="rounded-full border border-border bg-amber-50 px-2.5 py-1 font-medium text-amber-700"><T k="integrations.restrictedTargets" />: {atlas.coverage.restrictedTargets}</span>
         <span className="rounded-full border border-border bg-amber-50 px-2.5 py-1 font-medium text-amber-700"><T k="integrations.unresolvedTargets" />: {atlas.coverage.unresolvedTargets}</span>
+        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700"><T k="integrations.attested" />: {atlas.coverage.attestedContracts}</span>
+        <span className="rounded-full border border-red-200 bg-red-50 px-2.5 py-1 font-medium text-red-700"><T k="integrations.drift" />: {atlas.coverage.driftContracts}</span>
         {atlas.partial ? <span className="rounded-full bg-red-50 px-2.5 py-1 font-semibold text-red-700" data-testid="integrations-partial"><T k="integrations.partialNotice" /> · {atlas.partial.reason}</span> : null}
       </div>
       <IntegrationAtlasCanvas nodes={atlas.nodes} edges={atlas.edges} partialReason={atlas.canvasPartial?.reason ?? atlas.partial?.reason ?? null} language={locale === "zh" ? "zh" : "en"} />
@@ -47,6 +49,17 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
   );
 }
 
+function VerificationBadge({ state }: { state: Awaited<ReturnType<typeof loadIntegrationAtlas>>["outbound"][number]["verificationState"] }) {
+  const styles: Record<string, string> = {
+    ATTESTED: "border border-emerald-200 bg-emerald-50 text-emerald-700",
+    DRIFT: "bg-red-50 text-red-700",
+    BLOCKED_ATTESTATION: "bg-amber-50 text-amber-700",
+    UNATTESTED: "bg-slate-100 text-slate-500"
+  };
+  const keys: Record<string, MessageKey> = { ATTESTED: "integrations.attested", DRIFT: "integrations.drift", BLOCKED_ATTESTATION: "integrations.blockedAttestation", UNATTESTED: "integrations.unattested" };
+  return <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${styles[state] ?? styles.UNATTESTED}`}><T k={keys[state] ?? "integrations.unattested"} /></span>;
+}
+
 function ContractSection({ titleKey, contracts, showOwnerScope }: { titleKey: MessageKey; contracts: Awaited<ReturnType<typeof loadIntegrationAtlas>>["outbound"]; showOwnerScope: boolean }) {
   return (
     <Card className="p-0">
@@ -62,6 +75,7 @@ function ContractSection({ titleKey, contracts, showOwnerScope }: { titleKey: Me
                 <span className="text-muted">→</span>
                 <span className="font-mono text-xs font-semibold text-ink">{contract.targetSystem}</span>
                 <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{contract.protocolKind}</span>
+                <VerificationBadge state={contract.verificationState} />
                 {showOwnerScope ? <span className="rounded bg-chrome px-1.5 py-0.5 text-[10px] text-muted">{contract.consumerScopeId}</span> : null}
                 {contract.lifecycle !== "ACTIVE" ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{contract.lifecycle}</span> : null}
               </div>

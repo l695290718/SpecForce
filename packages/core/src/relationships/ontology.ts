@@ -333,13 +333,13 @@ const relationshipDefinitions = [
   {
     code: "VALIDATES",
     allowedSourceTypes: ["evidence"],
-    allowedTargetTypes: ["adr"],
+    allowedTargetTypes: ["adr", "integration"],
     forwardPropagation: false,
     reversePropagation: true,
     strength: "weak",
     defaultConfidence: 1,
     terminal: true,
-    description: "Verification evidence to ADR decision",
+    description: "Verification evidence to ADR decision or integration contract attestation",
     version: RELATIONSHIP_ONTOLOGY_VERSION
   }
 ] as const satisfies readonly RelationshipTypeDefinition[];

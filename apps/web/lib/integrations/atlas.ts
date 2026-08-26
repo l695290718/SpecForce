@@ -1,10 +1,11 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import type { IntegrationContract } from "@specforge/core";
+import type { Evidence, IntegrationContract } from "@specforge/core";
 import { prisma } from "../db";
 
 export const ATLAS_LIMITS = { maxScopes: 50, maxContracts: 500, maxNodes: 100, maxEdges: 200, maxPayloadBytes: 524_288, timeoutMs: 2_000 } as const;
 export type AtlasPartialReason = "MAX_SCOPES" | "MAX_CONTRACTS" | "MAX_NODES" | "MAX_EDGES" | "MAX_PAYLOAD" | "TIMEOUT";
 export type AtlasResolutionStatus = "RESOLVED" | "EXTERNAL" | "UNRESOLVED" | "RESTRICTED";
+export type AtlasVerificationState = "ATTESTED" | "DRIFT" | "BLOCKED_ATTESTATION" | "UNATTESTED";
 
 export class IntegrationAtlasReadError extends Error {
   constructor(readonly code: "ATLAS_CURSOR_INVALID" | "ATLAS_CURSOR_STALE" | "ATLAS_SCOPE_UNAUTHORIZED" | "ATLAS_SUBJECT_REQUIRED" | "ATLAS_CURSOR_KEY_REQUIRED" | "ATLAS_CURSOR_KEY_INVALID") { super(code); }
@@ -13,16 +14,18 @@ export class IntegrationAtlasReadError extends Error {
 export interface AtlasContractView {
   contractId: string; consumerScopeId: string; integrationCallKey: string; sourceSystem: string; targetSystem: string;
   protocolKind: string; protocolLocator: string; lifecycle: string; resolutionStatus: AtlasResolutionStatus; restricted: boolean;
+  verificationState: AtlasVerificationState;
   providerScopeId?: string; targetType?: string; targetId?: string; revisionLabel?: string;
 }
 export interface AtlasNode { id: string; kind: "scope" | "external" | "restricted"; label: string; scopeId?: string; }
 export interface AtlasEdge {
   id: string; sourceNodeId: string; targetNodeId: string; protocolKind: string; protocolLocator: string;
   contractId: string; lifecycle: string; resolutionStatus: AtlasResolutionStatus; restricted: boolean;
+  verificationState: AtlasVerificationState;
 }
 export interface IntegrationAtlasPage {
   nodes: AtlasNode[]; edges: AtlasEdge[]; contracts: AtlasContractView[]; outbound: AtlasContractView[]; inbound: AtlasContractView[];
-  coverage: { scopesInspected: number; contractsScanned: number; restrictedTargets: number; unresolvedTargets: number };
+  coverage: { scopesInspected: number; contractsScanned: number; restrictedTargets: number; unresolvedTargets: number; attestedContracts: number; driftContracts: number };
   partial: { reason: AtlasPartialReason } | null;
   canvasPartial: { reason: Extract<AtlasPartialReason, "MAX_NODES" | "MAX_EDGES" | "MAX_PAYLOAD"> } | null;
   cursor?: string;
@@ -74,7 +77,7 @@ function parseContract(contract: IntegrationContract, contractId: string, consum
   return { view: {
     contractId, consumerScopeId, integrationCallKey: contract.integrationCallKey ?? contractId, sourceSystem: consumerScopeId,
     targetSystem: contract.targetSystem, protocolKind: contract.protocolKind ?? "UNNORMALIZED", protocolLocator: contract.protocolLocator ?? "",
-    lifecycle: contract.lifecycle ?? "ACTIVE", resolutionStatus: status, restricted: false,
+    lifecycle: contract.lifecycle ?? "ACTIVE", resolutionStatus: status, restricted: false, verificationState: "UNATTESTED",
     ...(providerScopeId ? { providerScopeId, targetType: resolvedTarget!.targetType, targetId: resolvedTarget!.targetId, revisionLabel: resolvedTarget!.revisionLabel } : {})
   }, internalProviderScopeId: providerScopeId };
 }
@@ -120,9 +123,40 @@ export async function loadIntegrationAtlas(readableScopes: Array<{ id: string; n
   }
   if (!continuation && scopeIndex < orderedScopes.length) continuation = { scopeIndex, lastSortKey, reason: "MAX_SCOPES" };
 
+  // Verification states (ADR-0041): the latest VALIDATES evidence per contract decides the state.
+  const verificationByContract = new Map<string, AtlasVerificationState>();
+  const contractIds = rawContracts.map((raw) => raw.view.contractId);
+  if (contractIds.length > 0 && Date.now() - startedAt <= ATLAS_LIMITS.timeoutMs) {
+    const linkRows = await prisma.assetLink.findMany({
+      where: { relationType: "VALIDATES", targetType: "integration", targetId: { in: contractIds }, OR: orderedScopes.map((scope) => ({ applicationServiceId: scope.id, scopePath: scope.scopePath })) },
+      select: { sourceId: true, targetId: true }
+    });
+    const evidenceIds = [...new Set(linkRows.map((row) => row.sourceId))];
+    const evidenceRows = evidenceIds.length > 0
+      ? await prisma.designAsset.findMany({ where: { id: { in: evidenceIds }, type: "evidence" }, select: { id: true, payload: true } })
+      : [];
+    const evidenceById = new Map(evidenceRows.map((row) => [row.id, typeof row.payload === "string" ? JSON.parse(row.payload) as Evidence : row.payload as unknown as Evidence]));
+    const latest = new Map<string, { recordedAt: string; id: string; status: string }>();
+    for (const link of linkRows) {
+      const evidence = evidenceById.get(link.sourceId);
+      if (!evidence?.recordedAt || !["passed", "failed", "blocked"].includes(evidence.status)) continue;
+      const incumbent = latest.get(link.targetId);
+      if (!incumbent || evidence.recordedAt > incumbent.recordedAt || (evidence.recordedAt === incumbent.recordedAt && link.sourceId > incumbent.id)) {
+        latest.set(link.targetId, { recordedAt: evidence.recordedAt, id: link.sourceId, status: evidence.status });
+      }
+    }
+    for (const raw of rawContracts) {
+      const attestation = latest.get(raw.view.contractId);
+      verificationByContract.set(raw.view.contractId, !attestation ? "UNATTESTED" : attestation.status === "passed" ? "ATTESTED" : attestation.status === "failed" ? "DRIFT" : "BLOCKED_ATTESTATION");
+    }
+  } else {
+    for (const raw of rawContracts) verificationByContract.set(raw.view.contractId, "UNATTESTED");
+  }
+  for (const raw of rawContracts) raw.view.verificationState = verificationByContract.get(raw.view.contractId) ?? "UNATTESTED";
+
   const readableIds = new Set(orderedScopes.map((scope) => scope.id)); const scopeNames = new Map(orderedScopes.map((scope) => [scope.id, scope.name]));
   const nodeIndex = new Map<string, AtlasNode>(); const edges: AtlasEdge[] = []; const contractViews: AtlasContractView[] = []; const outbound: AtlasContractView[] = []; const inbound: AtlasContractView[] = [];
-  let restrictedTargets = 0; let unresolvedTargets = 0;
+  let restrictedTargets = 0; let unresolvedTargets = 0; let attestedContracts = 0; let driftContracts = 0;
   let canvasReason: Extract<AtlasPartialReason, "MAX_NODES" | "MAX_EDGES" | "MAX_PAYLOAD"> | undefined = undefined;
   const addNode = (node: AtlasNode): AtlasNode | undefined => { const existing = nodeIndex.get(node.id); if (existing) return existing; if (nodeIndex.size >= ATLAS_LIMITS.maxNodes) { canvasReason ??= "MAX_NODES"; return undefined; } nodeIndex.set(node.id, node); return node; };
   const scopeNode = (scopeId: string) => addNode({ id: `scope:${scopeId}`, kind: "scope", label: scopeNames.get(scopeId) ?? scopeId, scopeId });
@@ -131,16 +165,19 @@ export async function loadIntegrationAtlas(readableScopes: Array<{ id: string; n
   for (const raw of rawContracts) {
     const providerReadable = Boolean(raw.internalProviderScopeId && readableIds.has(raw.internalProviderScopeId));
     const view = raw.view.resolutionStatus === "RESOLVED" && !providerReadable ? redactProvider(raw.view) : raw.view;
+    view.verificationState = verificationByContract.get(view.contractId) ?? "UNATTESTED";
+    if (view.verificationState === "ATTESTED") attestedContracts += 1;
+    if (view.verificationState === "DRIFT") driftContracts += 1;
     if (view.restricted) restrictedTargets += 1; if (view.resolutionStatus === "UNRESOLVED") unresolvedTargets += 1;
     contractViews.push(view); if (activeScopeId && view.consumerScopeId === activeScopeId) outbound.push(view); if (activeScopeId && raw.internalProviderScopeId === activeScopeId) inbound.push(view);
     const source = scopeNode(view.consumerScopeId);
     const target = view.restricted ? restrictedNode(view.consumerScopeId, view.contractId, RESTRICTED) : view.resolutionStatus === "RESOLVED" && view.providerScopeId ? scopeNode(view.providerScopeId) : view.resolutionStatus === "EXTERNAL" ? externalNode(view.targetSystem) : restrictedNode(view.consumerScopeId, view.contractId, UNRESOLVED);
     if (!source || !target) continue;
     if (edges.length >= ATLAS_LIMITS.maxEdges) { canvasReason ??= "MAX_EDGES"; continue; }
-    edges.push({ id: `edge:${view.contractId}`, sourceNodeId: source.id, targetNodeId: target.id, protocolKind: view.protocolKind, protocolLocator: view.protocolLocator, contractId: view.contractId, lifecycle: view.lifecycle, resolutionStatus: view.resolutionStatus, restricted: view.restricted });
+    edges.push({ id: `edge:${view.contractId}`, sourceNodeId: source.id, targetNodeId: target.id, protocolKind: view.protocolKind, protocolLocator: view.protocolLocator, contractId: view.contractId, lifecycle: view.lifecycle, resolutionStatus: view.resolutionStatus, restricted: view.restricted, verificationState: view.verificationState });
   }
   let payloadBytes = Buffer.byteLength(JSON.stringify({ nodes: [...nodeIndex.values()], edges, contracts: contractViews }));
   if (payloadBytes > ATLAS_LIMITS.maxPayloadBytes) { canvasReason ??= "MAX_PAYLOAD"; while (edges.length > 1 && payloadBytes > ATLAS_LIMITS.maxPayloadBytes) { edges.pop(); payloadBytes = Buffer.byteLength(JSON.stringify({ nodes: [...nodeIndex.values()], edges, contracts: contractViews })); } }
   const nextCursor = continuation ? encodeCursor({ subject: options.subject, activeScopeId: activeScopeId ?? "", readableScopeDigest, waterline, scopeIndex: continuation.scopeIndex, lastSortKey: continuation.lastSortKey }, keyring) : undefined;
-  return { nodes: [...nodeIndex.values()].map((node) => localizeNode(node, options.language)), edges, contracts: contractViews, outbound, inbound, coverage: { scopesInspected: inspectedScopes, contractsScanned: scanned, restrictedTargets, unresolvedTargets }, partial: continuation ? { reason: continuation.reason } : null, canvasPartial: canvasReason ? { reason: canvasReason } : null, ...(nextCursor ? { cursor: nextCursor } : {}) };
+  return { nodes: [...nodeIndex.values()].map((node) => localizeNode(node, options.language)), edges, contracts: contractViews, outbound, inbound, coverage: { scopesInspected: inspectedScopes, contractsScanned: scanned, restrictedTargets, unresolvedTargets, attestedContracts, driftContracts }, partial: continuation ? { reason: continuation.reason } : null, canvasPartial: canvasReason ? { reason: canvasReason } : null, ...(nextCursor ? { cursor: nextCursor } : {}) };
 }

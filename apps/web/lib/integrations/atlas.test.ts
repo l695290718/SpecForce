@@ -7,15 +7,24 @@ function row(id: string, applicationServiceId: string, scopePath: string, payloa
   return { id, payload, updatedAt: new Date(), applicationServiceId, scopePath, integrationSortKey: `${applicationServiceId}\u001f${id}` };
 }
 
+const verificationLinkRows: Array<{ sourceId: string; targetId: string }> = [];
+
 vi.mock("../db", () => ({
   prisma: {
+    assetLink: {
+      findMany: vi.fn(async () => verificationLinkRows)
+    },
     designAsset: {
       aggregate: vi.fn(async () => ({ _count: { _all: designAssetRows.length }, _max: { updatedAt: designAssetRows.reduce<Date | null>((latest, candidate) => !latest || candidate.updatedAt > latest ? candidate.updatedAt : latest, null) } })),
-      findMany: vi.fn(async (args: { where: { applicationServiceId: string; scopePath: string; integrationSortKey?: { gt: string } }; take?: number }) => designAssetRows
-        .filter((candidate) => candidate.applicationServiceId === args.where.applicationServiceId && candidate.scopePath === args.where.scopePath)
-        .filter((candidate) => !args.where.integrationSortKey || candidate.integrationSortKey > args.where.integrationSortKey.gt)
-        .sort((left, right) => left.integrationSortKey.localeCompare(right.integrationSortKey) || left.id.localeCompare(right.id))
-        .slice(0, args.take))
+      findMany: vi.fn(async (args: { where: { applicationServiceId?: string; scopePath?: string; integrationSortKey?: { gt: string }; id?: { in: string[] }; type?: string }; take?: number }) => {
+        if (args.where.id?.in) return designAssetRows.filter((candidate) => args.where.id!.in.includes(candidate.id));
+        return designAssetRows
+          .filter((candidate) => candidate.applicationServiceId === args.where.applicationServiceId && candidate.scopePath === args.where.scopePath)
+          .filter((candidate) => typeof candidate.integrationSortKey === "string")
+          .filter((candidate) => !args.where.integrationSortKey || candidate.integrationSortKey > args.where.integrationSortKey.gt)
+          .sort((left, right) => left.integrationSortKey.localeCompare(right.integrationSortKey) || left.id.localeCompare(right.id))
+          .slice(0, args.take);
+      })
     }
   }
 }));
@@ -37,7 +46,7 @@ const READABLE = [
 ];
 const options = { subject: "atlas-reader", language: "en" };
 
-beforeEach(() => { designAssetRows.length = 0; });
+beforeEach(() => { designAssetRows.length = 0; verificationLinkRows.length = 0; });
 
 describe("loadIntegrationAtlas", () => {
   it("returns an explicit empty page when no contracts exist", async () => {
@@ -86,5 +95,29 @@ describe("loadIntegrationAtlas", () => {
     await expect(loadIntegrationAtlas(READABLE, undefined, { ...options, subject: "another-reader", cursor: first.cursor })).rejects.toThrow("ATLAS_CURSOR_INVALID");
     designAssetRows[0]!.updatedAt = new Date("2030-08-25T00:00:00.000Z");
     await expect(loadIntegrationAtlas(READABLE, undefined, { ...options, cursor: first.cursor })).rejects.toThrow("ATLAS_CURSOR_STALE");
+  });
+
+  it("derives ATTESTED from the latest passing evidence", async () => {
+    designAssetRows.push(row("integration-mcp-stdio", "com.huawei.celon.desiner", "pf/desiner", contract({ id: "integration-mcp-stdio" })));
+    designAssetRows.push({ integrationSortKey: "zz-evidence-1", id: "evidence-integration-mcp-stdio-20260826", applicationServiceId: "com.huawei.celon.desiner", scopePath: "pf/desiner", updatedAt: new Date(), payload: { id: "evidence-x", status: "passed", recordedAt: "2026-08-26T10:00:00Z" } });
+    verificationLinkRows.push({ sourceId: "evidence-integration-mcp-stdio-20260826", targetId: "integration-mcp-stdio" });
+    const page = await loadIntegrationAtlas(READABLE, undefined, options);
+    expect(page.contracts[0]!.verificationState).toBe("ATTESTED");
+  });
+
+  it("lets newer drift evidence mask older attestation and counts both coverage sides", async () => {
+    designAssetRows.push(row("integration-drifty", "com.huawei.celon.desiner", "pf/desiner", contract({ id: "integration-drifty" })));
+    designAssetRows.push({ integrationSortKey: "zz-evidence-2", id: "evidence-old-pass", applicationServiceId: "com.huawei.celon.desiner", scopePath: "pf/desiner", updatedAt: new Date(), payload: { status: "passed", recordedAt: "2026-08-20T10:00:00Z" } });
+    designAssetRows.push({ integrationSortKey: "zz-evidence-3", id: "evidence-new-fail", applicationServiceId: "com.huawei.celon.desiner", scopePath: "pf/desiner", updatedAt: new Date(), payload: { status: "failed", recordedAt: "2026-08-26T12:00:00Z" } });
+    verificationLinkRows.push({ sourceId: "evidence-old-pass", targetId: "integration-drifty" }, { sourceId: "evidence-new-fail", targetId: "integration-drifty" });
+    const page = await loadIntegrationAtlas(READABLE, undefined, options);
+    expect(page.outbound[0]?.verificationState ?? page.contracts.find((contract) => contract.contractId === "integration-drifty")?.verificationState).toBe("DRIFT");
+    expect(page.coverage.driftContracts).toBeGreaterThanOrEqual(1);
+  });
+
+  it("keeps contracts without any evidence explicitly UNATTESTED", async () => {
+    designAssetRows.push(row("integration-bare", "com.huawei.celon.desiner", "pf/desiner", contract({ id: "integration-bare" })));
+    const page = await loadIntegrationAtlas(READABLE, undefined, options);
+    expect(page.contracts.every((contract) => contract.verificationState === "UNATTESTED")).toBe(true);
   });
 });
