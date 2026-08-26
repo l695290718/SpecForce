@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import { prisma, readableScope, resolveWritableScope, writableActor } from "../persistence";
-import type { ArchitectureScopeRef } from "@specforge/core";
+import { prisma, readableScope, resolveWritableScope, upsertAssetLink, upsertContextPack, upsertProposal, writableActor } from "../persistence";
+import type { ArchitectureScopeRef, ContextPack, Proposal } from "@specforge/core";
 
 export interface RequirementAssessmentScopeInput {
   architectureScope: ArchitectureScopeRef;
@@ -108,6 +108,29 @@ export async function recordAssessmentExecutionActual(input: {
   if (existing) return { id: existing.id, idempotentReplay: true, architectureScope: scope };
   const actual = await prisma.assessmentExecutionActual.create({ data: { id: input.id, enterpriseId: process.env.SPECFORGE_ENTERPRISE_ID ?? "local-development", requirementId: input.requirementId, assessmentId: input.assessmentId, runId: input.runId, executionProfileId: input.executionProfileId, modelRevisions: (input.modelRevisions ?? {}) as never, usageDetails: (input.usageDetails ?? {}) as never, toolInvocations: (input.toolInvocations ?? []) as never, verificationCycles: input.verificationCycles ?? 0, failedAttempts: input.failedAttempts ?? 0, humanIntervention: (input.humanIntervention ?? {}) as never, elapsedAgentSeconds: input.elapsedAgentSeconds, actualPersonDays: input.actualPersonDays, changedAssets: (input.changedAssets ?? []) as never, finalStatus: input.finalStatus, contentDigest: input.contentDigest, ...scope } });
   return { id: actual.id, idempotentReplay: false, architectureScope: scope };
+}
+
+export async function createAssessmentProposalDraft(input: RequirementAssessmentScopeInput & { assessmentId: string; proposal: Omit<Proposal, "architectureScope" | "createdAt" | "updatedAt"> & { localizedContent?: Proposal["localizedContent"] }; idempotencyKey: string }) {
+  const scope = resolveWritableScope(writableActor(), input.architectureScope);
+  const assessment = await prisma.requirementAssessment.findFirst({ where: { id: input.assessmentId, ...scope } });
+  if (!assessment) throw new Error("ASSESSMENT_NOT_FOUND");
+  if (assessment.lifecycle !== "ACCEPTED") throw new Error(`ASSESSMENT_NOT_ACCEPTED:${assessment.lifecycle}`);
+  const now = new Date().toISOString();
+  const proposal: Proposal = { ...input.proposal, architectureScope: scope, createdAt: now, updatedAt: now };
+  const result = await upsertProposal({ proposal });
+  await upsertAssetLink({ architectureScope: scope, sourceType: "proposal", sourceId: proposal.id, targetType: "evidence", targetId: input.assessmentId, relationType: "IMPACTS", description: `Assessment draft ${input.idempotencyKey}` });
+  return { ...result, assessmentId: input.assessmentId, architectureScope: scope };
+}
+
+export async function createAssessmentContextPackDraft(input: RequirementAssessmentScopeInput & { assessmentId: string; contextPack: Omit<ContextPack, "architectureScope" | "createdAt"> & { localizedContent?: ContextPack["localizedContent"] }; idempotencyKey: string }) {
+  const scope = resolveWritableScope(writableActor(), input.architectureScope);
+  const assessment = await prisma.requirementAssessment.findFirst({ where: { id: input.assessmentId, ...scope } });
+  if (!assessment) throw new Error("ASSESSMENT_NOT_FOUND");
+  if (assessment.lifecycle !== "ACCEPTED") throw new Error(`ASSESSMENT_NOT_ACCEPTED:${assessment.lifecycle}`);
+  const pack: ContextPack = { ...input.contextPack, architectureScope: scope, createdAt: new Date().toISOString() };
+  const result = await upsertContextPack({ contextPack: pack });
+  await upsertAssetLink({ architectureScope: scope, sourceType: "contextPack", sourceId: pack.id, targetType: "proposal", targetId: pack.proposalId, relationType: "IMPLEMENTS_CONTEXT_FOR", description: `Assessment context draft ${input.idempotencyKey}` });
+  return { ...result, assessmentId: input.assessmentId, architectureScope: scope };
 }
 
 export async function cancelRequirementAssessment(input: RequirementAssessmentScopeInput & { runId: string }) {

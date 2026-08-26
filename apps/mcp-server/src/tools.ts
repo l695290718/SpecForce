@@ -24,7 +24,7 @@ import { getCoverageBuild, requestCoverageBuild } from "./knowledge/coverage-bui
 import { get3aCoverageReport } from "./knowledge/coverage-report";
 import { compare3aPublishedBaselines, get3aAlignment, get3aArchitectureFact, list3aProjectionManifests, list3aPublishedBaselines, query3aArchitectureMap, query3aArchitectureUnitNeighborhood, search3aArchitectureFacts, trace3aArchitecturePath } from "./knowledge/query-adapter";
 import { get3aArchitectureUnitNeighborhood, get3aAssetMapping, search3aArchitectureMap, search3aArchitectureRealizations, search3aAssetMappings } from "./knowledge/architecture-map-adapter";
-import { acceptRequirementAssessment, cancelRequirementAssessment, createRequirementAssessment, getRequirementAssessment, listRequirementAssessments, recordAssessmentExecutionActual } from "./requirement-assessment/tools";
+import { acceptRequirementAssessment, cancelRequirementAssessment, createAssessmentContextPackDraft, createAssessmentProposalDraft, createRequirementAssessment, getRequirementAssessment, listRequirementAssessments, recordAssessmentExecutionActual } from "./requirement-assessment/tools";
 import {
   analyzeScopedProposalImpact,
   buildScopedAssetGraph,
@@ -1087,4 +1087,20 @@ export function registerTools(server: McpServer): void {
     permissions: ["asset:write"],
     readOnly: false
   }, recordAssessmentExecutionActual);
+
+  registerJsonTool(server, "create_assessment_proposal_draft", {
+    title: "Create assessment Proposal draft",
+    description: "Creates a Proposal draft and a typed link only after the assessment is accepted; all writes remain within MCP.",
+    inputSchema: { architectureScope: architectureScopeSchema, assessmentId: z.string().min(1), idempotencyKey: z.string().min(1).max(256), proposal: z.object({ id: z.string().min(1), name: z.string().min(1), description: z.string().min(1), title: z.string().min(1), background: z.string(), goal: z.string(), nonGoal: z.string(), scope: z.string(), impactedAssets: z.array(z.object({ type: z.string(), id: z.string(), label: z.string() })), specChanges: z.array(z.string()), risks: z.array(z.string()), rolloutPlan: z.string(), rollbackPlan: z.string().optional(), status: z.enum(["draft", "reviewing", "approved", "implemented", "archived"]), localizedContent: z.unknown().optional() }) },
+    permissions: ["asset:write"],
+    readOnly: false
+  }, (input) => createAssessmentProposalDraft(input as Parameters<typeof createAssessmentProposalDraft>[0]));
+
+  registerJsonTool(server, "create_assessment_context_pack_draft", {
+    title: "Create assessment Context Pack draft",
+    description: "Creates a Context Pack draft and typed link for an accepted assessment through MCP.",
+    inputSchema: { architectureScope: architectureScopeSchema, assessmentId: z.string().min(1), idempotencyKey: z.string().min(1).max(256), contextPack: z.object({ id: z.string().min(1), name: z.string().min(1), proposalId: z.string().min(1), targetAgent: z.string().min(1), summary: z.string(), includedAssets: z.array(z.object({ type: z.string(), id: z.string(), label: z.string() })), constraints: z.array(z.string()), instructions: z.array(z.string()), generatedMarkdown: z.string(), localizedContent: z.unknown().optional() }) },
+    permissions: ["asset:write"],
+    readOnly: false
+  }, (input) => createAssessmentContextPackDraft(input as Parameters<typeof createAssessmentContextPackDraft>[0]));
 }
