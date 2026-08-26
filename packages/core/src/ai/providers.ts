@@ -7,6 +7,8 @@ import type {
   AIProviderResponse,
   BusinessRuleDraft,
   ProposalDraft,
+  RequirementAssessmentDraft,
+  RequirementAssessmentReviewDraft,
   SemanticCandidateDraft,
   TestSuggestionsDraft
 } from "./types";
@@ -26,7 +28,7 @@ function codeFrom(input: string): string {
 export class MockAIProvider implements AIProvider {
   id = "mock";
   label = "Mock AI Provider";
-  capabilities: AIProviderCapability[] = ["proposal", "adr", "businessRule", "testSuggestions", "agentContextPack", "semanticCandidates"];
+  capabilities: AIProviderCapability[] = ["proposal", "adr", "businessRule", "testSuggestions", "agentContextPack", "semanticCandidates", "requirementAssessment", "requirementAssessmentReview"];
 
   async generate<TContent = Record<string, unknown>>(request: AIProviderRequest): Promise<AIProviderResponse<TContent>> {
     if (!this.capabilities.includes(request.capability)) {
@@ -42,12 +44,17 @@ export class MockAIProvider implements AIProvider {
       usage: {
         mocked: true,
         inputTokens: Math.ceil(request.prompt.length / 4),
-        outputTokens: JSON.stringify(content).length / 4
+        outputTokens: Math.ceil(JSON.stringify(content).length / 4),
+        toolCalls: 0,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+        reasoningTokens: 0,
+        retryCount: 0
       }
     };
   }
 
-  private generateContent(request: AIProviderRequest): ProposalDraft | AdrDraft | BusinessRuleDraft | TestSuggestionsDraft | AgentContextPackDraft | SemanticCandidateDraft[] {
+  private generateContent(request: AIProviderRequest): ProposalDraft | AdrDraft | BusinessRuleDraft | TestSuggestionsDraft | AgentContextPackDraft | SemanticCandidateDraft[] | RequirementAssessmentDraft | RequirementAssessmentReviewDraft {
     const prompt = words(request.prompt);
 
     switch (request.capability) {
@@ -116,6 +123,23 @@ export class MockAIProvider implements AIProvider {
         };
       case "semanticCandidates":
         return mockSemanticCandidates(request);
+      case "requirementAssessment":
+        return {
+          summary: `Mock evidence-grounded assessment for ${prompt}.`,
+          requirementKinds: ["generic"],
+          options: [
+            { id: "option-preserve", title: "Preserve current contracts", rationale: "Minimizes compatibility and migration risk." },
+            { id: "option-evolve", title: "Evolve the affected design assets", rationale: "Allows the requirement while keeping changes explicit and reviewable." }
+          ],
+          assumptions: ["The selected application-service Scope is authorized.", "Deterministic governance findings remain authoritative."],
+          unknowns: ["Confirm acceptance criteria and external ownership before implementation."]
+        };
+      case "requirementAssessmentReview":
+        return {
+          disposition: "needs-attention",
+          findings: [{ code: "MOCK_REVIEW_REQUIRED", severity: "warning", detail: `Independently confirm evidence coverage for ${prompt}.` }],
+          checkedRules: ["Scope authorization", "Evidence coverage", "Estimate calibration status"]
+        };
     }
   }
 }
@@ -123,7 +147,7 @@ export class MockAIProvider implements AIProvider {
 export class OpenAIProvider implements AIProvider {
   id = "openai";
   label = "OpenAI Provider";
-  capabilities: AIProviderCapability[] = ["proposal", "adr", "businessRule", "testSuggestions", "agentContextPack", "semanticCandidates"];
+  capabilities: AIProviderCapability[] = ["proposal", "adr", "businessRule", "testSuggestions", "agentContextPack", "semanticCandidates", "requirementAssessment", "requirementAssessmentReview"];
 
   async generate<TContent = Record<string, unknown>>(_request: AIProviderRequest): Promise<AIProviderResponse<TContent>> {
     throw new Error("OpenAIProvider is not configured. Add an implementation and credentials in a future integration slice.");

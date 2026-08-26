@@ -7,6 +7,8 @@ import type {
   AIProviderResponse,
   BusinessRuleDraft,
   ProposalDraft,
+  RequirementAssessmentDraft,
+  RequirementAssessmentReviewDraft,
   SemanticCandidateDraft,
   TestSuggestionsDraft
 } from "./types";
@@ -50,4 +52,12 @@ export async function generateSemanticCandidates(request: { observations: ScanOb
     prompt: "Generate evidence-backed semantic candidates for scanned observations. Never promote or accept facts.",
     context: { observations: request.observations }
   });
+}
+
+export async function generateRequirementAssessment(request: DraftRequest): Promise<AIProviderResponse<RequirementAssessmentDraft>> {
+  return defaultRegistry.generate<RequirementAssessmentDraft>({ ...request, capability: "requirementAssessment" });
+}
+
+export async function generateRequirementAssessmentReview(request: DraftRequest): Promise<AIProviderResponse<RequirementAssessmentReviewDraft>> {
+  return defaultRegistry.generate<RequirementAssessmentReviewDraft>({ ...request, capability: "requirementAssessmentReview" });
 }

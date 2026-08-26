@@ -4,7 +4,9 @@ export type AIProviderCapability =
   | "businessRule"
   | "testSuggestions"
   | "agentContextPack"
-  | "semanticCandidates";
+  | "semanticCandidates"
+  | "requirementAssessment"
+  | "requirementAssessmentReview";
 
 export interface AIProviderRequest {
   capability: AIProviderCapability;
@@ -22,6 +24,11 @@ export interface AIProviderResponse<TContent = Record<string, unknown>> {
     mocked: boolean;
     inputTokens?: number;
     outputTokens?: number;
+    toolCalls?: number;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+    reasoningTokens?: number;
+    retryCount?: number;
   };
 }
 
@@ -86,4 +93,18 @@ export interface SemanticCandidateDraft {
   matchingEvidence: string[];
   counterEvidence: string[];
   unresolvedQuestions: string[];
+}
+
+export interface RequirementAssessmentDraft {
+  summary: string;
+  requirementKinds: string[];
+  options: Array<{ id: string; title: string; rationale: string }>;
+  assumptions: string[];
+  unknowns: string[];
+}
+
+export interface RequirementAssessmentReviewDraft {
+  disposition: "pass" | "needs-attention";
+  findings: Array<{ code: string; severity: "warning" | "blocking"; detail: string }>;
+  checkedRules: string[];
 }

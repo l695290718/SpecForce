@@ -9,6 +9,7 @@ export * from "./impact/analyze";
 export * from "./impact/evaluate";
 export * from "./summary/render";
 export * from "./ai";
+export * from "./requirement-assessment";
 export * from "./assets/service";
 export * from "./audit/log";
 export * from "./proposals/service";

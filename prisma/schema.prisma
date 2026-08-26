@@ -1696,3 +1696,260 @@ model KnowledgePromotionReceipt {
   @@unique([applicationServiceId, scopePath, id], map: "KnowledgePromotionReceipt_scope_id_key")
   @@unique([applicationServiceId, scopePath, promotionDecisionId, sourceDigest], map: "KnowledgePromotionReceipt_scope_decision_digest_key")
 }
+
+// Requirement assessment records are authored operational facts. They are
+// intentionally independent of graph projection tables so the exact Scope
+// boundary cannot be bypassed by a cross-Scope relation.
+model RequirementBrief {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  enterpriseId         String
+  requirementId        String
+  revision             Int
+  canonicalIntent      String
+  localizedContent     Json     @default("{}") @db.JsonB
+  confirmedFacts       Json     @default("{}") @db.JsonB
+  assumptions          Json     @default("[]") @db.JsonB
+  acceptanceCriteria   Json     @default("[]") @db.JsonB
+  qualityTargets       Json     @default("{}") @db.JsonB
+  constraints          Json     @default("[]") @db.JsonB
+  exclusions           Json     @default("[]") @db.JsonB
+  sourceReferences     Json     @default("[]") @db.JsonB
+  authorId             String
+  contentDigest        String
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "RequirementBrief_scope_id_key")
+  @@unique([applicationServiceId, scopePath, requirementId, revision], map: "RequirementBrief_scope_requirement_revision_key")
+  @@index([applicationServiceId, scopePath, contentDigest], map: "RequirementBrief_scope_digest_idx")
+}
+
+model RequirementAssessmentRun {
+  dbId                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                      String
+  enterpriseId            String
+  requirementId           String
+  requirementRevision     Int
+  idempotencyKey          String
+  status                  String
+  stage                   String
+  evidenceSnapshotId      String?
+  assessmentId            String?
+  leaseOwner              String?
+  leaseExpiresAt          DateTime?
+  heartbeatAt             DateTime?
+  retryCount              Int      @default(0)
+  cancellationRequestedAt DateTime?
+  stopReason              String?
+  partialDiagnostics      Json     @default("{}") @db.JsonB
+  modelInvocationRefs     Json     @default("[]") @db.JsonB
+  startedAt               DateTime?
+  completedAt             DateTime?
+  applicationServiceId    String
+  scopePath               String
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "RequirementAssessmentRun_scope_id_key")
+  @@unique([applicationServiceId, scopePath, idempotencyKey], map: "RequirementAssessmentRun_scope_idempotency_key")
+  @@index([applicationServiceId, scopePath, status, createdAt], map: "RequirementAssessmentRun_scope_status_created_idx")
+  @@index([applicationServiceId, scopePath, leaseExpiresAt], map: "RequirementAssessmentRun_scope_lease_idx")
+}
+
+model AssessmentEvidenceSnapshot {
+  dbId                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                      String
+  enterpriseId            String
+  requirementId           String
+  requirementRevision     Int
+  authorizationDecisionRef String
+  catalogWaterline        String
+  relationshipWaterline   String
+  projectionCheckpoint    String?
+  orderedAssetManifest    Json     @default("[]") @db.JsonB
+  relationshipManifest    Json     @default("[]") @db.JsonB
+  rulesetRevision         String
+  coveragePolicyRevision  String
+  promptTemplateDigest    String
+  reviewTemplateDigest    String
+  modelProfileRevision    String
+  executionProfileRevision String
+  contentDigest           String
+  validAtWaterline        String
+  applicationServiceId    String
+  scopePath               String
+  createdAt               DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, id], map: "AssessmentEvidenceSnapshot_scope_id_key")
+  @@unique([applicationServiceId, scopePath, contentDigest], map: "AssessmentEvidenceSnapshot_scope_digest_key")
+  @@index([applicationServiceId, scopePath, requirementId, requirementRevision], map: "AssessmentEvidenceSnapshot_scope_requirement_revision_idx")
+  @@index([applicationServiceId, scopePath, contentDigest], map: "AssessmentEvidenceSnapshot_scope_content_digest_idx")
+}
+
+model RequirementAssessment {
+  dbId                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                      String
+  enterpriseId            String
+  requirementId           String
+  revision                Int
+  lifecycle               String
+  verdict                 String
+  confidence              Float
+  evidenceCoverage        Float
+  evidenceSnapshotId      String
+  designContextDigest     String
+  canonicalSummary        String
+  localizedContent        Json     @default("{}") @db.JsonB
+  impactedFacts           Json     @default("[]") @db.JsonB
+  hardConstraints         Json     @default("[]") @db.JsonB
+  unresolvedDependencies  Json     @default("[]") @db.JsonB
+  solutionOptions         Json     @default("[]") @db.JsonB
+  workBreakdown           Json     @default("[]") @db.JsonB
+  humanEstimate           Json     @default("{}") @db.JsonB
+  aiEstimate              Json     @default("{}") @db.JsonB
+  assumptions             Json     @default("[]") @db.JsonB
+  unknowns                Json     @default("[]") @db.JsonB
+  sensitivityFactors      Json     @default("[]") @db.JsonB
+  reviewResult            Json     @default("{}") @db.JsonB
+  validAtWaterline        String
+  invalidatedBy           String?
+  invalidatedAt           DateTime?
+  staleReason             String?
+  supersedesId            String?
+  contentDigest           String
+  applicationServiceId    String
+  scopePath               String
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "RequirementAssessment_scope_id_key")
+  @@unique([applicationServiceId, scopePath, requirementId, revision], map: "RequirementAssessment_scope_requirement_revision_key")
+  @@index([applicationServiceId, scopePath, lifecycle, createdAt], map: "RequirementAssessment_scope_lifecycle_created_idx")
+  @@index([applicationServiceId, scopePath, contentDigest], map: "RequirementAssessment_scope_content_digest_idx")
+  @@index([applicationServiceId, scopePath, evidenceSnapshotId], map: "RequirementAssessment_scope_snapshot_idx")
+}
+
+model RequirementAssessmentTask {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  enterpriseId         String
+  assessmentId         String
+  requirementId        String
+  assessmentRevision   Int
+  sequence             Int
+  kind                 String
+  title                String
+  description          String
+  details              Json     @default("{}") @db.JsonB
+  dependencies         Json     @default("[]") @db.JsonB
+  estimate             Json     @default("{}") @db.JsonB
+  contentDigest        String
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "RequirementAssessmentTask_scope_id_key")
+  @@unique([applicationServiceId, scopePath, assessmentId, assessmentRevision, sequence], map: "RequirementAssessmentTask_scope_sequence_key")
+  @@index([applicationServiceId, scopePath, assessmentId, sequence], map: "RequirementAssessmentTask_scope_assessment_sequence_idx")
+  @@index([applicationServiceId, scopePath, contentDigest], map: "RequirementAssessmentTask_scope_content_digest_idx")
+}
+
+model ModelProfile {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  enterpriseId         String
+  profileId            String
+  revision             Int
+  provider             String
+  model                String
+  contextLimit         Int
+  inputPrice           Float?
+  outputPrice          Float?
+  approvedDataClasses  Json     @default("[]") @db.JsonB
+  calibration          Json     @default("{}") @db.JsonB
+  observedUsage        Json     @default("{}") @db.JsonB
+  cachingPolicy        Json     @default("{}") @db.JsonB
+  priceAssumptions     Json     @default("{}") @db.JsonB
+  supportedToolProfile Json     @default("{}") @db.JsonB
+  effectiveFrom        DateTime
+  effectiveTo          DateTime?
+  status               String
+  contentDigest        String
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "ModelProfile_scope_id_key")
+  @@unique([applicationServiceId, scopePath, profileId, revision], map: "ModelProfile_scope_profile_revision_key")
+  @@index([applicationServiceId, scopePath, status, createdAt], map: "ModelProfile_scope_status_created_idx")
+  @@index([applicationServiceId, scopePath, contentDigest], map: "ModelProfile_scope_content_digest_idx")
+}
+
+model AgentExecutionProfile {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  enterpriseId         String
+  profileId            String
+  revision             Int
+  primaryModelProfileId String
+  reviewModelProfileId  String
+  toolSet              Json     @default("[]") @db.JsonB
+  contextAssembly      Json     @default("{}") @db.JsonB
+  maxContextTokens     Int
+  maxOutputTokens      Int
+  maxRepairLoops       Int
+  maxToolCalls         Int
+  hardTokenBudget      Int
+  stopOnBudgetExceeded Boolean
+  retryPolicy          Json     @default("{}") @db.JsonB
+  concurrency          Int      @default(1)
+  cacheBehavior        Json     @default("{}") @db.JsonB
+  verificationCommands Json     @default("[]") @db.JsonB
+  stopConditions       Json     @default("[]") @db.JsonB
+  overrunPolicy        Json     @default("{}") @db.JsonB
+  status               String
+  contentDigest        String
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "AgentExecutionProfile_scope_id_key")
+  @@unique([applicationServiceId, scopePath, profileId, revision], map: "AgentExecutionProfile_scope_profile_revision_key")
+  @@index([applicationServiceId, scopePath, status, createdAt], map: "AgentExecutionProfile_scope_status_created_idx")
+  @@index([applicationServiceId, scopePath, contentDigest], map: "AgentExecutionProfile_scope_content_digest_idx")
+}
+
+model AssessmentExecutionActual {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  enterpriseId         String
+  requirementId        String
+  assessmentId         String
+  runId                String?
+  executionProfileId   String
+  modelRevisions       Json     @default("{}") @db.JsonB
+  usageDetails         Json     @default("{}") @db.JsonB
+  toolInvocations      Json     @default("[]") @db.JsonB
+  verificationCycles   Int      @default(0)
+  failedAttempts       Int      @default(0)
+  humanIntervention    Json     @default("{}") @db.JsonB
+  elapsedAgentSeconds  Int?
+  actualPersonDays     Float?
+  changedAssets        Json     @default("[]") @db.JsonB
+  finalStatus          String
+  contentDigest        String
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "AssessmentExecutionActual_scope_id_key")
+  @@index([applicationServiceId, scopePath, assessmentId, createdAt], map: "AssessmentExecutionActual_scope_assessment_created_idx")
+  @@index([applicationServiceId, scopePath, contentDigest], map: "AssessmentExecutionActual_scope_content_digest_idx")
+}
