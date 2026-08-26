@@ -1,6 +1,6 @@
 # SpecForge Design Center deployment
 
-This directory provides the supported single-host deployment. It manages one Web service, one authoritative PostgreSQL service, a direct first-startup Bootstrap service, a governed one-shot 3A baseline/projection Bootstrap service, and the asynchronous Knowledge Projector. The default Web port is `3010` so it does not conflict with a local development server on `3000`.
+This directory provides the supported single-host deployment. It manages one Web service, one authoritative PostgreSQL service, a direct first-startup Bootstrap service, a governed one-shot 3A baseline/projection Bootstrap service, the asynchronous Knowledge Projector, the connector Worker, and the exact-Scope Requirement Assessment Worker. The default Web port is `3010` so it does not conflict with a local development server on `3000`.
 
 PostgreSQL is authoritative for authored design facts and relationship events. On a brand-new empty database, the direct one-shot Bootstrap service creates the authored catalog and canonical relationship events. After it succeeds, the governed 3A Bootstrap service invokes the MCP tools `prepare_design_change`, `bootstrap_3a_from_design_assets`, `request_3a_projection_build`, `get_3a_projection_build`, and `close_design_change_session`; it waits for a `READY` projection before the Web service is released. Business design changes continue through MCP. The startup scripts never run a recurring seed, clean, reset, or delete the PostgreSQL volume. NebulaGraph is optional and is not started by this deployment profile. MCP remains an Agent-launched stdio process, not a network container.
 
@@ -65,6 +65,8 @@ Required in `deploy/.env`:
 | `POSTGRES_PASSWORD` | Bundled PostgreSQL password; never use the example placeholder. |
 | `POSTGRES_DB` | Bundled PostgreSQL database name. |
 | `SPECFORGE_WEB_PORT` | Host port for Web; defaults to `3010`. |
+| `SPECFORGE_ASSESSMENT_RECONCILIATION_STATUS` | Assessment governance gate; keep `UNVERIFIED` until the scoped design-fact reconciliation passes, then set `CONVERGED`. |
+| `SPECFORGE_ASSESSMENT_WORKER_INTERVAL_MS` | Assessment Worker poll interval; defaults to `5000`. |
 | `SPECFORGE_3A_CURSOR_ACTIVE_KEY_ID` | Active key ID used to sign bounded 3A cursors. |
 | `SPECFORGE_3A_CURSOR_KEYS` | JSON object of key IDs to base64-encoded secrets. |
 | `SPECFORGE_WEB_AUTH_MODE` | `static` for an explicitly configured local/deployment principal, or `production` when an injected WebPrincipalResolver is provided by the host integration. |
@@ -90,6 +92,6 @@ The live check validates Web health and design-asset count across a Web restart.
 
 ## What The Scripts Manage
 
-Managed: Docker Web, bundled PostgreSQL, direct first-startup Bootstrap, governed 3A Bootstrap, Knowledge Projector, health checks, and the named PostgreSQL volume.
+Managed: Docker Web, bundled PostgreSQL, direct first-startup Bootstrap, governed 3A Bootstrap, Knowledge Projector, Connector Worker, Requirement Assessment Worker, health checks, and the named PostgreSQL volume.
 
 Not managed: local Node development on port `3000`, MCP stdio client processes, NebulaGraph, TLS termination, enterprise identity, backups, and external PostgreSQL lifecycle.

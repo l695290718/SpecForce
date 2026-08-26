@@ -9,6 +9,7 @@ import type {
 
 export interface RequirementAssessmentRunRecord extends AssessmentRunRef {
   requirementId: string;
+  requirementRevision: number;
   status: AssessmentRunStatus;
   stage: string;
   evidenceSnapshotId?: string | null;
@@ -180,8 +181,9 @@ export class PrismaRequirementAssessmentRepository {
 
   async saveSnapshot(input: AssessmentEvidenceSnapshot): Promise<void> {
     const scope = scopeWhere(input);
-    await this.prisma.assessmentEvidenceSnapshot.create({
-      data: {
+    await this.prisma.assessmentEvidenceSnapshot.upsert({
+      where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } },
+      create: {
         id: input.id,
         enterpriseId: input.enterpriseId,
         requirementId: input.requirementId,
@@ -201,14 +203,20 @@ export class PrismaRequirementAssessmentRepository {
         contentDigest: input.contentDigest,
         validAtWaterline: input.validAtWaterline,
         ...scope
+      },
+      update: {
+        orderedAssetManifest: input.orderedAssetManifest as Prisma.InputJsonValue,
+        relationshipManifest: input.relationshipManifest as Prisma.InputJsonValue,
+        contentDigest: input.contentDigest,
+        validAtWaterline: input.validAtWaterline,
+        projectionCheckpoint: input.projectionCheckpoint
       }
     });
   }
 
   async saveAssessmentRevision(input: SaveAssessmentRevisionInput) {
     const scope = scopeWhere(input);
-    return this.prisma.requirementAssessment.create({
-      data: {
+    const data = {
         id: input.id,
         enterpriseId: input.enterpriseId,
         requirementId: input.requirementId,
@@ -235,7 +243,11 @@ export class PrismaRequirementAssessmentRepository {
         validAtWaterline: input.validAtWaterline,
         contentDigest: input.contentDigest,
         ...scope
-      }
+    };
+    return this.prisma.requirementAssessment.upsert({
+      where: { applicationServiceId_scopePath_id: { ...scope, id: input.id } },
+      create: data,
+      update: data
     });
   }
 
@@ -255,10 +267,40 @@ export class PrismaRequirementAssessmentRepository {
       data: { status: "CANCELLATION_REQUESTED", cancellationRequestedAt: new Date() }
     });
   }
+
+  async listRunnableRuns(scope: AssessmentScopeRef, limit = 10): Promise<RequirementAssessmentRunRecord[]> {
+    const rows = await this.prisma.requirementAssessmentRun.findMany({ where: { ...scopeWhere(scope), status: "QUEUED" }, orderBy: [{ createdAt: "asc" }, { dbId: "asc" }], take: limit });
+    return rows.map(toRunRecord);
+  }
+
+  async findBrief(ref: AssessmentRunRef, requirementId: string, revision: number) {
+    return this.prisma.requirementBrief.findFirst({ where: { requirementId, revision, ...scopeWhere(ref) } });
+  }
+
+  async findSnapshot(ref: AssessmentRunRef, snapshotId: string) {
+    return this.prisma.assessmentEvidenceSnapshot.findFirst({ where: { id: snapshotId, ...scopeWhere(ref) } });
+  }
+
+  async markReviewed(ref: AssessmentRunRef, assessmentId: string, reviewResult: unknown) {
+    const updated = await this.prisma.requirementAssessment.updateMany({ where: { id: assessmentId, lifecycle: "ASSESSED", ...scopeWhere(ref) }, data: { lifecycle: "REVIEWED", reviewResult: reviewResult as Prisma.InputJsonValue } });
+    if (updated.count !== 1) throw new Error("ASSESSMENT_REVIEW_FENCE_LOST");
+  }
+
+  async currentWaterline(scope: AssessmentScopeRef): Promise<string> {
+    const [cursor, relationship] = await Promise.all([
+      this.prisma.authoredCatalogCursor.findUnique({ where: { applicationServiceId_scopePath: scopeWhere(scope) }, select: { nextVersion: true } }),
+      this.prisma.relationshipEvent.aggregate({ where: scopeWhere(scope), _max: { graphVersion: true } })
+    ]);
+    return `${cursor?.nextVersion?.toString() ?? "0"}:${relationship._max.graphVersion?.toString() ?? "0"}`;
+  }
+
+  async listAssessmentsForFreshness(scope: AssessmentScopeRef, limit = 100) {
+    return this.prisma.requirementAssessment.findMany({ where: { lifecycle: { in: ["ACCEPTED", "REVIEWED", "ASSESSED"] }, ...scopeWhere(scope) }, orderBy: { updatedAt: "asc" }, take: limit });
+  }
 }
 
 function toRunRecord(row: {
-  id: string; enterpriseId: string; requirementId: string; status: string; stage: string;
+  id: string; enterpriseId: string; requirementId: string; requirementRevision: number; status: string; stage: string;
   applicationServiceId: string; scopePath: string; evidenceSnapshotId: string | null;
   assessmentId: string | null; leaseOwner: string | null; leaseExpiresAt: Date | null;
   heartbeatAt: Date | null; retryCount: number; stopReason: string | null;
@@ -267,6 +309,7 @@ function toRunRecord(row: {
     id: row.id,
     enterpriseId: row.enterpriseId,
     requirementId: row.requirementId,
+    requirementRevision: row.requirementRevision,
     status: row.status as AssessmentRunStatus,
     stage: row.stage,
     applicationServiceId: row.applicationServiceId,

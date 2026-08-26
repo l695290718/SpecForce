@@ -6,6 +6,8 @@
   "main": "src/repository.ts",
   "types": "src/repository.ts",
   "scripts": {
+    "dev": "tsx src/main.ts",
+    "start": "tsx src/main.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },

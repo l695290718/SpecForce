@@ -23,7 +23,7 @@ const handlers: AssessmentWorkerHandlers = {
 };
 
 function runRecord(): RequirementAssessmentRunRecord {
-  return { ...ref, requirementId: "brief-1", status: "QUEUED", stage: "QUEUED", retryCount: 0 };
+  return { ...ref, requirementId: "brief-1", requirementRevision: 1, status: "QUEUED", stage: "QUEUED", retryCount: 0 };
 }
 
 describe("durable requirement assessment worker", () => {
