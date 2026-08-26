@@ -13,7 +13,7 @@ const PROTOCOL_COLORS: Record<string, string> = {
   UNNORMALIZED: "#94a3b8"
 };
 
-const LABELS: Record<Locale, Record<string, string>> = {
+export const INTEGRATION_ATLAS_LABELS: Record<Locale, Record<string, string>> = {
   zh: {
     title: "集成图谱（有界投影）",
     hint: "点击连线查看契约详情。画布最多渲染 100 节点 / 200 边；完整清单以列表为准。",
@@ -25,6 +25,7 @@ const LABELS: Record<Locale, Record<string, string>> = {
     locator: "定位器",
     lifecycle: "生命周期",
     ownerScope: "归属 Scope",
+    verificationState: "验证状态",
     close: "关闭"
   },
   en: {
@@ -38,13 +39,14 @@ const LABELS: Record<Locale, Record<string, string>> = {
     locator: "Locator",
     lifecycle: "Lifecycle",
     ownerScope: "Owning scope",
+    verificationState: "Verification state",
     close: "Close"
   }
 };
 
 export function IntegrationAtlasCanvas({ nodes, edges, partialReason, language }: { nodes: AtlasNode[]; edges: AtlasEdge[]; partialReason: string | null; language: Locale }) {
   const { t } = useLanguage();
-  const labels = { ...LABELS.zh, ...LABELS.en, ...(LABELS[language] ?? {}) };
+  const labels = { ...INTEGRATION_ATLAS_LABELS.zh, ...INTEGRATION_ATLAS_LABELS.en, ...(INTEGRATION_ATLAS_LABELS[language] ?? {}) };
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | undefined>();
   const selected = useMemo(() => edges.find((edge) => edge.id === selectedEdgeId), [edges, selectedEdgeId]);
 
@@ -123,7 +125,7 @@ export function IntegrationAtlasCanvas({ nodes, edges, partialReason, language }
             <span>{labels.locator}: <code>{selected.restricted ? "—" : selected.protocolLocator || "—"}</code></span>
             <span>protocol: {selected.protocolKind}</span>
             <span>{labels.lifecycle}: {selected.lifecycle}</span>
-            <span data-testid="integration-drawer-verification">verification: {selected.verificationState}</span>
+            <span data-testid="integration-drawer-verification">{labels.verificationState}: {selected.verificationState}</span>
           </div>
         </div>
       ) : null}
