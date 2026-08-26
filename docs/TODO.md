@@ -295,3 +295,31 @@ Only incomplete work is listed here. Completed and superseded records are preser
 **启动条件：** 在精确 Designer Scope 执行设计事实同步与回读，启动权威 Web 服务，完成桌面和紧凑视口检查，并用生产遥测认证声明的容量。
 
 **完成证据：** MCP 记录与有类型链接回读时 missing、mismatched、outOfScope、blocked 均为空；浏览器确认 MODEL/SCOPE 隔离、过滤、选择、双语、WebGL 回退和快照恢复；生产容量通过测量得到而非推断。
+
+## 12. Evidence-Driven Requirement Assessment Center Phase 2/3
+
+**Status:** Deferred; Phase 1 is limited to exact-Scope design evidence, durable assessment runs, deterministic coverage, heuristic planning ranges, explicit AI token budgets, and governed implementation handoff.
+
+**Owner:** SpecForge Architecture, AI Governance, and Integration.
+
+**Rationale:** The first release must not fabricate precision or pretend that source-code and runtime semantics are already available. Repository/code ownership mappings, OpenAPI and schema observations, test coverage, deployment topology, selected runtime evidence, calibration samples, and connector delivery require separate evidence and operational ownership.
+
+**Trigger:** Start Phase 2 when approved repository and runtime evidence sources are available for the target Scope. Start Phase 3 only after representative completed work items and actual execution/token records are retained for calibration and backtesting.
+
+**Deferred work:** Phase 2 adds bounded repository/code ownership, API/schema, test, deployment, and selected runtime evidence adapters with provenance and redaction. Phase 3 adds ExecutionActual ingestion, representative-sample thresholds, backtesting, drift monitoring, and calibrated P50/P90 quality reporting. External CodeHub or other connector delivery remains a separately governed increment.
+
+**Completion evidence:** Each phase has a new exact-Scope design session, bilingual MCP assets and typed links, immutable evidence snapshots, source digests, rejection and retry states, focused tests, reconciliation read-back, and updated Context Packs. Calibration must demonstrate error metrics and drift controls before P50/P90 is exposed.
+
+**中文本地化：**
+
+**状态：** 延期；第一阶段仅覆盖精确 Scope 设计证据、持久化评估运行、确定性覆盖、启发式规划区间、明确 AI Token 预算和受治理的实现交接。
+
+**负责人：** SpecForge 架构、AI 治理与集成团队。
+
+**理由：** 第一阶段不能伪造精度，也不能假设代码和运行时语义已经可用。仓库/代码归属、OpenAPI 与 Schema 观测、测试覆盖、部署拓扑、选定运行时证据、校准样本和连接器交付都需要独立证据与运营负责人。
+
+**启动条件：** 目标 Scope 有获批的仓库和运行时证据来源时启动第二阶段；只有在保留足够代表性的已完成工作项、实际执行记录和 Token 记录后，才启动第三阶段校准与回测。
+
+**延期工作：** 第二阶段增加带来源和脱敏能力的有界仓库/代码归属、API/Schema、测试、部署和选定运行时证据适配器。第三阶段增加 ExecutionActual 接入、代表性样本阈值、回测、漂移监控和校准后的 P50/P90 质量报告。CodeHub 或其他外部连接器交付仍是独立治理增量。
+
+**完成证据：** 每个阶段都必须有新的精确 Scope 设计会话、双语 MCP 资产和有类型链接、不可变证据快照、来源摘要、拒绝与重试状态、聚焦测试、对账回读和更新后的 Context Pack。只有校准证明误差指标和漂移控制后，才允许暴露 P50/P90。

@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(28);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(28);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(28);
+  expect(manifest.decisions).toHaveLength(29);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(29);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(29);
   const proposalByContextPack = new Map<string, string>();
 
   for (const decision of manifest.decisions) {
@@ -32,6 +32,31 @@ it("maps every baseline decision to a complete repository and MCP record", () =>
 
 it("includes federated design-fact governance in the baseline", () => {
   expect(manifest.decisions.some((decision) => decision.mcpAdrId === "adr-federated-design-fact-synchronization")).toBe(true);
+});
+
+it("includes the evidence-driven requirement assessment center baseline", () => {
+  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-requirement-assessment-center");
+  expect(decision?.proposalId).toBe("proposal-requirement-assessment-center");
+  expect(decision?.contextPackId).toBe("context-pack-requirement-assessment-center");
+  expect(decision?.scope).toEqual(expectedScope);
+  expect(decision?.managedAssets?.map((managed) => managed.asset.id)).toEqual([
+    "api-specforge-requirement-assessment",
+    "data-specforge-requirement-assessment",
+    "data-specforge-assessment-evidence-snapshot",
+    "data-specforge-model-profile",
+    "data-specforge-agent-execution-profile",
+    "rule-specforge-assessment-acceptance",
+    "quality-specforge-assessment-confidence"
+  ]);
+  expect(decision?.managedRelationships).toEqual(expect.arrayContaining([
+    expect.objectContaining({ sourceId: "api-specforge-requirement-assessment", targetId: "data-specforge-requirement-assessment", relationType: "WRITES" }),
+    expect.objectContaining({ sourceId: "api-specforge-requirement-assessment", targetId: "data-specforge-assessment-evidence-snapshot", relationType: "READS" }),
+    expect.objectContaining({ sourceId: "rule-specforge-assessment-acceptance", targetId: "quality-specforge-assessment-confidence", relationType: "GOVERNS" })
+  ]));
+  expect(decision?.managedAssets?.every((managed) => {
+    const localized = managed.asset.localizedContent as { en?: { name?: string; description?: string }; zh?: { name?: string; description?: string } };
+    return localized.en?.name && localized.en.description && localized.zh?.name && localized.zh.description;
+  })).toBe(true);
 });
 
 it("records the scoped Data Model ER workspace without claiming MCP or browser completion", () => {
@@ -187,7 +212,7 @@ it("includes the single-host Docker deployment decision in the baseline", () => 
   const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-single-host-docker-compose-deployment");
   expect(decision?.proposalId).toBe("proposal-single-host-docker-deployment");
   expect(decision?.contextPackId).toBe("context-pack-single-host-docker-deployment");
-  expect(decision?.evidence).toHaveLength(12);
+  expect(decision?.evidence).toHaveLength(13);
 });
 
 it("records the governed graph-first 3A workspace separately from assertion analysis", () => {

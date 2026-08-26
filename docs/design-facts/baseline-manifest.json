@@ -2503,6 +2503,416 @@
                                        { "command": "apps/web: node node_modules/vitest/vitest.mjs run --pool=threads", "result": "Full web suite passed 45 files and 198 tests after the restyle." },
                                        { "command": "apps/web: $env:SPECFORGE_NEXT_STANDALONE='0'; pnpm build", "result": "Exited 0 and emitted /architecture/3a; standalone packaging remains blocked only by the documented Windows/OneDrive symlink EPERM." }
                                    ]
+                  },
+                  {
+                    "id": "adr-requirement-assessment-center",
+                    "repositoryAdr": "docs/adr/0041-evidence-driven-requirement-assessment.md",
+                    "mcpAdrId": "adr-requirement-assessment-center",
+                    "scope": {
+                      "applicationServiceId": "com.huawei.celon.desiner",
+                      "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                    },
+                    "proposalId": "proposal-requirement-assessment-center",
+                    "proposalStatus": "approved",
+                    "proposalNonGoal": {
+                      "en": "Repository and runtime evidence ingestion, calibrated P50/P90 prediction, automatic implementation, and external connector delivery remain deferred to later phases.",
+                      "zh": "仓库与运行时证据接入、校准后的 P50/P90 预测、自动实现和外部连接器交付延期到后续阶段。"
+                    },
+                    "contextPackId": "context-pack-requirement-assessment-center",
+                    "relatedAssetIds": [
+                      "api-specforge-requirement-assessment",
+                      "data-specforge-requirement-assessment",
+                      "data-specforge-assessment-evidence-snapshot",
+                      "data-specforge-model-profile",
+                      "data-specforge-agent-execution-profile",
+                      "rule-specforge-assessment-acceptance",
+                      "quality-specforge-assessment-confidence"
+                    ],
+                    "managedAssets": [
+                      {
+                        "assetType": "api",
+                        "asset": {
+                          "id": "api-specforge-requirement-assessment",
+                          "name": "SpecForge Requirement Assessment API",
+                          "title": "SpecForge Requirement Assessment API",
+                          "description": "Creates and reads durable evidence-driven requirement assessments for feasibility, impact, effort range, AI token budget, risks, and implementation handoff.",
+                          "method": "POST|GET",
+                          "path": "/api/requirement-assessments",
+                          "providerSystem": "SpecForge Web and MCP",
+                          "authType": "Bearer token with exact application-service Scope grant",
+                          "requestSchema": {
+                            "requirementText": "required human or Agent requirement",
+                            "architectureScope": "exact application-service Scope",
+                            "requestedBy": "actor identity",
+                            "modelProfileId": "optional approved model profile",
+                            "agentExecutionProfileId": "optional approved Agent execution profile"
+                          },
+                          "responseSchema": {
+                            "assessmentId": "stable assessment identifier",
+                            "runId": "durable asynchronous run identifier",
+                            "status": "QUEUED|RUNNING|SUCCEEDED|FAILED|CANCELLED|STALE",
+                            "result": "feasibility, coverage, impact, effort, token budget, risks, and handoff"
+                          },
+                          "errorCodes": [
+                            "SCOPE_FORBIDDEN",
+                            "DESIGN_RECONCILIATION_BLOCKED",
+                            "ASSESSMENT_EVIDENCE_UNAVAILABLE",
+                            "ASSESSMENT_STALE",
+                            "ASSESSMENT_NOT_FOUND"
+                          ],
+                          "createdAt": "2026-08-26T00:00:00Z",
+                          "updatedAt": "2026-08-26T00:00:00Z",
+                          "localizedContent": {
+                            "en": {
+                              "name": "SpecForge Requirement Assessment API",
+                              "description": "Creates and reads durable evidence-driven requirement assessments for feasibility, impact, effort range, AI token budget, risks, and implementation handoff.",
+                              "authType": "Bearer token with exact application-service Scope grant"
+                            },
+                            "zh": {
+                              "name": "SpecForge 需求评估 API",
+                              "description": "创建和读取持久化的证据驱动需求评估，覆盖可行性、影响、工作量区间、AI Token 预算、风险和实现交接。",
+                              "authType": "具备精确应用服务 Scope 授权的 Bearer Token"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "assetType": "dataModel",
+                        "asset": {
+                          "id": "data-specforge-requirement-assessment",
+                          "name": "SpecForge Requirement Assessment Model",
+                          "description": "Authoritative model for an immutable assessment result, its state, findings, estimates, risks, handoff, and invalidation metadata.",
+                          "code": "RequirementAssessment",
+                          "modelType": "logical",
+                          "schemaVersion": 2,
+                          "domainId": "domain-specforge-governance",
+                          "entities": ["Requirement Assessment"],
+                          "entityDefinitions": [{"id": "assessment", "name": "Requirement Assessment", "ordinal": 0}],
+                          "fields": [{"id": "assessment-id", "entityId": "assessment", "ordinal": 0, "fieldName": "id", "displayName": "Assessment ID", "dataType": "string", "nullable": false, "primaryKey": true, "owner": "SpecForge"}],
+                          "relationships": ["One assessment belongs to one exact Scope.", "One assessment references one immutable evidence snapshot.", "One assessment may produce one implementation handoff."],
+                          "dataRelations": [],
+                          "constraints": ["Assessment identity and evidence references are immutable after completion.", "Only current non-stale assessments may be used for implementation handoff.", "PostgreSQL is authoritative for authored assessment records."],
+                          "lifecycle": "QUEUED -> RUNNING -> SUCCEEDED or FAILED; a completed assessment becomes STALE when its evidence or design generation changes.",
+                          "lineage": "Requirement text, exact-Scope design catalog, typed relationships, evidence snapshot, deterministic checks, AI analysis, review, and implementation handoff.",
+                          "dataClassification": "internal engineering governance metadata",
+                          "createdAt": "2026-08-26T00:00:00Z",
+                          "updatedAt": "2026-08-26T00:00:00Z",
+                          "localizedContent": {
+                            "en": {
+                              "name": "SpecForge Requirement Assessment Model",
+                              "description": "Authoritative model for an immutable assessment result, its state, findings, estimates, risks, handoff, and invalidation metadata.",
+                              "entities": {"assessment": {"displayName": "Requirement Assessment"}},
+                              "fields": {"assessment-id": {"displayName": "Assessment ID"}},
+                              "relationships": ["One assessment belongs to one exact Scope.", "One assessment references one immutable evidence snapshot.", "One assessment may produce one implementation handoff."],
+                              "constraints": ["Assessment identity and evidence references are immutable after completion.", "Only current non-stale assessments may be used for implementation handoff.", "PostgreSQL is authoritative for authored assessment records."],
+                              "lifecycle": "QUEUED -> RUNNING -> SUCCEEDED or FAILED; a completed assessment becomes STALE when its evidence or design generation changes.",
+                              "lineage": "Requirement text, exact-Scope design catalog, typed relationships, evidence snapshot, deterministic checks, AI analysis, review, and implementation handoff."
+                            },
+                            "zh": {
+                              "name": "SpecForge 需求评估模型",
+                              "description": "需求评估结果的权威模型，包含不可变结果、状态、发现项、估算、风险、实现交接和失效元数据。",
+                              "entities": {"assessment": {"displayName": "需求评估"}},
+                              "fields": {"assessment-id": {"displayName": "评估 ID"}},
+                              "relationships": ["一个评估属于一个精确 Scope。", "一个评估引用一个不可变证据快照。", "一个评估可以产生一个实现交接。"],
+                              "constraints": ["评估身份和证据引用在完成后不可变。", "只有当前且未失效的评估可以用于实现交接。", "PostgreSQL 对编写的评估记录保持权威。"],
+                              "lifecycle": "QUEUED -> RUNNING -> SUCCEEDED 或 FAILED；当证据或设计代次变化时，已完成评估变为 STALE。",
+                              "lineage": "需求文本、精确 Scope 设计目录、有类型关系、证据快照、确定性检查、AI 分析、审核和实现交接。"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "assetType": "dataModel",
+                        "asset": {
+                          "id": "data-specforge-assessment-evidence-snapshot",
+                          "name": "SpecForge Assessment Evidence Snapshot Model",
+                          "description": "Immutable, generation-bound snapshot of the scoped design facts, relationships, governance rules, and source digests used by an assessment.",
+                          "code": "AssessmentEvidenceSnapshot",
+                          "modelType": "logical",
+                          "schemaVersion": 2,
+                          "domainId": "domain-specforge-governance",
+                          "entities": ["Evidence Snapshot"],
+                          "entityDefinitions": [{"id": "snapshot", "name": "Evidence Snapshot", "ordinal": 0}],
+                          "fields": [{"id": "snapshot-id", "entityId": "snapshot", "ordinal": 0, "fieldName": "id", "displayName": "Snapshot ID", "dataType": "string", "nullable": false, "primaryKey": true, "owner": "SpecForge"}],
+                          "relationships": ["One snapshot belongs to one exact Scope and catalog generation.", "One assessment reads one snapshot.", "A snapshot may contain bounded evidence for many design assets."],
+                          "dataRelations": [],
+                          "constraints": ["Snapshots are immutable.", "Snapshot scope and generation are checked before use.", "Missing or blocked evidence fails closed."],
+                          "lifecycle": "Created before assessment execution and retained for audit; superseded snapshots remain readable but cannot authorize a new implementation handoff.",
+                          "lineage": "Exact-Scope PostgreSQL catalog generation, authored assets, typed relationships, governance rules, and source digests.",
+                          "dataClassification": "internal engineering governance metadata",
+                          "createdAt": "2026-08-26T00:00:00Z",
+                          "updatedAt": "2026-08-26T00:00:00Z",
+                          "localizedContent": {
+                            "en": {
+                              "name": "SpecForge Assessment Evidence Snapshot Model",
+                              "description": "Immutable, generation-bound snapshot of the scoped design facts, relationships, governance rules, and source digests used by an assessment.",
+                              "entities": {"snapshot": {"displayName": "Evidence Snapshot"}},
+                              "fields": {"snapshot-id": {"displayName": "Snapshot ID"}},
+                              "relationships": ["One snapshot belongs to one exact Scope and catalog generation.", "One assessment reads one snapshot.", "A snapshot may contain bounded evidence for many design assets."],
+                              "constraints": ["Snapshots are immutable.", "Snapshot scope and generation are checked before use.", "Missing or blocked evidence fails closed."],
+                              "lifecycle": "Created before assessment execution and retained for audit; superseded snapshots remain readable but cannot authorize a new implementation handoff.",
+                              "lineage": "Exact-Scope PostgreSQL catalog generation, authored assets, typed relationships, governance rules, and source digests."
+                            },
+                            "zh": {
+                              "name": "SpecForge 评估证据快照模型",
+                              "description": "评估使用的精确 Scope 设计事实、关系、治理规则和来源摘要的不可变代次绑定快照。",
+                              "entities": {"snapshot": {"displayName": "证据快照"}},
+                              "fields": {"snapshot-id": {"displayName": "快照 ID"}},
+                              "relationships": ["一个快照属于一个精确 Scope 和目录代次。", "一个评估读取一个快照。", "一个快照可以包含多条设计资产的有界证据。"],
+                              "constraints": ["快照不可变。", "使用前必须检查快照 Scope 和代次。", "缺失或阻塞的证据必须失败关闭。"],
+                              "lifecycle": "评估执行前创建并保留用于审计；被替代的快照仍可读取，但不能授权新的实现交接。",
+                              "lineage": "精确 Scope 的 PostgreSQL 目录代次、已编写资产、有类型关系、治理规则和来源摘要。"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "assetType": "dataModel",
+                        "asset": {
+                          "id": "data-specforge-model-profile",
+                          "name": "SpecForge Model Profile Model",
+                          "description": "Governed profile for model identity, context limits, pricing assumptions, and approved capability metadata used in token estimation.",
+                          "code": "ModelProfile",
+                          "modelType": "logical",
+                          "schemaVersion": 2,
+                          "domainId": "domain-specforge-ai-governance",
+                          "entities": ["Model Profile"],
+                          "entityDefinitions": [{"id": "model-profile", "name": "Model Profile", "ordinal": 0}],
+                          "fields": [{"id": "model-profile-id", "entityId": "model-profile", "ordinal": 0, "fieldName": "id", "displayName": "Model Profile ID", "dataType": "string", "nullable": false, "primaryKey": true, "owner": "SpecForge"}],
+                          "relationships": ["One assessment may reference one approved model profile.", "A profile is independent from an Agent execution profile."],
+                          "dataRelations": [],
+                          "constraints": ["Profiles are versioned and approved before use.", "Unknown pricing remains explicitly unknown rather than fabricated."],
+                          "lifecycle": "DRAFT -> APPROVED -> RETIRED; historical assessments retain the profile revision used.",
+                          "lineage": "Governed model registry, provider metadata, pricing assumptions, and assessment execution records.",
+                          "dataClassification": "internal AI governance metadata",
+                          "createdAt": "2026-08-26T00:00:00Z",
+                          "updatedAt": "2026-08-26T00:00:00Z",
+                          "localizedContent": {
+                            "en": {
+                              "name": "SpecForge Model Profile Model",
+                              "description": "Governed profile for model identity, context limits, pricing assumptions, and approved capability metadata used in token estimation.",
+                              "entities": {"model-profile": {"displayName": "Model Profile"}},
+                              "fields": {"model-profile-id": {"displayName": "Model Profile ID"}},
+                              "relationships": ["One assessment may reference one approved model profile.", "A profile is independent from an Agent execution profile."],
+                              "constraints": ["Profiles are versioned and approved before use.", "Unknown pricing remains explicitly unknown rather than fabricated."],
+                              "lifecycle": "DRAFT -> APPROVED -> RETIRED; historical assessments retain the profile revision used.",
+                              "lineage": "Governed model registry, provider metadata, pricing assumptions, and assessment execution records."
+                            },
+                            "zh": {
+                              "name": "SpecForge 模型档案模型",
+                              "description": "用于 Token 估算的模型身份、上下文限制、价格假设和已批准能力元数据治理档案。",
+                              "entities": {"model-profile": {"displayName": "模型档案"}},
+                              "fields": {"model-profile-id": {"displayName": "模型档案 ID"}},
+                              "relationships": ["一个评估可以引用一个已批准的模型档案。", "模型档案与 Agent 执行档案相互独立。"],
+                              "constraints": ["档案在使用前必须版本化并获批。", "未知价格必须明确标记未知，不能伪造。"],
+                              "lifecycle": "DRAFT -> APPROVED -> RETIRED；历史评估保留所使用的档案修订。",
+                              "lineage": "受治理的模型注册表、供应商元数据、价格假设和评估执行记录。"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "assetType": "dataModel",
+                        "asset": {
+                          "id": "data-specforge-agent-execution-profile",
+                          "name": "SpecForge Agent Execution Profile Model",
+                          "description": "Governed profile for the Agent workflow, tool policy, review mode, and execution assumptions used to estimate AI work.",
+                          "code": "AgentExecutionProfile",
+                          "modelType": "logical",
+                          "schemaVersion": 2,
+                          "domainId": "domain-specforge-ai-governance",
+                          "entities": ["Agent Execution Profile"],
+                          "entityDefinitions": [{"id": "agent-profile", "name": "Agent Execution Profile", "ordinal": 0}],
+                          "fields": [{"id": "agent-profile-id", "entityId": "agent-profile", "ordinal": 0, "fieldName": "id", "displayName": "Agent Execution Profile ID", "dataType": "string", "nullable": false, "primaryKey": true, "owner": "SpecForge"}],
+                          "relationships": ["One assessment may reference one approved Agent execution profile.", "An Agent profile is independent from a model profile."],
+                          "dataRelations": [],
+                          "constraints": ["Provider-specific behavior cannot override Scope governance.", "Unbounded autonomous execution is not assumed by a Phase 1 estimate."],
+                          "lifecycle": "DRAFT -> APPROVED -> RETIRED; historical assessments retain the execution profile revision used.",
+                          "lineage": "Governed Agent capability registry, tool policy, review policy, and assessment execution records.",
+                          "dataClassification": "internal AI governance metadata",
+                          "createdAt": "2026-08-26T00:00:00Z",
+                          "updatedAt": "2026-08-26T00:00:00Z",
+                          "localizedContent": {
+                            "en": {
+                              "name": "SpecForge Agent Execution Profile Model",
+                              "description": "Governed profile for the Agent workflow, tool policy, review mode, and execution assumptions used to estimate AI work.",
+                              "entities": {"agent-profile": {"displayName": "Agent Execution Profile"}},
+                              "fields": {"agent-profile-id": {"displayName": "Agent Execution Profile ID"}},
+                              "relationships": ["One assessment may reference one approved Agent execution profile.", "An Agent profile is independent from a model profile."],
+                              "constraints": ["Provider-specific behavior cannot override Scope governance.", "Unbounded autonomous execution is not assumed by a Phase 1 estimate."],
+                              "lifecycle": "DRAFT -> APPROVED -> RETIRED; historical assessments retain the execution profile revision used.",
+                              "lineage": "Governed Agent capability registry, tool policy, review policy, and assessment execution records."
+                            },
+                            "zh": {
+                              "name": "SpecForge Agent 执行档案模型",
+                              "description": "用于估算 AI 工作的 Agent 工作流、工具策略、审核模式和执行假设治理档案。",
+                              "entities": {"agent-profile": {"displayName": "Agent 执行档案"}},
+                              "fields": {"agent-profile-id": {"displayName": "Agent 执行档案 ID"}},
+                              "relationships": ["一个评估可以引用一个已批准的 Agent 执行档案。", "Agent 档案与模型档案相互独立。"],
+                              "constraints": ["供应商特定行为不能覆盖 Scope 治理。", "第一阶段估算不假设无边界的自主执行。"],
+                              "lifecycle": "DRAFT -> APPROVED -> RETIRED；历史评估保留所使用的执行档案修订。",
+                              "lineage": "受治理的 Agent 能力注册表、工具策略、审核策略和评估执行记录。"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "assetType": "businessRule",
+                        "asset": {
+                          "id": "rule-specforge-assessment-acceptance",
+                          "name": "SpecForge Assessment Acceptance Rule",
+                          "description": "Controls whether an assessment can be accepted for implementation handoff based on exact Scope, evidence, reconciliation, confidence, and review state.",
+                          "code": "SPECFORGE_ASSESSMENT_ACCEPTANCE",
+                          "domainId": "domain-specforge-governance",
+                          "ruleType": "validation",
+                          "condition": "An actor attempts to accept an assessment or use it to create an implementation handoff.",
+                          "action": "Require exact Scope authorization, a converged evidence snapshot, deterministic coverage checks, independent review when required, and non-stale status.",
+                          "exception": "A failed, blocked, partial, or stale assessment may be inspected but cannot authorize implementation.",
+                          "examples": ["A stale evidence snapshot blocks implementation handoff.", "A blocked reconciliation keeps the assessment inspectable but not acceptable."],
+                          "relatedAssets": [],
+                          "severity": "high",
+                          "createdAt": "2026-08-26T00:00:00Z",
+                          "updatedAt": "2026-08-26T00:00:00Z",
+                          "localizedContent": {
+                            "en": {
+                              "name": "SpecForge Assessment Acceptance Rule",
+                              "description": "Controls whether an assessment can be accepted for implementation handoff based on exact Scope, evidence, reconciliation, confidence, and review state.",
+                              "condition": "An actor attempts to accept an assessment or use it to create an implementation handoff.",
+                              "action": "Require exact Scope authorization, a converged evidence snapshot, deterministic coverage checks, independent review when required, and non-stale status.",
+                              "exception": "A failed, blocked, partial, or stale assessment may be inspected but cannot authorize implementation.",
+                              "examples": ["A stale evidence snapshot blocks implementation handoff.", "A blocked reconciliation keeps the assessment inspectable but not acceptable."]
+                            },
+                            "zh": {
+                              "name": "SpecForge 评估接收规则",
+                              "description": "依据精确 Scope、证据、对账、置信度和审核状态控制评估是否可以用于实现交接。",
+                              "condition": "操作者尝试接收评估或使用评估创建实现交接。",
+                              "action": "要求精确 Scope 授权、已收敛证据快照、确定性覆盖检查、必要时的独立审核以及未失效状态。",
+                              "exception": "失败、阻塞、部分完成或失效的评估可以查看，但不能授权实现。",
+                              "examples": ["失效的证据快照会阻止实现交接。", "阻塞的对账会让评估可查看但不可接收。"]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "assetType": "quality",
+                        "asset": {
+                          "id": "quality-specforge-assessment-confidence",
+                          "name": "SpecForge Assessment Confidence Quality Requirement",
+                          "description": "Requires transparent confidence, coverage, estimate basis, unknowns, and stale-state reporting for every assessment result.",
+                          "code": "SPECFORGE_ASSESSMENT_CONFIDENCE",
+                          "domainId": "domain-specforge-governance",
+                          "category": "reliability",
+                          "target": "Every assessment exposes evidence coverage, deterministic findings, heuristic assumptions, unresolved unknowns, and a confidence level.",
+                          "measurement": "An assessment is accepted only when required evidence and review criteria pass; uncalibrated P50/P90 values are prohibited.",
+                          "priority": "high",
+                          "verificationMethod": "Focused assessment tests, evidence snapshot read-back, acceptance-rule checks, and reconciliation evidence.",
+                          "createdAt": "2026-08-26T00:00:00Z",
+                          "updatedAt": "2026-08-26T00:00:00Z",
+                          "localizedContent": {
+                            "en": {
+                              "name": "SpecForge Assessment Confidence Quality Requirement",
+                              "description": "Requires transparent confidence, coverage, estimate basis, unknowns, and stale-state reporting for every assessment result.",
+                              "target": "Every assessment exposes evidence coverage, deterministic findings, heuristic assumptions, unresolved unknowns, and a confidence level.",
+                              "measurement": "An assessment is accepted only when required evidence and review criteria pass; uncalibrated P50/P90 values are prohibited.",
+                              "verificationMethod": "Focused assessment tests, evidence snapshot read-back, acceptance-rule checks, and reconciliation evidence."
+                            },
+                            "zh": {
+                              "name": "SpecForge 评估置信度质量需求",
+                              "description": "要求每个评估结果透明展示置信度、覆盖率、估算依据、未知项和失效状态。",
+                              "target": "每个评估展示证据覆盖率、确定性发现、启发式假设、未解决未知项和置信度。",
+                              "measurement": "只有所需证据和审核条件通过时才能接收评估；禁止未校准的 P50/P90 数值。",
+                              "verificationMethod": "聚焦评估测试、证据快照回读、接收规则检查和对账证据。"
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "managedRelationships": [
+                      {
+                        "sourceType": "api",
+                        "sourceId": "api-specforge-requirement-assessment",
+                        "targetType": "dataModel",
+                        "targetId": "data-specforge-requirement-assessment",
+                        "relationType": "WRITES"
+                      },
+                      {
+                        "sourceType": "api",
+                        "sourceId": "api-specforge-requirement-assessment",
+                        "targetType": "dataModel",
+                        "targetId": "data-specforge-assessment-evidence-snapshot",
+                        "relationType": "READS"
+                      },
+                      {
+                        "sourceType": "api",
+                        "sourceId": "api-specforge-requirement-assessment",
+                        "targetType": "dataModel",
+                        "targetId": "data-specforge-assessment-evidence-snapshot",
+                        "relationType": "READS"
+                      },
+                      {
+                        "sourceType": "businessRule",
+                        "sourceId": "rule-specforge-assessment-acceptance",
+                        "targetType": "quality",
+                        "targetId": "quality-specforge-assessment-confidence",
+                        "relationType": "GOVERNS"
+                      },
+                      {
+                        "sourceType": "proposal",
+                        "sourceId": "proposal-requirement-assessment-center",
+                        "targetType": "api",
+                        "targetId": "api-specforge-requirement-assessment",
+                        "relationType": "IMPACTS"
+                      }
+                    ],
+                    "owner": "SpecForge Architecture and AI Governance",
+                    "status": "Approved design; baseline registration and MCP synchronization pending before implementation",
+                    "reason": "Requirement assessment must be evidence-driven and durable so feasibility, impact, effort, AI token budget, and implementation handoff remain traceable instead of relying on unsupported model intuition.",
+                    "retryTrigger": "After exact-Scope synchronization and preflight succeed, implement Tasks 2-9 in order and close the implementation session with focused evidence.",
+                    "localizedContent": {
+                      "en": {
+                        "decision": "Introduce a durable hybrid assessment center with immutable evidence snapshots, deterministic coverage and hard constraints, heuristic planning ranges, explicit AI token budgets, independent review, and stale-assessment rejection.",
+                        "constraints": [
+                          "PostgreSQL remains authoritative for authored assessments and evidence snapshots.",
+                          "Only exact-Scope facts and authorized relationships may enter a snapshot.",
+                          "Phase 1 does not claim calibrated P50/P90 prediction or external connector delivery."
+                        ]
+                      },
+                      "zh": {
+                        "decision": "引入持久化混合评估中心：使用不可变证据快照、确定性的覆盖与硬约束检查、启发式规划区间、明确的 AI Token 预算、独立审核和失效评估拒绝。",
+                        "alternatives": [
+                          "纯规则评估：否决，因为它不能可靠拆解含糊的自然语言意图，也不能提供有价值的语义方案比较。",
+                          "纯 AI 评估：否决，因为在证据缺失或矛盾时难以复现、审计、限定范围和失败关闭。",
+                          "证据驱动的混合评估：采纳，确定性策略保护硬边界，AI 负责语义理解和方案生成。"
+                        ],
+                        "consequences": [
+                          "需求可行性变为有证据支持的判断，证据不足时可以明确返回 INSUFFICIENT_EVIDENCE。",
+                          "影响分析能够覆盖设计、代码、迁移、兼容、测试、发布、回滚、文档和治理工作。",
+                          "通过 AI Work Units 以及有版本的模型/执行档案，AI 执行成本可以比较。",
+                          "由于证据快照和水位不可变，历史报告可以审计和复现。",
+                          "第一阶段可以评估架构与设计可行性，但不能声称代码级可行性或校准后的交付准确度。",
+                          "后续仍需实现持久化、Worker、MCP、Web 和对账能力。"
+                        ],
+                        "constraints": [
+                          "PostgreSQL 对编写的评估和证据快照保持权威。",
+                          "快照只能包含精确 Scope 的事实和已授权关系。",
+                          "第一阶段不声明校准后的 P50/P90 预测或外部连接器交付。"
+                        ]
+                      }
+                    },
+                    "evidence": [
+                      {
+                        "command": "docs/superpowers/specs/2026-08-26-evidence-driven-requirement-assessment-design.md",
+                        "result": "Approved design defines hybrid evidence-driven assessment, durable runs, immutable snapshots, heuristic estimates, explicit token budgets, independent review, stale invalidation, and Phase 2/3 boundaries."
+                      },
+                      {
+                        "command": "docs/superpowers/plans/2026-08-26-requirement-assessment-center.md",
+                        "result": "Approved implementation plan decomposes the increment into nine governed tasks with exact Scope, focused verification, Docker, and MCP closure evidence."
+                      },
+                      {
+                        "command": "pnpm exec vitest run scripts/design-fact-manifest.test.ts --exclude .worktrees/** --exclude .pnpm-store/**",
+                        "result": "Pending baseline registration; this focused manifest regression is the gate before MCP synchronization."
+                      }
+                    ]
                   }
                   ]
 }
