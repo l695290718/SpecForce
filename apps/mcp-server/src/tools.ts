@@ -24,7 +24,7 @@ import { getCoverageBuild, requestCoverageBuild } from "./knowledge/coverage-bui
 import { get3aCoverageReport } from "./knowledge/coverage-report";
 import { compare3aPublishedBaselines, get3aAlignment, get3aArchitectureFact, list3aProjectionManifests, list3aPublishedBaselines, query3aArchitectureMap, query3aArchitectureUnitNeighborhood, search3aArchitectureFacts, trace3aArchitecturePath } from "./knowledge/query-adapter";
 import { get3aArchitectureUnitNeighborhood, get3aAssetMapping, search3aArchitectureMap, search3aArchitectureRealizations, search3aAssetMappings } from "./knowledge/architecture-map-adapter";
-import { cancelRequirementAssessment, createRequirementAssessment, getRequirementAssessment } from "./requirement-assessment/tools";
+import { acceptRequirementAssessment, cancelRequirementAssessment, createRequirementAssessment, getRequirementAssessment, listRequirementAssessments, recordAssessmentExecutionActual } from "./requirement-assessment/tools";
 import {
   analyzeScopedProposalImpact,
   buildScopedAssetGraph,
@@ -1056,6 +1056,14 @@ export function registerTools(server: McpServer): void {
     readOnly: true
   }, getRequirementAssessment);
 
+  registerJsonTool(server, "list_requirement_assessments", {
+    title: "List requirement assessments",
+    description: "Lists requirement assessment runs and immutable report revisions within one exact authorized Scope.",
+    inputSchema: { architectureScope: architectureScopeSchema },
+    permissions: ["asset:read"],
+    readOnly: true
+  }, listRequirementAssessments);
+
   registerJsonTool(server, "cancel_requirement_assessment", {
     title: "Cancel requirement assessment",
     description: "Requests cancellation of one queued or running requirement assessment in the exact authorized Scope.",
@@ -1063,4 +1071,20 @@ export function registerTools(server: McpServer): void {
     permissions: ["asset:write"],
     readOnly: false
   }, cancelRequirementAssessment);
+
+  registerJsonTool(server, "accept_requirement_assessment", {
+    title: "Accept requirement assessment",
+    description: "Accepts only a reviewed, non-blocked assessment. Acceptance does not authorize implementation.",
+    inputSchema: { architectureScope: architectureScopeSchema, assessmentId: z.string().min(1), idempotencyKey: z.string().min(1).max(256) },
+    permissions: ["asset:write"],
+    readOnly: false
+  }, acceptRequirementAssessment);
+
+  registerJsonTool(server, "record_assessment_execution_actual", {
+    title: "Record assessment execution actual",
+    description: "Records observed agent execution usage and changed assets for later calibration in one exact Scope.",
+    inputSchema: { architectureScope: architectureScopeSchema, id: z.string().min(1), requirementId: z.string().min(1), assessmentId: z.string().min(1), runId: z.string().optional(), executionProfileId: z.string().min(1), modelRevisions: z.unknown().optional(), usageDetails: z.unknown().optional(), toolInvocations: z.unknown().optional(), verificationCycles: z.number().int().nonnegative().optional(), failedAttempts: z.number().int().nonnegative().optional(), humanIntervention: z.unknown().optional(), elapsedAgentSeconds: z.number().int().nonnegative().optional(), actualPersonDays: z.number().nonnegative().optional(), changedAssets: z.unknown().optional(), finalStatus: z.string().min(1), contentDigest: z.string().min(1) },
+    permissions: ["asset:write"],
+    readOnly: false
+  }, recordAssessmentExecutionActual);
 }

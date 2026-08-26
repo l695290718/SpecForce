@@ -63,6 +63,53 @@ export async function getRequirementAssessment(input: RequirementAssessmentScope
   return { architectureScope: scope, run, assessment };
 }
 
+export async function listRequirementAssessments(input: RequirementAssessmentScopeInput) {
+  const scope = readableScope(input.architectureScope.applicationServiceId);
+  if (scope.scopePath !== input.architectureScope.scopePath) throw new Error("SCOPE_READ_NOT_AUTHORIZED");
+  const [runs, assessments] = await Promise.all([
+    prisma.requirementAssessmentRun.findMany({ where: scope, orderBy: { createdAt: "desc" }, take: 50 }),
+    prisma.requirementAssessment.findMany({ where: scope, orderBy: { createdAt: "desc" }, take: 50 })
+  ]);
+  return { architectureScope: scope, runs, assessments };
+}
+
+export async function acceptRequirementAssessment(input: RequirementAssessmentScopeInput & { assessmentId: string; idempotencyKey: string }) {
+  const scope = resolveWritableScope(writableActor(), input.architectureScope);
+  const current = await prisma.requirementAssessment.findFirst({ where: { id: input.assessmentId, ...scope } });
+  if (!current) throw new Error("ASSESSMENT_NOT_FOUND");
+  if (current.lifecycle === "ACCEPTED") return { assessmentId: current.id, lifecycle: current.lifecycle, idempotentReplay: true, architectureScope: scope };
+  if (current.lifecycle !== "REVIEWED") throw new Error(`ASSESSMENT_NOT_REVIEWED:${current.lifecycle}`);
+  if (["BLOCKED", "INSUFFICIENT_EVIDENCE"].includes(current.verdict)) throw new Error(`ASSESSMENT_ACCEPTANCE_BLOCKED:${current.verdict}`);
+  const updated = await prisma.requirementAssessment.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: current.id } }, data: { lifecycle: "ACCEPTED", reviewResult: { ...(asObject(current.reviewResult)), acceptedAt: new Date().toISOString(), acceptanceIdempotencyKey: input.idempotencyKey } } });
+  return { assessmentId: updated.id, lifecycle: updated.lifecycle, idempotentReplay: false, architectureScope: scope };
+}
+
+export async function recordAssessmentExecutionActual(input: {
+  architectureScope: ArchitectureScopeRef;
+  id: string;
+  requirementId: string;
+  assessmentId: string;
+  runId?: string;
+  executionProfileId: string;
+  modelRevisions?: unknown;
+  usageDetails?: unknown;
+  toolInvocations?: unknown;
+  verificationCycles?: number;
+  failedAttempts?: number;
+  humanIntervention?: unknown;
+  elapsedAgentSeconds?: number;
+  actualPersonDays?: number;
+  changedAssets?: unknown;
+  finalStatus: string;
+  contentDigest: string;
+}) {
+  const scope = resolveWritableScope(writableActor(), input.architectureScope);
+  const existing = await prisma.assessmentExecutionActual.findFirst({ where: { id: input.id, ...scope } });
+  if (existing) return { id: existing.id, idempotentReplay: true, architectureScope: scope };
+  const actual = await prisma.assessmentExecutionActual.create({ data: { id: input.id, enterpriseId: process.env.SPECFORGE_ENTERPRISE_ID ?? "local-development", requirementId: input.requirementId, assessmentId: input.assessmentId, runId: input.runId, executionProfileId: input.executionProfileId, modelRevisions: (input.modelRevisions ?? {}) as never, usageDetails: (input.usageDetails ?? {}) as never, toolInvocations: (input.toolInvocations ?? []) as never, verificationCycles: input.verificationCycles ?? 0, failedAttempts: input.failedAttempts ?? 0, humanIntervention: (input.humanIntervention ?? {}) as never, elapsedAgentSeconds: input.elapsedAgentSeconds, actualPersonDays: input.actualPersonDays, changedAssets: (input.changedAssets ?? []) as never, finalStatus: input.finalStatus, contentDigest: input.contentDigest, ...scope } });
+  return { id: actual.id, idempotentReplay: false, architectureScope: scope };
+}
+
 export async function cancelRequirementAssessment(input: RequirementAssessmentScopeInput & { runId: string }) {
   const scope = resolveWritableScope(writableActor(), input.architectureScope);
   const updated = await prisma.requirementAssessmentRun.updateMany({ where: { id: input.runId, ...scope }, data: { status: "CANCELLATION_REQUESTED", cancellationRequestedAt: new Date() } });
@@ -71,3 +118,4 @@ export async function cancelRequirementAssessment(input: RequirementAssessmentSc
 }
 
 function digest(value: unknown): string { return `sha256:${createHash("sha256").update(JSON.stringify(value)).digest("hex")}`; }
+function asObject(value: unknown): Record<string, unknown> { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}; }

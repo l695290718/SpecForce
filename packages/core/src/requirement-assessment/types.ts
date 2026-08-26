@@ -1,5 +1,6 @@
 export type AssessmentRunStatus =
   | "QUEUED"
+  | "RUNNING"
   | "RESOLVING_EVIDENCE"
   | "WAITING_FOR_EVIDENCE"
   | "WAITING_FOR_PROJECTION"
