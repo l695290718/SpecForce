@@ -68,7 +68,7 @@ it("includes integration contract verification states in the baseline", () => {
   expect(decision?.status).toContain("implemented");
   expect(decision?.localizedContent?.en.decision).toContain("ATTESTED");
   expect(decision?.localizedContent?.zh.decision).toContain("ATTESTED");
-  expect(decision?.evidence).toHaveLength(3);
+  expect(decision?.evidence).toHaveLength(10);
 });
 
 it("records the scoped Data Model ER workspace without claiming MCP or browser completion", () => {

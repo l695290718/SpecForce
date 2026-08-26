@@ -2932,39 +2932,67 @@
                     ],
                     "managedRelationships": [],
                     "owner": "SpecForge Designer",
-                    "status": "Accepted and implemented; scanner scheduling, provider acknowledgement, bidirectional reconciliation, and external APPLY remain deferred.",
+                    "status": "Accepted and implemented under design-change-session:ba5c8d00-ad33-46cc-befd-1f93dcb0a5c2; scanner scheduling, provider acknowledgement, bidirectional reconciliation, and external APPLY remain deferred.",
                     "reason": "Integration contracts need explicit, evidence-backed verification states so authored intent is distinguishable from observed protocol reality without adding a second write boundary.",
                     "retryTrigger": "When an enterprise observer or connector is approved, open a new exact-Scope session for scheduling, drift detection, provider acknowledgement, or reconciliation.",
                     "localizedContent": {
                       "en": {
-                        "decision": "Extend VALIDATES to integration contracts and derive ATTESTED, DRIFT, BLOCKED_ATTESTATION, or UNATTESTED from the latest MCP-authored Evidence asset.",
+                        "decision": "Extend VALIDATES to integration contracts, project evidence links into the canonical relationship ledger, and derive ATTESTED, DRIFT, BLOCKED_ATTESTATION, or UNATTESTED from the latest MCP-authored Evidence asset using composite Scope identity.",
                         "constraints": [
-                          "Evidence is authored only through the exact-Scope MCP boundary.",
-                          "Verification state is derived and never stored on the contract.",
+                          "Evidence is authored only through the exact-Scope MCP boundary; VALIDATES links are projected into the canonical relationship ledger and legacy links can be repaired by an idempotent exact-Scope backfill.",
+                          "Verification state is derived and never stored on the contract; Atlas reads a repeatable-read snapshot and binds continuation cursors to catalog and relationship version vectors.",
                           "Scanner scheduling, provider acknowledgement, bidirectional reconciliation, and external APPLY remain deferred."
                         ]
                       },
                       "zh": {
-                        "decision": "将 VALIDATES 扩展到集成契约，并根据最新的 MCP 证据资产推导 ATTESTED、DRIFT、BLOCKED_ATTESTATION 或 UNATTESTED。",
+                        "decision": "将 VALIDATES 扩展到集成契约，把证据关系投影到规范关系账本，并使用复合 Scope 身份根据最新 MCP 证据资产推导 ATTESTED、DRIFT、BLOCKED_ATTESTATION 或 UNATTESTED。",
                         "constraints": [
-                          "证据只能通过精确 Scope 的 MCP 边界写入。",
-                          "验证状态只做推导，绝不存储到契约本身。",
+                          "证据只能通过精确 Scope 的 MCP 边界写入；VALIDATES 关系进入规范关系账本，存量关系可通过精确 Scope 幂等回填修复。",
+                          "验证状态只做推导，绝不存储到契约本身；Atlas 使用可重复读快照，连续游标绑定目录和关系版本向量。",
                           "扫描调度、提供方确认、双向对账和外部 APPLY 继续延期。"
                         ]
                       }
                     },
                     "evidence": [
                       {
-                        "command": "pnpm exec vitest run apps/web/lib/integrations/atlas.test.ts --exclude .worktrees/** --exclude .pnpm-store/**",
-                        "result": "Passed: 1 file and 8 tests, covering attested derivation, newer drift masking, and explicit unattested states."
+                        "command": "pnpm exec vitest run apps/web/lib/integrations/atlas.test.ts apps/web/components/integration-atlas-canvas.test.ts --exclude .worktrees/** --exclude .pnpm-store/**",
+                        "result": "Passed: 2 files and 11 tests, covering cross-Scope identity, catalog and relationship cursor invalidation, timestamp ordering, and bilingual labels."
                       },
                       {
                         "command": "pnpm --filter @specforge/web typecheck",
                         "result": "Passed: Web TypeScript compilation completed with no errors."
                       },
                       {
+                        "command": "pnpm --filter @specforge/mcp-server exec vitest run src/persistence.test.ts src/relationships/command-service.test.ts",
+                        "result": "Passed: 45 tests, including canonical evidence VALIDATES projection into RelationshipEvent, RelationshipCurrent, and outbox records."
+                      },
+                      {
+                        "command": "pnpm integration-attestations:backfill -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --mode dry-run",
+                        "result": "Passed: scanned 551, eligible 1, failed 0; no apply was needed."
+                      },
+                      {
                         "command": "docker compose --env-file deploy/.env -f deploy/compose.yaml ps web postgres; Invoke-WebRequest http://127.0.0.1:3010/healthz",
                         "result": "Passed: Web and PostgreSQL containers healthy; Web health endpoint returned HTTP 200."
+                      },
+                      {
+                        "command": "$env:SPECFORGE_DESIGN_FACT_IDS='adr-integration-verification-states'; pnpm design-facts:sync",
+                        "result": "Passed: exact ADR synchronization returned status complete."
+                      },
+                      {
+                        "command": "$env:SPECFORGE_DESIGN_FACT_IDS='adr-integration-verification-states'; pnpm design-facts:check",
+                        "result": "Passed: missing=[], mismatched=[], outOfScope=[], blocked=[]; the exact ADR was read back as verified."
+                      },
+                      {
+                        "command": "pnpm design-facts:relations:check",
+                        "result": "Passed: 54 legacy relationships have no unregistered or ambiguous relation codes."
+                      },
+                      {
+                        "command": "$env:SPECFORGE_APPLICATION_SERVICE_ID='com.huawei.celon.desiner'; $env:SPECFORGE_SCOPE_PATH='pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner'; pnpm design-facts:federation:check",
+                        "result": "Passed: exact Scope federation reconciliation returned blocking=false."
+                      },
+                      {
+                        "command": "pnpm design-facts:sync",
+                        "result": "MCP synchronization blocked for the unrelated full baseline at adr-agent-driven-legacy-baseline-discovery with DATA_MODEL_UPGRADE_REQUIRED; owner SpecForge Architecture and retry trigger are recorded in ADR-0041."
                       }
                     ]
                   }
