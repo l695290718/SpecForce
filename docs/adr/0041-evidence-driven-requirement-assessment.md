@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted design for Phase 1 under the exact Designer Scope. This record registers the design facts; implementation remains a separate governed increment.
+Accepted and implemented for the Phase 1 exact Designer Scope. Production identity, calibrated prediction, live source evidence, and a production polling deployment remain separately governed increments.
 
 ## Context
 
@@ -53,7 +53,12 @@ Design evidence must remain distinct from implementation evidence. Code ownershi
 
 - Approved implementation plan: `docs/superpowers/plans/2026-08-26-requirement-assessment-center.md`.
 - Initial preflight returned `DESIGN_CONTEXT_FACT_NOT_FOUND` because the new IDs were not registered; retry is triggered by successful synchronization and reconciliation.
-- Focused manifest tests and `git diff --check` are the Task 1 repository checks.
+- Initial design synchronization and manifest read-back passed with zero missing, mismatched, out-of-Scope, or blocked facts.
+- Implementation preflight: `design-change-session:8c6a52d3-859f-4714-a93c-8dfbe377a6b4`, exact Scope `com.huawei.celon.desiner` / `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`.
+- `pnpm exec vitest run packages/core/src/requirement-assessment apps/requirement-assessment-worker/src apps/mcp-server/src/tools.test.ts apps/mcp-server/src/tools.integration-v1.test.ts --exclude .worktrees/** --exclude .pnpm-store/**`: 10 files, 55 tests passed.
+- `pnpm --filter @specforge/mcp-server typecheck`: passed.
+- `pnpm exec prisma validate`: passed; `pnpm db:generate` had a transient Windows `EPERM` while replacing a locked Prisma query-engine binary, with the already-generated client remaining usable and retry triggered after the dev process releases the file.
+- Commits: `3447d16`, `7feaf94`, `ec53829`, `2613ec4`, `662e80a`.
 
 ## MCP Record
 
@@ -108,3 +113,9 @@ SpecForge 已经维护按 Scope 隔离的设计资产、有类型关系、3A 映
 - 已批准实施计划：`docs/superpowers/plans/2026-08-26-requirement-assessment-center.md`。
 - 新事实集合的首次精确 Scope 预检因事实尚未登记返回 `DESIGN_CONTEXT_FACT_NOT_FOUND`；同步和对账完成后重试。
 - manifest 聚焦测试和 `git diff --check` 是 Task 1 的仓库检查。
+- 初始设计同步和回读通过，缺失、范围不匹配、越界和阻塞事实均为 0。
+- 实施预检：`design-change-session:8c6a52d3-859f-4714-a93c-8dfbe377a6b4`，精确 Scope 为 `com.huawei.celon.desiner` / `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`。
+- `pnpm exec vitest run packages/core/src/requirement-assessment apps/requirement-assessment-worker/src apps/mcp-server/src/tools.test.ts apps/mcp-server/src/tools.integration-v1.test.ts --exclude .worktrees/** --exclude .pnpm-store/**`：10 个文件、55 项测试通过。
+- `pnpm --filter @specforge/mcp-server typecheck`：通过。
+- `pnpm exec prisma validate`：通过；`pnpm db:generate` 因 Windows Prisma query-engine 文件被占用出现一次临时 `EPERM`，释放开发进程文件句柄后触发重试；已有生成客户端可用。
+- 提交：`3447d16`、`7feaf94`、`ec53829`、`2613ec4`、`662e80a`。
