@@ -35,19 +35,28 @@ describe("GraphAnalysisRepository", () => {
 
     await repository.loadOverview(scope, manifest, { layers: ["BIZ"], budget });
 
-    expect(prisma.knowledgeGraphAnalysis.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { ...scope, generationId: manifest.generationId, baselineId: manifest.baselineId, projectionManifestId: manifest.id, analysisVersion: defaultGraphAnalysisVersion, status: "READY" }, take: 1 }));
+    expect(prisma.knowledgeGraphAnalysis.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { ...scope, generationId: manifest.generationId, baselineId: manifest.baselineId, projectionManifestId: manifest.id, analysisVersion: defaultGraphAnalysisVersion, status: "PUBLISHED" }, take: 1 }));
     expect(prisma.knowledgeGraphCluster.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { ...scope, analysisId: analysisRow().dbId, layer: { in: ["BIZ"] } }, orderBy: [{ clusterId: "asc" }], take: budget.maxNodes + 1 }));
     expect(prisma.knowledgeProjectionEdge.findMany).not.toHaveBeenCalled();
   });
 
-  it("returns stale when the summary was published from a different manifest digest", async () => {
-    const prisma = fakePrisma({ knowledgeGraphAnalysis: { findFirst: vi.fn().mockResolvedValue(analysisRow({ sourceContentDigest: "old" })) } });
+  it("treats the analysis bound to this manifest as READY even when the materializer and publication digest formulas differ (ADR-0042)", async () => {
+    // sourceContentDigest (materializer shape) and manifest.contentDigest (publication shape) are
+    // computed by different formulas; the composite key already binds this row to this manifest.
+    const prisma = fakePrisma({ knowledgeGraphAnalysis: { findFirst: vi.fn().mockResolvedValue(analysisRow({ sourceContentDigest: "materializer-shape-digest", relationshipVersion: manifest.relationshipVersion })) } });
     const repository = createGraphAnalysisRepository(prisma);
 
     const result = await repository.loadOverview(scope, manifest, { budget });
 
-    expect(result).toMatchObject({ availability: "STALE", nodes: [], edges: [] });
-    expect(prisma.knowledgeGraphCluster.findMany).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ availability: "READY", analysis: expect.objectContaining({ id: analysisRow().dbId }) });
+    expect(prisma.knowledgeGraphCluster.findMany).toHaveBeenCalled();
+  });
+
+  it("keeps EMPTY and VERSION_MISMATCH as explicit non-ready degradations", async () => {
+    const empty = createGraphAnalysisRepository(fakePrisma({ knowledgeGraphAnalysis: { findFirst: vi.fn().mockResolvedValue(analysisRow({ nodeMetricCount: 0 })) } }));
+    expect((await empty.loadOverview(scope, manifest, { budget })).availability).toBe("EMPTY");
+    const mismatched = createGraphAnalysisRepository(fakePrisma({ knowledgeGraphAnalysis: { findFirst: vi.fn().mockResolvedValue(analysisRow({ analysisVersion: "other.v1" })) } }));
+    expect((await mismatched.loadOverview(scope, manifest, { budget })).availability).toBe("VERSION_MISMATCH");
   });
 
   it("fails closed when a returned row escapes the requested Scope", async () => {

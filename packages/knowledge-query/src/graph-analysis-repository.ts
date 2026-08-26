@@ -297,8 +297,14 @@ class PrismaGraphAnalysisRepository implements GraphAnalysisRepository {
     if (!row) return { availability: "UNAVAILABLE", partialReasons: [] };
     assertRowScope(scope, row);
     if (row.analysisVersion !== requestedVersion) return { availability: "VERSION_MISMATCH", partialReasons: [] };
-    if (row.sourceContentDigest !== manifest.contentDigest || row.relationshipVersion !== manifest.relationshipVersion) return { availability: "STALE", partialReasons: uniquePartialReasons(arrayOfStrings(row.partialReasons) as ThreeAPartialReason[]) };
     if (row.nodeMetricCount === 0) return { availability: "EMPTY", partialReasons: uniquePartialReasons(arrayOfStrings(row.partialReasons) as ThreeAPartialReason[]) };
+    // Freshness is guaranteed by identity, not by digest comparison: the composite key
+    // (scope, generationId, projectionManifestId, analysisVersion) binds this analysis row to
+    // exactly one published manifest, generations are immutable, and the projector publishes the
+    // analysis from the same snapshot it just published. sourceContentDigest (materializer formula)
+    // and manifest.contentDigest (publication formula) are computed by different shapes and were
+    // never equal even for a freshly published analysis, so comparing them falsely degraded every
+    // read to STALE (see ADR-0042).
     return { availability: "READY", analysis: analysisFromRow(row), row, partialReasons: uniquePartialReasons(arrayOfStrings(row.partialReasons) as ThreeAPartialReason[]) };
   }
 }
