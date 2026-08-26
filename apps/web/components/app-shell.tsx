@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Boxes, ClipboardList, FileCode2, Home, LayoutDashboard, ListChecks, LoaderCircle, Network, Search, Settings, Waypoints } from "lucide-react";
+import { Activity, Boxes, ClipboardList, FileCode2, Home, LayoutDashboard, ListChecks, LoaderCircle, Network, Search, Settings, Waypoints, ScanSearch } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
@@ -74,6 +74,7 @@ export function AppShell({ children, readableScopes }: { children: ReactNode; re
           <div className="px-3 pt-4 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500"><T k="nav.workflows" /></div>
           <NavItem href={withScope("/proposals")} icon={<ClipboardList size={16} />} isActive={pathname.startsWith("/proposals")} labelKey="nav.proposals" onNavigate={startNavigation} />
           <NavItem href={withScope("/context-packs")} icon={<Activity size={16} />} isActive={pathname.startsWith("/context-packs")} labelKey="nav.contextPacks" onNavigate={startNavigation} />
+          <NavItem href={withScope("/requirement-assessment")} icon={<ScanSearch size={16} />} isActive={pathname.startsWith("/requirement-assessment")} labelKey="nav.assessments" onNavigate={startNavigation} />
           <NavItem href={withScope("/graph")} icon={<Network size={16} />} isActive={pathname.startsWith("/graph")} labelKey="nav.graph" onNavigate={startNavigation} />
           <NavItem href={withScope("/governance/checks")} icon={<ListChecks size={16} />} isActive={pathname.startsWith("/governance")} labelKey="nav.governance" onNavigate={startNavigation} />
           <NavItem href={withScope("/settings")} icon={<Settings size={16} />} isActive={pathname.startsWith("/settings")} labelKey="nav.settings" onNavigate={startNavigation} />

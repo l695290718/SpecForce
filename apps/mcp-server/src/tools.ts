@@ -24,6 +24,7 @@ import { getCoverageBuild, requestCoverageBuild } from "./knowledge/coverage-bui
 import { get3aCoverageReport } from "./knowledge/coverage-report";
 import { compare3aPublishedBaselines, get3aAlignment, get3aArchitectureFact, list3aProjectionManifests, list3aPublishedBaselines, query3aArchitectureMap, query3aArchitectureUnitNeighborhood, search3aArchitectureFacts, trace3aArchitecturePath } from "./knowledge/query-adapter";
 import { get3aArchitectureUnitNeighborhood, get3aAssetMapping, search3aArchitectureMap, search3aArchitectureRealizations, search3aAssetMappings } from "./knowledge/architecture-map-adapter";
+import { cancelRequirementAssessment, createRequirementAssessment, getRequirementAssessment } from "./requirement-assessment/tools";
 import {
   analyzeScopedProposalImpact,
   buildScopedAssetGraph,
@@ -1027,4 +1028,39 @@ export function registerTools(server: McpServer): void {
     permissions: ["knowledge:read"],
     readOnly: true
   }, async (input) => listKnowledgeAssertions(input.applicationServiceId));
+
+  registerJsonTool(server, "create_requirement_assessment", {
+    title: "Create requirement assessment",
+    description: "Queues an evidence-driven requirement assessment in one exact application-service Scope. The run is durable and asynchronous; it does not authorize implementation.",
+    inputSchema: {
+      architectureScope: architectureScopeSchema,
+      requirementId: z.string().min(1).max(200),
+      revision: z.number().int().positive(),
+      intent: z.object({ en: z.string().min(1), zh: z.string().min(1) }),
+      acceptanceCriteria: z.array(z.object({ en: z.string().min(1), zh: z.string().min(1) })).optional(),
+      qualityTargets: z.array(z.object({ en: z.string().min(1), zh: z.string().min(1) })).optional(),
+      constraints: z.array(z.object({ en: z.string().min(1), zh: z.string().min(1) })).optional(),
+      exclusions: z.array(z.object({ en: z.string().min(1), zh: z.string().min(1) })).optional(),
+      idempotencyKey: z.string().min(1).max(256),
+      authorId: z.string().min(1).optional()
+    },
+    permissions: ["asset:write"],
+    readOnly: false
+  }, createRequirementAssessment);
+
+  registerJsonTool(server, "get_requirement_assessment", {
+    title: "Get requirement assessment",
+    description: "Reads one durable requirement assessment run and its report from the exact authorized application-service Scope.",
+    inputSchema: { architectureScope: architectureScopeSchema, runId: z.string().min(1) },
+    permissions: ["asset:read"],
+    readOnly: true
+  }, getRequirementAssessment);
+
+  registerJsonTool(server, "cancel_requirement_assessment", {
+    title: "Cancel requirement assessment",
+    description: "Requests cancellation of one queued or running requirement assessment in the exact authorized Scope.",
+    inputSchema: { architectureScope: architectureScopeSchema, runId: z.string().min(1) },
+    permissions: ["asset:write"],
+    readOnly: false
+  }, cancelRequirementAssessment);
 }
