@@ -25,6 +25,7 @@
     "legacy-baseline:verify": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-legacy-baseline.ps1",
     "design-context:close": "tsx scripts/design-context.ts close",
     "catalog:bootstrap": "tsx scripts/bootstrap-authored-catalog.ts",
+    "integration-attestations:backfill": "tsx scripts/backfill-integration-attestations.ts",
     "enterprise-3a:build": "tsx scripts/build-enterprise-3a-coverage.ts",
     "enterprise-3a:verify": "tsx scripts/verify-enterprise-3a-coverage.ts",
     "enterprise-3a:sync-facts": "tsx scripts/sync-enterprise-3a-coverage-design-facts.ts",
