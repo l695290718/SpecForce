@@ -59,6 +59,7 @@ Design evidence must remain distinct from implementation evidence. Code ownershi
 - `pnpm --filter @specforge/mcp-server typecheck`: passed.
 - `pnpm exec prisma validate`: passed; `pnpm db:generate` had a transient Windows `EPERM` while replacing a locked Prisma query-engine binary, with the already-generated client remaining usable and retry triggered after the dev process releases the file.
 - Commits: `3447d16`, `7feaf94`, `ec53829`, `2613ec4`, `662e80a`.
+- `pnpm design-context:close -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session design-change-session:8c6a52d3-859f-4714-a93c-8dfbe377a6b4 --status CONVERGED ...`: returned `CONVERGED`; the first retry without the `design-change-session:` prefix returned `DESIGN_CHANGE_SESSION_NOT_FOUND` and was corrected without changing Scope or data.
 
 ## MCP Record
 
@@ -119,3 +120,4 @@ SpecForge 已经维护按 Scope 隔离的设计资产、有类型关系、3A 映
 - `pnpm --filter @specforge/mcp-server typecheck`：通过。
 - `pnpm exec prisma validate`：通过；`pnpm db:generate` 因 Windows Prisma query-engine 文件被占用出现一次临时 `EPERM`，释放开发进程文件句柄后触发重试；已有生成客户端可用。
 - 提交：`3447d16`、`7feaf94`、`ec53829`、`2613ec4`、`662e80a`。
+- 使用完整的 `design-change-session:` 前缀和精确 Scope 运行关闭命令后，实施会话返回 `CONVERGED`；首次省略前缀导致 `DESIGN_CHANGE_SESSION_NOT_FOUND`，已纠正，未改变 Scope 或数据。
