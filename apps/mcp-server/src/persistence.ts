@@ -1266,7 +1266,8 @@ export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedA
   assertString(input.sourceId, "sourceId");
   assertString(input.targetId, "targetId");
   assertString(input.relationType, "relationType");
-  const designFactRelation = isDesignFactRelation(input.relationType);
+  const integrationAttestation = isIntegrationAttestation(sourceType, targetType, input.relationType);
+  const designFactRelation = isDesignFactRelation(input.relationType) && !integrationAttestation;
   const relationshipCode = designFactRelation ? undefined : normalizeLegacyRelationshipCode(input.relationType);
   const id = assetLinkId({ ...input, sourceType, targetType });
   await ensureMcpPersistenceSchema();
@@ -1321,6 +1322,10 @@ export async function upsertAssetLink(input: AssetLinkInput): Promise<PersistedA
 function isDesignFactRelation(relationType: string): boolean {
   return new Set(["DECIDES", "IMPLEMENTS_DECISION", "IMPLEMENTS_CONTEXT_FOR", "VALIDATES"])
     .has(relationType.trim().toUpperCase());
+}
+
+function isIntegrationAttestation(sourceType: string, targetType: string, relationType: string): boolean {
+  return sourceType === "evidence" && targetType === "integration" && relationType.trim().toUpperCase() === "VALIDATES";
 }
 
 export async function listPersistedAssetLinks(applicationServiceId: string): Promise<PersistedAssetLink[]> {

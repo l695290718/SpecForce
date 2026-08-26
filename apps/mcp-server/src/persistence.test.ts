@@ -452,6 +452,30 @@ describe("legacy AssetLink ledger synchronization", () => {
     expect(harness.state.outbox).toHaveLength(0);
   });
 
+  it("projects an evidence VALIDATES integration link into the canonical ledger", async () => {
+    mockSchemaSetup();
+    const harness = installLegacyLedgerHarness();
+
+    await expect(upsertAssetLink({
+      ...legacyLinkInput(),
+      sourceType: "evidence",
+      sourceId: "evidence-integration-observation",
+      targetType: "integration",
+      targetId: "integration-contract",
+      relationType: "VALIDATES"
+    })).resolves.toMatchObject({ relationType: "VALIDATES" });
+
+    expect(harness.state.assetLinks).toHaveLength(1);
+    expect(harness.state.current).toHaveLength(1);
+    expect(harness.state.current[0]).toMatchObject({
+      relationType: "VALIDATES",
+      source: "legacy-asset-link",
+      lifecycleStatus: "ACTIVE"
+    });
+    expect(harness.state.events).toHaveLength(1);
+    expect(harness.state.outbox).toHaveLength(1);
+  });
+
   it("updates a backfilled legacy relationship in its recorded enterprise instead of duplicating it", async () => {
     process.env.SPECFORGE_ENTERPRISE_ID = "configured-enterprise";
     mockSchemaSetup();
