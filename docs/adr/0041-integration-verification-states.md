@@ -20,19 +20,11 @@ ADR-0039 交付了受治理的跨应用集成契约与有界图谱，但没有�
 4. **Explicit everywhere.** Rows, drawer, and coverage chips show the state; no evidence renders as explicit UNATTESTED rather than hidden.
 5. **First attestation is real.** The legacy `integration-specforge-mcp-agent` record receives one evidence-backed attestation from this session's receipts (live stdio JSON-RPC performed by `pnpm design:query`). It remains target-UNRESOLVED while becoming protocol-ATTESTED. Nothing else is observed or fabricated.
 
-1. **本体加法式扩展。** `VALIDATES` 允许目标类型增加 `integration`；证据经既有类型化链接边界验证契约。不新增关系编码，不做模式迁移。
-2. **证明即普通证据。** 观察是消费方 Scope 经 MCP 编写的 `Evidence` 资产（decisionId 锚定 ADR-0039、command 记录精确观察方法、result 原样记录观察到的协议/定位器与漂移说明、status 取 passed/failed/blocked、recordedAt 决定新鲜度）。契约不加字段。
-3. **推导状态，最新为准。** 图谱联接可读 Scope 内 evidence—VALIDATES→integration 的 AssetLink 与证据载荷，按最新 recordedAt 推导每契约 ATTESTED / DRIFT / BLOCKED_ATTESTATION / UNATTESTED（平局按资产 id），推导遵守既有 Scope/预算/游标边界。
-4. **处处显式。** 行、抽屉、覆盖芯片均展示状态；无证据显式渲染 UNATTESTED 而非隐藏。
-5. **首条证明真实。** 存量 `integration-specforge-mcp-agent` 依据本会话回执（`pnpm design:query` 实际执行的 stdio JSON-RPC）获得一条证据支撑的证明：目标解析仍为 UNRESOLVED，协议层面为 ATTESTED。此外不观察、不编造任何事实。
-
 ## Alternatives
 
 - **New AttestationRecord asset type**: rejected — Evidence plus a typed link carries all needed facts without a schema migration or a second authoring path.
 - **Embedding observations on the contract**: rejected — it couples intent with observations inside one mutable payload and breaks single-authorship clarity.
-
-- **新建 AttestationRecord 资产类型**：否决——Evidence 加类型化链接即可承载全部事实，避免模式迁移与第二条编写路径。
-- **把观察嵌入契约字段**：否决——意图与观察耦合进同一可变负载，破坏单作者清晰性。
+- **Centralized gateway observation or file-only records**: rejected — the former breaks consumer ownership and the latter is not queryable.
 
 ## Consequences
 
@@ -40,24 +32,11 @@ ADR-0039 交付了受治理的跨应用集成契约与有界图谱，但没有�
 - Rule authors of future automation must respect that states are derived, never stored on contracts; deleting evidence changes derived state deterministically.
 - Requirement-assessment Phase 2 (contract/schema observations) can consume these attestations instead of inventing its own.
 
-- 集成界面成为真实性仪表盘：UNATTESTED 是可见的待办工作，DRIFT 是可行动发现，而证明只需一位持有精确命令回执的授权观察者。
-- 未来自动化的实现者必须遵守：状态是推导的，绝不存储在契约上；删除证据会确定性地改变推导结果。
-- 需求评估 Phase 2（契约观测）可以直接消费这些证明，而不必另起炉灶。
-
 ## Constraints
 
 - Reads stay within readable scopes; derivation respects the bounded atlas budgets and cursor waterline.
 - No new asset type, Prisma migration, or write boundary: evidence authoring still flows exclusively through MCP upserts.
 - English canonical fields and complete Chinese overlays are required on the evidence assets and all new UI labels.
-
-- 读取限于可读 Scope；推导遵守图谱预算与游标水位。
-- 不新增资产类型、Prisma 迁移或写边界：证据编写仍只能经 MCP upsert。
-- 证据资产与全部新界面标签必须提供英文规范字段与完整中文覆盖。
-
-## Alternatives Considered (zh)
-
-- **网关集中登记观察**：否决——观察属于消费方事实，集中化破坏 ADR-0039 的归属模型。
-- **仅存文件不进系统记录**：否决——不可查询的证据等于没有证据。
 
 ## Evidence
 
@@ -72,18 +51,44 @@ ADR-0039 交付了受治理的跨应用集成契约与有界图谱，但没有�
 
 - MCP ADR ID: `adr-integration-verification-states`
 - Owning architectureScope: `com.huawei.celon.desiner`
-- Related records: ADR-0039, spec `2026-08-26-integration-contract-verification-states-design.md`, first attestation evidence `evidence-integration-specforge-mcp-agent-20260826` with typed link VALIDATES → `integration-specforge-mcp-agent`, Proposal `proposal-specforge-self-design`, Context Pack `ctx-specforge-self-design`.
+- Related records: ADR-0039, spec `2026-08-26-integration-contract-verification-states-design.md`, first attestation evidence `evidence-integration-specforge-mcp-agent-20260826` with typed link VALIDATES → `integration-specforge-mcp-agent`, Proposal `proposal-integration-contract-verification-states`, Context Pack `context-pack-integration-contract-verification-states`.
 
-# 集成契约验证状态：来自证明证据的推导
+## 集成契约验证状态：来自证明证据的推导
 
 **状态：** 已接受并实现（会话 `89ee66e7`，Designer Scope）
 
-**背景：** ADR-0039 之后没有任何东西记录调用的实际观察；证据缺席与无人关注无法区分；Evidence 类型和 VALIDATES 关系都不通向契约。
+### 背景
 
-**决策：** VALIDATES 目标加法式扩展至 integration；观察以普通证据资产经 MCP 编写（command/result/status/recordedAt）；图谱按最新 recordedAt 推导每契约 ATTESTED/DRIFT/BLOCKED_ATTESTATION/UNATTESTED 并在各界面显式呈现；首条证明来自本会话真实的 stdio JSON-RPC 回执，其余一律不编造。
+ADR-0039 之后没有任何东西记录调用的实际观察；证据缺席与无人关注无法区分；Evidence 类型和 VALIDATES 关系都不通向契约。
 
-**备选：** 新建证明资产类型（否决——无需迁移）；观察嵌入契约（否决——意图与观察耦合）。网关集中观察（否决）、仅存文件（否决）。
+### 决策
 
-**后果与约束：** 界面成为真实性仪表盘；状态是推导的而非存储；读取限于可读 Scope 并遵守预算游标；无新模式或新写边界；双语覆盖完整。
+VALIDATES 目标加法式扩展至 integration；观察以普通证据资产经 MCP 编写（command/result/status/recordedAt）；图谱按最新 recordedAt 推导每契约 ATTESTED/DRIFT/BLOCKED_ATTESTATION/UNATTESTED 并在各界面显式呈现；首条证明来自本会话真实的 stdio JSON-RPC 回执，其余一律不编造。
 
-**MCP 记录：** `adr-integration-verification-states`，Designer Scope；关联 ADR-0039、验证切片规格、首条证据及其 VALIDATES 链接、Proposal 与 Context Pack 条目。
+### 备选方案
+
+- 新建证明资产类型：否决，无需迁移。
+- 观察嵌入契约：否决，意图与观察耦合。
+- 网关集中观察或仅存文件：否决，分别破坏消费方归属或不可查询。
+
+### 后果
+
+- 界面成为真实性仪表盘，UNATTESTED 是显式待办而不是隐藏状态。
+- 状态是推导的而非存储，删除证据会确定性地改变结果。
+- 需求评估 Phase 2 可以直接消费这些证明，不必另建观测模型。
+
+### 约束
+
+- 读取限于可读 Scope，并遵守预算与游标。
+- 不新增资产类型、Schema 迁移或写边界，证据仍只能经 MCP upsert。
+- 所有面向人的内容必须提供英文规范字段和完整中文覆盖。
+
+### 证据
+
+- `pnpm exec vitest run apps/web/lib/integrations/atlas.test.ts --exclude .worktrees/** --exclude .pnpm-store/**`：1 个文件、8 项测试通过。
+- `pnpm --filter @specforge/web typecheck`：通过。
+- `docker compose --env-file deploy/.env -f deploy/compose.yaml ps web postgres` 与 `Invoke-WebRequest http://127.0.0.1:3010/healthz`：容器健康，Web 健康端点返回 HTTP 200。
+
+### MCP 记录
+
+`adr-integration-verification-states`，Designer Scope；关联 ADR-0039、首条证据及其 VALIDATES 链接、独立 Proposal `proposal-integration-contract-verification-states` 和 Context Pack `context-pack-integration-contract-verification-states`。

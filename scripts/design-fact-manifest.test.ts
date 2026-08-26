@@ -8,9 +8,9 @@ const expectedScope = {
 };
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(29);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(29);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(29);
+  expect(manifest.decisions).toHaveLength(30);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(30);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(30);
   const proposalByContextPack = new Map<string, string>();
 
   for (const decision of manifest.decisions) {
@@ -57,6 +57,18 @@ it("includes the evidence-driven requirement assessment center baseline", () => 
     const localized = managed.asset.localizedContent as { en?: { name?: string; description?: string }; zh?: { name?: string; description?: string } };
     return localized.en?.name && localized.en.description && localized.zh?.name && localized.zh.description;
   })).toBe(true);
+});
+
+it("includes integration contract verification states in the baseline", () => {
+  const decision = manifest.decisions.find((item) => item.mcpAdrId === "adr-integration-verification-states");
+  expect(decision?.repositoryAdr).toBe("docs/adr/0041-integration-verification-states.md");
+  expect(decision?.proposalId).toBe("proposal-integration-contract-verification-states");
+  expect(decision?.contextPackId).toBe("context-pack-integration-contract-verification-states");
+  expect(decision?.scope).toEqual(expectedScope);
+  expect(decision?.status).toContain("implemented");
+  expect(decision?.localizedContent?.en.decision).toContain("ATTESTED");
+  expect(decision?.localizedContent?.zh.decision).toContain("ATTESTED");
+  expect(decision?.evidence).toHaveLength(3);
 });
 
 it("records the scoped Data Model ER workspace without claiming MCP or browser completion", () => {

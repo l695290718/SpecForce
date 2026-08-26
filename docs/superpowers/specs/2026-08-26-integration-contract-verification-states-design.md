@@ -1,6 +1,6 @@
 # Integration Contract Verification States Design
 
-**Status:** Approved written design; implementation in progress
+**Status:** Implemented and synchronized for the exact Designer Scope; scanner scheduling, provider acknowledgement, bidirectional reconciliation, drift alerting, and external APPLY remain deferred.
 **Scope:** `com.huawei.celon.desiner`
 **Owner:** SpecForge Designer
 **Design session:** `design-change-session:89ee66e7-8e43-4638-9704-e15f7ab1546b`

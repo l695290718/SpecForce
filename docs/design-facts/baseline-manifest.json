@@ -2913,6 +2913,60 @@
                         "result": "Pending baseline registration; this focused manifest regression is the gate before MCP synchronization."
                       }
                     ]
+                  },
+                  {
+                    "id": "adr-integration-verification-states",
+                    "repositoryAdr": "docs/adr/0041-integration-verification-states.md",
+                    "mcpAdrId": "adr-integration-verification-states",
+                    "scope": {
+                      "applicationServiceId": "com.huawei.celon.desiner",
+                      "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                    },
+                    "proposalId": "proposal-integration-contract-verification-states",
+                    "proposalStatus": "implemented",
+                    "contextPackId": "context-pack-integration-contract-verification-states",
+                    "relatedAssetIds": [
+                      "adr-cross-scope-integration-contracts",
+                      "api-specforge-mcp-tools",
+                      "data-specforge-assets"
+                    ],
+                    "managedRelationships": [],
+                    "owner": "SpecForge Designer",
+                    "status": "Accepted and implemented; scanner scheduling, provider acknowledgement, bidirectional reconciliation, and external APPLY remain deferred.",
+                    "reason": "Integration contracts need explicit, evidence-backed verification states so authored intent is distinguishable from observed protocol reality without adding a second write boundary.",
+                    "retryTrigger": "When an enterprise observer or connector is approved, open a new exact-Scope session for scheduling, drift detection, provider acknowledgement, or reconciliation.",
+                    "localizedContent": {
+                      "en": {
+                        "decision": "Extend VALIDATES to integration contracts and derive ATTESTED, DRIFT, BLOCKED_ATTESTATION, or UNATTESTED from the latest MCP-authored Evidence asset.",
+                        "constraints": [
+                          "Evidence is authored only through the exact-Scope MCP boundary.",
+                          "Verification state is derived and never stored on the contract.",
+                          "Scanner scheduling, provider acknowledgement, bidirectional reconciliation, and external APPLY remain deferred."
+                        ]
+                      },
+                      "zh": {
+                        "decision": "将 VALIDATES 扩展到集成契约，并根据最新的 MCP 证据资产推导 ATTESTED、DRIFT、BLOCKED_ATTESTATION 或 UNATTESTED。",
+                        "constraints": [
+                          "证据只能通过精确 Scope 的 MCP 边界写入。",
+                          "验证状态只做推导，绝不存储到契约本身。",
+                          "扫描调度、提供方确认、双向对账和外部 APPLY 继续延期。"
+                        ]
+                      }
+                    },
+                    "evidence": [
+                      {
+                        "command": "pnpm exec vitest run apps/web/lib/integrations/atlas.test.ts --exclude .worktrees/** --exclude .pnpm-store/**",
+                        "result": "Passed: 1 file and 8 tests, covering attested derivation, newer drift masking, and explicit unattested states."
+                      },
+                      {
+                        "command": "pnpm --filter @specforge/web typecheck",
+                        "result": "Passed: Web TypeScript compilation completed with no errors."
+                      },
+                      {
+                        "command": "docker compose --env-file deploy/.env -f deploy/compose.yaml ps web postgres; Invoke-WebRequest http://127.0.0.1:3010/healthz",
+                        "result": "Passed: Web and PostgreSQL containers healthy; Web health endpoint returned HTTP 200."
+                      }
+                    ]
                   }
                   ]
 }
