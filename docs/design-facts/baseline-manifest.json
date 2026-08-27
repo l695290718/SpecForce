@@ -2995,6 +2995,141 @@
                         "result": "MCP synchronization blocked for the unrelated full baseline at adr-agent-driven-legacy-baseline-discovery with DATA_MODEL_UPGRADE_REQUIRED; owner SpecForge Architecture and retry trigger are recorded in ADR-0041."
                       }
                     ]
+                  },
+                  {
+                    "id": "adr-unified-scoped-read-model-performance",
+                    "repositoryAdr": "docs/adr/0043-unified-scoped-read-model-performance.md",
+                    "mcpAdrId": "adr-unified-scoped-read-model-performance",
+                    "scope": {
+                      "applicationServiceId": "com.huawei.celon.desiner",
+                      "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                    },
+                    "proposalId": "proposal-scoped-read-model-performance",
+                    "proposalStatus": "implemented",
+                    "contextPackId": "ctx-scoped-read-model-performance",
+                    "relatedAssetIds": [
+                      "api-specforge-mcp-tools",
+                      "data-specforge-assets",
+                      "data-specforge-3a-projection-read-model"
+                    ],
+                    "managedAssets": [
+                      {
+                        "assetType": "dataModel",
+                        "asset": {
+                          "id": "data-specforge-asset-search-projection",
+                          "type": "dataModel",
+                          "name": "SpecForge Asset Search Projection",
+                          "title": "SpecForge Asset Search Projection",
+                          "description": "Rebuildable bilingual summary projection for bounded exact-Scope asset search.",
+                          "lifecycle": "Derived from authored assets and rebuilt on demand.",
+                          "lineage": "PostgreSQL authored design assets and catalog revisions.",
+                          "schemaVersion": 2,
+                          "modelType": "logical",
+                          "dataRelations": [],
+                          "relationships": [],
+                          "constraints": ["Scope identity is composite: applicationServiceId + scopePath.", "Projection rows are derived and rebuildable."],
+                          "localizedContent": {
+                            "en": {
+                              "name": "SpecForge Asset Search Projection",
+                              "description": "Rebuildable bilingual summary projection for bounded exact-Scope asset search.",
+                              "lifecycle": "Derived from authored assets and rebuilt on demand.",
+                              "lineage": "PostgreSQL authored design assets and catalog revisions.",
+                              "entities": { "asset-search-projection": { "displayName": "Asset Search Projection" } },
+                              "fields": {
+                                "asset-search-projection-id": { "displayName": "Asset ID" },
+                                "asset-search-projection-scope": { "displayName": "Architecture Scope" },
+                                "asset-search-projection-document": { "displayName": "Search Document" },
+                                "asset-search-projection-version": { "displayName": "Catalog Version" }
+                              },
+                              "relationships": [],
+                              "constraints": ["Scope identity is composite: applicationServiceId + scopePath.", "Projection rows are derived and rebuildable."]
+                            },
+                            "zh": {
+                              "name": "SpecForge 设计资产搜索投影",
+                              "description": "用于精确 Scope 有界设计资产搜索的可重建双语概要投影。",
+                              "lifecycle": "由已编写资产派生，并支持按需重建。",
+                              "lineage": "PostgreSQL 中的设计资产和目录修订。",
+                              "entities": { "asset-search-projection": { "displayName": "资产搜索投影" } },
+                              "fields": {
+                                "asset-search-projection-id": { "displayName": "资产 ID" },
+                                "asset-search-projection-scope": { "displayName": "架构 Scope" },
+                                "asset-search-projection-document": { "displayName": "搜索文档" },
+                                "asset-search-projection-version": { "displayName": "目录版本" }
+                              },
+                              "relationships": [],
+                              "constraints": ["Scope 身份由 applicationServiceId 与 scopePath 组成。", "投影行是可重建的派生数据。"]
+                            }
+                          },
+                          "entityDefinitions": [
+                            { "id": "asset-search-projection", "name": "Asset Search Projection", "ordinal": 0 }
+                          ],
+                          "fields": [
+                            { "id": "asset-search-projection-id", "entityId": "asset-search-projection", "ordinal": 0, "fieldName": "assetId", "displayName": "Asset ID", "dataType": "string", "nullable": false, "primaryKey": true, "owner": "SpecForge" },
+                            { "id": "asset-search-projection-scope", "entityId": "asset-search-projection", "ordinal": 1, "fieldName": "architectureScope", "displayName": "Architecture Scope", "dataType": "object", "nullable": false, "primaryKey": false, "owner": "SpecForge" },
+                            { "id": "asset-search-projection-document", "entityId": "asset-search-projection", "ordinal": 2, "fieldName": "searchDocument", "displayName": "Search Document", "dataType": "string", "nullable": false, "primaryKey": false, "owner": "SpecForge" },
+                            { "id": "asset-search-projection-version", "entityId": "asset-search-projection", "ordinal": 3, "fieldName": "catalogVersion", "displayName": "Catalog Version", "dataType": "integer", "nullable": false, "primaryKey": false, "owner": "SpecForge" }
+                          ]
+                        }
+                      },
+                      {
+                        "assetType": "api",
+                        "asset": {
+                          "id": "api-specforge-scoped-read",
+                          "type": "api",
+                          "name": "SpecForge Scoped Read API",
+                          "title": "SpecForge Scoped Read API",
+                          "description": "Bounded bilingual search, detail, relationship, and focused graph reads for one authorized application-service Scope.",
+                          "localizedContent": {
+                            "en": {
+                              "name": "SpecForge Scoped Read API",
+                              "description": "Bounded bilingual search, detail, relationship, and focused graph reads for one authorized application-service Scope.",
+                              "authType": "ScopedPrincipal"
+                            },
+                            "zh": {
+                              "name": "SpecForge Scope 读取 API",
+                              "description": "面向单个授权应用服务 Scope 的双语搜索、详情、关系和有焦点图读取。",
+                              "authType": "Scope 作用域主体"
+                            }
+                          },
+                          "method": "READ",
+                          "path": "MCP:search_design_assets|query_asset_links|query_asset_graph",
+                          "providerSystem": "SpecForge MCP",
+                          "authType": "ScopedPrincipal",
+                          "requestSchema": { "applicationServiceId": "exact application-service id", "scopePath": "server-resolved exact Scope", "pageSize": "1..50", "cursor": "signed opaque cursor" },
+                          "responseSchema": { "results": "bounded summaries", "waterlines": "catalog and projection versions", "truncation": "explicit partial and reason" },
+                          "errorCodes": ["SCOPE_READ_UNAUTHORIZED", "CURSOR_STALE", "READ_SCOPE_MISMATCH", "PARTIAL"]
+                        }
+                      }
+                    ],
+                    "managedRelationships": [
+                      { "sourceType": "adr", "sourceId": "adr-unified-scoped-read-model-performance", "targetType": "dataModel", "targetId": "data-specforge-asset-search-projection", "relationType": "DECIDES" },
+                      { "sourceType": "adr", "sourceId": "adr-unified-scoped-read-model-performance", "targetType": "api", "targetId": "api-specforge-scoped-read", "relationType": "DECIDES" },
+                      { "sourceType": "proposal", "sourceId": "proposal-scoped-read-model-performance", "targetType": "api", "targetId": "api-specforge-scoped-read", "relationType": "IMPACTS" },
+                      { "sourceType": "api", "sourceId": "api-specforge-scoped-read", "targetType": "dataModel", "targetId": "data-specforge-asset-search-projection", "relationType": "READS" }
+                    ],
+                    "owner": "SpecForge Architecture",
+                    "status": "Implemented and locally verified; production-scale query-plan certification remains deferred.",
+                    "reason": "First-page design reads must remain bounded, exact-Scope, bilingual, and affordable for human and Agent consumers.",
+                    "retryTrigger": "When a representative enterprise dataset is available, run the scoped-read benchmark and open a new exact-Scope session for query-plan and production latency certification.",
+                    "localizedContent": {
+                      "en": {
+                        "decision": "Use a shared version-aware scoped-read contract, a rebuildable bilingual search projection, direct detail reads, and bounded MCP/Web graph reads.",
+                        "constraints": ["PostgreSQL is authoritative.", "Every read is exact-Scope and authorization-bound.", "Production-scale latency certification is deferred."]
+                      },
+                      "zh": {
+                        "decision": "采用版本感知的统一 Scope 读取契约、可重建双语搜索投影、直接详情读取和有界 MCP/Web 图读取。",
+                        "constraints": ["PostgreSQL 保持权威。", "每次读取都必须绑定精确 Scope 和授权。", "生产规模延迟认证延期。"]
+                      }
+                    },
+                    "evidence": [
+                      { "command": "pnpm --filter @specforge/scoped-read typecheck", "result": "Passed." },
+                      { "command": "pnpm --filter @specforge/mcp-server typecheck", "result": "Passed." },
+                      { "command": "pnpm --filter @specforge/web typecheck", "result": "Passed." },
+                      { "command": "pnpm exec vitest run apps/mcp-server/src/mcp-read-performance.test.ts apps/mcp-server/src/scoped-derived.test.ts apps/mcp-server/src/tools.test.ts", "result": "Passed: 33 files and 474 tests in the current workspace scan." },
+                      { "command": "pnpm exec prisma validate", "result": "Passed." },
+                      { "command": "pnpm design-read:rebuild", "result": "Passed: exact Designer Scope rebuilt 409 projection rows at catalog version 1559." },
+                      { "command": "git diff --check", "result": "Passed with Windows line-ending normalization warnings only." }
+                    ]
                   }
                   ]
 }

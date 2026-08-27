@@ -31,6 +31,7 @@
     "enterprise-3a:sync-facts": "tsx scripts/sync-enterprise-3a-coverage-design-facts.ts",
     "design-context:archive-outbox": "tsx scripts/design-context.ts archive-outbox",
     "design-context:status": "tsx scripts/design-context.ts status",
+    "design-read:rebuild": "tsx scripts/rebuild-asset-search-projection.ts",
     "design-facts:federation:check": "tsx scripts/reconcile-federated-facts.ts",
     "graph-outbox:archive": "tsx scripts/archive-legacy-graph-outbox.ts",
     "format": "prettier --write .",

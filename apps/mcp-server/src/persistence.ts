@@ -7,6 +7,8 @@ import { PrismaRelationshipRepository, type RelationshipScope } from "./relation
 import { currentRequestPrincipal } from "./auth";
 import { appendAuthoredAssetRevision } from "./knowledge/catalog-revision";
 import { isGovernedIntegrationContract, validateIntegrationContractV1, type IntegrationContractProjection } from "./integration-contract";
+import { mapAssetSearchProjection } from "./scoped-read-projection";
+import { decodeReadCursor, encodeReadCursor, ReadCursorError } from "@specforge/scoped-read";
 
 const globalForPrisma = globalThis as unknown as { specforgeMcpPrisma?: PrismaClient };
 const legacyContextPackFallbackSymbol = Symbol("legacyContextPackFallback");
@@ -258,6 +260,8 @@ async function initializeMcpPersistenceSchema() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_source_idx" ON "AssetLink"("sourceType", "sourceId")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_target_idx" ON "AssetLink"("targetType", "targetId")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_relationType_idx" ON "AssetLink"("relationType")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_scope_source_idx" ON "AssetLink"("applicationServiceId", "scopePath", "sourceType", "sourceId", "relationType")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetLink_scope_target_idx" ON "AssetLink"("applicationServiceId", "scopePath", "targetType", "targetId", "relationType")`);
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "KnowledgeAssertion" (
       "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
@@ -287,6 +291,29 @@ async function initializeMcpPersistenceSchema() {
       UNIQUE("applicationServiceId", "scopePath", id)
     )
   `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "AssetSearchProjection" (
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "assetType" TEXT NOT NULL,
+      "assetId" TEXT NOT NULL,
+      "canonicalName" TEXT NOT NULL,
+      "canonicalSummary" TEXT NOT NULL,
+      "localizedNameZh" TEXT NOT NULL,
+      "localizedSummaryZh" TEXT NOT NULL,
+      "domainId" TEXT,
+      status TEXT,
+      "updatedAt" TIMESTAMP NOT NULL,
+      "catalogVersion" BIGINT NOT NULL,
+      "contentDigest" TEXT NOT NULL,
+      "searchDocument" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", "assetType", "assetId")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetSearchProjection_scope_type_updated_idx" ON "AssetSearchProjection"("applicationServiceId", "scopePath", "assetType", "updatedAt", "assetId")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AssetSearchProjection_scope_domain_type_updated_idx" ON "AssetSearchProjection"("applicationServiceId", "scopePath", "domainId", "assetType", "updatedAt", "assetId")`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "KnowledgeAssertion" ADD COLUMN IF NOT EXISTS "riskTier" TEXT NOT NULL DEFAULT 'T1'`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "KnowledgeAssertion" ADD COLUMN IF NOT EXISTS "domainCluster" TEXT`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "KnowledgeAssertion" ADD COLUMN IF NOT EXISTS "generatedByActorId" TEXT`);
@@ -901,7 +928,7 @@ export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
         updatedAt: optionalDate(canonicalAsset.updatedAt)
       }
     });
-    await appendAuthoredAssetRevision(transaction, {
+    const revision = await appendAuthoredAssetRevision(transaction, {
       architectureScope: scope,
       assetType: input.assetType,
       assetId: String(canonicalAsset.id),
@@ -912,6 +939,13 @@ export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
       channel: "mcp",
       correlationId: `design-asset-revision:${input.assetType}:${canonicalAsset.id}`,
       idempotencyKey: authoredRevisionIdempotencyKey(input.assetType, canonicalAsset)
+    });
+    await upsertAssetSearchProjection(transaction, {
+      architectureScope: scope,
+      assetType: input.assetType,
+      asset: localizedAsset,
+      catalogVersion: revision.catalogVersion,
+      updatedAt: optionalDate(canonicalAsset.updatedAt)
     });
     const graphIdempotencyKey = designAssetGraphIdempotencyKey(input.assetType, canonicalAsset);
     await relationshipService(transaction, configuredRelationshipScope(scope)).upsertAssetGraph({
@@ -924,6 +958,82 @@ export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
   });
 
   return { id: canonicalAsset.id, type: input.assetType, status: "upserted" };
+}
+
+async function upsertAssetSearchProjection(
+  transaction: Prisma.TransactionClient,
+  input: {
+    architectureScope: ArchitectureScopeRef;
+    assetType: AssetType;
+    asset: Asset | Proposal | ContextPack;
+    catalogVersion: bigint;
+    updatedAt: Date;
+  }
+): Promise<void> {
+  const row = mapAssetSearchProjection(input);
+  await transaction.$executeRawUnsafe(
+    `INSERT INTO "AssetSearchProjection" (
+       "applicationServiceId", "scopePath", "assetType", "assetId",
+       "canonicalName", "canonicalSummary", "localizedNameZh", "localizedSummaryZh",
+       "domainId", status, "updatedAt", "catalogVersion", "contentDigest", "searchDocument"
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+     ON CONFLICT ("applicationServiceId", "scopePath", "assetType", "assetId") DO UPDATE SET
+       "canonicalName" = EXCLUDED."canonicalName",
+       "canonicalSummary" = EXCLUDED."canonicalSummary",
+       "localizedNameZh" = EXCLUDED."localizedNameZh",
+       "localizedSummaryZh" = EXCLUDED."localizedSummaryZh",
+       "domainId" = EXCLUDED."domainId",
+       status = EXCLUDED.status,
+       "updatedAt" = EXCLUDED."updatedAt",
+       "catalogVersion" = EXCLUDED."catalogVersion",
+       "contentDigest" = EXCLUDED."contentDigest",
+       "searchDocument" = EXCLUDED."searchDocument"`,
+    row.applicationServiceId,
+    row.scopePath,
+    row.assetType,
+    row.assetId,
+    row.canonicalName,
+    row.canonicalSummary,
+    row.localizedNameZh,
+    row.localizedSummaryZh,
+    row.domainId ?? null,
+    row.status ?? null,
+    row.updatedAt,
+    row.catalogVersion,
+    row.contentDigest,
+    row.searchDocument
+  );
+}
+
+export async function rebuildAssetSearchProjection(applicationServiceId: string): Promise<{ applicationServiceId: string; scopePath: string; rebuilt: number; catalogVersion: string }> {
+  const scope = readableScope(applicationServiceId);
+  await ensureMcpPersistenceSchema();
+  const cursor = await prisma.authoredCatalogCursor.findUnique({ where: { applicationServiceId_scopePath: scope }, select: { nextVersion: true } });
+  const catalogVersion = cursor?.nextVersion ?? 0n;
+  let rebuilt = 0;
+  await prisma.$transaction(async (transaction) => {
+    const [assets, proposals, contextPacks] = await Promise.all([
+      transaction.designAsset.findMany({ where: scope, select: { id: true, type: true, payload: true, updatedAt: true } }),
+      transaction.proposal.findMany({ where: scope, select: { id: true, payload: true, updatedAt: true } }),
+      transaction.contextPack.findMany({ where: scope, select: { id: true, payload: true, createdAt: true, name: true, proposalId: true, targetAgent: true, summary: true, includedAssets: true, constraints: true, instructions: true, generatedMarkdown: true } })
+    ]);
+    for (const row of assets) {
+      const asset = { ...(JSON.parse(row.payload) as Asset), architectureScope: scope };
+      await upsertAssetSearchProjection(transaction, { architectureScope: scope, assetType: normalizeAssetType(row.type), asset, catalogVersion, updatedAt: row.updatedAt });
+      rebuilt++;
+    }
+    for (const row of proposals) {
+      const proposal = { ...(JSON.parse(row.payload) as Proposal), architectureScope: scope };
+      await upsertAssetSearchProjection(transaction, { architectureScope: scope, assetType: "proposal", asset: proposal, catalogVersion, updatedAt: row.updatedAt });
+      rebuilt++;
+    }
+    for (const row of contextPacks) {
+      const parsed = parseContextPackPayload(row.payload) ?? rowToContextPack({ ...row, ...scope });
+      await upsertAssetSearchProjection(transaction, { architectureScope: scope, assetType: "contextPack", asset: { ...parsed, architectureScope: scope }, catalogVersion, updatedAt: row.createdAt });
+      rebuilt++;
+    }
+  });
+  return { applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath, rebuilt, catalogVersion: catalogVersion.toString() };
 }
 
 async function resolveIntegrationContractProjection(asset: IntegrationContract, scope: ArchitectureScopeRef): Promise<IntegrationContractProjection | undefined> {
@@ -1038,7 +1148,7 @@ export async function upsertProposal(input: UpsertProposalInput) {
         updatedAt: new Date(canonicalProposal.updatedAt)
       }
     });
-    await appendAuthoredAssetRevision(transaction, {
+    const revision = await appendAuthoredAssetRevision(transaction, {
       architectureScope: scope,
       assetType: "proposal",
       assetId: canonicalProposal.id,
@@ -1049,6 +1159,13 @@ export async function upsertProposal(input: UpsertProposalInput) {
       channel: "mcp",
       correlationId: `proposal-revision:${canonicalProposal.id}`,
       idempotencyKey: authoredRevisionIdempotencyKey("proposal", localizedProposal as unknown as Record<string, unknown>)
+    });
+    await upsertAssetSearchProjection(transaction, {
+      architectureScope: scope,
+      assetType: "proposal",
+      asset: localizedProposal,
+      catalogVersion: revision.catalogVersion,
+      updatedAt: new Date(canonicalProposal.updatedAt)
     });
   });
 
@@ -1104,7 +1221,7 @@ export async function upsertContextPack(input: UpsertContextPackInput) {
         scopePath: scope.scopePath
       }
     });
-    await appendAuthoredAssetRevision(transaction, {
+    const revision = await appendAuthoredAssetRevision(transaction, {
       architectureScope: scope,
       assetType: "contextPack",
       assetId: canonicalPack.id,
@@ -1115,6 +1232,13 @@ export async function upsertContextPack(input: UpsertContextPackInput) {
       channel: "mcp",
       correlationId: `context-pack-revision:${canonicalPack.id}`,
       idempotencyKey: authoredRevisionIdempotencyKey("contextPack", localizedPack)
+    });
+    await upsertAssetSearchProjection(transaction, {
+      architectureScope: scope,
+      assetType: "contextPack",
+      asset: localizedPack,
+      catalogVersion: revision.catalogVersion,
+      updatedAt: new Date(canonicalPack.createdAt)
     });
   });
 
@@ -1348,6 +1472,45 @@ export async function listPersistedAssetLinks(applicationServiceId: string): Pro
   }));
 }
 
+export async function queryPersistedAssetLinks(input: {
+  applicationServiceId: string;
+  sourceType?: string;
+  sourceId?: string;
+  targetType?: string;
+  targetId?: string;
+  relationType?: string;
+  limit?: number;
+}) {
+  const scope = readableScope(input.applicationServiceId);
+  await ensureMcpPersistenceSchema();
+  const limit = Math.max(1, Math.min(input.limit ?? 50, 100));
+  const rows = await prisma.assetLink.findMany({
+    where: {
+      applicationServiceId: scope.applicationServiceId,
+      scopePath: scope.scopePath,
+      ...(input.sourceType ? { sourceType: input.sourceType } : {}),
+      ...(input.sourceId ? { sourceId: input.sourceId } : {}),
+      ...(input.targetType ? { targetType: input.targetType } : {}),
+      ...(input.targetId ? { targetId: input.targetId } : {}),
+      ...(input.relationType ? { relationType: input.relationType } : {})
+    },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    take: limit + 1
+  });
+  const links = rows.slice(0, limit).map((row) => ({
+    id: row.id,
+    sourceType: row.sourceType,
+    sourceId: row.sourceId,
+    targetType: row.targetType,
+    targetId: row.targetId,
+    relationType: row.relationType,
+    description: row.description ?? undefined,
+    architectureScope: scope,
+    createdAt: row.createdAt.toISOString()
+  }));
+  return { applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath, links, hasMore: rows.length > links.length, truncated: rows.length > links.length };
+}
+
 export async function listPersistedAssets(applicationServiceId: string, assetType?: AssetType): Promise<Array<{ type: AssetType; asset: Asset }>> {
   await ensureMcpPersistenceSchema();
   const scope = readableScope(applicationServiceId);
@@ -1427,7 +1590,10 @@ export async function renderPersistedAssetAsMarkdown(assetType: string, assetId:
     .join("\n");
 }
 
-export async function searchPersistedDesignAssets(input: { applicationServiceId: string; query: string; assetTypes?: string[]; domainId?: string; limit?: number; locale?: AssetLocale }) {
+export async function searchPersistedDesignAssets(input: { applicationServiceId: string; query: string; assetTypes?: string[]; domainId?: string; limit?: number; pageSize?: number; cursor?: string; locale?: AssetLocale }) {
+  const projected = await searchAssetSearchProjection(input);
+  if (projected) return projected;
+
   const terms = input.query.toLowerCase().split(/\s+/).map((term) => term.trim()).filter(Boolean);
   const types = input.assetTypes?.length ? input.assetTypes.map(normalizeAssetType) : undefined;
   const locale = input.locale ?? "en";
@@ -1454,6 +1620,88 @@ export async function searchPersistedDesignAssets(input: { applicationServiceId:
       relevanceReason: score > 0 ? `Matched ${score} query term(s) in persisted ${assetLabel(type)} metadata.` : `Included from persisted ${assetLabel(type)} catalog.`
     }))
   };
+}
+
+async function searchAssetSearchProjection(input: { applicationServiceId: string; query: string; assetTypes?: string[]; domainId?: string; limit?: number; pageSize?: number; cursor?: string; locale?: AssetLocale }): Promise<{ results: Array<{ id: string; type: AssetType; name: string; summary: string; relevanceReason: string }>; catalogVersion: string; projectionVersion: string; hasMore: boolean; nextCursor?: string; resultDigest: string; truncated: boolean } | undefined> {
+  const scope = readableScope(input.applicationServiceId);
+  const terms = input.query.toLocaleLowerCase().split(/\s+/).map((term) => term.trim()).filter(Boolean);
+  const types = input.assetTypes?.map(normalizeAssetType).filter(Boolean);
+  const locale = input.locale ?? "en";
+  const pageSize = Math.max(1, Math.min(input.pageSize ?? input.limit ?? 10, 50));
+  const cursorVersion = await prisma.authoredCatalogCursor.findUnique({ where: { applicationServiceId_scopePath: scope }, select: { nextVersion: true } });
+  const catalogVersion = (cursorVersion?.nextVersion ?? 0n).toString();
+  const projectionVersion = "1";
+  const subject = currentRequestPrincipal()?.subject ?? writableActor().actorId;
+  const queryDigest = createHash("sha256").update(JSON.stringify({ assetTypes: types?.slice().sort(), domainId: input.domainId ?? "", query: input.query.trim(), locale, sort: "updatedAt" })).digest("hex");
+  const cursorBinding = { subject, architectureScope: scope, locale, queryDigest, catalogVersion, projectionVersion } as const;
+  const after = input.cursor ? decodeReadCursor(input.cursor, cursorBinding).orderKey : undefined;
+  const params: unknown[] = [scope.applicationServiceId, scope.scopePath];
+  const predicates = ['"applicationServiceId" = $1', '"scopePath" = $2'];
+  if (types?.length) {
+    params.push(types);
+    predicates.push(`"assetType" = ANY($${params.length}::text[])`);
+  }
+  if (input.domainId) {
+    params.push(input.domainId);
+    predicates.push(`("domainId" = $${params.length} OR "assetId" = $${params.length})`);
+  }
+  for (const term of terms) {
+    params.push(`%${term}%`);
+    predicates.push(`"searchDocument" ILIKE $${params.length}`);
+  }
+  if (after) {
+    if (after.length !== 3 || typeof after[0] !== "string" || typeof after[1] !== "string" || typeof after[2] !== "string") throw new ReadCursorError("CURSOR_INVALID");
+    params.push(after[0], after[1], after[2]);
+    const dateParam = `$${params.length - 2}`;
+    const typeParam = `$${params.length - 1}`;
+    const idParam = `$${params.length}`;
+    predicates.push(`("updatedAt" < ${dateParam} OR ("updatedAt" = ${dateParam} AND ("assetType" > ${typeParam} OR ("assetType" = ${typeParam} AND "assetId" > ${idParam}))))`);
+  }
+  params.push(pageSize + 1);
+  try {
+    const rows = await prisma.$queryRawUnsafe<Array<{
+      assetId: string;
+      assetType: string;
+      canonicalName: string;
+      canonicalSummary: string;
+      localizedNameZh: string;
+      localizedSummaryZh: string;
+      updatedAt: Date;
+      contentDigest: string;
+    }>>(
+      `SELECT "assetId", "assetType", "canonicalName", "canonicalSummary", "localizedNameZh", "localizedSummaryZh", "updatedAt", "contentDigest"
+       FROM "AssetSearchProjection"
+       WHERE ${predicates.join(" AND ")}
+       ORDER BY "updatedAt" DESC, "assetType" ASC, "assetId" ASC
+       LIMIT $${params.length}`,
+      ...params
+    );
+    if (!rows.length && !input.cursor) return undefined;
+    const pageRows = rows.slice(0, pageSize);
+    const hasMore = rows.length > pageRows.length;
+    const last = pageRows.at(-1);
+    const nextCursor = hasMore && last
+      ? encodeReadCursor({ version: 1, ...cursorBinding, orderKey: [last.updatedAt.toISOString(), last.assetType, last.assetId] })
+      : undefined;
+    return {
+      results: pageRows.map((row) => ({
+        id: row.assetId,
+        type: normalizeAssetType(row.assetType),
+        name: locale === "zh" ? row.localizedNameZh : row.canonicalName,
+        summary: locale === "zh" ? row.localizedSummaryZh : row.canonicalSummary,
+        relevanceReason: `Matched persisted ${assetLabel(normalizeAssetType(row.assetType))} search projection.`
+      })),
+      catalogVersion,
+      projectionVersion,
+      hasMore,
+      ...(nextCursor ? { nextCursor } : {}),
+      resultDigest: createHash("sha256").update(JSON.stringify(pageRows.map((row) => [row.assetType, row.assetId, row.contentDigest]))).digest("hex"),
+      truncated: hasMore
+    };
+  } catch (error) {
+    if (error instanceof ReadCursorError) throw error;
+    return undefined;
+  }
 }
 
 export async function disconnectMcpPersistence() {

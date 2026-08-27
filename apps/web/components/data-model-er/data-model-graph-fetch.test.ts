@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DataModelGraphResponse } from "@specforge/core";
-import { readCompleteDataModelGraph } from "./data-model-graph-fetch";
+import { DATA_MODEL_GRAPH_CLIENT_CAPACITY, DATA_MODEL_GRAPH_INITIAL_PAGE_SIZE, readCompleteDataModelGraph, shouldFetchDataModelGraph } from "./data-model-graph-fetch";
 
 const scope = { applicationServiceId: "svc", scopePath: "scope" };
 const waterlines = { catalogVersion: "1", catalogDigest: "catalog", relationshipVersion: "1", relationshipDigest: "relations" };
@@ -10,6 +10,27 @@ function page(overrides: Partial<DataModelGraphResponse> = {}): DataModelGraphRe
 }
 
 describe("readCompleteDataModelGraph", () => {
+  it("only enables graph requests for the ER view", () => {
+    expect(shouldFetchDataModelGraph("list")).toBe(false);
+    expect(shouldFetchDataModelGraph("er")).toBe(true);
+  });
+
+  it("uses the declared bounded initial page parameters", async () => {
+    let requestUrl = "";
+    await readCompleteDataModelGraph({
+      query: `scope=svc&scopePath=scope&pageSize=${DATA_MODEL_GRAPH_INITIAL_PAGE_SIZE}&clientCapacity=${DATA_MODEL_GRAPH_CLIENT_CAPACITY}`,
+      headers: {},
+      fetchImpl: async (url) => {
+        requestUrl = String(url);
+        return new Response(JSON.stringify(page()), { status: 200 });
+      }
+    });
+
+    const request = new URL(requestUrl, "http://localhost");
+    expect(request.searchParams.get("pageSize")).toBe(String(DATA_MODEL_GRAPH_INITIAL_PAGE_SIZE));
+    expect(request.searchParams.get("clientCapacity")).toBe(String(DATA_MODEL_GRAPH_CLIENT_CAPACITY));
+  });
+
   it("follows cursors and keeps all pages on one waterline", async () => {
     const calls: string[] = [];
     const pages = [

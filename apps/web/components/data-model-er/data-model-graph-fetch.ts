@@ -2,6 +2,13 @@ import type { DataModelGraphResponse } from "@specforge/core";
 
 const DEFAULT_MAX_PAGES = 50;
 
+export const DATA_MODEL_GRAPH_INITIAL_PAGE_SIZE = 200;
+export const DATA_MODEL_GRAPH_CLIENT_CAPACITY = 5000;
+
+export function shouldFetchDataModelGraph(view: string): boolean {
+  return view === "er";
+}
+
 export interface CompleteDataModelGraphFetchOptions {
   query: string;
   headers: HeadersInit;

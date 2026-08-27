@@ -70,6 +70,13 @@ const persistence = vi.hoisted(() => ({
   getPersistedAsset: vi.fn(),
   listPersistedAssetLinks: vi.fn().mockResolvedValue([]),
   listPersistedContextPacks: vi.fn().mockResolvedValue([]),
+  queryPersistedAssetLinks: vi.fn().mockResolvedValue({
+    applicationServiceId: "com.huawei.celon.desiner",
+    scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner",
+    links: [],
+    hasMore: false,
+    truncated: false
+  }),
   renderPersistedAssetAsMarkdown: vi.fn(),
   searchPersistedDesignAssets: vi.fn(),
   upsertAssetLink: vi.fn(),

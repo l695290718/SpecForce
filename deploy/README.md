@@ -33,6 +33,9 @@ Open [http://localhost:3010](http://localhost:3010).
 # Inspect containers, Web health, and PostgreSQL readiness.
 .\deploy\scripts\status.ps1
 
+# Backfill the bounded bilingual search projection for an existing database.
+pnpm design-read:rebuild
+
 # Stop containers and preserve the PostgreSQL volume.
 .\deploy\scripts\stop.ps1
 ```

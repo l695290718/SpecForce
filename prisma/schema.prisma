@@ -76,6 +76,29 @@ model ContextPack {
   @@unique([applicationServiceId, scopePath, id])
 }
 
+model AssetSearchProjection {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationServiceId String
+  scopePath            String
+  assetType            String
+  assetId              String
+  canonicalName        String
+  canonicalSummary     String
+  localizedNameZh      String
+  localizedSummaryZh   String
+  domainId             String?
+  status               String?
+  updatedAt            DateTime
+  catalogVersion       BigInt
+  contentDigest        String
+  searchDocument       String
+  createdAt            DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, assetType, assetId], map: "AssetSearchProjection_scope_asset_key")
+  @@index([applicationServiceId, scopePath, assetType, updatedAt, assetId], map: "AssetSearchProjection_scope_type_updated_idx")
+  @@index([applicationServiceId, scopePath, domainId, assetType, updatedAt, assetId], map: "AssetSearchProjection_scope_domain_type_updated_idx")
+}
+
 model AuthoredCatalogCursor {
   dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   applicationServiceId String

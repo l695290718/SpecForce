@@ -9,7 +9,6 @@ import {
   hasScopeAccess,
   localizeAsset,
   normalizeAssetType,
-  renderAssetAsMarkdown,
   renderAssetSummary,
   runGovernanceChecks,
   scopeById,
@@ -31,6 +30,8 @@ import {
   listPersistedAssets,
   listPersistedContextPacks,
   listPersistedProposals,
+  getPersistedAsset,
+  renderPersistedAssetAsMarkdown,
   upsertContextPack
 } from "./persistence";
 
@@ -114,7 +115,14 @@ function governanceStatus(results: GovernanceCheckResult[]): "passed" | "warning
   return "passed";
 }
 
-export async function buildScopedAssetGraph(input: ScopedDerivedInput & { domainId?: string; assetType?: AssetType }) {
+export async function buildScopedAssetGraph(input: ScopedDerivedInput & {
+  domainId?: string;
+  assetType?: AssetType;
+  focusAssetId?: string;
+  maxNodes?: number;
+  maxEdges?: number;
+  includeCanonicalSource?: boolean;
+}) {
   const locale = input.locale ?? "en";
   const catalog = await loadScopedAssetCatalog(input.applicationServiceId);
   const links = await listPersistedAssetLinks(input.applicationServiceId);
@@ -122,12 +130,53 @@ export async function buildScopedAssetGraph(input: ScopedDerivedInput & { domain
   appendPersistedGraphRecords(canonicalGraph, catalog, links, input.applicationServiceId, "en", input);
   const graph = await buildAssetGraph(input.domainId, input.assetType, { catalog, locale });
   appendPersistedGraphRecords(graph, catalog, links, input.applicationServiceId, locale, input);
+  const bounded = boundAssetGraph(graph, input.focusAssetId, input.maxNodes ?? Number.POSITIVE_INFINITY, input.maxEdges ?? Number.POSITIVE_INFINITY);
   return {
     applicationServiceId: input.applicationServiceId,
     locale,
-    graph,
-    canonicalSource: { graph: canonicalGraph, assets: catalog }
+    graph: bounded.graph,
+    partial: bounded.partial,
+    ...(bounded.truncationReason ? { truncationReason: bounded.truncationReason } : {}),
+    ...(input.includeCanonicalSource === false ? {} : { canonicalSource: { graph: canonicalGraph, assets: catalog } })
   };
+}
+
+function boundAssetGraph(graph: AssetGraph, focusAssetId: string | undefined, maxNodes: number, maxEdges: number): {
+  graph: AssetGraph;
+  partial: boolean;
+  truncationReason?: string;
+} {
+  const nodeLimit = Number.isFinite(maxNodes) ? Math.max(1, Math.floor(maxNodes)) : graph.nodes.length;
+  const edgeLimit = Number.isFinite(maxEdges) ? Math.max(0, Math.floor(maxEdges)) : graph.edges.length;
+  const focus = focusAssetId?.trim();
+  const selectedNodes = focus
+    ? selectFocusedGraphNodes(graph, focus, nodeLimit)
+    : graph.nodes.slice(0, nodeLimit);
+  const selectedIds = new Set(selectedNodes.map((node) => node.logicalId ?? node.id));
+  const relatedEdges = graph.edges.filter((edge) => selectedIds.has(edge.sourceLogicalId ?? edge.source) && selectedIds.has(edge.targetLogicalId ?? edge.target));
+  const selectedEdges = relatedEdges.slice(0, edgeLimit);
+  const reasons: string[] = [];
+  if (selectedNodes.length < graph.nodes.length) reasons.push("maxNodes");
+  if (selectedEdges.length < relatedEdges.length) reasons.push("maxEdges");
+  if (focus && !graph.nodes.some((node) => (node.logicalId ?? node.id) === focus)) reasons.push("focusNotFound");
+  return {
+    graph: { nodes: selectedNodes, edges: selectedEdges },
+    partial: reasons.length > 0,
+    ...(reasons.length ? { truncationReason: reasons.join(",") } : {})
+  };
+}
+
+function selectFocusedGraphNodes(graph: AssetGraph, focusAssetId: string, maxNodes: number): AssetGraph["nodes"] {
+  const focus = graph.nodes.find((node) => (node.logicalId ?? node.id) === focusAssetId);
+  if (!focus) return graph.nodes.slice(0, maxNodes);
+  const relatedIds = new Set([focusAssetId]);
+  for (const edge of graph.edges) {
+    const source = edge.sourceLogicalId ?? edge.source;
+    const target = edge.targetLogicalId ?? edge.target;
+    if (source === focusAssetId) relatedIds.add(target);
+    if (target === focusAssetId) relatedIds.add(source);
+  }
+  return graph.nodes.filter((node) => relatedIds.has(node.logicalId ?? node.id)).slice(0, maxNodes);
 }
 
 function appendPersistedGraphRecords(
@@ -264,10 +313,9 @@ export async function renderScopedAssetMarkdown(input: ScopedDerivedInput & {
   assetId: string;
 }) {
   const locale = input.locale ?? "en";
-  const catalog = await loadScopedAssetCatalog(input.applicationServiceId);
   const assetType = normalizeAssetType(input.assetType);
-  const canonicalSource = getAsset(assetType, input.assetId, catalog);
-  const localizedMarkdown = await renderAssetAsMarkdown(assetType, input.assetId, { catalog, locale });
+  const canonicalSource = await getPersistedAsset(assetType, input.assetId, input.applicationServiceId);
+  const localizedMarkdown = await renderPersistedAssetAsMarkdown(assetType, input.assetId, input.applicationServiceId, locale);
   const content = [
     localizedMarkdown,
     "",
@@ -284,9 +332,8 @@ export async function getScopedAssetDetail(input: ScopedDerivedInput & {
   assetId: string;
 }) {
   const locale = input.locale ?? "en";
-  const catalog = await loadScopedAssetCatalog(input.applicationServiceId);
   const assetType = normalizeAssetType(input.assetType);
-  const canonicalSource = getAsset(assetType, input.assetId, catalog);
+  const canonicalSource = await getPersistedAsset(assetType, input.assetId, input.applicationServiceId);
   const asset = localizeAsset(assetType, canonicalSource, locale);
   return { applicationServiceId: input.applicationServiceId, locale, asset, canonicalSource };
 }

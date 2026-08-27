@@ -23,6 +23,7 @@
     "@specforge/core": "workspace:*",
     "@specforge/knowledge-query": "workspace:*",
     "@specforge/scan-contract": "workspace:*",
+    "@specforge/scoped-read": "workspace:*",
     "zod": "^3.24.1"
   },
   "devDependencies": {

@@ -189,7 +189,15 @@ Example client configuration:
 }
 ```
 
-Read tools require `applicationServiceId` and accept `locale`. Write tools require the exact `architectureScope` and a complete bilingual payload. Principal capabilities include asset/proposal/ADR/Context Pack upsert, asset links, scoped search/detail/graph, governance, impact analysis, Context Pack generation/export, and proposal workflow tools.
+Read tools require `applicationServiceId` and accept `locale`. Write tools require the exact `architectureScope` and a complete bilingual payload. Principal capabilities include asset/proposal/ADR/Context Pack upsert, asset links, scoped search/detail/graph, governance, impact analysis, Context Pack generation/export, and proposal workflow tools. `search_design_assets` supports bounded `pageSize`/opaque `cursor`; `query_asset_links` and `query_asset_graph` are bounded read paths, and graph responses report `partial` with a truncation reason.
+
+For an existing database, rebuild the bilingual summary projection after deploying the read-model change:
+
+```bash
+pnpm design-read:rebuild
+```
+
+The command is derived-data maintenance only. It preserves authored PostgreSQL rows and defaults to `com.huawei.celon.desiner`; set `SPECFORGE_APPLICATION_SERVICE_ID` to rebuild another authorized application service.
 
 Scoped MCP resource templates use URIs such as:
 

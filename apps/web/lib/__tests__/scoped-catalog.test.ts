@@ -165,13 +165,13 @@ describe("scoped AssetCatalog", () => {
     await expect(getScopedAssetCatalog(scope.applicationServiceId)).rejects.toThrow("Persisted row scope mismatch");
   });
 
-  it("returns every asset for an empty query and explicitly paginates nonempty search", async () => {
+  it("paginates an empty query and keeps explicit pagination for nonempty search", async () => {
     db.designAssets.mockResolvedValue(Array.from({ length: 60 }, (_, index) =>
       persistedRow(apiPayload(`Policy API ${index}`, `${zhPolicyApi} ${index}`, `api-${index}`), { type: "api" })
     ));
     const all = await searchScopedAssets("api", scope.applicationServiceId, "", "en", { limit: 10 });
     const firstPage = await searchScopedAssets("api", scope.applicationServiceId, "Policy", "en", { limit: 10, offset: 0 });
-    expect(all.items).toHaveLength(60);
+    expect(all.items).toHaveLength(10);
     expect(all.total).toBe(60);
     expect(firstPage.items).toHaveLength(10);
     expect(firstPage).toMatchObject({ total: 60, limit: 10, offset: 0 });

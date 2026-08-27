@@ -7,7 +7,7 @@ import { Badge, Card, DataTable } from "./ui";
 import { DataModelErWorkspace } from "./data-model-er/data-model-er-workspace";
 import { ErInspector } from "./data-model-er/er-inspector";
 import { ErToolbar, type ErToolbarMode, type ErView } from "./data-model-er/er-toolbar";
-import { readCompleteDataModelGraph } from "./data-model-er/data-model-graph-fetch";
+import { DATA_MODEL_GRAPH_CLIENT_CAPACITY, DATA_MODEL_GRAPH_INITIAL_PAGE_SIZE, readCompleteDataModelGraph, shouldFetchDataModelGraph } from "./data-model-er/data-model-graph-fetch";
 
 export function SpecializedAssetSections({ assetType, asset, locale, scope, scopePath }: { assetType: AssetType; asset: Record<string, any>; locale: AssetLocale; scope?: string; scopePath?: string }) {
   if (assetType === "dataModel") return <DataModelSection model={asset as DataModel} locale={locale} scope={scope ?? asset.architectureScope?.applicationServiceId ?? ""} scopePath={scopePath ?? asset.architectureScope?.scopePath ?? ""} />;
@@ -63,7 +63,7 @@ export function DataModelGraphSurface({ locale, scope, scopePath, modelId, defau
   const mode = (params.get("mode") as ErToolbarMode | null) ?? defaultMode;
   const rootModelId = mode === "MODEL" ? (params.get("rootModelId") ?? modelId) : undefined;
   const query = useMemo(() => {
-    const query = new URLSearchParams({ scope, scopePath, mode, pageSize: "200", clientCapacity: "5000" });
+    const query = new URLSearchParams({ scope, scopePath, mode, pageSize: String(DATA_MODEL_GRAPH_INITIAL_PAGE_SIZE), clientCapacity: String(DATA_MODEL_GRAPH_CLIENT_CAPACITY) });
     if (rootModelId) query.set("rootModelId", rootModelId);
     const search = params.get("search");
     const nodeTypes = params.get("nodeTypes");
@@ -76,12 +76,18 @@ export function DataModelGraphSurface({ locale, scope, scopePath, modelId, defau
 
   useEffect(() => {
     let active = true;
+    if (!shouldFetchDataModelGraph(view)) {
+      setResponses([]);
+      setError(undefined);
+      return () => { active = false; };
+    }
+    setResponses([]);
     setError(undefined);
     readCompleteDataModelGraph({ query, headers: { "x-specforge-application-service-id": scope, "x-specforge-scope-path": scopePath } })
       .then((pages) => { if (active) setResponses(pages); })
       .catch((reason: unknown) => { if (active) { setResponses([]); setError(reason instanceof Error ? reason.message : "GRAPH_READ_FAILED"); } });
     return () => { active = false; };
-  }, [query, scope, scopePath]);
+  }, [query, scope, scopePath, view]);
 
   const title = locale === "zh" ? "数据模型关系工作区" : "Data model relationship workspace";
   return <section className="overflow-hidden rounded-lg border border-border bg-white" aria-label={title}>

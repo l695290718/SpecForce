@@ -47,7 +47,7 @@ export default async function AssetListPage({ params, searchParams }: { params: 
           <Link className="font-medium text-accent" href={buildScopedHref(`/assets/${type}/${asset.id}`, scope)} key="details"><T k="action.details" /></Link>
         ])}
       />
-      {q.trim() && result.total > result.limit ? (
+      {result.total > result.limit ? (
         <nav className="mt-4 flex justify-end gap-2 text-sm">
           {result.offset > 0 ? <Link className="rounded-md border border-border px-3 py-2" href={withSearchParams(`/assets/${type}`, { scope, q, limit: String(limit), offset: String(Math.max(0, result.offset - limit)) })}>{locale === "zh" ? "\u4e0a\u4e00\u9875" : "Previous"}</Link> : null}
           {result.offset + result.limit < result.total ? <Link className="rounded-md border border-border px-3 py-2" href={withSearchParams(`/assets/${type}`, { scope, q, limit: String(limit), offset: String(result.offset + limit) })}>{locale === "zh" ? "\u4e0b\u4e00\u9875" : "Next"}</Link> : null}

@@ -56,6 +56,12 @@ export type LocalizedAssetGraph = Omit<AssetGraph, "edges"> & {
 };
 
 export type ScopedSearchOptions = { limit: number; offset?: number };
+export type ScopedSearchResult<TType extends AssetType> = {
+  items: Array<{ id: string; type: TType; name: string; summary: string; relevanceReason: string; asset: AssetTypeMap[TType] }>;
+  total: number;
+  limit: number;
+  offset: number;
+};
 
 export const assetTitles: Record<AssetRouteType, string> = {
   domains: "Domain Models",
@@ -136,16 +142,47 @@ export async function searchScopedAssets<TType extends AssetType>(
   locale: AssetLocale,
   options: ScopedSearchOptions,
   principal?: ScopedPrincipal
-) {
+): Promise<ScopedSearchResult<TType>> {
+  const limit = Math.max(1, options.limit);
+  const offset = Math.max(0, options.offset ?? 0);
+  if (!query.trim()) {
+    const scope = requireReadableApplicationService(scopeId, principal);
+    const where = { type: assetType, ...scopeDatabaseWhere(scope) };
+    const [rows, total] = await Promise.all([
+      prisma.designAsset.findMany({
+        where,
+        orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+        skip: offset,
+        take: limit,
+        select: { id: true, payload: true }
+      }),
+      typeof (prisma.designAsset as unknown as { count?: unknown }).count === "function"
+        ? (prisma.designAsset as unknown as { count: (args: unknown) => Promise<number> }).count({ where })
+        : Promise.resolve(Number.NaN)
+    ]);
+    const pageRows = rows.slice(0, limit);
+    const items = pageRows.map((row) => {
+      const localized = safeLocalizeAssetForRead(assetType, JSON.parse(row.payload) as Asset, locale) as AssetTypeMap[TType];
+      return {
+        id: localized.id,
+        type: assetType,
+        name: "title" in localized && localized.title ? localized.title : localized.name,
+        summary: "description" in localized ? localized.description : localized.summary,
+        relevanceReason: locale === "zh" ? "来自当前作用域目录。" : "Included from scoped catalog.",
+        asset: localized
+      };
+    });
+    return { items, total: Number.isNaN(total) ? rows.length : total, limit, offset };
+  }
+  const projected = await searchProjectedAssets(assetType, scopeId, query, locale, { limit, offset }, principal);
+  if (projected) return projected as ScopedSearchResult<TType>;
   const catalog = await getScopedAssetCatalog(scopeId, principal);
   const terms = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const matches = (catalog[assetCollections[assetType]] as Asset[])
     .map((asset) => ({ asset, score: terms.reduce((score, term) => score + (JSON.stringify(asset).toLocaleLowerCase().includes(term) ? 1 : 0), 0) }))
     .filter((entry) => terms.length === 0 || entry.score > 0)
     .sort((left, right) => right.score - left.score || left.asset.id.localeCompare(right.asset.id));
-  const offset = terms.length === 0 ? 0 : Math.max(0, options.offset ?? 0);
-  const limit = terms.length === 0 ? matches.length : Math.max(1, options.limit);
-  const page = terms.length === 0 ? matches : matches.slice(offset, offset + limit);
+  const page = matches.slice(offset, offset + limit);
   const items = page.map(({ asset, score }) => {
     const localized = safeLocalizeAssetForRead(assetType, asset, locale) as AssetTypeMap[TType];
     return {
@@ -314,6 +351,59 @@ export async function getRouteAssetWithDatabase(route: string, id: string, scope
 
 export async function getDomainsWithDatabase(scopeId: string, locale: AssetLocale = "en", principal?: ScopedPrincipal): Promise<DomainModel[]> {
   return (await getRouteAssetsWithDatabase("domains", scopeId, locale, principal)) as DomainModel[];
+}
+
+async function searchProjectedAssets(
+  assetType: AssetType,
+  scopeId: string,
+  query: string,
+  locale: AssetLocale,
+  options: ScopedSearchOptions,
+  principal?: ScopedPrincipal
+): Promise<{ items: Array<{ id: string; type: AssetType; name: string; summary: string; relevanceReason: string; asset: Asset }>; total: number; limit: number; offset: number } | undefined> {
+  const scope = requireReadableApplicationService(scopeId, principal);
+  const terms = query.toLocaleLowerCase().split(/\s+/).map((term) => term.trim()).filter(Boolean);
+  const params: unknown[] = [scope.id, scope.scopePath, assetType];
+  const predicates = ['"applicationServiceId" = $1', '"scopePath" = $2', '"assetType" = $3'];
+  for (const term of terms) {
+    params.push(`%${term}%`);
+    predicates.push(`"searchDocument" ILIKE $${params.length}`);
+  }
+  const offset = Math.max(0, options.offset ?? 0);
+  const limit = Math.max(1, options.limit);
+  params.push(offset, limit);
+  try {
+    const rows = await prisma.$queryRawUnsafe<Array<{ assetId: string; total: bigint | number }>>(
+      `SELECT "assetId", COUNT(*) OVER() AS total
+       FROM "AssetSearchProjection"
+       WHERE ${predicates.join(" AND ")}
+       ORDER BY "updatedAt" DESC, "assetId" ASC
+       OFFSET $${params.length - 1} LIMIT $${params.length}`,
+      ...params
+    );
+    if (!rows.length) return undefined;
+    const assets = await prisma.designAsset.findMany({
+      where: { ...scopeDatabaseWhere(scope), type: assetType, id: { in: rows.map((row) => row.assetId) } },
+      select: { id: true, payload: true }
+    });
+    const byId = new Map(assets.map((row) => [row.id, row]));
+    const items = rows.flatMap((row) => {
+      const persisted = byId.get(row.assetId);
+      if (!persisted) return [];
+      const asset = safeLocalizeAssetForRead(assetType, JSON.parse(persisted.payload) as Asset, locale);
+      return [{
+        id: asset.id,
+        type: assetType,
+        name: "title" in asset && asset.title ? asset.title : asset.name,
+        summary: "description" in asset ? asset.description : asset.summary,
+        relevanceReason: locale === "zh" ? "匹配双语搜索投影。" : "Matched bilingual search projection.",
+        asset
+      }];
+    });
+    return { items, total: Number(rows[0]?.total ?? 0), limit, offset };
+  } catch {
+    return undefined;
+  }
 }
 
 export async function getGovernanceTargetsWithDatabase(scopeId: string, principal?: ScopedPrincipal): Promise<Array<{ type: AssetType; id: string }>> {

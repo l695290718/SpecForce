@@ -481,6 +481,12 @@ git commit -m "docs: record scoped read performance evidence"
 
 ## Plan Self-Review
 
+## Execution Status (2026-08-27)
+
+Implemented in the current workspace: shared scoped-read contracts and signed cursors; the bilingual PostgreSQL search projection and transactional maintenance; direct MCP/Web summary and detail paths; bounded relationship and focused graph MCP reads; lazy Web data-model graph loading; the projection rebuild command; bilingual ADR/Proposal/Context Pack synchronization; and exact-Scope session closure. Local typechecks, focused tests, Prisma validation, projection rebuild, MCP read-back, and diff checks passed.
+
+Deferred by design: a Prisma-generated migration for environments that do not run the compatibility schema initializer, a true repository adapter wiring for the currently standalone shared service contract, enterprise-dataset query-plan benchmarking, and production-scale latency certification. These are not represented as completed capabilities.
+
 - Spec coverage: shared Web/MCP boundary is covered by Tasks 1 and 3; PostgreSQL projection and indexes by Task 2; MCP compatibility by Task 4; Web progressive loading by Task 5; graph bounds by Task 6; consistency, evidence, and MCP synchronization by Task 7.
 - Placeholder scan: implementation commands use concrete paths and commands; `<preflight-session-id>` is an execution-time value intentionally supplied by the preflight receipt, not an implementation placeholder.
 - Type consistency: Task 1 defines `ScopedReadPage` and cursor binding; Task 3 consumes them; Tasks 4-6 consume the service; Task 7 verifies all adapters.

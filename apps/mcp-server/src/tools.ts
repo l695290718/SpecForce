@@ -5,7 +5,7 @@ import { z } from "zod";
 import { auditToolCall } from "./audit";
 import { validateIntegrationContractV1 as validateIntegrationContractEnvelope } from "./integration-contract";
 import { allowAllPolicy, getDefaultActor, principalFromAuthInfo, withRequestPrincipal, type McpAuthInfo } from "./auth";
-import { archiveSeedGraphOutbox, deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, prepareDataModelUpgrade, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
+import { archiveSeedGraphOutbox, deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, prepareDataModelUpgrade, queryPersistedAssetLinks, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
 import { applyDataModelChangeSet } from "./data-models/change-set";
 import { commitKnowledgeChangeSet, createIdentityCandidate, createKnowledgeAssertion, createKnowledgeReviewBundle, createProjectionManifest, createWorkingStream, decideKnowledgeReviewBundle, listKnowledgeAssertions, publishKnowledgeBaseline } from "./knowledge/persistence";
 import { promote3aArchitectureFacts, reconcile3aArchitectureFacts, submit3aArchitectureFactBatch } from "./knowledge/architecture-authoring";
@@ -306,12 +306,15 @@ export function registerTools(server: McpServer): void {
         assetTypes: z.array(z.string()).optional(),
         domainId: z.string().optional(),
         limit: z.number().int().min(1).max(50).optional(),
+        pageSize: z.number().int().min(1).max(50).optional(),
+        cursor: z.string().max(4096).optional(),
+        summaryOnly: z.boolean().optional(),
         locale: assetLocaleSchema.optional()
       },
       permissions: ["asset:read"],
       readOnly: true
     },
-    searchPersistedDesignAssets
+    async (input) => searchPersistedDesignAssets({ ...input, limit: input.pageSize ?? input.limit, pageSize: input.pageSize, cursor: input.cursor })
   );
 
   registerJsonTool(
@@ -354,6 +357,27 @@ export function registerTools(server: McpServer): void {
       readOnly: true
     },
     buildScopedAssetGraph
+  );
+
+  registerJsonTool(
+    server,
+    "query_asset_graph",
+    {
+      title: "Query bounded asset graph",
+      description: "Reads a bounded, optionally focused relationship graph in one authorized application-service scope. The response reports truncation instead of silently dropping graph data.",
+      inputSchema: {
+        applicationServiceId: z.string().min(1),
+        locale: assetLocaleSchema.optional(),
+        domainId: z.string().optional(),
+        assetType: assetTypeSchema.optional(),
+        focusAssetId: z.string().optional(),
+        maxNodes: z.number().int().min(1).max(5000).optional(),
+        maxEdges: z.number().int().min(0).max(10000).optional()
+      },
+      permissions: ["asset:read", "graph:read"],
+      readOnly: true
+    },
+    async (input) => buildScopedAssetGraph({ ...input, includeCanonicalSource: false })
   );
 
   registerJsonTool(
@@ -510,6 +534,27 @@ export function registerTools(server: McpServer): void {
       readOnly: true
     },
     async (input) => listPersistedAssetLinks(input.applicationServiceId)
+  );
+
+  registerJsonTool(
+    server,
+    "query_asset_links",
+    {
+      title: "Query scoped asset links",
+      description: "Reads a bounded page of typed relationships inside one authorized application-service scope.",
+      inputSchema: {
+        applicationServiceId: z.string().min(1),
+        sourceType: z.string().optional(),
+        sourceId: z.string().optional(),
+        targetType: z.string().optional(),
+        targetId: z.string().optional(),
+        relationType: z.string().optional(),
+        limit: z.number().int().min(1).max(100).optional()
+      },
+      permissions: ["asset:read"],
+      readOnly: true
+    },
+    queryPersistedAssetLinks
   );
 
   registerJsonTool(

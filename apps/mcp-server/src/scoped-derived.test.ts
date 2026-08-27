@@ -7,6 +7,8 @@ const persistence = vi.hoisted(() => ({
   listPersistedAssets: vi.fn(),
   listPersistedContextPacks: vi.fn(),
   listPersistedProposals: vi.fn(),
+  getPersistedAsset: vi.fn(),
+  renderPersistedAssetAsMarkdown: vi.fn(),
   upsertContextPack: vi.fn()
 }));
 
@@ -131,6 +133,14 @@ beforeEach(() => {
   persistence.listPersistedContextPacks.mockImplementation(async (applicationServiceId: keyof typeof fixtures) => [
     fixtures[applicationServiceId].contextPack
   ]);
+  persistence.getPersistedAsset.mockImplementation(async (assetType: string, assetId: string, applicationServiceId: keyof typeof fixtures) => {
+    if (assetType === "domain" && assetId === "shared-domain") return fixtures[applicationServiceId].domain;
+    throw new Error(`Asset not found: ${assetType}/${assetId}`);
+  });
+  persistence.renderPersistedAssetAsMarkdown.mockImplementation(async (assetType: string, assetId: string, applicationServiceId: keyof typeof fixtures, locale: "en" | "zh") => {
+    const asset = await persistence.getPersistedAsset(assetType, assetId, applicationServiceId);
+    return locale === "zh" ? `# ${asset.localizedContent?.zh?.name}\n\n${asset.name}` : `# ${asset.name}`;
+  });
   persistence.listPersistedAssetLinks.mockImplementation(async (applicationServiceId: keyof typeof fixtures) => [{
     id: "shared-link",
     sourceType: "proposal",
@@ -183,10 +193,10 @@ describe("scoped MCP derived views", () => {
     const chinese = await buildScopedAssetGraph({ applicationServiceId: designerId, locale: "zh" });
 
     expect(english.canonicalSource).toEqual(chinese.canonicalSource);
-    expect(english.canonicalSource.graph).not.toBe(english.graph);
-    expect(english.canonicalSource.graph.nodes.map((node) => node.label)).toContain("Designer Context");
-    expect(english.canonicalSource.graph.edges.map((edge) => edge.label)).toContain("depends-on");
-    expect(chinese.canonicalSource.graph.nodes.map((node) => node.label)).not.toContain("设计器上下文");
+    expect(english.canonicalSource!.graph).not.toBe(english.graph);
+    expect(english.canonicalSource!.graph.nodes.map((node) => node.label)).toContain("Designer Context");
+    expect(english.canonicalSource!.graph.edges.map((edge) => edge.label)).toContain("depends-on");
+    expect(chinese.canonicalSource!.graph.nodes.map((node) => node.label)).not.toContain("设计器上下文");
   });
 
   it("uses the scoped proposal for impact analysis and preserves its canonical source", async () => {
