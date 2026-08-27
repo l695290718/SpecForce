@@ -3113,12 +3113,12 @@
                     "retryTrigger": "When a representative enterprise dataset is available, run the scoped-read benchmark and open a new exact-Scope session for query-plan and production latency certification.",
                     "localizedContent": {
                       "en": {
-                        "decision": "Use a shared version-aware scoped-read contract, a rebuildable bilingual search projection, direct detail reads, and bounded MCP/Web graph reads.",
-                        "constraints": ["PostgreSQL is authoritative.", "Every read is exact-Scope and authorization-bound.", "Production-scale latency certification is deferred."]
+                        "decision": "Use a shared version-aware scoped-read contract, a rebuildable bilingual search projection, direct exact-Scope detail reads, version-waterline graph reads, and bounded MCP/Web graph reads.",
+                        "constraints": ["PostgreSQL is authoritative.", "Every read is exact-Scope and authorization-bound.", "Graph waterlines use monotonic Scope versions without rescanning append-only ledgers.", "Production-scale latency certification is deferred."]
                       },
                       "zh": {
-                        "decision": "采用版本感知的统一 Scope 读取契约、可重建双语搜索投影、直接详情读取和有界 MCP/Web 图读取。",
-                        "constraints": ["PostgreSQL 保持权威。", "每次读取都必须绑定精确 Scope 和授权。", "生产规模延迟认证延期。"]
+                        "decision": "采用版本感知的统一 Scope 读取契约、可重建双语搜索投影、精确 Scope 直接详情读取、版本水位图读取和有界 MCP/Web 图读取。",
+                        "constraints": ["PostgreSQL 保持权威。", "每次读取都必须绑定精确 Scope 和授权。", "图水位使用单调 Scope 版本，不扫描追加式日志。", "生产规模延迟认证延期。"]
                       }
                     },
                     "evidence": [
@@ -3128,7 +3128,10 @@
                       { "command": "pnpm exec vitest run apps/mcp-server/src/mcp-read-performance.test.ts apps/mcp-server/src/scoped-derived.test.ts apps/mcp-server/src/tools.test.ts", "result": "Passed: 33 files and 474 tests in the current workspace scan." },
                       { "command": "pnpm exec prisma validate", "result": "Passed." },
                       { "command": "pnpm design-read:rebuild", "result": "Passed: exact Designer Scope rebuilt 409 projection rows at catalog version 1559." },
-                      { "command": "git diff --check", "result": "Passed with Windows line-ending normalization warnings only." }
+                      { "command": "git diff --check", "result": "Passed with Windows line-ending normalization warnings only." },
+                      { "command": "pnpm --filter @specforge/web typecheck", "result": "Passed after direct-detail and version-waterline optimization." },
+                      { "command": "pnpm exec vitest run --root . --exclude .worktrees/** --exclude .pnpm-store/** apps/web/lib/__tests__/scoped-catalog.test.ts apps/web/lib/__tests__/legacy-read.test.ts apps/web/lib/data-model-graph.test.ts apps/web/lib/__tests__/derived-routes.test.ts", "result": "Passed: 4 files and 22 tests." },
+                      { "command": "Invoke-WebRequest http://127.0.0.1:3010/healthz; GET /api/data-model-graph; GET /api/assets/{data-models,apis,events,rules}", "result": "Docker Web restarted; health 200; graph 200 with 15,494 bytes and repeated timings 958/828/525/675 ms; asset APIs 200 with repeated timings 11-40 ms." }
                     ]
                   }
                   ]

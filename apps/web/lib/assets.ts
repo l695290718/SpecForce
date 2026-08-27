@@ -245,8 +245,35 @@ function normalizePersistedAsset<TAsset extends Asset>(asset: TAsset, row: Persi
   return { ...asset, architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath } };
 }
 
+function assetIdFromPayload(payload: string): string | undefined {
+  try {
+    const parsed = JSON.parse(payload) as { id?: unknown };
+    return typeof parsed.id === "string" ? parsed.id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function getScopedAssetDetail(assetType: AssetType, assetId: string, scopeId: string, locale: AssetLocale = "en", principal?: ScopedPrincipal) {
-  const catalog = await getScopedAssetCatalog(scopeId, principal);
+  const scope = requireReadableApplicationService(scopeId, principal);
+  const catalog = emptyCatalog() as ScopedAssetCatalog;
+  const trustedScope = { applicationServiceId: scope.id, scopePath: scope.scopePath };
+  const where = { ...scopeDatabaseWhere(scope), id: assetId };
+  if (assetType === "proposal") {
+    const proposalRows = await prisma.proposal.findMany({ where, take: 1 });
+    const proposal = proposalRows[0];
+    if (!proposal) throw new Error(`Asset not found: ${assetType}/${assetId}`);
+    catalog.proposals.push(normalizePersistedAsset(JSON.parse(proposal.payload) as Proposal, proposal, trustedScope));
+    const contextPackRows = await prisma.contextPack.findMany({ where: { ...scopeDatabaseWhere(scope), proposalId: assetId } });
+    catalog.contextPacks = contextPackRows.map((row) => localizeContextPackRow(row, locale));
+  } else {
+    const assetRows = await prisma.designAsset.findMany({ where: { ...where, type: assetType }, take: 1 });
+    const row = assetRows.find((candidate) => candidate.id === assetId || assetIdFromPayload(candidate.payload) === assetId);
+    if (!row) throw new Error(`Asset not found: ${assetType}/${assetId}`);
+    assertPersistedScope(row, trustedScope);
+    const canonical = normalizePersistedAsset(JSON.parse(row.payload) as Asset, row, trustedScope);
+    (catalog[assetCollections[assetType]] as Asset[]).push(canonical);
+  }
   const canonical = (catalog[assetCollections[assetType]] as Asset[]).find((asset) => asset.id === assetId);
   if (!canonical) throw new Error(`Asset not found: ${assetType}/${assetId}`);
   const options = { catalog, locale };

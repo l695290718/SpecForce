@@ -144,19 +144,19 @@ async function readPrismaSnapshot(client: GraphReadClient, scope: ArchitectureSc
 }
 
 async function readWaterlines(client: GraphReadClient, scope: ArchitectureScopeRef): Promise<DataModelGraphWaterlines> {
-  const [cursor, revisions, relationshipEvents, relationshipMax] = await Promise.all([
+  const [cursor, relationshipMax] = await Promise.all([
     client.authoredCatalogCursor.findUnique({ where: { applicationServiceId_scopePath: scope } }),
-    client.authoredAssetRevision.findMany({ where: scope, select: { assetType: true, assetId: true, catalogVersion: true, operation: true, contentDigest: true }, orderBy: [{ assetType: "asc" }, { assetId: "asc" }, { catalogVersion: "asc" }] }),
-    client.relationshipEvent.findMany({ where: scope, select: { dbId: true, graphVersion: true, action: true, relationshipId: true, snapshot: true }, orderBy: [{ graphVersion: "asc" }, { dbId: "asc" }] }),
     client.relationshipEvent.aggregate({ where: scope, _max: { graphVersion: true } })
   ]);
   const catalogVersion = cursor?.nextVersion ?? 0n;
   const relationshipVersion = relationshipMax._max.graphVersion ?? 0n;
   return {
     catalogVersion: catalogVersion.toString(),
-    catalogDigest: digest({ scope, catalogVersion: catalogVersion.toString(), revisions: revisions.map(toJsonSafe) }),
+    // Versions are monotonic within the exact Scope, so the waterline digest
+    // does not need to rescan the append-only revision ledger on every read.
+    catalogDigest: digest({ scope, catalogVersion: catalogVersion.toString() }),
     relationshipVersion: relationshipVersion.toString(),
-    relationshipDigest: digest({ scope, relationshipVersion: relationshipVersion.toString(), events: relationshipEvents.map(toJsonSafe) })
+    relationshipDigest: digest({ scope, relationshipVersion: relationshipVersion.toString() })
   };
 }
 

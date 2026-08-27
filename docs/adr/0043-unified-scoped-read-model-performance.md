@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted and implemented under exact-Scope design-change-session `design-change-session:5e1f747e-e1c6-4acd-82e4-1b4f4dfd0b24` in the Designer Scope. Repository and MCP records are synchronized by the filtered design-fact sync and read-back checks for this ADR.
+Accepted and implemented under exact-Scope design-change-sessions `design-change-session:5e1f747e-e1c6-4acd-82e4-1b4f4dfd0b24` and `design-change-session:c2366b3a-b5f6-4924-92a8-9c678b8d32ca` in the Designer Scope. Repository and MCP records are synchronized by the filtered design-fact sync and read-back checks for this ADR.
 
 ## Context
 
@@ -15,6 +15,8 @@ Web asset lists, MCP search, and derived graph reads could load the complete app
 3. Make Web typed lists use Scope-qualified summary reads and direct detail reads. Data-model ER graph loading is on demand and starts with a bounded page rather than running for list view.
 4. Add additive MCP pagination metadata, bounded `query_asset_links`, and bounded/focused `query_asset_graph`. Compatibility tools remain available; graph responses report partial results and truncation reasons.
 5. Treat cursor reuse across Scope, principal, locale, query, projection version, or catalog version as invalid. Never use an unversioned TTL cache or silently aggregate across application services.
+6. Derive graph waterline digests from the monotonic exact-Scope catalog and relationship versions instead of rescanning append-only revision and event ledgers on every request.
+7. Use a single-row exact-Scope detail read for asset detail pages, loading only the target asset and proposal Context Packs required by proposal governance checks.
 
 ## Alternatives
 
@@ -27,6 +29,8 @@ Web asset lists, MCP search, and derived graph reads could load the complete app
 - First-page reads avoid full-catalog materialization in the optimized Web and MCP paths, reducing payload and token pressure.
 - Existing authored assets remain intact; the search projection can be rebuilt after deployment or migration.
 - A fresh write is visible to the next read after the transaction commits. A missing projection temporarily uses the bounded Web fallback or the legacy MCP compatibility path until backfill completes.
+- Graph waterline reads no longer materialize the full revision/event ledgers; monotonic Scope versions still invalidate cursors and detect snapshot changes.
+- Asset detail pages avoid loading unrelated assets and links; proposal detail reads additionally load only Context Packs belonging to that proposal.
 - Large graph reads still require explicit bounds; the bounded MCP graph surface is a response and token guard, not a claim of production-scale graph query certification.
 
 ## Constraints
@@ -46,6 +50,10 @@ Web asset lists, MCP search, and derived graph reads could load the complete app
 - `pnpm exec prisma validate` passed.
 - `pnpm design-read:rebuild` passed for the exact Designer Scope: 409 projection rows rebuilt at catalog version 1559.
 - `git diff --check` passed with only Windows line-ending normalization warnings.
+- `pnpm --filter @specforge/web typecheck` passed after direct-detail and version-waterline optimization.
+- Focused Web read tests passed: 4 files and 22 tests.
+- Docker Web image rebuilt and 3010 restarted successfully; `/healthz` returned 200.
+- Live 3010 checks after restart: `/api/data-model-graph` returned 200 and 15,494 bytes; repeated timings were 958, 828, 525, and 675 ms. `/api/assets/{data-models,apis,events,rules}` returned 200 with repeated timings between 11 and 40 ms.
 
 ## MCP Record
 
@@ -62,7 +70,7 @@ Web asset lists, MCP search, and derived graph reads could load the complete app
 
 ### 状态
 
-已接受，并在 Designer Scope 的精确 Scope 设计变更会话 `design-change-session:5e1f747e-e1c6-4acd-82e4-1b4f4dfd0b24` 下实现。仓库记录与 MCP 记录通过本 ADR 的过滤同步和回读检查保持一致。
+已接受，并在 Designer Scope 的精确 Scope 设计变更会话 `design-change-session:5e1f747e-e1c6-4acd-82e4-1b4f4dfd0b24`、`design-change-session:c2366b3a-b5f6-4924-92a8-9c678b8d32ca` 下实现。仓库记录与 MCP 记录通过本 ADR 的过滤同步和回读检查保持一致。
 
 ### 背景
 
@@ -75,6 +83,8 @@ Web 设计资产列表、MCP 搜索和派生图读取在返回第一页前可能
 3. Web 类型列表使用按 Scope 限定的概要读取和直接详情读取；数据模型 ER 图按需加载，列表视图不再触发图请求，并从有界页开始。
 4. MCP 增加分页元数据、有界 `query_asset_links` 和有焦点/上限的 `query_asset_graph`。兼容工具继续保留；图响应明确返回 partial 和截断原因。
 5. Scope、主体、语言、查询、投影版本或目录版本变化时，游标必须失效。禁止使用无版本 TTL 缓存，也禁止跨应用服务隐式聚合。
+6. 图读取水位摘要使用精确 Scope 内单调递增的目录版本和关系版本，不再每次扫描追加式修订日志和事件日志。
+7. 资产详情页按精确 Scope 读取单条目标资产；提案详情只额外读取该提案需要的 Context Pack。
 
 ### 备选方案
 
@@ -87,6 +97,8 @@ Web 设计资产列表、MCP 搜索和派生图读取在返回第一页前可能
 - 优化后的 Web 和 MCP 首页读取不再物化完整目录，降低响应体和 Token 压力。
 - 既有设计资产保持不变；部署或迁移后可以重新构建搜索投影。
 - 事务提交后下一次读取即可看到新写入；投影尚未回填时，Web 使用有界回退路径，MCP 使用旧兼容路径。
+- 图读取水位不再物化完整修订/事件日志；单调 Scope 版本仍用于游标失效和快照变化检测。
+- 资产详情页不再加载无关资产和关系；提案详情只读取属于该提案的上下文包。
 - 大图读取仍需显式上限；有界 MCP 图面是响应和 Token 保护，不代表已完成生产规模图查询认证。
 
 ### 约束
@@ -106,3 +118,7 @@ Web 设计资产列表、MCP 搜索和派生图读取在返回第一页前可能
 - `pnpm exec prisma validate` 通过。
 - 精确 Designer Scope 回填 409 条投影记录，目录版本为 1559。
 - `git diff --check` 通过，仅有 Windows 换行规范化提示。
+- 直接详情读取和版本水位优化后，`pnpm --filter @specforge/web typecheck` 通过。
+- Web 聚焦读取测试通过：4 个文件、22 个测试。
+- Docker Web 镜像重建并成功重启 3010；`/healthz` 返回 200。
+- 重启后的 3010 实测：`/api/data-model-graph` 返回 200、15,494 字节，连续耗时 958、828、525、675 毫秒；`/api/assets/{data-models,apis,events,rules}` 均返回 200，连续耗时 11-40 毫秒。
