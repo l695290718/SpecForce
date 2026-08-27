@@ -30,6 +30,7 @@ export class DataModelGraphReadError extends Error {
 }
 
 type GraphReadClient = {
+  $queryRawUnsafe?: <T>(query: string, ...values: unknown[]) => Promise<T>;
   authoredCatalogCursor: { findUnique(args: unknown): Promise<{ nextVersion: bigint } | null> };
   authoredAssetRevision: { findMany(args: unknown): Promise<unknown[]> };
   designAsset: { findMany(args: unknown): Promise<unknown[]> };
@@ -132,7 +133,7 @@ function createPrismaRepository(client: GraphReadClient = prisma as unknown as G
 async function readPrismaSnapshot(client: GraphReadClient, scope: ArchitectureScopeRef): Promise<GraphSnapshot> {
   const before = await readWaterlines(client, scope);
   const [revisionRows, fallbackRows, nodes, relationships] = await Promise.all([
-    client.authoredAssetRevision.findMany({ where: { ...scope, catalogVersion: { lte: BigInt(before.catalogVersion) } }, orderBy: [{ assetType: "asc" }, { assetId: "asc" }, { catalogVersion: "asc" }] }),
+    readLatestDataModelRevisions(client, scope, BigInt(before.catalogVersion)),
     client.designAsset.findMany({ where: { ...scope, type: "dataModel" }, orderBy: { id: "asc" } }),
     client.assetNode.findMany({ where: { ...scope, lifecycleStatus: "ACTIVE" }, orderBy: [{ nodeType: "asc" }, { logicalId: "asc" }] }),
     client.relationshipCurrent.findMany({ where: { ...scope, lifecycleStatus: "ACTIVE", validTo: null }, include: { sourceNode: true, targetNode: true }, orderBy: [{ relationType: "asc" }, { dbId: "asc" }] })
@@ -141,6 +142,27 @@ async function readPrismaSnapshot(client: GraphReadClient, scope: ArchitectureSc
   const after = await readWaterlines(client, scope);
   if (JSON.stringify(before) !== JSON.stringify(after)) throw new DataModelGraphReadError("SNAPSHOT_CHANGED");
   return { assets, nodes, relationships, waterlines: after };
+}
+
+async function readLatestDataModelRevisions(client: GraphReadClient, scope: ArchitectureScopeRef, catalogVersion: bigint): Promise<unknown[]> {
+  if (client.$queryRawUnsafe) {
+    return client.$queryRawUnsafe<unknown[]>(
+      `SELECT DISTINCT ON ("assetId") "assetId", "operation", "payload", "catalogVersion"
+       FROM "AuthoredAssetRevision"
+       WHERE "applicationServiceId" = $1
+         AND "scopePath" = $2
+         AND "assetType" = 'dataModel'
+         AND "catalogVersion" <= $3
+       ORDER BY "assetId" ASC, "catalogVersion" DESC, "dbId" DESC`,
+      scope.applicationServiceId,
+      scope.scopePath,
+      catalogVersion
+    );
+  }
+  return client.authoredAssetRevision.findMany({
+    where: { ...scope, assetType: "dataModel", catalogVersion: { lte: catalogVersion } },
+    orderBy: [{ assetId: "asc" }, { catalogVersion: "desc" }]
+  });
 }
 
 async function readWaterlines(client: GraphReadClient, scope: ArchitectureScopeRef): Promise<DataModelGraphWaterlines> {
