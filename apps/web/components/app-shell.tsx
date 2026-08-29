@@ -2,8 +2,8 @@
 
 import { Activity, Boxes, ClipboardList, FileCode2, Home, LayoutDashboard, ListChecks, LoaderCircle, Network, Search, Settings, Waypoints, ScanSearch } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useTransition, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { LanguageSwitcher, T } from "./language-provider";
 import { ArchitectureScopeSwitcher } from "./architecture-scope-switcher";
 import type { MessageKey } from "../lib/i18n";
@@ -25,21 +25,40 @@ const assetLinks = [
 
 export function AppShell({ children, readableScopes }: { children: ReactNode; readableScopes: ResolvedApplicationServiceScope[] }) {
   const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const scope = searchParams.get("scope");
   const withScope = (href: string) => scope ? buildScopedHref(href, scope) : href;
-  const [isPending, startTransition] = useTransition();
+  const [isNavigating, setIsNavigating] = useState(false);
   const startNavigation = (href: string) => {
     if (window.location.pathname + window.location.search === href) {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-    startTransition(() => router.push(href));
+    setIsNavigating(true);
+    // A hard navigation is the reliable fallback for the production Docker build:
+    // it cannot remain stuck in an App Router RSC transition when the server is healthy.
+    window.setTimeout(() => window.location.assign(href), 0);
+  };
+
+  const handleInternalLinkClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const anchor = target.closest("a");
+    if (!anchor || anchor.hasAttribute("download")) return;
+    const href = anchor.getAttribute("href");
+    if (!href || href.startsWith("#") || href.startsWith("data:")) return;
+    const destination = new URL(href, window.location.href);
+    if (destination.origin !== window.location.origin) return;
+    const nextHref = `${destination.pathname}${destination.search}${destination.hash}`;
+    if (window.location.pathname + window.location.search + window.location.hash === nextHref) return;
+    event.preventDefault();
+    event.stopPropagation();
+    startNavigation(nextHref);
   };
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-screen bg-surface" onClickCapture={handleInternalLinkClick}>
       <aside className="sf-deck fixed inset-y-0 left-0 hidden w-72 px-4 py-5 text-slate-200 shadow-deck lg:block">
         <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-blue-400/40 to-transparent" />
         <div className="relative mb-5 overflow-hidden rounded-xl border border-white/10 bg-white/[0.06] p-3 shadow-elevated backdrop-blur">
@@ -101,7 +120,7 @@ export function AppShell({ children, readableScopes }: { children: ReactNode; re
         </div>
         <div className="mx-auto max-w-7xl px-5 py-6 lg:px-8">{children}</div>
       </main>
-      {isPending ? <div aria-busy="true" aria-live="polite" className="pointer-events-none fixed inset-x-0 top-0 z-50" role="status"><div className="h-1 animate-pulse bg-gradient-to-r from-blue-500 via-violet-500 to-blue-500" /><div className="absolute right-4 top-3 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-lg backdrop-blur"><LoaderCircle className="animate-spin text-accent" size={14} aria-hidden="true" /><T k="nav.loading" /></div></div> : null}
+      {isNavigating ? <div aria-busy="true" aria-live="polite" className="pointer-events-none fixed inset-x-0 top-0 z-50" role="status"><div className="h-1 animate-pulse bg-gradient-to-r from-blue-500 via-violet-500 to-blue-500" /><div className="absolute right-4 top-3 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-lg backdrop-blur"><LoaderCircle className="animate-spin text-accent" size={14} aria-hidden="true" /><T k="nav.loading" /></div></div> : null}
     </div>
   );
 }

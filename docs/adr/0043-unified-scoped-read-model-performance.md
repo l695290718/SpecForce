@@ -18,6 +18,7 @@ Web asset lists, MCP search, and derived graph reads could load the complete app
 6. Derive graph waterline digests from the monotonic exact-Scope catalog and relationship versions instead of rescanning append-only revision and event ledgers on every request.
 7. Use a single-row exact-Scope detail read for asset detail pages, loading only the target asset and proposal Context Packs required by proposal governance checks.
 8. For graph snapshots, select the latest data-model revision per asset inside PostgreSQL with the catalog-version upper bound; retain the authored table fallback for compatibility test doubles and older clients.
+9. Treat internal Web route navigation as a full-document navigation fallback. The loading indicator may be shown before `window.location.assign`, preventing a healthy 3010 Docker server from leaving users in an indefinitely pending App Router transition.
 
 ## Alternatives
 
@@ -33,6 +34,7 @@ Web asset lists, MCP search, and derived graph reads could load the complete app
 - Graph waterline reads no longer materialize the full revision/event ledgers; monotonic Scope versions still invalidate cursors and detect snapshot changes.
 - Asset detail pages avoid loading unrelated assets and links; proposal detail reads additionally load only Context Packs belonging to that proposal.
 - Data-model graph snapshots avoid transferring historical revisions for unrelated asset types or older revisions; the query remains bounded by the exact Scope and captured catalog version.
+- Internal asset and workflow links remain usable when an App Router RSC transition stalls; the browser performs a deterministic same-origin document navigation while preserving the requested Scope query.
 - Large graph reads still require explicit bounds; the bounded MCP graph surface is a response and token guard, not a claim of production-scale graph query certification.
 
 ## Constraints
@@ -53,6 +55,7 @@ Web asset lists, MCP search, and derived graph reads could load the complete app
 - `pnpm design-read:rebuild` passed for the exact Designer Scope: 409 projection rows rebuilt at catalog version 1559.
 - `git diff --check` passed with only Windows line-ending normalization warnings.
 - `pnpm --filter @specforge/web typecheck` passed after direct-detail and version-waterline optimization.
+- 3010 browser reproduction before the navigation fallback: internal asset clicks remained on `/assets/data-models?scope=com.huawei.celon.desiner` with the client transition stuck in `Opening page…`; direct detail and RSC requests returned 200.
 - Focused Web read tests passed: 4 files and 22 tests.
 - Docker Web image rebuilt and 3010 restarted successfully; `/healthz` returned 200.
 - Live 3010 checks after restart: `/api/data-model-graph` returned 200 and 15,494 bytes; repeated timings were 958, 828, 525, and 675 ms. `/api/assets/{data-models,apis,events,rules}` returned 200 with repeated timings between 11 and 40 ms.
@@ -89,6 +92,7 @@ Web 设计资产列表、MCP 搜索和派生图读取在返回第一页前可能
 6. 图读取水位摘要使用精确 Scope 内单调递增的目录版本和关系版本，不再每次扫描追加式修订日志和事件日志。
 7. 资产详情页按精确 Scope 读取单条目标资产；提案详情只额外读取该提案需要的 Context Pack。
 8. 图快照在 PostgreSQL 内按资产选择不超过当前目录版本的最新数据模型修订，同时保留兼容回退路径。
+9. Web 内部路由采用整页导航作为客户端路由过渡的可靠回退；在调用 `window.location.assign` 前可以显示加载指示器，避免健康的 3010 Docker 服务让用户停留在无限等待的 App Router 过渡中。
 
 ### 备选方案
 
@@ -104,6 +108,7 @@ Web 设计资产列表、MCP 搜索和派生图读取在返回第一页前可能
 - 图读取水位不再物化完整修订/事件日志；单调 Scope 版本仍用于游标失效和快照变化检测。
 - 资产详情页不再加载无关资产和关系；提案详情只读取属于该提案的上下文包。
 - 数据模型图快照不再传输无关类型或历史版本的修订，查询仍绑定精确 Scope 和捕获的目录版本。
+- 当 App Router 的 RSC 过渡卡住时，内部资产和工作流链接仍可用；浏览器会执行确定性的同源整页导航，并保留请求中的 Scope 查询参数。
 - 大图读取仍需显式上限；有界 MCP 图面是响应和 Token 保护，不代表已完成生产规模图查询认证。
 
 ### 约束
