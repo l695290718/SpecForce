@@ -1988,3 +1988,53 @@ model AssessmentExecutionActual {
   @@index([applicationServiceId, scopePath, assessmentId, createdAt], map: "AssessmentExecutionActual_scope_assessment_created_idx")
   @@index([applicationServiceId, scopePath, contentDigest], map: "AssessmentExecutionActual_scope_content_digest_idx")
 }
+
+model KnowledgeReadinessPolicy {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  version              Int
+  profileId            String
+  overlay              Json     @db.JsonB
+  status               String
+  actorId              String
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, id, version], map: "KnowledgeReadinessPolicy_scope_id_version_key")
+  @@index([applicationServiceId, scopePath, profileId, status, version], map: "KnowledgeReadinessPolicy_scope_profile_status_idx")
+}
+
+model SystemKnowledgeReadinessReceipt {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  deterministicKey     String
+  subjectId            String
+  grantDigest          String
+  profileId            String
+  selectorDigest       String
+  purpose              String
+  locale               String
+  policyId             String
+  policyVersion        Int
+  trustStatus          String
+  dimensionStatuses    Json     @db.JsonB
+  baselineBindings     Json     @db.JsonB
+  sourceWaterlines     Json     @db.JsonB
+  coverageSummary      Json     @db.JsonB
+  freshnessSummary     Json     @db.JsonB
+  reasonCodes          Json     @db.JsonB
+  remediationActions   Json     @db.JsonB
+  asOf                 DateTime
+  validUntil           DateTime
+  receiptDigest        String
+  lifecycleStatus      String   @default("ACTIVE")
+  applicationServiceId String
+  scopePath            String
+  createdAt            DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, id], map: "SystemKnowledgeReadinessReceipt_scope_id_key")
+  @@unique([applicationServiceId, scopePath, deterministicKey], map: "SystemKnowledgeReadinessReceipt_scope_deterministic_key")
+  @@index([applicationServiceId, scopePath, subjectId, profileId, validUntil], map: "SKRR_scope_subject_profile_expiry_idx")
+  @@index([applicationServiceId, scopePath, lifecycleStatus, createdAt], map: "SystemKnowledgeReadinessReceipt_scope_lifecycle_created_idx")
+}

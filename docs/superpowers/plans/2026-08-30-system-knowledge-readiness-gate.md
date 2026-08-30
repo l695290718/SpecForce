@@ -41,7 +41,7 @@
 - Consumes: `ArchitectureScopeRef` from `packages/core/src/types.ts`.
 - Produces: `composeKnowledgeReadinessPolicy(overlay)`, `evaluateKnowledgeReadiness(input)`, `enterpriseMinimumPolicy`, and the types `KnowledgeProfileId`, `KnowledgeReadinessPolicy`, `KnowledgeEvidenceSnapshot`, `KnowledgeReadinessDecision`, `KnowledgeReasonCode`, and `KnowledgeRemediationAction`.
 
-- [ ] **Step 1: Write failing policy-composition and evaluator tests**
+- [x] **Step 1: Write failing policy-composition and evaluator tests**
 
 Create table-driven tests that prove strictness ordering, profile requirements, full-snapshot completeness, pending work, reconciliation blocking, receipt expiry inputs, and time-skew handling:
 
@@ -107,13 +107,13 @@ describe("system knowledge readiness", () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and confirm the contract is absent**
+- [x] **Step 2: Run the focused test and confirm the contract is absent**
 
 Run: `pnpm exec vitest run packages/core/src/knowledge-readiness/evaluate.test.ts`
 
 Expected: FAIL because `packages/core/src/knowledge-readiness/index.ts` does not exist.
 
-- [ ] **Step 3: Add the complete public type contract**
+- [x] **Step 3: Add the complete public type contract**
 
 Define the closed unions and immutable inputs in `types.ts`:
 
@@ -198,13 +198,13 @@ export interface KnowledgeReadinessDecision {
 }
 ```
 
-- [ ] **Step 4: Implement policy composition and evaluation as pure functions**
+- [x] **Step 4: Implement policy composition and evaluation as pure functions**
 
 In `policy.ts`, register all three Profiles and reject any overlay freshness, TTL, or response budget that is looser/larger than the enterprise value. In `evaluate.ts`, evaluate authorization-independent evidence using this precedence: unresolved conflict or non-converged reconciliation -> `BLOCKED`; missing source, missing full snapshot, open tombstone, pending work, stale/future/late timestamp -> `SOURCE_CHECK_REQUIRED`; otherwise `SELF_CONTAINED`. Compute `validUntil` as the minimum of receipt TTL and every required source freshness deadline. Keep reason codes sorted and unique so receipt digests are deterministic.
 
 Export the module from `knowledge-readiness/index.ts` and add `export * from "./knowledge-readiness/index.js";` to `packages/core/src/index.ts`.
 
-- [ ] **Step 5: Run focused tests and core typecheck**
+- [x] **Step 5: Run focused tests and core typecheck**
 
 Run: `pnpm exec vitest run packages/core/src/knowledge-readiness/evaluate.test.ts`
 
@@ -214,7 +214,7 @@ Run: `pnpm --filter @specforge/core typecheck`
 
 Expected: exit code 0 with no TypeScript diagnostics.
 
-- [ ] **Step 6: Commit the pure domain increment**
+- [x] **Step 6: Commit the pure domain increment**
 
 ```bash
 git add packages/core/src/knowledge-readiness packages/core/src/index.ts
@@ -233,7 +233,7 @@ git commit -m "feat: add system knowledge readiness evaluator"
 - Consumes: `KnowledgeReadinessPolicyOverlay`, `KnowledgeReadinessDecision`, and exact `ArchitectureScopeRef`.
 - Produces: `getActivePolicyOverlay(tx, scope, profileId)`, `upsertPolicyOverlay(prisma, input)`, `findReusableReceipt(tx, deterministicKey, now)`, and `insertImmutableReceipt(tx, input)`.
 
-- [ ] **Step 1: Write failing repository tests against PostgreSQL**
+- [x] **Step 1: Write failing repository tests against PostgreSQL**
 
 Test that policy versions are exact-Scope, only one active version is selected, identical deterministic keys reuse one receipt, and receipt rows cannot be updated through repository APIs. Gate the suite with `SPECFORGE_CONTINUOUS_INTEGRATION=1`, following the existing PostgreSQL integration-test convention.
 
@@ -251,13 +251,13 @@ it("never resolves a policy from another Scope", async () => {
 });
 ```
 
-- [ ] **Step 2: Run the repository test and confirm the Prisma models are absent**
+- [x] **Step 2: Run the repository test and confirm the Prisma models are absent**
 
 Run: `$env:SPECFORGE_CONTINUOUS_INTEGRATION='1'; pnpm exec vitest run apps/mcp-server/src/knowledge-readiness/repository.test.ts`
 
 Expected: FAIL with missing Prisma model properties.
 
-- [ ] **Step 3: Add the Prisma models and matching SQL migration**
+- [x] **Step 3: Add the Prisma models and matching SQL migration**
 
 Append these models to `prisma/schema.prisma`, preserving exact-Scope uniqueness and immutable receipt identity:
 
@@ -315,11 +315,11 @@ model SystemKnowledgeReadinessReceipt {
 
 The SQL migration must create the same columns, constraints, and indexes with quoted Prisma table/column names. Do not add foreign keys to mutable Baseline or connector rows; immutable bindings are stored as IDs and digests inside the receipt.
 
-- [ ] **Step 4: Implement repository functions with exact-Scope predicates**
+- [x] **Step 4: Implement repository functions with exact-Scope predicates**
 
 `upsertPolicyOverlay` inserts a new `(scope,id,version)` row and marks older versions for the same Profile `SUPERSEDED` in one transaction. `insertImmutableReceipt` uses `upsert` only on the deterministic key with an empty update object and verifies the returned digest equals the requested digest; a collision with different content throws `KNOWLEDGE_POLICY_VIOLATION`. No update or delete receipt function is exported.
 
-- [ ] **Step 5: Generate Prisma Client and apply the additive schema**
+- [x] **Step 5: Generate Prisma Client and apply the additive schema**
 
 Run: `pnpm db:generate`
 
@@ -329,7 +329,7 @@ Run: `pnpm db:push`
 
 Expected: database schema synchronized without destructive-change warnings.
 
-- [ ] **Step 6: Run repository tests and MCP server typecheck**
+- [x] **Step 6: Run repository tests and MCP server typecheck**
 
 Run: `$env:SPECFORGE_CONTINUOUS_INTEGRATION='1'; pnpm exec vitest run apps/mcp-server/src/knowledge-readiness/repository.test.ts`
 
@@ -339,7 +339,7 @@ Run: `pnpm --filter @specforge/mcp-server typecheck`
 
 Expected: exit code 0.
 
-- [ ] **Step 7: Commit persistence separately**
+- [x] **Step 7: Commit persistence separately**
 
 ```bash
 git add prisma/schema.prisma prisma/migrations/20260830_system_knowledge_readiness_gate apps/mcp-server/src/knowledge-readiness/repository.ts apps/mcp-server/src/knowledge-readiness/repository.test.ts
