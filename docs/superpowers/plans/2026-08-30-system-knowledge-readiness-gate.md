@@ -992,14 +992,14 @@ pnpm design-context:close -- --session design-change-session:214866ac-190d-4182-
 
 Expected: the same session returns `CONVERGED`. If MCP persistence or reconciliation fails, close as `BLOCKED` with the actual failure and retry trigger, add `MCP synchronization blocked` to the ADR/backlog record, and do not claim completion.
 
-- [ ] **Step 8: Commit the synchronized repository records**
+- [x] **Step 8: Commit the synchronized repository records**
 
 ```bash
 git add docs/adr/0045-system-knowledge-readiness-gate.md docs/design-facts/system-knowledge-readiness-manifest.json docs/TODO.md README.md docs/superpowers/specs/2026-08-30-system-knowledge-readiness-gate-design.md
 git commit -m "docs: record system knowledge readiness delivery"
 ```
 
-- [ ] **Step 9: Inspect final repository state**
+- [x] **Step 9: Inspect final repository state**
 
 Run: `git status --short`
 
