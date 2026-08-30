@@ -23,6 +23,7 @@ import { principalFromAuthInfo, withRequestPrincipal, type McpAuthInfo } from ".
 import { upsertPolicyOverlay } from "../knowledge-readiness/repository";
 import { evaluateScopedKnowledgeReadiness, type KnowledgeReadRequest } from "../knowledge-readiness/service";
 import { readSystemKnowledge } from "../knowledge-readiness/read";
+import { recordBudgetFailure, recordCursorInvalidation, recordReadinessEvaluation, recordReceiptReuse } from "../knowledge-readiness/metrics";
 
 const architectureScopeSchema = z.object({
   applicationServiceId: z.string().min(1),
@@ -341,6 +342,20 @@ function deniedKnowledgeRead() {
   };
 }
 
+function recordKnowledgeOutcome(scope: ArchitectureScopeRef, result: { accessDecision: "ALLOW" | "DENY"; profileId?: string; reasonCodes: readonly string[]; receiptId?: string; asOf?: string }, startedAt: number, input: { receiptId?: string; cursor?: string }): void {
+  if (result.profileId === "ARCHITECTURE_OVERVIEW" || result.profileId === "CHANGE_ASSESSMENT" || result.profileId === "RUNTIME_DIAGNOSIS") {
+    recordReadinessEvaluation(scope, {
+      profileId: result.profileId,
+      accessDecision: result.accessDecision,
+      reasonCodes: result.reasonCodes as never,
+      latencyMilliseconds: Date.now() - startedAt
+    });
+  }
+  if (!input.receiptId && result.receiptId && result.asOf && Date.parse(result.asOf) < startedAt) recordReceiptReuse(scope);
+  if (input.cursor && result.reasonCodes.includes("KNOWLEDGE_RECEIPT_STALE")) recordCursorInvalidation(scope);
+  if (result.reasonCodes.includes("KNOWLEDGE_RESPONSE_BUDGET_EXCEEDED")) recordBudgetFailure(scope);
+}
+
 function auditActor(extra: FederationRequestExtra | undefined): { actorType: FederationCaller["actorType"]; actorId: string } {
   try {
     const principal = requestActor(extra);
@@ -623,7 +638,10 @@ export function registerFederationTools(server: McpServer): void {
   }, async (input, caller) => {
     const architectureScope = readableKnowledgeScope(input.architectureScope, caller);
     if (!architectureScope) return deniedKnowledgeRead();
-    return evaluateScopedKnowledgeReadiness(prisma, { ...input, architectureScope } as KnowledgeReadRequest, caller);
+    const startedAt = Date.now();
+    const result = await evaluateScopedKnowledgeReadiness(prisma, { ...input, architectureScope } as KnowledgeReadRequest, caller);
+    recordKnowledgeOutcome(architectureScope, result, startedAt, input);
+    return result;
   });
 
   registerFederationJsonTool(server, "read_system_knowledge", {
@@ -635,7 +653,10 @@ export function registerFederationTools(server: McpServer): void {
   }, async (input, caller) => {
     const architectureScope = readableKnowledgeScope(input.architectureScope, caller);
     if (!architectureScope) return deniedKnowledgeRead();
-    return readSystemKnowledge(prisma, { ...input, architectureScope } as KnowledgeReadRequest, caller);
+    const startedAt = Date.now();
+    const result = await readSystemKnowledge(prisma, { ...input, architectureScope } as KnowledgeReadRequest, caller);
+    recordKnowledgeOutcome(architectureScope, result, startedAt, input);
+    return result;
   });
 
   registerFederationJsonTool(server, "register_connector", {

@@ -754,7 +754,7 @@ git commit -m "feat: migrate agents to readiness-gated knowledge reads"
 - Consumes: connector observation, candidate promotion, reconciliation, Baseline publication, readiness evaluation, and gated read operations.
 - Produces: bounded per-Scope readiness metrics and one executable acceptance path proving allow -> deny -> reconverge -> allow.
 
-- [ ] **Step 1: Write the end-to-end trust-transition test**
+- [x] **Step 1: Write the end-to-end trust-transition test**
 
 The test must perform this sequence using the public persistence/tool boundaries rather than inserting a ready receipt directly:
 
@@ -781,21 +781,21 @@ it("allows only a current reconciled generation and fails closed on drift", asyn
 
 Add separate assertions for freshness expiry without waterline movement, unauthorized no-leak, incomplete snapshot, open tombstone, runtime-source absence, and mixed-page cursor rejection.
 
-- [ ] **Step 2: Write failing bounded-metrics tests**
+- [x] **Step 2: Write failing bounded-metrics tests**
 
 Assert counters by Profile/reason, receipt reuse, evaluation latency histogram, stale/incomplete/pending ages, diagnostic denials, cursor invalidations, and budget failures. Labels may include exact Scope only after authorization; asset IDs and bodies must never appear.
 
-- [ ] **Step 3: Run the E2E and metrics tests before implementation**
+- [x] **Step 3: Run the E2E and metrics tests before implementation**
 
 Run: `$env:SPECFORGE_CONTINUOUS_INTEGRATION='1'; pnpm exec vitest run apps/mcp-server/src/knowledge-readiness/readiness.e2e.test.ts apps/mcp-server/src/knowledge-readiness/metrics.test.ts`
 
 Expected: metrics test FAIL before instrumentation; E2E exposes any missing lifecycle wiring.
 
-- [ ] **Step 4: Add bounded in-process metrics instrumentation**
+- [x] **Step 4: Add bounded in-process metrics instrumentation**
 
 Implement counters and fixed buckets without a new dependency. Expose `recordReadinessEvaluation`, `recordReceiptReuse`, `recordCursorInvalidation`, `recordDiagnosticDenial`, `recordBudgetFailure`, and `snapshotReadinessMetrics(scope)`; cap Profile/reason label cardinality with the closed unions from Task 1. Call the recorders only after exact-Scope authorization.
 
-- [ ] **Step 5: Run the full readiness suite once for the phase**
+- [x] **Step 5: Run the full readiness suite once for the phase**
 
 Run: `$env:SPECFORGE_CONTINUOUS_INTEGRATION='1'; pnpm exec vitest run packages/core/src/knowledge-readiness apps/mcp-server/src/knowledge-readiness apps/mcp-server/src/federation/tools.test.ts`
 
@@ -809,7 +809,7 @@ Run: `git diff --check`
 
 Expected: no whitespace errors.
 
-- [ ] **Step 6: Commit acceptance evidence code**
+- [x] **Step 6: Commit acceptance evidence code**
 
 ```bash
 git add apps/mcp-server/src/knowledge-readiness/readiness.e2e.test.ts apps/mcp-server/src/knowledge-readiness/metrics.ts apps/mcp-server/src/knowledge-readiness/metrics.test.ts apps/mcp-server/src/federation/tools.ts
