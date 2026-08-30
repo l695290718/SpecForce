@@ -20,11 +20,56 @@ import { createConnectorRun, getConnectorHealth, getConnectorRun, setConnectorRu
 import { issueChangeAttestation } from "./attestation";
 import { verifyPersistedChangeAttestation } from "./attestation-verification";
 import { principalFromAuthInfo, withRequestPrincipal, type McpAuthInfo } from "../auth";
+import { upsertPolicyOverlay } from "../knowledge-readiness/repository";
+import { evaluateScopedKnowledgeReadiness, type KnowledgeReadRequest } from "../knowledge-readiness/service";
+import { readSystemKnowledge } from "../knowledge-readiness/read";
 
 const architectureScopeSchema = z.object({
   applicationServiceId: z.string().min(1),
   scopePath: z.string().min(1)
 });
+
+const knowledgeProfileSchema = z.enum(["ARCHITECTURE_OVERVIEW", "CHANGE_ASSESSMENT", "RUNTIME_DIAGNOSIS"]);
+const knowledgeSourceRoleSchema = z.enum(["DESIGN_CATALOG", "SOURCE_CODE", "API_SCHEMA", "DATA_SCHEMA", "TEST_EVIDENCE", "DEPLOYMENT", "RUNTIME_TELEMETRY"]);
+const knowledgeDimensionSchema = z.enum(["DESIGN_INTENT", "IMPLEMENTATION", "RUNTIME"]);
+const knowledgeSourceRequirementSchema = z.object({
+  role: knowledgeSourceRoleSchema,
+  dimension: knowledgeDimensionSchema,
+  maximumFreshnessSeconds: z.number().int().positive(),
+  maximumClockSkewSeconds: z.number().int().nonnegative(),
+  requireFullSnapshot: z.boolean()
+}).strict();
+const knowledgePolicyOverlaySchema = z.object({
+  id: z.string().min(1).max(200),
+  version: z.number().int().positive(),
+  profileId: knowledgeProfileSchema,
+  additionalSources: z.array(knowledgeSourceRequirementSchema).max(16).optional(),
+  maximumFreshnessSeconds: z.record(knowledgeSourceRoleSchema, z.number().int().positive()).optional(),
+  maximumClockSkewSeconds: z.record(knowledgeSourceRoleSchema, z.number().int().nonnegative()).optional(),
+  responseBudget: z.object({
+    assets: z.number().int().positive().optional(),
+    relationships: z.number().int().positive().optional(),
+    bytes: z.number().int().positive().optional(),
+    executionMilliseconds: z.number().int().positive().optional()
+  }).strict().optional(),
+  receiptTtlSeconds: z.number().int().positive().optional(),
+  retentionDays: z.number().int().positive().optional()
+}).strict();
+const knowledgeSelectorsSchema = z.array(z.object({
+  assetTypes: z.array(z.string().min(1).max(100)).max(100).optional(),
+  assetIds: z.array(z.string().min(1).max(200)).max(100).optional(),
+  relationshipTypes: z.array(z.string().min(1).max(100)).max(100).optional()
+}).strict()).max(32);
+const knowledgeReadInputSchema = {
+  knowledgeProfile: knowledgeProfileSchema,
+  selectors: knowledgeSelectorsSchema.default([]),
+  purpose: z.string().min(1).max(500),
+  locale: z.enum(["en", "zh"]).default("en"),
+  receiptId: z.string().min(1).max(200).optional(),
+  pageSize: z.number().int().positive().max(200).optional(),
+  cursor: z.string().min(1).optional(),
+  architectureScope: architectureScopeSchema
+};
 
 type FederationRequestExtra = {
   authInfo?: McpAuthInfo;
@@ -109,6 +154,18 @@ const stableErrorCodes = new Set([
   "IDENTITY_MAPPING_INVALID",
   "IDENTITY_MAPPING_MISSING",
   "LOCALIZATION_INCOMPLETE",
+  "KNOWLEDGE_POLICY_VERSION_MUST_INCREASE",
+  "KNOWLEDGE_POLICY_VIOLATION",
+  "KNOWLEDGE_SOURCE_NOT_CONFIGURED",
+  "KNOWLEDGE_COVERAGE_INCOMPLETE",
+  "KNOWLEDGE_STALE",
+  "KNOWLEDGE_FULL_SNAPSHOT_REQUIRED",
+  "KNOWLEDGE_PENDING_PROMOTION",
+  "KNOWLEDGE_RECONCILIATION_BLOCKED",
+  "KNOWLEDGE_CONFLICT_UNRESOLVED",
+  "KNOWLEDGE_RECEIPT_STALE",
+  "KNOWLEDGE_RESPONSE_BUDGET_EXCEEDED",
+  "KNOWLEDGE_SCOPE_ACCESS_DENIED",
   "OUTBOX_ARCHIVE_CUTOFF_INVALID",
   "OUTBOX_ARCHIVE_LIMIT_INVALID",
   "OUTBOX_ARCHIVE_REASON_REQUIRED",
@@ -181,6 +238,18 @@ function safeClientMessage(code: string): string {
     FEDERATION_TOOL_ERROR: "The federation tool request could not be completed.",
     IDENTITY_CONFLICT: "The requested fact has an identity conflict.",
     LOCALIZATION_INCOMPLETE: "The requested fact has incomplete localization.",
+    KNOWLEDGE_POLICY_VERSION_MUST_INCREASE: "The knowledge policy version must increase within its exact Scope.",
+    KNOWLEDGE_POLICY_VIOLATION: "The knowledge policy cannot weaken the enterprise minimum.",
+    KNOWLEDGE_SOURCE_NOT_CONFIGURED: "A required knowledge source is not configured.",
+    KNOWLEDGE_COVERAGE_INCOMPLETE: "The requested knowledge is not complete enough for this Profile.",
+    KNOWLEDGE_STALE: "A required knowledge source is stale.",
+    KNOWLEDGE_FULL_SNAPSHOT_REQUIRED: "A complete snapshot is required for this knowledge read.",
+    KNOWLEDGE_PENDING_PROMOTION: "Knowledge candidates are still pending promotion.",
+    KNOWLEDGE_RECONCILIATION_BLOCKED: "Knowledge reconciliation is blocked for this Scope.",
+    KNOWLEDGE_CONFLICT_UNRESOLVED: "Knowledge conflicts remain unresolved.",
+    KNOWLEDGE_RECEIPT_STALE: "The knowledge readiness receipt or continuation cursor is stale.",
+    KNOWLEDGE_RESPONSE_BUDGET_EXCEEDED: "The requested knowledge response exceeds its policy budget.",
+    KNOWLEDGE_SCOPE_ACCESS_DENIED: "The caller is not authorized to read this architecture Scope.",
     OUTBOX_ARCHIVE_CUTOFF_INVALID: "The federation Outbox archive cutoff is invalid.",
     OUTBOX_ARCHIVE_LIMIT_INVALID: "The federation Outbox archive limit is invalid.",
     OUTBOX_ARCHIVE_REASON_REQUIRED: "A reason is required to archive federation Outbox records.",
@@ -252,6 +321,24 @@ function requestActor(extra: FederationRequestExtra | undefined): FederationCall
   } catch (error) {
     throw new FederationToolError(error instanceof Error ? error.message : "AUTHENTICATION_REQUIRED", "MCP authInfo does not contain a valid normalized principal.");
   }
+}
+
+function readableKnowledgeScope(scope: ArchitectureScopeRef, caller: FederationCaller): ArchitectureScopeRef | undefined {
+  const resolved = scopeById(scope.applicationServiceId);
+  if (!resolved || resolved.level !== "applicationService" || resolved.scopePath !== scope.scopePath || !hasExactFederationScopeGrant(caller, resolved, "read")) return undefined;
+  return { applicationServiceId: resolved.id, scopePath: resolved.scopePath };
+}
+
+function deniedKnowledgeRead() {
+  return {
+    accessDecision: "DENY" as const,
+    trustStatus: "BLOCKED" as const,
+    assets: [],
+    relationships: [],
+    responseCompleteness: "COMPLETE" as const,
+    reasonCodes: ["KNOWLEDGE_SCOPE_ACCESS_DENIED" as const],
+    remediationActions: []
+  };
 }
 
 function auditActor(extra: FederationRequestExtra | undefined): { actorType: FederationCaller["actorType"]; actorId: string } {
@@ -512,6 +599,45 @@ function registerFederationJsonTool<T extends z.ZodRawShape>(
 }
 
 export function registerFederationTools(server: McpServer): void {
+  registerFederationJsonTool(server, "upsert_knowledge_readiness_policy", {
+    title: "Upsert knowledge readiness policy",
+    description: "Stores a stricter knowledge-readiness policy overlay in one exact application-service Scope.",
+    inputSchema: {
+      overlay: knowledgePolicyOverlaySchema,
+      architectureScope: architectureScopeSchema
+    },
+    permissions: ["knowledge:write", "governance:run"],
+    readOnly: false
+  }, async (input, caller) => upsertPolicyOverlay(prisma, {
+    architectureScope: assertWritableExactScope(input.architectureScope, caller),
+    actorId: caller.actorId,
+    overlay: input.overlay
+  }));
+
+  registerFederationJsonTool(server, "evaluate_system_knowledge_readiness", {
+    title: "Evaluate system knowledge readiness",
+    description: "Evaluates whether one exact Scope has sufficient, current, and converged knowledge for an Agent Profile.",
+    inputSchema: knowledgeReadInputSchema,
+    permissions: ["knowledge:consume"],
+    readOnly: true
+  }, async (input, caller) => {
+    const architectureScope = readableKnowledgeScope(input.architectureScope, caller);
+    if (!architectureScope) return deniedKnowledgeRead();
+    return evaluateScopedKnowledgeReadiness(prisma, { ...input, architectureScope } as KnowledgeReadRequest, caller);
+  });
+
+  registerFederationJsonTool(server, "read_system_knowledge", {
+    title: "Read system knowledge",
+    description: "Returns only bounded knowledge facts after exact-Scope readiness evaluation and waterline-bound authorization.",
+    inputSchema: knowledgeReadInputSchema,
+    permissions: ["knowledge:consume"],
+    readOnly: true
+  }, async (input, caller) => {
+    const architectureScope = readableKnowledgeScope(input.architectureScope, caller);
+    if (!architectureScope) return deniedKnowledgeRead();
+    return readSystemKnowledge(prisma, { ...input, architectureScope } as KnowledgeReadRequest, caller);
+  });
+
   registerFederationJsonTool(server, "register_connector", {
     title: "Register federation connector",
     description: "Registers a source-neutral connector in one exact architecture Scope.",

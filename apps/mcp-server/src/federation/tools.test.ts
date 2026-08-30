@@ -25,6 +25,7 @@ const persistence = vi.hoisted(() => ({
   isSeedMode: vi.fn(() => false),
   deletePersistedDesignData: vi.fn(),
   searchPersistedDesignAssets: vi.fn(),
+  queryPersistedAssetLinks: vi.fn(),
   listPersistedAssetLinks: vi.fn(),
   upsertAssetLink: vi.fn(),
   upsertContextPack: vi.fn(),
@@ -107,7 +108,7 @@ const authorizedExtra: ToolExtra = {
   authInfo: {
     token: "test-token",
     clientId: "test-client",
-    scopes: ["asset:read", "asset:write", "governance:run", "graph:read"],
+    scopes: ["asset:read", "asset:write", "governance:run", "graph:read", "knowledge:consume"],
     extra: {
       actor: {
         actorType: "agent",
@@ -206,12 +207,34 @@ describe("federation MCP tools", () => {
       "close_design_change_session",
       "reconcile_federated_scope",
       "retry_federated_audit_finalization",
-      "get_federated_sync_status"
+      "get_federated_sync_status",
+      "upsert_knowledge_readiness_policy",
+      "evaluate_system_knowledge_readiness",
+      "read_system_knowledge"
     ]));
     expect((tools.get("reconcile_federated_scope")!.config.annotations as { readOnlyHint: boolean }).readOnlyHint).toBe(true);
     expect((tools.get("get_federated_sync_status")!.config.annotations as { readOnlyHint: boolean }).readOnlyHint).toBe(true);
     expect((tools.get("retry_federated_audit_finalization")!.config.annotations as { readOnlyHint: boolean }).readOnlyHint).toBe(false);
     expect(tools.get("promote_candidate_fact")!.config.inputSchema).not.toHaveProperty("humanFacing");
+  });
+
+  it("returns a no-leak denial envelope for a sibling Scope", async () => {
+    const result = await callTool("read_system_knowledge", {
+      knowledgeProfile: "ARCHITECTURE_OVERVIEW",
+      selectors: [],
+      purpose: "test sibling scope isolation",
+      locale: "en",
+      architectureScope: siblingScope
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(JSON.parse(result.content[0]!.text)).toMatchObject({
+      accessDecision: "DENY",
+      trustStatus: "BLOCKED",
+      assets: [],
+      relationships: [],
+      reasonCodes: ["KNOWLEDGE_SCOPE_ACCESS_DENIED"]
+    });
   });
 
   it("prepares an exact-Scope design context before implementation", async () => {

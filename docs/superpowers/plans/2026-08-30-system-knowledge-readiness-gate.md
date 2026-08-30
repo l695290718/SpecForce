@@ -605,7 +605,7 @@ git commit -m "feat: add atomic gated system knowledge reads"
 - Consumes: Task 4 service and Task 5 read operation.
 - Produces MCP tools `upsert_knowledge_readiness_policy`, `evaluate_system_knowledge_readiness`, and `read_system_knowledge`; new permissions `knowledge:consume` and `knowledge:diagnostic`.
 
-- [ ] **Step 1: Write failing MCP registration, permission, and no-leak tests**
+- [x] **Step 1: Write failing MCP registration, permission, and no-leak tests**
 
 Extend the federation tool harness to invoke each new tool with exact and parent-only grants. Assert tool annotations, required permission claims, durable success/failure audit, and the precise unauthorized body.
 
@@ -622,17 +622,17 @@ it("does not reveal readiness diagnostics across Scope", async () => {
 });
 ```
 
-- [ ] **Step 2: Run the tool tests and confirm registrations are absent**
+- [x] **Step 2: Run the tool tests and confirm registrations are absent**
 
 Run: `pnpm exec vitest run apps/mcp-server/src/federation/tools.test.ts`
 
 Expected: FAIL because the three tool names and permissions are absent.
 
-- [ ] **Step 3: Add permissions to the closed Permission union and principal validator**
+- [x] **Step 3: Add permissions to the closed Permission union and principal validator**
 
 Add `"knowledge:consume"` and `"knowledge:diagnostic"` to `Permission` and the recognized permission Set. Do not grant either permission merely because the actor has `asset:read`; authenticated claims and exact Scope grants remain independently required.
 
-- [ ] **Step 4: Register the three tools through `registerFederationJsonTool`**
+- [x] **Step 4: Register the three tools through `registerFederationJsonTool`**
 
 Use `architectureScopeSchema` and bounded schemas:
 
@@ -657,11 +657,11 @@ const knowledgeReadInputSchema = {
 
 Call `assertReadableExactScope` before the service and map any Scope failure to the stable no-leak response. Policy writes call `assertWritableExactScope`; evaluation and reads call `assertReadableExactScope`. Keep durable federation audit summaries to subject, Scope, Profile, selector digest, decision, reasons, and receipt ID; never include asset bodies.
 
-- [ ] **Step 5: Set safe default development claims without weakening exact-Scope grants**
+- [x] **Step 5: Set safe default development claims without weakening exact-Scope grants**
 
 Add `knowledge:consume` to the MCP server's local default claim list in `apps/mcp-server/src/index.ts`. Do not add `knowledge:diagnostic` to defaults. Production tokens still supply explicit claims and exact application-service grants.
 
-- [ ] **Step 6: Run MCP tests and typechecks**
+- [x] **Step 6: Run MCP tests and typechecks**
 
 Run: `pnpm exec vitest run apps/mcp-server/src/federation/tools.test.ts`
 
@@ -671,7 +671,7 @@ Run: `pnpm --filter @specforge/core typecheck && pnpm --filter @specforge/mcp-se
 
 Expected: both commands exit 0.
 
-- [ ] **Step 7: Commit the MCP boundary**
+- [x] **Step 7: Commit the MCP boundary**
 
 ```bash
 git add packages/core/src/types.ts packages/core/src/architecture/principal.ts apps/mcp-server/src/federation/tools.ts apps/mcp-server/src/federation/tools.test.ts apps/mcp-server/src/index.ts

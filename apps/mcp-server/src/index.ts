@@ -62,7 +62,7 @@ function buildAuthInfo() {
   const scopeIds = (process.env.SPECFORGE_MCP_TOKEN_SCOPE_IDS ?? "").split(",").map((value) => value.trim()).filter(Boolean);
   return {
     clientId: "specforge-cli",
-    scopes: ["asset:read", "asset:write", "governance:run", "graph:read"],
+    scopes: ["asset:read", "asset:write", "governance:run", "graph:read", "knowledge:consume"],
     tenantId: process.env.SPECFORGE_MCP_TENANT_ID ?? "local-development",
     authSource: "static-bearer",
     extra: {
