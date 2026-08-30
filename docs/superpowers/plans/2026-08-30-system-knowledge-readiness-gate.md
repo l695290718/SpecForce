@@ -356,7 +356,7 @@ git commit -m "feat: persist knowledge readiness policies and receipts"
 - Consumes: Prisma transaction client, exact `ArchitectureScopeRef`, composed `KnowledgeReadinessPolicy`, and `KnowledgeProfileId`.
 - Produces: `loadKnowledgeEvidenceSnapshot(tx, scope, policy, profileId): Promise<KnowledgeEvidenceSnapshot & KnowledgeWaterlineEnvelope>`.
 
-- [ ] **Step 1: Write failing evidence-mapping tests**
+- [x] **Step 1: Write failing evidence-mapping tests**
 
 Cover these persisted states with exact fixtures: no published Baseline; completed FULL_SNAPSHOT with matching cursor; DELTA-only run; unfinished FULL_SNAPSHOT; open tombstone; pending `SourceObservation`; pending `IdentityCandidate`; unresolved conflict; and non-converged `ReconciliationSnapshot`.
 
@@ -373,13 +373,13 @@ it("includes pending and reconciliation waterlines in the envelope", async () =>
 });
 ```
 
-- [ ] **Step 2: Run the focused test and confirm the loader is absent**
+- [x] **Step 2: Run the focused test and confirm the loader is absent**
 
 Run: `$env:SPECFORGE_CONTINUOUS_INTEGRATION='1'; pnpm exec vitest run apps/mcp-server/src/knowledge-readiness/evidence-snapshot.test.ts`
 
 Expected: FAIL because `loadKnowledgeEvidenceSnapshot` is undefined.
 
-- [ ] **Step 3: Implement the bounded snapshot loader**
+- [x] **Step 3: Implement the bounded snapshot loader**
 
 Query only the exact `(applicationServiceId, scopePath)`. Resolve:
 
@@ -403,7 +403,7 @@ export interface KnowledgeWaterlineEnvelope {
 
 Use the active published `KnowledgeBaseline`, current catalog and relationship version rows, required connector registrations, `FederationObservationCursor.lastCompletedSnapshotId`, matching completed `ConnectorRun` rows, pending observations/candidates, conflicted observations/mappings, open tombstones, and latest durable `ReconciliationSnapshot`. Sort every array before hashing canonical JSON. Treat absent required runtime registration as absent evidence rather than manufacturing a source row.
 
-- [ ] **Step 4: Run evidence tests and verify no unbounded table scans are introduced**
+- [x] **Step 4: Run evidence tests and verify no unbounded table scans are introduced**
 
 Run: `$env:SPECFORGE_CONTINUOUS_INTEGRATION='1'; pnpm exec vitest run apps/mcp-server/src/knowledge-readiness/evidence-snapshot.test.ts`
 
@@ -413,7 +413,7 @@ Run: `rg -n "findMany\(\{\s*$" apps/mcp-server/src/knowledge-readiness/evidence-
 
 Expected: every `findMany` block is followed by an exact-Scope `where` predicate and a bounded `take` or aggregate selection where cardinality can grow.
 
-- [ ] **Step 5: Commit the evidence loader**
+- [x] **Step 5: Commit the evidence loader**
 
 ```bash
 git add apps/mcp-server/src/knowledge-readiness/evidence-snapshot.ts apps/mcp-server/src/knowledge-readiness/evidence-snapshot.test.ts
