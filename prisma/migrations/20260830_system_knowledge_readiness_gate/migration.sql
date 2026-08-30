@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS "SystemKnowledgeReadinessReceipt" (
     "dbId" UUID NOT NULL DEFAULT gen_random_uuid(),
     "id" TEXT NOT NULL,
     "deterministicKey" TEXT NOT NULL,
+    "evaluationEpoch" BIGINT NOT NULL DEFAULT 0,
     "subjectId" TEXT NOT NULL,
     "grantDigest" TEXT NOT NULL,
     "profileId" TEXT NOT NULL,
@@ -44,6 +45,8 @@ CREATE TABLE IF NOT EXISTS "SystemKnowledgeReadinessReceipt" (
     CONSTRAINT "SystemKnowledgeReadinessReceipt_pkey" PRIMARY KEY ("dbId")
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "SystemKnowledgeReadinessReceipt_scope_id_key" ON "SystemKnowledgeReadinessReceipt"("applicationServiceId", "scopePath", "id");
-CREATE UNIQUE INDEX IF NOT EXISTS "SystemKnowledgeReadinessReceipt_scope_deterministic_key" ON "SystemKnowledgeReadinessReceipt"("applicationServiceId", "scopePath", "deterministicKey");
+ALTER TABLE "SystemKnowledgeReadinessReceipt" ADD COLUMN IF NOT EXISTS "evaluationEpoch" BIGINT NOT NULL DEFAULT 0;
+DROP INDEX IF EXISTS "SystemKnowledgeReadinessReceipt_scope_deterministic_key";
+CREATE UNIQUE INDEX IF NOT EXISTS "SKRR_scope_deterministic_epoch_key" ON "SystemKnowledgeReadinessReceipt"("applicationServiceId", "scopePath", "deterministicKey", "evaluationEpoch");
 CREATE INDEX IF NOT EXISTS "SKRR_scope_subject_profile_expiry_idx" ON "SystemKnowledgeReadinessReceipt"("applicationServiceId", "scopePath", "subjectId", "profileId", "validUntil");
 CREATE INDEX IF NOT EXISTS "SystemKnowledgeReadinessReceipt_scope_lifecycle_created_idx" ON "SystemKnowledgeReadinessReceipt"("applicationServiceId", "scopePath", "lifecycleStatus", "createdAt");

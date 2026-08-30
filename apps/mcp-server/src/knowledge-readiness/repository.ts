@@ -13,6 +13,7 @@ export interface ImmutableReceiptInput {
   architectureScope: ArchitectureScopeRef;
   id: string;
   deterministicKey: string;
+  evaluationEpoch: bigint;
   subjectId: string;
   grantDigest: string;
   profileId: string;
@@ -83,13 +84,15 @@ export async function findReusableReceipt(
   db: ReadinessDb,
   architectureScope: ArchitectureScopeRef,
   deterministicKey: string,
+  evaluationEpoch: bigint,
   now: Date
 ) {
   const receipt = await db.systemKnowledgeReadinessReceipt.findUnique({
     where: {
-      applicationServiceId_scopePath_deterministicKey: {
+      applicationServiceId_scopePath_deterministicKey_evaluationEpoch: {
         ...scopeWhere(architectureScope),
-        deterministicKey
+        deterministicKey,
+        evaluationEpoch
       }
     }
   });
@@ -101,6 +104,7 @@ export async function insertImmutableReceipt(db: ReadinessDb, input: ImmutableRe
     ...scopeWhere(input.architectureScope),
     id: input.id,
     deterministicKey: input.deterministicKey,
+    evaluationEpoch: input.evaluationEpoch,
     subjectId: input.subjectId,
     grantDigest: input.grantDigest,
     profileId: input.profileId,
@@ -125,9 +129,10 @@ export async function insertImmutableReceipt(db: ReadinessDb, input: ImmutableRe
 
   const existing = await db.systemKnowledgeReadinessReceipt.findUnique({
     where: {
-      applicationServiceId_scopePath_deterministicKey: {
+      applicationServiceId_scopePath_deterministicKey_evaluationEpoch: {
         ...scopeWhere(input.architectureScope),
-        deterministicKey: input.deterministicKey
+        deterministicKey: input.deterministicKey,
+        evaluationEpoch: input.evaluationEpoch
       }
     }
   });
@@ -141,9 +146,10 @@ export async function insertImmutableReceipt(db: ReadinessDb, input: ImmutableRe
     if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
     const raced = await db.systemKnowledgeReadinessReceipt.findUnique({
       where: {
-        applicationServiceId_scopePath_deterministicKey: {
+        applicationServiceId_scopePath_deterministicKey_evaluationEpoch: {
           ...scopeWhere(input.architectureScope),
-          deterministicKey: input.deterministicKey
+          deterministicKey: input.deterministicKey,
+          evaluationEpoch: input.evaluationEpoch
         }
       }
     });

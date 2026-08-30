@@ -59,7 +59,7 @@ export function evaluateKnowledgeReadiness(input: {
   const validUntilCandidates = [input.now.getTime() + input.policy.receiptTtlSeconds * 1000];
 
   if (!input.snapshot.baseline) dimensionReasons.get("DESIGN_INTENT")!.push("KNOWLEDGE_SOURCE_NOT_CONFIGURED");
-  if (input.snapshot.reconciliation === null) dimensionReasons.get("DESIGN_INTENT")!.push("KNOWLEDGE_RECONCILIATION_BLOCKED");
+  if (input.snapshot.reconciliation === null) dimensionReasons.get("DESIGN_INTENT")!.push("KNOWLEDGE_COVERAGE_INCOMPLETE");
   else if (input.snapshot.reconciliation.status !== "CONVERGED" && input.policy.blockOnNonConvergedReconciliation) dimensionReasons.get("DESIGN_INTENT")!.push("KNOWLEDGE_RECONCILIATION_BLOCKED");
   if (input.snapshot.unresolvedConflictCount > 0 && input.policy.blockOnUnresolvedConflict) dimensionReasons.get("IMPLEMENTATION")!.push("KNOWLEDGE_CONFLICT_UNRESOLVED");
   if (input.snapshot.pendingCandidateCount > 0) dimensionReasons.get("IMPLEMENTATION")!.push("KNOWLEDGE_PENDING_PROMOTION");

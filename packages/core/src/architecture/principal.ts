@@ -17,7 +17,7 @@ const actorTypes = new Set(["agent", "user", "system"]);
 const authSources = new Set<PrincipalAuthSource>(["seed", "static-bearer", "oidc", "system"]);
 const permissions = new Set<Permission>([
   "asset:read", "asset:write", "proposal:read", "proposal:write", "context-pack:generate",
-  "governance:run", "adr:write", "graph:read", "knowledge:read", "knowledge:write"
+  "governance:run", "adr:write", "graph:read", "knowledge:read", "knowledge:write", "knowledge:consume", "knowledge:diagnostic"
 ]);
 
 export function normalizePrincipalClaims(claims: PrincipalClaims, options: { allowSeed?: boolean } = {}): ScopedPrincipal {

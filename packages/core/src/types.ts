@@ -190,7 +190,9 @@ export type Permission =
   | "adr:write"
   | "graph:read"
   | "knowledge:read"
-  | "knowledge:write";
+  | "knowledge:write"
+  | "knowledge:consume"
+  | "knowledge:diagnostic";
 
 export interface BaseAsset<TLocalizedFields extends object = BaseAssetLocalizedFields> {
   id: string;

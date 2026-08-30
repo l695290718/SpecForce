@@ -2009,6 +2009,7 @@ model SystemKnowledgeReadinessReceipt {
   dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   id                   String
   deterministicKey     String
+  evaluationEpoch      BigInt   @default(0)
   subjectId            String
   grantDigest          String
   profileId            String
@@ -2034,7 +2035,7 @@ model SystemKnowledgeReadinessReceipt {
   createdAt            DateTime @default(now())
 
   @@unique([applicationServiceId, scopePath, id], map: "SystemKnowledgeReadinessReceipt_scope_id_key")
-  @@unique([applicationServiceId, scopePath, deterministicKey], map: "SystemKnowledgeReadinessReceipt_scope_deterministic_key")
+  @@unique([applicationServiceId, scopePath, deterministicKey, evaluationEpoch], map: "SKRR_scope_deterministic_epoch_key")
   @@index([applicationServiceId, scopePath, subjectId, profileId, validUntil], map: "SKRR_scope_subject_profile_expiry_idx")
   @@index([applicationServiceId, scopePath, lifecycleStatus, createdAt], map: "SystemKnowledgeReadinessReceipt_scope_lifecycle_created_idx")
 }

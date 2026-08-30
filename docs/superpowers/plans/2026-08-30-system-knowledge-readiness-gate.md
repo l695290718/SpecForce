@@ -430,7 +430,7 @@ git commit -m "feat: compose scoped knowledge readiness evidence"
 - Consumes: repository functions from Task 2 and evidence loader from Task 3.
 - Produces: `upsertScopedReadinessPolicy(input, caller)`, `evaluateScopedKnowledgeReadiness(tx, input, caller)`, `revalidateReceipt(tx, receiptId, input, caller)`, and stable public DTOs.
 
-- [ ] **Step 1: Write failing service tests**
+- [x] **Step 1: Write failing service tests**
 
 Test deterministic selector normalization, grant-digest binding, policy version invalidation, receipt TTL expiry, waterline invalidation, identical receipt reuse, and no diagnostic fields for denied authorization.
 
@@ -450,13 +450,13 @@ it("returns no evidence diagnostics before exact-Scope authorization", async () 
 });
 ```
 
-- [ ] **Step 2: Run tests and confirm the service is absent**
+- [x] **Step 2: Run tests and confirm the service is absent**
 
 Run: `$env:SPECFORGE_CONTINUOUS_INTEGRATION='1'; pnpm exec vitest run apps/mcp-server/src/knowledge-readiness/service.test.ts`
 
 Expected: FAIL with missing service exports.
 
-- [ ] **Step 3: Implement canonical bindings and deterministic receipt identity**
+- [x] **Step 3: Implement canonical bindings and deterministic receipt identity**
 
 Normalize selectors by type, ID, and sorted filter keys; derive `selectorDigest`, `grantDigest`, and `waterlineDigest` with SHA-256 over canonical JSON. Compute `deterministicKey` from exact Scope, subject, grant digest, Profile, selector digest, purpose, locale, policy ID/version, and source waterline digest. Deliberately exclude the server-generated `asOf` and `validUntil`: including either timestamp would defeat unchanged-decision reuse. Look up an unexpired matching receipt before creating a new one; only a new receipt captures the transaction clock as `asOf`. Bind persisted receipt content to:
 
@@ -478,11 +478,11 @@ const receiptBinding = {
 
 `revalidateReceipt` must compare exact Scope, subject, grant digest, Profile, selector digest, policy version, `validUntil`, and every current waterline. Return `KNOWLEDGE_RECEIPT_STALE` on any mismatch and never silently upgrade an old receipt.
 
-- [ ] **Step 4: Implement restrictive policy writes**
+- [x] **Step 4: Implement restrictive policy writes**
 
 Validate the proposed overlay by calling `composeKnowledgeReadinessPolicy` before persistence. Require the caller's exact write grant in the tool layer and persist actor ID, incremented version, canonical overlay JSON, and `ACTIVE` status. The enterprise minimum remains compiled in `@specforge/core`; database rows are exact-Scope overlays only.
 
-- [ ] **Step 5: Run service tests and typecheck**
+- [x] **Step 5: Run service tests and typecheck**
 
 Run: `$env:SPECFORGE_CONTINUOUS_INTEGRATION='1'; pnpm exec vitest run apps/mcp-server/src/knowledge-readiness/service.test.ts`
 
@@ -492,7 +492,7 @@ Run: `pnpm --filter @specforge/mcp-server typecheck`
 
 Expected: exit code 0.
 
-- [ ] **Step 6: Commit the governed decision service**
+- [x] **Step 6: Commit the governed decision service**
 
 ```bash
 git add apps/mcp-server/src/knowledge-readiness/service.ts apps/mcp-server/src/knowledge-readiness/service.test.ts
