@@ -26,6 +26,14 @@ const validation: ReadCursorBinding = {
   projectionVersion: payload.projectionVersion
 };
 
+const gatedPayload: ReadCursorPayload = {
+  ...payload,
+  grantDigest: "a".repeat(64),
+  receiptId: "receipt-1",
+  profileId: "ARCHITECTURE_OVERVIEW",
+  waterlineDigest: "b".repeat(64)
+};
+
 describe("scoped read cursors", () => {
   it("round-trips a signed cursor without exposing its payload as plain text", () => {
     const cursor = encodeReadCursor(payload);
@@ -59,5 +67,21 @@ describe("scoped read cursors", () => {
 
     expect(() => decodeReadCursor(`${body}.${signature}x`, validation)).toThrow("CURSOR_INVALID");
     expect(() => decodeReadCursor("not-a-cursor", validation)).toThrow("CURSOR_INVALID");
+  });
+
+  it("binds gated cursors to caller grant, receipt, profile, and waterline", () => {
+    const gatedValidation: ReadCursorBinding = {
+      ...validation,
+      grantDigest: gatedPayload.grantDigest,
+      receiptId: gatedPayload.receiptId,
+      profileId: gatedPayload.profileId,
+      waterlineDigest: gatedPayload.waterlineDigest
+    };
+    const cursor = encodeReadCursor(gatedPayload);
+
+    expect(decodeReadCursor(cursor, gatedValidation)).toEqual(gatedPayload);
+    expect(() => decodeReadCursor(cursor, { ...gatedValidation, grantDigest: "c".repeat(64) })).toThrow("CURSOR_INVALID");
+    expect(() => decodeReadCursor(cursor, { ...gatedValidation, receiptId: "receipt-2" })).toThrow("CURSOR_INVALID");
+    expect(() => decodeReadCursor(cursor, { ...gatedValidation, waterlineDigest: "d".repeat(64) })).toThrow("CURSOR_STALE");
   });
 });

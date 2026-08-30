@@ -30,8 +30,10 @@ export interface KnowledgeReadinessResult {
   dimensionStatuses: unknown;
   architectureScope: ArchitectureScopeRef;
   profileId: KnowledgeProfileId;
+  grantDigest: string;
   selectorDigest: string;
   policyVersion: number;
+  catalogVersion: string;
   waterlineDigest: string;
   asOf: string;
   validUntil: string;
@@ -47,6 +49,16 @@ function jsonRecord(value: Prisma.JsonValue): Record<string, unknown> {
 
 function sortedStrings(values: readonly string[] | undefined): string[] {
   return [...new Set((values ?? []).map((value) => value.trim()).filter(Boolean))].sort();
+}
+
+export function knowledgeQueryDigest(input: Pick<KnowledgeReadRequest, "architectureScope" | "knowledgeProfile" | "selectors" | "purpose" | "locale">): string {
+  return contentDigest({
+    architectureScope: input.architectureScope,
+    knowledgeProfile: input.knowledgeProfile,
+    selectors: normalizeKnowledgeSelectors(input.selectors),
+    purpose: input.purpose.trim(),
+    locale: input.locale
+  });
 }
 
 export function normalizeKnowledgeSelectors(selectors: readonly KnowledgeSelector[]): KnowledgeSelector[] {
@@ -86,6 +98,7 @@ function requestBinding(input: KnowledgeReadRequest, caller: ScopedPrincipal, se
 function publicResult(row: {
   id: string;
   trustStatus: string;
+  grantDigest: string;
   profileId: string;
   dimensionStatuses: Prisma.JsonValue;
   selectorDigest: string;
@@ -100,6 +113,7 @@ function publicResult(row: {
   applicationServiceId: string;
   scopePath: string;
 }, accessDecision: "ALLOW" | "DENY", waterlineDigest = contentDigest(row.sourceWaterlines)): KnowledgeReadinessResult {
+  const sourceWaterlines = jsonRecord(row.sourceWaterlines);
   return {
     accessDecision,
     receiptId: row.id,
@@ -107,8 +121,10 @@ function publicResult(row: {
     dimensionStatuses: row.dimensionStatuses,
     architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath },
     profileId: row.profileId as KnowledgeProfileId,
+    grantDigest: row.grantDigest,
     selectorDigest: row.selectorDigest,
     policyVersion: row.policyVersion,
+    catalogVersion: typeof sourceWaterlines.catalog === "string" ? sourceWaterlines.catalog : "0",
     waterlineDigest,
     asOf: row.asOf.toISOString(),
     validUntil: row.validUntil.toISOString(),
@@ -119,7 +135,7 @@ function publicResult(row: {
   };
 }
 
-function resultFromEvaluation(input: KnowledgeReadRequest, receipt: Awaited<ReturnType<typeof insertImmutableReceipt>>, decision: ReturnType<typeof evaluateKnowledgeReadiness>, waterlineDigest: string): KnowledgeReadinessResult {
+function resultFromEvaluation(input: KnowledgeReadRequest, receipt: Awaited<ReturnType<typeof insertImmutableReceipt>>, decision: ReturnType<typeof evaluateKnowledgeReadiness>, waterlineDigest: string, grantDigest: string, catalogVersion: string): KnowledgeReadinessResult {
   return {
     accessDecision: decision.trustStatus === "SELF_CONTAINED" ? "ALLOW" : "DENY",
     receiptId: receipt.id,
@@ -127,8 +143,10 @@ function resultFromEvaluation(input: KnowledgeReadRequest, receipt: Awaited<Retu
     dimensionStatuses: decision.dimensionStatuses,
     architectureScope: input.architectureScope,
     profileId: input.knowledgeProfile,
+    grantDigest,
     selectorDigest: receipt.selectorDigest,
     policyVersion: receipt.policyVersion,
+    catalogVersion,
     waterlineDigest,
     asOf: receipt.asOf.toISOString(),
     validUntil: receipt.validUntil.toISOString(),
@@ -158,7 +176,9 @@ export async function evaluateScopedKnowledgeReadiness(
   const reusable = await findReusableReceipt(db, input.architectureScope, deterministicKey, evaluationEpoch, now);
   if (reusable) {
     return {
-      ...resultFromEvaluation(input, reusable, decision, snapshot.waterlineDigest),
+      ...resultFromEvaluation(input, reusable, decision, snapshot.waterlineDigest, binding.grantDigest, snapshot.catalogWaterline),
+      grantDigest: binding.grantDigest,
+      catalogVersion: snapshot.catalogWaterline,
       receiptId: reusable.id,
       trustStatus: reusable.trustStatus as KnowledgeTrustStatus,
       dimensionStatuses: reusable.dimensionStatuses,
@@ -193,7 +213,7 @@ export async function evaluateScopedKnowledgeReadiness(
     validUntil: decision.validUntil,
     receiptDigest: contentDigest({ binding, decision, sourceWaterlines: snapshot.waterlines })
   });
-  return resultFromEvaluation(input, receipt, decision, snapshot.waterlineDigest);
+  return resultFromEvaluation(input, receipt, decision, snapshot.waterlineDigest, binding.grantDigest, snapshot.catalogWaterline);
 }
 
 export async function revalidateReceipt(
@@ -206,6 +226,6 @@ export async function revalidateReceipt(
   const row = await db.systemKnowledgeReadinessReceipt.findFirst({ where: { ...input.architectureScope, id: receiptId } });
   if (!row || row.validUntil <= now || row.lifecycleStatus !== "ACTIVE") throw new Error("KNOWLEDGE_RECEIPT_STALE");
   const current = await evaluateScopedKnowledgeReadiness(db, { ...input, receiptId: undefined }, caller, now);
-  if (current.receiptId !== row.id || current.waterlineDigest !== contentDigest(row.sourceWaterlines)) throw new Error("KNOWLEDGE_RECEIPT_STALE");
+  if (current.receiptId !== row.id || current.grantDigest !== row.grantDigest || current.waterlineDigest !== contentDigest(row.sourceWaterlines)) throw new Error("KNOWLEDGE_RECEIPT_STALE");
   return publicResult(row, current.accessDecision, current.waterlineDigest);
 }

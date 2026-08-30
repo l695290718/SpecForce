@@ -13,6 +13,10 @@ export type ReadCursorPayload = {
   queryDigest: string;
   catalogVersion: string;
   projectionVersion?: string;
+  grantDigest?: string;
+  receiptId?: string;
+  profileId?: string;
+  waterlineDigest?: string;
   orderKey: ReadOrderKey;
 };
 
@@ -23,6 +27,10 @@ export type ReadCursorBinding = {
   queryDigest: string;
   catalogVersion: string;
   projectionVersion?: string;
+  grantDigest?: string;
+  receiptId?: string;
+  profileId?: string;
+  waterlineDigest?: string;
 };
 
 export type ReadCursorValidation = ReadCursorBinding;
@@ -86,7 +94,7 @@ function isBase64Url(value: string): boolean {
 }
 
 function assertPayload(value: unknown): asserts value is ReadCursorPayload {
-  if (!isRecord(value) || value.version !== READ_CURSOR_VERSION || typeof value.subject !== "string" || !value.subject || !isScope(value.architectureScope) || !isLocale(value.locale) || typeof value.queryDigest !== "string" || !value.queryDigest || typeof value.catalogVersion !== "string" || !value.catalogVersion || (value.projectionVersion !== undefined && (typeof value.projectionVersion !== "string" || !value.projectionVersion)) || !isOrderKey(value.orderKey)) {
+  if (!isRecord(value) || value.version !== READ_CURSOR_VERSION || typeof value.subject !== "string" || !value.subject || !isScope(value.architectureScope) || !isLocale(value.locale) || typeof value.queryDigest !== "string" || !value.queryDigest || typeof value.catalogVersion !== "string" || !value.catalogVersion || (value.projectionVersion !== undefined && (typeof value.projectionVersion !== "string" || !value.projectionVersion)) || !optionalDigest(value.grantDigest) || !optionalId(value.receiptId) || !optionalId(value.profileId) || !optionalDigest(value.waterlineDigest) || !isOrderKey(value.orderKey)) {
     throw new Error("invalid payload");
   }
 }
@@ -94,6 +102,18 @@ function assertPayload(value: unknown): asserts value is ReadCursorPayload {
 function assertBinding(payload: ReadCursorPayload, expected: ReadCursorBinding): void {
   if (payload.catalogVersion !== expected.catalogVersion || payload.projectionVersion !== expected.projectionVersion) throw new CursorStaleError();
   if (payload.subject !== expected.subject || !sameScope(payload.architectureScope, expected.architectureScope) || payload.locale !== expected.locale || payload.queryDigest !== expected.queryDigest) throw new Error("binding mismatch");
+  if (expected.grantDigest !== undefined && payload.grantDigest !== expected.grantDigest) throw new Error("binding mismatch");
+  if (expected.receiptId !== undefined && payload.receiptId !== expected.receiptId) throw new Error("binding mismatch");
+  if (expected.profileId !== undefined && payload.profileId !== expected.profileId) throw new Error("binding mismatch");
+  if (expected.waterlineDigest !== undefined && payload.waterlineDigest !== expected.waterlineDigest) throw new CursorStaleError();
+}
+
+function optionalDigest(value: unknown): boolean {
+  return value === undefined || (typeof value === "string" && /^[a-f0-9]{64}$/u.test(value));
+}
+
+function optionalId(value: unknown): boolean {
+  return value === undefined || (typeof value === "string" && value.length > 0 && value.length <= 200);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

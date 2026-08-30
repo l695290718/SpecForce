@@ -510,7 +510,7 @@ git commit -m "feat: issue scoped knowledge readiness receipts"
 - Consumes: `evaluateScopedKnowledgeReadiness`, `revalidateReceipt`, `AssetSearchProjection`, typed relationship repository, and `encodeReadCursor`/`decodeReadCursor` from `@specforge/scoped-read`.
 - Produces: `readSystemKnowledge(prisma, input, caller)` returning a denied envelope or an allowed `trustEnvelope`, `assets`, `relationships`, `responseCompleteness`, and optional signed `nextCursor`.
 
-- [ ] **Step 1: Write failing atomic-read and pagination tests**
+- [x] **Step 1: Write failing atomic-read and pagination tests**
 
 Cover first-page atomicity, response budgets, cursor caller binding, cursor query binding, cursor waterline invalidation, and `PARTIAL` until exhaustion.
 
@@ -529,13 +529,13 @@ it("separates trust status from page completeness", async () => {
 });
 ```
 
-- [ ] **Step 2: Run focused tests and confirm the read boundary is absent**
+- [x] **Step 2: Run focused tests and confirm the read boundary is absent**
 
 Run: `$env:SPECFORGE_CONTINUOUS_INTEGRATION='1'; pnpm exec vitest run apps/mcp-server/src/knowledge-readiness/read.test.ts`
 
 Expected: FAIL with missing `readSystemKnowledge`.
 
-- [ ] **Step 3: Implement the first page in one REPEATABLE READ transaction**
+- [x] **Step 3: Implement the first page in one REPEATABLE READ transaction**
 
 Use this transaction boundary:
 
@@ -554,7 +554,7 @@ return prisma.$transaction(
 
 Read from `AssetSearchProjection` and the typed relationship tables using exact Scope, stable order `(assetType, assetId)` and `(relationshipType, sourceAssetType, sourceAssetId, targetAssetType, targetAssetId)`, and `pageSize + 1`. Enforce policy limits for asset count, relationship count, encoded JSON bytes, and elapsed execution time. A budget failure returns no partial asset body and reason `KNOWLEDGE_RESPONSE_BUDGET_EXCEEDED`.
 
-- [ ] **Step 4: Bind and sign continuation cursors**
+- [x] **Step 4: Bind and sign continuation cursors**
 
 Reuse `@specforge/scoped-read` with a dedicated keyring loaded from `SPECFORGE_KNOWLEDGE_CURSOR_KEY` and `SPECFORGE_KNOWLEDGE_CURSOR_KEY_ID`. The binding must include:
 
@@ -575,7 +575,7 @@ const cursorBinding = {
 
 On continuation, re-evaluate TTL and waterlines before decoding/reading. Map signature or binding failures to `KNOWLEDGE_RECEIPT_STALE` without exposing cursor internals.
 
-- [ ] **Step 5: Run atomicity, cursor, and type tests**
+- [x] **Step 5: Run atomicity, cursor, and type tests**
 
 Run: `$env:SPECFORGE_CONTINUOUS_INTEGRATION='1'; pnpm exec vitest run apps/mcp-server/src/knowledge-readiness/read.test.ts`
 
@@ -585,7 +585,7 @@ Run: `pnpm --filter @specforge/mcp-server typecheck`
 
 Expected: exit code 0.
 
-- [ ] **Step 6: Commit the authoritative read operation**
+- [x] **Step 6: Commit the authoritative read operation**
 
 ```bash
 git add apps/mcp-server/src/knowledge-readiness/read.ts apps/mcp-server/src/knowledge-readiness/read.test.ts apps/mcp-server/src/scoped-read-projection.ts
