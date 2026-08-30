@@ -323,3 +323,35 @@ Only incomplete work is listed here. Completed and superseded records are preser
 **延期工作：** 第二阶段增加带来源和脱敏能力的有界仓库/代码归属、API/Schema、测试、部署和选定运行时证据适配器。第三阶段增加 ExecutionActual 接入、代表性样本阈值、回测、漂移监控和校准后的 P50/P90 质量报告。CodeHub 或其他外部连接器交付仍是独立治理增量。
 
 **完成证据：** 每个阶段都必须有新的精确 Scope 设计会话、双语 MCP 资产和有类型链接、不可变证据快照、来源摘要、拒绝与重试状态、聚焦测试、对账回读和更新后的 Context Pack。只有校准证明误差指标和漂移控制后，才允许暴露 P50/P90。
+
+## 13. Designer 3A v7 Candidate Set Publication
+
+**Backlog ID:** `backlog-designer-3a-v7-candidate-publication`
+
+**Status:** Deferred. The governed candidate analysis and publication path is implemented, but no concrete v7 Candidate Set is approved for publication yet.
+
+**Owner:** SpecForge Architecture and the authorized Designer Agent for `com.huawei.celon.desiner`.
+
+**Rationale:** Candidate analysis must not invent architectural intent from names, graph proximity, or incomplete evidence. The v6 Baseline remains the last known-good authority until a concrete candidate passes review, promotion, reconciliation, and projection read-back.
+
+**Trigger:** Start when an authorized Agent supplies an evidence-bound Candidate Set against the current published Baseline and all review, promotion, reconciliation, and projection read-back checks pass.
+
+**Completion evidence:** A candidate batch is persisted through MCP in the exact Scope, passes deterministic closure and freshness checks, receives ReviewBundle approval, is promoted and reconciled, and is read back from the published Baseline and derived projection. Update this item and preserve the candidate IDs and evidence references.
+
+**Design references:** ADR-0044, `docs/superpowers/plans/2026-08-30-designer-3a-v7-structural-semantic-expansion.md`, `scripts/analyze-designer-3a-v7.ts`, `scripts/publish-designer-3a-v7.ts`。
+
+**中文本地化：**
+
+**待办标识：** `backlog-designer-3a-v7-candidate-publication`
+
+**状态：** 延期。候选分析与发布治理路径已经实现，但当前还没有获准发布的具体 v7 候选集。
+
+**负责人：** `com.huawei.celon.desiner` 的 SpecForge 架构团队及获授权的 Designer Agent。
+
+**理由：** 候选分析不能从名称、图邻近关系或不完整证据中臆造架构意图。在具体候选集通过审核、晋升、对账和投影回读前，v6 Baseline 仍是最后一个已知可靠的权威版本。
+
+**启动条件：** 获授权 Agent 针对当前已发布 Baseline 提供带证据的候选集，并且审核、晋升、对账和投影回读全部通过后启动。
+
+**完成证据：** 候选批次通过精确 Scope 的 MCP 持久化，确定性闭包和新鲜度校验，ReviewBundle 审批，晋升与对账，并从已发布 Baseline 和派生投影回读。完成后更新此项，并保留候选 ID 和证据引用。
+
+**设计引用：** ADR-0044、`docs/superpowers/plans/2026-08-30-designer-3a-v7-structural-semantic-expansion.md`、`scripts/analyze-designer-3a-v7.ts`、`scripts/publish-designer-3a-v7.ts`。

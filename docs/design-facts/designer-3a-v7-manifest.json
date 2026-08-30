@@ -291,9 +291,12 @@
       ],
       "owner": "SpecForge Architecture",
       "proposalNonGoal": {
-        "en": "Continuous legacy scanning, connector delivery, cross-Scope aggregation, and external APPLY remain deferred federation increments.",
-        "zh": "持续存量扫描、连接器交付、跨 Scope 聚合和外部 APPLY 仍属于延期的联邦增量。"
-      }
+        "en": "Continuous legacy scanning, connector delivery, cross-Scope aggregation, and external APPLY remain deferred federation increments. The concrete v7 Candidate Set publication is also deferred until an authorized Agent supplies an evidence-bound candidate that passes review, promotion, reconciliation, and projection read-back.",
+        "zh": "持续存量扫描、连接器交付、跨 Scope 聚合和外部 APPLY 仍属于延期的联邦增量。具体 v7 候选集发布也要等获授权 Agent 提供带证据的候选集，并通过审核、晋升、对账和投影回读后再进行。"
+      },
+      "status": "Governance core implemented; concrete v7 Candidate Set publication deferred",
+      "reason": "No evidence-bound concrete v7 Candidate Set is currently approved for publication; publishing one would fabricate architectural intent while v6 remains the last known-good Baseline.",
+      "retryTrigger": "When an authorized Agent supplies an evidence-bound Candidate Set against the current published Baseline and review, promotion, reconciliation, and projection read-back all pass."
     }
   ]
 }

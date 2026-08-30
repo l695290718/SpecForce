@@ -47,6 +47,22 @@ The known asset-to-3A mismatch between canonical IDs such as `data-specforge-ass
 - Direct database writes, implicit approval, partial publication, and graph-authority writes are forbidden.
 - Continuous legacy scanning, connector delivery, cross-Scope aggregate views, and external `APPLY` remain deferred federation increments.
 
+## Backlog Fact Registered
+
+- **ID:** `backlog-designer-3a-v7-candidate-publication`
+- **Status:** Deferred. The governed candidate analysis and publication path exists, but no concrete v7 Candidate Set is currently approved for publication.
+- **Owner:** SpecForge Architecture and the authorized Designer Agent for `com.huawei.celon.desiner`.
+- **Trigger:** Start when an authorized Agent supplies an evidence-bound Candidate Set against the current published Baseline and the candidate passes review, promotion, reconciliation, and projection read-back.
+- **Rationale:** Publishing a concrete v7 architecture without supplied evidence would fabricate architectural intent. The v6 Baseline must remain the last known-good authority until a candidate is reviewed and published.
+
+## 已登记待办事实
+
+- **标识：** `backlog-designer-3a-v7-candidate-publication`
+- **状态：** 延期。候选分析和发布治理路径已经存在，但当前没有获准发布的具体 v7 候选集。
+- **负责人：** `com.huawei.celon.desiner` 的 SpecForge 架构团队及获授权的 Designer Agent。
+- **触发条件：** 获授权 Agent 针对当前已发布 Baseline 提供带证据的候选集，并且候选集通过审核、晋升、对账和投影回读后启动。
+- **理由：** 没有输入证据就发布具体 v7 架构会臆造架构意图。在候选集完成审核并发布前，必须保留 v6 Baseline 作为最后一个已知可靠的权威版本。
+
 ## Evidence
 
 - `pnpm --filter @specforge/core typecheck`: passed.
