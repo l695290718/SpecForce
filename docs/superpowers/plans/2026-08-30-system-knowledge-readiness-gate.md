@@ -74,7 +74,7 @@ describe("system knowledge readiness", () => {
       id: "scope-policy",
       version: 1,
       profileId: "ARCHITECTURE_OVERVIEW",
-      maximumFreshnessSeconds: { SOURCE_CODE: 172800 }
+      maximumFreshnessSeconds: { SOURCE_CODE: 8 * 24 * 60 * 60 }
     })).toThrow("KNOWLEDGE_POLICY_VIOLATION");
   });
 
