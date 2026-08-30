@@ -28,6 +28,7 @@ const CHECKLIST_EN = [
   "Write every authored fact through MCP tools; never bypass to direct database access.",
   "Keep English canonical fields complete and provide full Chinese overlays for human-facing content.",
   "Close the session with CONVERGED evidence only after focused tests, build, and live verification pass.",
+  "For current system knowledge, evaluate readiness before read_system_knowledge; legacy reads are compatibility fallbacks subject to enforcement.",
   "Record deferred work as backlog facts with owner, trigger, and rationale - never silently drop it."
 ];
 
@@ -37,6 +38,7 @@ const CHECKLIST_ZH = [
   "所有已编写事实必须经 MCP 工具写入；禁止绕行直查或直写数据库。",
   "英文字段保持规范完整，面向人的内容提供完整中文覆盖。",
   "聚焦测试、构建与线上验证全部通过后，才能以 CONVERGED 证据关闭会话。",
+  "读取系统现状知识时，先评估就绪状态，再调用 read_system_knowledge；旧读取仅作为受门禁控制的兼容回退。",
   "延期工作必须登记为带负责人、触发条件与理由的待办事实——不得静默丢弃。"
 ];
 

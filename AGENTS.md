@@ -27,6 +27,14 @@ Before changing code, schema, APIs, relationships, behavior, or agent-facing con
 
 After implementation and focused verification, close the same session through MCP `close_design_change_session`, or run `pnpm design-context:close -- --session <id> --status CONVERGED --evidence "command=result,..."`. A `BLOCKED` closure must include the reason and retry trigger. The closing evidence must include exact commands and results; a successful code test without the matching MCP closure is incomplete. Documentation-only edits may skip preflight only when they do not change a design fact, contract, rule, relationship, or user-visible behavior.
 
+## System knowledge consumption
+
+When an agent needs the current state of an application service, it must first call `evaluate_system_knowledge_readiness` and then consume only the bounded result of `read_system_knowledge` in the exact owning Scope. `search_design_assets`, direct detail reads, and graph reads are compatibility fallbacks during migration and may be denied when `SPECFORGE_KNOWLEDGE_READ_ENFORCEMENT=enforce`. `knowledge:diagnostic` is an explicit diagnostic bypass, not a substitute for readiness.
+
+## 系统知识读取
+
+当 Agent 需要读取应用服务现状时，必须先调用 `evaluate_system_knowledge_readiness`，再在精确归属 Scope 内只消费 `read_system_knowledge` 返回的有界结果。`search_design_assets`、直接详情读取和图读取只在迁移期间作为兼容回退；当设置 `SPECFORGE_KNOWLEDGE_READ_ENFORCEMENT=enforce` 时可能被拒绝。`knowledge:diagnostic` 只是显式诊断旁路，不能替代就绪评估。
+
 ## Federated Governance Increment
 
 For federated design facts, record the governance-core increment independently from connector delivery. Only scoped federation contracts, persistence, MCP authorization, durable audit/outbox behavior, candidate promotion, and read-only reconciliation may be described as implemented after focused evidence. Do not claim legacy scanners, continuous inbound synchronization, outbound proposals, or external `APPLY` until separately designed, evidenced, synchronized, and reconciled through MCP.

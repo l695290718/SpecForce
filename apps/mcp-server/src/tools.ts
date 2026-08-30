@@ -22,6 +22,7 @@ import { bootstrapThreeAFromDesignAssets } from "./knowledge/bootstrap";
 import { deriveScopedKnowledgeProjection } from "./knowledge/projection";
 import { getProjectionBuild, requestProjectionBuild } from "./knowledge/projection-build";
 import { getCoverageBuild, requestCoverageBuild } from "./knowledge/coverage-build";
+import { assertLegacyKnowledgeReadAllowed } from "./knowledge-readiness/compatibility";
 import { get3aCoverageReport } from "./knowledge/coverage-report";
 import { compare3aPublishedBaselines, get3aAlignment, get3aArchitectureFact, list3aProjectionManifests, list3aPublishedBaselines, query3aArchitectureMap, query3aArchitectureUnitNeighborhood, search3aArchitectureFacts, trace3aArchitecturePath } from "./knowledge/query-adapter";
 import { get3aArchitectureUnitNeighborhood, get3aAssetMapping, search3aArchitectureMap, search3aArchitectureRealizations, search3aAssetMappings } from "./knowledge/architecture-map-adapter";
@@ -38,6 +39,16 @@ import {
 
 type ToolHandler<T> = (input: T) => Promise<unknown>;
 type ToolExtra = { authInfo?: McpAuthInfo };
+const legacyKnowledgeReadTools = new Set([
+  "search_design_assets",
+  "get_asset_detail",
+  "get_asset_graph",
+  "query_asset_graph",
+  "analyze_proposal_impact",
+  "export_context_pack",
+  "list_asset_links",
+  "query_asset_links"
+]);
 
 function textResult(value: unknown): CallToolResult {
   const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
@@ -80,6 +91,7 @@ function registerJsonTool<T extends z.ZodRawShape>(
     readOnly: boolean;
     destructive?: boolean;
     seedOnly?: boolean;
+    legacyKnowledgeRead?: boolean;
   },
   handler: ToolHandler<z.output<z.ZodObject<T>>>
 ) {
@@ -108,6 +120,7 @@ function registerJsonTool<T extends z.ZodRawShape>(
         try {
           if (config.seedOnly && !isSeedMode()) throw new Error("Seed cleanup is not enabled.");
           await allowAllPolicy.authorize(actor, config.permissions);
+          if (config.legacyKnowledgeRead || legacyKnowledgeReadTools.has(name)) assertLegacyKnowledgeReadAllowed(principal);
           const output = await handler(input as z.output<z.ZodObject<T>>);
           auditToolCall({ actor, action: name, ...target, toolInput: input, output, status: "success" });
           return textResult(output);

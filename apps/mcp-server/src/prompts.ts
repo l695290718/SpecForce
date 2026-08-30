@@ -38,12 +38,13 @@ export function registerPrompts(server: McpServer): void {
           "",
           "Workflow:",
           "1. Clarify business goal, actors, constraints, and success metrics.",
-          "2. Search existing assets with search_design_assets using the applicationServiceId and locale above.",
-          "3. Identify domain model, data model, API/event changes, business rules, state machines, and non-functional requirements.",
-          "4. Create a complete English-canonical Proposal with localizedContent.zh and the exact application-service architectureScope using create_proposal.",
-          "5. Run analyze_proposal_impact in the same application-service scope.",
-          "6. Generate a Context Pack with generate_context_pack in the same application-service scope.",
-          "7. Run run_governance_checks in the same application-service scope and report unresolved warnings.",
+          "2. Evaluate system knowledge readiness with evaluate_system_knowledge_readiness, then read only the bounded facts returned by read_system_knowledge using the exact application-service architectureScope.",
+          "3. Use search_design_assets only as a compatibility fallback; obey the configured legacy-read enforcement mode.",
+          "4. Identify domain model, data model, API/event changes, business rules, state machines, and non-functional requirements.",
+          "5. Create a complete English-canonical Proposal with localizedContent.zh and the exact application-service architectureScope using create_proposal.",
+          "6. Run analyze_proposal_impact in the same application-service scope.",
+          "7. Generate a Context Pack with generate_context_pack in the same application-service scope.",
+          "8. Run run_governance_checks in the same application-service scope and report unresolved warnings.",
           "Do not execute arbitrary code or invent asset ids without checking SpecForge first."
         ]
           .filter(Boolean)

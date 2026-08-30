@@ -693,7 +693,7 @@ git commit -m "feat: expose gated knowledge reads through mcp"
 - Consumes: `knowledge:consume`, `knowledge:diagnostic`, and the new MCP tool names.
 - Produces: `resolveKnowledgeReadMode(environment, caller)` with `OBSERVE`, `ENFORCE`, and `DIAGNOSTIC_ONLY` outcomes; deprecation audit metadata for low-level reads.
 
-- [ ] **Step 1: Write failing compatibility-mode tests**
+- [x] **Step 1: Write failing compatibility-mode tests**
 
 ```ts
 it("keeps payload compatibility while auditing ordinary low-level reads in observe mode", () => {
@@ -709,23 +709,23 @@ it("marks explicitly authorized governance reads as diagnostic only", () => {
 });
 ```
 
-- [ ] **Step 2: Run the compatibility test and confirm the resolver is absent**
+- [x] **Step 2: Run the compatibility test and confirm the resolver is absent**
 
 Run: `pnpm exec vitest run apps/mcp-server/src/knowledge-readiness/compatibility.test.ts`
 
 Expected: FAIL with missing resolver.
 
-- [ ] **Step 3: Implement the explicit compatibility switch**
+- [x] **Step 3: Implement the explicit compatibility switch**
 
 Read `SPECFORGE_KNOWLEDGE_READ_ENFORCEMENT`, accepting only `observe` or `enforce` and defaulting to `observe`. In observe mode, preserve existing low-level response payloads and emit an audit event that names `read_system_knowledge` as the replacement. In enforce mode, ordinary Agents receive a stable migration denial; callers with `knowledge:diagnostic` and governance role receive the existing payload wrapped only at tool metadata/audit level as `DIAGNOSTIC_ONLY`, avoiding a silent payload-shape change.
 
-- [ ] **Step 4: Route agent-facing prompts and briefings through the gate**
+- [x] **Step 4: Route agent-facing prompts and briefings through the gate**
 
 Change `design_feature`, proposal review, coding context, and architecture/system-understanding guidance to call `read_system_knowledge` first with the appropriate registered Profile. The prompt must state: retain `Profile` and `asOf` in conclusions; follow all continuation pages before claiming a complete inventory; stop deterministic answering on `DENY`; use low-level tools only for explicitly authorized diagnostics.
 
 Add the same pre-code read rule to `AGENTS.md`, directly after the Implementation Preflight Gate, without changing the existing design-change session requirement.
 
-- [ ] **Step 5: Run compatibility and prompt tests**
+- [x] **Step 5: Run compatibility and prompt tests**
 
 Run: `pnpm exec vitest run apps/mcp-server/src/knowledge-readiness/compatibility.test.ts apps/mcp-server/src/tools.test.ts`
 
@@ -735,7 +735,7 @@ Run: `pnpm --filter @specforge/mcp-server typecheck`
 
 Expected: exit code 0.
 
-- [ ] **Step 6: Commit migration behavior and guidance**
+- [x] **Step 6: Commit migration behavior and guidance**
 
 ```bash
 git add apps/mcp-server/src/knowledge-readiness/compatibility.ts apps/mcp-server/src/knowledge-readiness/compatibility.test.ts apps/mcp-server/src/tools.ts apps/mcp-server/src/tools.test.ts apps/mcp-server/src/prompts.ts packages/core/src/governance/briefing.ts AGENTS.md
