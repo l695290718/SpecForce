@@ -456,9 +456,9 @@
                                                   "adr-federated-design-fact-synchronization"
                                               ],
                           "owner":  "SpecForge Architecture and Enterprise Integration",
-                          "status":  "Local enforcement increment implemented; CodeHub enforcement deferred",
+                          "status":  "Local enforcement increment implemented; CodeHub enforcement externally blocked because the target service is unreachable",
                           "reason":  "The first enforcement increment is a standalone Go pre-commit gate that binds staged Git evidence, exact application-service design coverage, CONVERGED reconciliation, and verification evidence to a short-lived Ed25519-signed Change Attestation.",
-                          "retryTrigger":  "Implement CodeHub protected-branch enforcement only after the local protocol is proven and separately approved; after future changes rerun the exact-Scope MCP synchronization and read-back checks.",
+                          "retryTrigger":  "Retry after CodeHub connectivity and a test repository are available; then open a new exact-Scope session, verify the platform status-check or CI integration, and rerun MCP synchronization and read-back checks.",
                           "evidence":  [
                                            {
                                                "command":  "pnpm design-context:preflight -- --intent \"Design the standalone Go local Git hook and signed change-attestation gate; defer CodeHub enforcement.\" --affected \"adr-design-context-preflight-gate\" --evidence \"bilingual design spec review,manifest validation,MCP design-fact synchronization and read-back\"",
@@ -503,6 +503,10 @@
                                            {
                                                "command":  "PowerShell AST parse; git diff --check; pnpm exec vitest run scripts/design-fact-manifest.test.ts --exclude .worktrees/** --exclude .pnpm-store/**",
                                                "result":  "new-attestation-key.ps1, start-mcp-http.ps1, and start.ps1 parsed successfully; diff check passed; manifest tests passed 14 tests."
+                                           },
+                                           {
+                                               "command":  "User-confirmed CodeHub connectivity check",
+                                               "result":  "Target CodeHub service is unreachable; platform-specific adapter, protected-branch registration, and live merge-blocking evidence remain externally blocked."
                                            }
                                        ]
                       },

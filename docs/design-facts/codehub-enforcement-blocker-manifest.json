@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "decisions": [
+    {
+      "id": "local-git-hook-change-attestation",
+      "repositoryAdr": "docs/adr/0017-local-git-hook-change-attestation.md",
+      "mcpAdrId": "adr-local-git-hook-change-attestation",
+      "scope": {
+        "applicationServiceId": "com.huawei.celon.desiner",
+        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+      },
+      "proposalId": "proposal-local-git-hook-change-attestation",
+      "contextPackId": "context-pack-local-git-hook-change-attestation",
+      "relatedAssetIds": [
+        "api-specforge-mcp-tools",
+        "data-specforge-assets",
+        "adr-design-context-preflight-gate",
+        "adr-federated-design-fact-synchronization"
+      ],
+      "owner": "SpecForge Architecture and Enterprise Integration",
+      "status": "Local enforcement increment implemented; CodeHub enforcement externally blocked because the target service is unreachable",
+      "reason": "The local Go verifier is implemented, but the target CodeHub service cannot currently be reached to verify its adapter, status-check registration, protected-branch configuration, or live merge rejection.",
+      "retryTrigger": "Retry after CodeHub connectivity and a test repository are available; then open a new exact-Scope session, verify the platform status-check or CI integration, and rerun MCP synchronization and read-back checks.",
+      "evidence": [
+        {
+          "command": "User-confirmed CodeHub connectivity check",
+          "result": "Target CodeHub service is unreachable; platform-specific adapter, protected-branch registration, and live merge-blocking evidence remain externally blocked."
+        },
+        {
+          "command": "go test ./... (apps/specforge-cli)",
+          "result": "Standalone provider-neutral CLI verification tests passed in offline mode."
+        },
+        {
+          "command": "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner",
+          "result": "Opened exact-Scope design-change-session:06bf34e7-c714-4d11-9200-80b6c899b65c."
+        }
+      ]
+    }
+  ]
+}

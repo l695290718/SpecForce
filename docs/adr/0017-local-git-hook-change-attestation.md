@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted design. Local enforcement increment implemented; CodeArts/CodeHub enforcement remains deferred.
+Accepted design. Local enforcement increment implemented; CodeArts/CodeHub enforcement is externally blocked because the target CodeHub service is currently unreachable.
 
 ## Context
 
@@ -12,7 +12,7 @@ SpecForge currently provides an MCP design-context preflight and evidence-backed
 
 Build the first enforcement increment as a standalone Go `specforge` CLI with an idempotently installed Git `pre-commit` dispatcher. The CLI reads `.specforge.yaml`, maps every staged path to one or more application-service IDs and their registered `scopePath` values, computes deterministic Git index evidence, and requests a short-lived Ed25519-signed Change Attestation from an authenticated remote MCP endpoint. The same CLI exposes `verify-commit --attestation <file>` for CI: it recomputes committed-tree evidence and delegates read-only verification to MCP.
 
-The service resolves canonical `scopePath` values, applies server-owned policy, requires a valid Design Change Session for every exact Scope, requires complete design coverage and evidence, treats every reconciliation state other than `CONVERGED` as blocking, and atomically closes sessions and persists signed attestations, audit, and Outbox records. The CLI verifies the signature and staged tree before allowing the commit, while CI recomputes the committed tree and reads an attestation artifact supplied by the pipeline. CodeArts/CodeHub merge enforcement is deferred as a separately tracked backlog fact.
+The service resolves canonical `scopePath` values, applies server-owned policy, requires a valid Design Change Session for every exact Scope, requires complete design coverage and evidence, treats every reconciliation state other than `CONVERGED` as blocking, and atomically closes sessions and persists signed attestations, audit, and Outbox records. The CLI verifies the signature and staged tree before allowing the commit, while CI recomputes the committed tree and reads an attestation artifact supplied by the pipeline. CodeArts/CodeHub merge enforcement is deferred as a separately tracked backlog fact. The current target service is unreachable, so no platform adapter, protected-branch registration, or production enforcement claim is made.
 
 ## Alternatives
 
@@ -28,6 +28,7 @@ The service resolves canonical `scopePath` values, applies server-owned policy, 
 - Shared files can require multiple exact application-service attestations in one commit.
 - The first increment requires authenticated remote MCP transport and signing-key lifecycle in addition to the CLI.
 - Local hooks remain bypassable with `--no-verify`; only the deferred CodeHub protected-branch gate can make enforcement repository-authoritative.
+- The CodeHub increment is externally blocked until the target service can be reached and its repository status-check API or CI integration can be verified.
 
 ## Constraints
 
@@ -55,6 +56,10 @@ The service resolves canonical `scopePath` values, applies server-owned policy, 
 - `pnpm db:push` synchronized `ChangeAttestation` into the authoritative `localhost:15433/specforge_canonical` database.
 - `pnpm design-facts:sync` returned `complete` for all 15 baseline decisions; `pnpm design-facts:check` returned empty `missing`, `mismatched`, `outOfScope`, and `blocked` lists with all 15 verified.
 - `go test ./...` in `apps/specforge-cli` passed exact `scopePath` propagation and committed-tree blob-list tests; the temporary Windows CI verifier executable built successfully.
+- `pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner` opened `design-change-session:06bf34e7-c714-4d11-9200-80b6c899b65c` after reading the exact scoped catalog and relationships.
+- The user confirmed CodeHub connectivity is unavailable; no platform adapter, protected-branch registration, or live merge-blocking evidence was claimed.
+- Targeted `pnpm design-facts:sync` returned `complete`; targeted `pnpm design-facts:check` returned empty `missing`, `mismatched`, `outOfScope`, and `blocked` lists.
+- The same design session closed as `BLOCKED` with retry trigger `CodeHub connectivity and a test repository available`.
 
 ## MCP Record
 
@@ -95,6 +100,7 @@ SpecForge 已提供 MCP 设计上下文预检和带证据的 Design Change Sessi
 - 公共文件可以要求一次提交同时具备多个精确应用服务证明。
 - 第一增量除 CLI 外还需要最小鉴权远程 MCP 传输和签名密钥生命周期。
 - 本地 Hook 仍可被 `--no-verify` 绕过，只有后续 CodeHub 受保护分支门禁能形成仓库权威控制。
+- CodeHub 增量在目标服务恢复连接并完成状态检查或 CI 集成验证前保持外部阻塞。
 
 ### 约束
 
@@ -110,6 +116,10 @@ SpecForge 已提供 MCP 设计上下文预检和带证据的 Design Change Sessi
 - `.specforge.yaml` 可以声明每个应用服务注册的 `scopePath`；缺失或错误路径必须失败关闭。
 - CI 必须通过流水线或制品通道接收变更证明；本地 `.git/specforge/attestations` 缓存不具备仓库权威性。
 
+### 当前外部阻塞
+
+用户已确认当前无法连接目标 CodeHub 服务。因此平台适配器验证、状态检查注册、受保护分支配置和真实合入拒绝证据均被阻塞。在 CodeHub 恢复连接并提供测试仓库后重试；实现适配器前必须重新开启精确 Scope 设计会话。
+
 ### 证据
 
 - `pnpm design-context:preflight` 在精确 Designer Scope 下读取 107 条资产和相关关系，并创建会话 `design-change-session:4ad91d6a-e33c-46f3-bb3c-1d4987fedfb6`。
@@ -122,3 +132,7 @@ SpecForge 已提供 MCP 设计上下文预检和带证据的 Design Change Sessi
 - `go test ./...`（`apps/specforge-cli`，仓库内 `GOCACHE`）通过 CLI 及全部内部包测试；临时 Windows 构建产物生成成功。
 - PowerShell AST 解析通过 `deploy/scripts/new-attestation-key.ps1`、`deploy/scripts/start-mcp-http.ps1` 和 `deploy/scripts/start.ps1`；启动器在缺少 Bearer Token 时失败关闭。
 - `specforge hook install` 的 Go 测试验证既有 Hook 保留、幂等重装和卸载恢复；无暂存变更返回 `NO_STAGED_CHANGES`。
+- `pnpm design-context:preflight` 在精确 Designer Scope 下读取当前目录和关系，并创建会话 `design-change-session:06bf34e7-c714-4d11-9200-80b6c899b65c`。
+- 用户确认 CodeHub 当前不可连接；未声明已完成平台适配器、受保护分支注册或真实合入阻断证据。
+- 精确清单的 `pnpm design-facts:sync` 返回 `complete`；`pnpm design-facts:check` 的 `missing`、`mismatched`、`outOfScope` 和 `blocked` 均为空。
+- 同一设计会话按 `BLOCKED` 关闭，重试条件为 CodeHub 恢复连接并提供测试仓库。

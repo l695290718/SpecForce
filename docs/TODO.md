@@ -22,13 +22,13 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 ## 2. CodeArts/CodeHub Protected-Branch Enforcement
 
-**Status:** Provider-neutral CI verifier implemented; CodeHub/CodeArts status registration deferred.
+**Status:** Provider-neutral CI verifier implemented; CodeHub/CodeArts status registration externally blocked because the target CodeHub service is currently unreachable.
 
 **Owner:** SpecForge Enterprise Integration and Repository Governance.
 
 **Rationale:** The standalone CLI now exposes `verify-commit`, which recomputes committed-tree evidence and delegates read-only signed-attestation verification to MCP. Git still permits `--no-verify`, and Hooks are not installed automatically by clone. Repository-authoritative enforcement still requires CodeArts/CodeHub to register this command as a mandatory protected-branch status check with a CI service identity.
 
-**Trigger:** Implement the platform-specific adapter only after the provider-neutral `verify-commit` entrypoint, artifact transport, strict `CONVERGED` policy, signing-key lifecycle, and local developer workflow are reviewed for the target CodeHub deployment.
+**Trigger:** Retry when CodeHub connectivity and a test repository are available. Then open a new exact-Scope design session, verify the platform-specific status-check or CI integration, and register the gate only after the adapter is reviewed for the target deployment.
 
 **Completion evidence:** `specforge verify-commit --attestation <artifact>` recomputes committed-tree evidence and fails closed for missing/invalid artifacts, stale tree, wrong repository or Scope, expired or revoked signature, incomplete multi-Scope coverage, or non-converged design. `verify_change_attestation` continues to validate the signed evidence server-side. A CodeArts/CodeHub protected-branch status check must still register this command as mandatory and reject the same failure cases.
 
@@ -36,13 +36,13 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **中文本地化：**
 
-**状态：** 平台无关 CI 校验器已实现；CodeHub/CodeArts 状态检查注册仍延期。
+**状态：** 平台无关 CI 校验器已实现；由于当前无法连接目标 CodeHub 服务，CodeHub/CodeArts 状态检查注册暂时受外部条件阻塞。
 
 **负责人：** SpecForge 企业集成与仓库治理团队。
 
 **理由：** 独立 CLI 现已提供 `verify-commit`，重新计算提交 tree 证据，并将只读签名证明校验委托给 MCP。Git 仍允许 `--no-verify`，clone 也不会自动安装 Hook。仓库权威门禁仍要求 CodeArts/CodeHub 使用 CI 服务身份注册该命令为受保护分支必选状态检查。
 
-**启动条件：** 目标 CodeHub 部署完成平台无关的 `verify-commit` 入口、证明产物传输、严格 `CONVERGED` 策略、签名密钥生命周期和本地开发流程评审后，再实现平台适配器。
+**启动条件：** CodeHub 恢复连接并提供测试仓库后重试。随后重新开启精确 Scope 设计会话，验证平台状态检查或 CI 集成，并完成目标部署评审后再注册门禁。
 
 **完成证据：** `specforge verify-commit --attestation <artifact>` 重新计算提交 tree 证据，并在证明缺失或无效、tree 过期、仓库或 Scope 错误、签名过期或撤销、多 Scope 覆盖不足以及设计未收敛时失败关闭；服务端 `verify_change_attestation` 继续校验全部签名证据。CodeArts/CodeHub 仍需把该命令注册为必选状态检查并拒绝同类失败。
 
