@@ -355,3 +355,47 @@ Only incomplete work is listed here. Completed and superseded records are preser
 **完成证据：** 候选批次通过精确 Scope 的 MCP 持久化，确定性闭包和新鲜度校验，ReviewBundle 审批，晋升与对账，并从已发布 Baseline 和派生投影回读。完成后更新此项，并保留候选 ID 和证据引用。
 
 **设计引用：** ADR-0044、`docs/superpowers/plans/2026-08-30-designer-3a-v7-structural-semantic-expansion.md`、`scripts/analyze-designer-3a-v7.ts`、`scripts/publish-designer-3a-v7.ts`。
+
+## 14. System Knowledge Readiness Gate Productionization
+
+**Backlog ID:** `backlog-system-knowledge-readiness-productionization`
+
+**Status:** Deferred. The exact-Scope readiness gate and bounded MCP read path are implemented; production source onboarding and operational completion are intentionally separate increments.
+
+**Owner:** SpecForge platform governance.
+
+**Rationale:** SpecForge may be the sole knowledge source only for a declared Profile when the scoped receipt proves coverage, freshness, authority, reconciliation, authorization, and pagination completeness. It must not imply that a static catalog or local test evidence represents every enterprise system.
+
+**Deferred items and triggers:**
+
+- **Production source onboarding:** register approved repositories, OpenAPI/schema sources, deployment metadata, and runtime telemetry when enterprise source owners and credentials are available.
+- **Continuous legacy synchronization:** start after the first approved source connector has a retry, dead-letter, redaction, provenance, and owner acceptance runbook.
+- **Cross-Scope readiness aggregation:** start when a governed product-level use case requires comparisons across application services and a non-leaking aggregation contract is approved.
+- **Web policy administration:** start when operators need UI management and dashboarding for readiness policies without bypassing MCP governance.
+- **External production identity:** start when enterprise identity, service-to-service tokens, rotation, and audit integration are available.
+- **Automatic remediation:** start only after typed remediation actions have approval, idempotency, rollback, and audit contracts.
+- **Production capacity certification:** start after representative telemetry can certify receipt retention, source scale, pagination, and latency targets.
+
+**Completion evidence:** Each item has an exact-Scope design session, bilingual MCP assets, typed links, immutable evidence, reconciliation read-back, and an updated Context Pack. Until then, `SOURCE_CHECK_REQUIRED` or `BLOCKED` remains a valid result and no complete system claim is made.
+
+### 系统知识可信读取门禁生产化
+
+**待办标识：** `backlog-system-knowledge-readiness-productionization`
+
+**状态：** 延期。精确 Scope 的就绪门禁和有界 MCP 读取路径已经实现；生产来源接入和运营闭环明确拆分为独立增量。
+
+**负责人：** SpecForge 平台治理团队。
+
+**理由：** 只有在声明的 Profile 下，精确 Scope 收据证明覆盖、新鲜度、权威性、对账、授权和分页完整性时，SpecForge 才能作为唯一知识来源。静态目录或本地测试证据不能代表所有企业系统。
+
+**延期事项与启动条件：**
+
+- **生产来源接入：** 企业来源负责人和凭据就绪后，注册获批准的仓库、OpenAPI/Schema、部署元数据和运行时遥测来源。
+- **持续存量同步：** 首个获批连接器具备重试、死信、脱敏、来源追溯和负责人验收运行手册后启动。
+- **跨 Scope 就绪聚合：** 需要跨应用服务比较的受治理产品场景和防泄漏聚合契约获批后启动。
+- **Web 策略管理：** 运维需要 UI 管理和仪表盘，且不会绕过 MCP 治理时启动。
+- **外部生产身份：** 企业身份、服务间 Token、轮换和审计集成就绪后启动。
+- **自动修复：** 类型化修复动作具备审批、幂等、回滚和审计契约后启动。
+- **生产容量认证：** 有代表性的遥测能够认证收据保留、来源规模、分页和延迟目标后启动。
+
+**完成证据：** 每项能力都必须拥有精确 Scope 设计会话、双语 MCP 资产、有类型关系、不可变 Evidence、对账回读和更新后的 Context Pack。在此之前，`SOURCE_CHECK_REQUIRED` 或 `BLOCKED` 都是合法结果，系统不得声明完整系统事实。

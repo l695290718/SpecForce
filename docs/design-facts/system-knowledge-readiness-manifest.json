@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "decisions": [
+    {
+      "id": "system-knowledge-readiness-gate",
+      "repositoryAdr": "docs/adr/0045-system-knowledge-readiness-gate.md",
+      "mcpAdrId": "adr-system-knowledge-readiness-gate",
+      "scope": {
+        "applicationServiceId": "com.huawei.celon.desiner",
+        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+      },
+      "proposalId": "proposal-system-knowledge-readiness-gate",
+      "contextPackId": "context-pack-system-knowledge-readiness-gate",
+      "relatedAssetIds": [
+        "api-specforge-system-knowledge-readiness",
+        "data-specforge-system-knowledge-readiness-receipt",
+        "rule-specforge-system-knowledge-readiness"
+      ],
+      "managedAssets": [
+        {
+          "assetType": "api",
+          "asset": {
+            "id": "api-specforge-system-knowledge-readiness",
+            "name": "System Knowledge Readiness MCP Contract",
+            "description": "Fail-closed exact-Scope evaluation and atomic bounded knowledge reads for Agents.",
+            "method": "POST",
+            "path": "mcp://tools/read_system_knowledge",
+            "domainId": "domain-specforge-platform",
+            "providerSystem": "SpecForge MCP Server",
+            "consumers": ["Authorized coding Agent", "SpecForge governance operations"],
+            "requestSchema": { "architectureScope": "ArchitectureScopeRef", "knowledgeProfile": "KnowledgeProfileId", "selectors": "KnowledgeSelector[]", "purpose": "string", "locale": "en|zh" },
+            "responseSchema": { "decision": "SystemKnowledgeReadResult", "receipt": "SystemKnowledgeReadinessReceipt", "nextCursor": "signed opaque cursor" },
+            "errorCodes": ["KNOWLEDGE_SCOPE_ACCESS_DENIED", "KNOWLEDGE_RECEIPT_STALE", "KNOWLEDGE_RESPONSE_BUDGET_EXCEEDED"],
+            "authType": "Exact application-service knowledge:consume grant",
+            "idempotency": "Identical caller, query, policy, and waterlines reuse one immutable receipt.",
+            "rateLimit": "Bounded by Profile asset, relationship, byte, and execution budgets.",
+            "timeout": "Profile executionMilliseconds budget",
+            "compatibilityPolicy": "Gated v1 is additive; legacy reads migrate through explicit observe and enforce modes.",
+            "openapiSpec": "MCP schemas: evaluate_system_knowledge_readiness and read_system_knowledge",
+            "exposure": "internal",
+            "localizedContent": {
+              "en": { "name": "System Knowledge Readiness MCP Contract", "description": "Fail-closed exact-Scope evaluation and atomic bounded knowledge reads for Agents.", "authType": "Exact application-service knowledge:consume grant", "idempotency": "Identical caller, query, policy, and waterlines reuse one immutable receipt.", "rateLimit": "Bounded by Profile asset, relationship, byte, and execution budgets.", "timeout": "Profile executionMilliseconds budget", "compatibilityPolicy": "Gated v1 is additive; legacy reads migrate through explicit observe and enforce modes." },
+              "zh": { "name": "系统知识可信读取 MCP 契约", "description": "面向 Agent 的失败关闭、精确 Scope 评估与原子有界知识读取契约。", "authType": "精确应用服务 knowledge:consume 授权", "idempotency": "相同调用者、查询、策略和来源水位复用同一不可变回执。", "rateLimit": "受 Profile 的资产数、关系数、字节数和执行时间预算约束。", "timeout": "Profile 的 executionMilliseconds 预算", "compatibilityPolicy": "门禁 v1 采用增量兼容；旧读取通过显式 observe 和 enforce 模式迁移。" }
+            }
+          }
+        },
+        {
+          "assetType": "dataModel",
+          "asset": {
+            "id": "data-specforge-system-knowledge-readiness-receipt",
+            "name": "System Knowledge Readiness Receipt",
+            "description": "Immutable caller-, policy-, selector-, and waterline-bound trust decisions retained in PostgreSQL.",
+            "code": "SystemKnowledgeReadinessReceipt",
+            "modelType": "logical",
+            "domainId": "domain-specforge-platform",
+            "tables": ["KnowledgeReadinessPolicy", "SystemKnowledgeReadinessReceipt"],
+            "entities": ["Readiness Policy Overlay", "Readiness Receipt", "Source Waterline Envelope"],
+            "fields": [],
+            "relationships": ["One receipt binds one exact Scope, caller grant, Profile, selector digest, policy version, and source generation."],
+            "constraints": ["Receipts are immutable and reused only while unexpired and waterline-current.", "Scope overlays can tighten but never weaken the enterprise minimum."],
+            "dataClassification": "internal governance metadata",
+            "lifecycle": "Created after evaluation, ACTIVE until expiry or waterline invalidation, then retained according to policy.",
+            "lineage": "Published Baseline, connector snapshots, catalog and relationship waterlines, reconciliation, and caller grant.",
+            "localizedContent": {
+              "en": { "name": "System Knowledge Readiness Receipt", "description": "Immutable caller-, policy-, selector-, and waterline-bound trust decisions retained in PostgreSQL.", "lifecycle": "Created after evaluation, ACTIVE until expiry or waterline invalidation, then retained according to policy.", "lineage": "Published Baseline, connector snapshots, catalog and relationship waterlines, reconciliation, and caller grant.", "relationships": ["One receipt binds one exact Scope, caller grant, Profile, selector digest, policy version, and source generation."], "constraints": ["Receipts are immutable and reused only while unexpired and waterline-current.", "Scope overlays can tighten but never weaken the enterprise minimum."], "fields": {} },
+              "zh": { "name": "系统知识可信读取回执", "description": "持久化在 PostgreSQL 中并绑定调用者、策略、选择条件和水位的不可变可信判定。", "lifecycle": "评估后创建，在过期或来源水位失效前为 ACTIVE，之后按策略保留。", "lineage": "来源于已发布 Baseline、连接器快照、目录与关系水位、对账结果和调用者授权。", "relationships": ["一条回执绑定一个精确 Scope、调用者授权、Profile、选择条件摘要、策略版本和来源代次。"], "constraints": ["回执不可变，仅在未过期且来源水位当前时复用。", "Scope 覆盖只能收紧企业最低要求，不能削弱它。"], "fields": {} }
+            }
+          }
+        },
+        {
+          "assetType": "businessRule",
+          "asset": {
+            "id": "rule-specforge-system-knowledge-readiness",
+            "name": "Fail-Closed System Knowledge Consumption Rule",
+            "description": "Permits Agent use only when the exact Profile is current, complete, authorized, conflict-free, and reconciled.",
+            "code": "SPECFORGE_SYSTEM_KNOWLEDGE_READINESS",
+            "domainId": "domain-specforge-platform",
+            "ruleType": "permission",
+            "condition": "An Agent requests deterministic system knowledge for an exact application-service Scope.",
+            "action": "Evaluate the registered Profile and return assets only for a current SELF_CONTAINED receipt.",
+            "exception": "Governance diagnostics require knowledge:diagnostic and are marked DIAGNOSTIC_ONLY.",
+            "examples": ["Pending source drift returns SOURCE_CHECK_REQUIRED with no asset body.", "An unresolved conflict returns BLOCKED with no asset body."],
+            "relatedAssets": [{ "type": "api", "id": "api-specforge-system-knowledge-readiness", "label": "System Knowledge Readiness MCP Contract" }],
+            "severity": "high",
+            "localizedContent": {
+              "en": { "name": "Fail-Closed System Knowledge Consumption Rule", "description": "Permits Agent use only when the exact Profile is current, complete, authorized, conflict-free, and reconciled.", "action": "Evaluate the registered Profile and return assets only for a current SELF_CONTAINED receipt.", "condition": "An Agent requests deterministic system knowledge for an exact application-service Scope.", "exception": "Governance diagnostics require knowledge:diagnostic and are marked DIAGNOSTIC_ONLY.", "examples": ["Pending source drift returns SOURCE_CHECK_REQUIRED with no asset body.", "An unresolved conflict returns BLOCKED with no asset body."] },
+              "zh": { "name": "系统知识失败关闭读取规则", "description": "仅在精确 Profile 足够新、完整、已授权、无冲突且对账收敛时，允许 Agent 使用 SpecForge 作为唯一来源。", "action": "评估已注册 Profile，仅在当前回执为 SELF_CONTAINED 时返回资产。", "condition": "Agent 针对精确应用服务 Scope 请求确定性系统知识。", "exception": "治理诊断需要 knowledge:diagnostic 授权，并始终标记为 DIAGNOSTIC_ONLY。", "examples": ["来源漂移待处理时返回 SOURCE_CHECK_REQUIRED，且不返回资产正文。", "存在未解决冲突时返回 BLOCKED，且不返回资产正文。"] }
+            }
+          }
+        }
+      ],
+      "managedRelationships": [
+        { "sourceType": "api", "sourceId": "api-specforge-system-knowledge-readiness", "targetType": "dataModel", "targetId": "data-specforge-system-knowledge-readiness-receipt", "relationType": "READS" },
+        { "sourceType": "businessRule", "sourceId": "rule-specforge-system-knowledge-readiness", "targetType": "api", "targetId": "api-specforge-system-knowledge-readiness", "relationType": "GOVERNS" },
+        { "sourceType": "proposal", "sourceId": "proposal-system-knowledge-readiness-gate", "targetType": "api", "targetId": "api-specforge-system-knowledge-readiness", "relationType": "IMPACTS" },
+        { "sourceType": "proposal", "sourceId": "proposal-system-knowledge-readiness-gate", "targetType": "dataModel", "targetId": "data-specforge-system-knowledge-readiness-receipt", "relationType": "IMPACTS" },
+        { "sourceType": "proposal", "sourceId": "proposal-system-knowledge-readiness-gate", "targetType": "businessRule", "targetId": "rule-specforge-system-knowledge-readiness", "relationType": "IMPACTS" }
+      ],
+      "proposalStatus": "implemented",
+      "owner": "SpecForge platform governance",
+      "status": "Implemented, locally verified, MCP synchronized, and reconciled in the exact Designer Scope.",
+      "reason": "Agents need an auditable fail-closed proof before treating SpecForge as the sole source for current system knowledge.",
+      "retryTrigger": "Open a new exact-Scope design session when Profile requirements, policy semantics, permissions, or read contracts change.",
+      "evidence": [
+        { "command": "pnpm exec vitest run packages/core/src/knowledge-readiness/evaluate.test.ts", "result": "1 file, 7 tests passed" },
+        { "command": "pnpm --filter @specforge/scoped-read test", "result": "2 files, 11 tests passed" },
+        { "command": "pnpm exec vitest run packages/core/src/knowledge-readiness apps/mcp-server/src/knowledge-readiness apps/mcp-server/src/federation/tools.test.ts --exclude **/.worktrees/** --exclude **/.pnpm-store/**", "result": "9 files, 60 tests passed" },
+        { "command": "pnpm design-facts:sync", "result": "system-knowledge-readiness-gate complete" },
+        { "command": "pnpm design-facts:check", "result": "missing=0, mismatched=0, outOfScope=0, blocked=0" },
+        { "command": "pnpm exec vitest run packages/core/src/knowledge-readiness apps/mcp-server/src/knowledge-readiness apps/mcp-server/src/federation/tools.test.ts apps/mcp-server/src/tools.test.ts --exclude **/.worktrees/** --exclude **/.pnpm-store/**", "result": "9 files passed, 90 tests passed, 1 environment E2E test skipped" },
+        { "command": "pnpm typecheck", "result": "all workspace typechecks passed" },
+        { "command": "git diff --check", "result": "passed" }
+      ]
+    }
+  ]
+}

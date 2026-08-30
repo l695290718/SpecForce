@@ -209,6 +209,22 @@ specforge://scopes/{applicationServiceId}/{locale}/graph
 
 The MVP transport is stdio. Streamable HTTP and production OAuth/RBAC are not implemented.
 
+### System Knowledge Readiness Gate
+
+Agents that need to understand an existing system must use the readiness-gated MCP path for the exact application-service Scope `com.huawei.celon.desiner`:
+
+```text
+1. evaluate_system_knowledge_readiness
+2. read_system_knowledge
+3. consume every signed cursor page before describing a complete result
+```
+
+The supported Profiles are `ARCHITECTURE_OVERVIEW`, `CHANGE_ASSESSMENT`, and `RUNTIME_DIAGNOSIS`. `SELF_CONTAINED` means the requested knowledge is sufficient at the returned `asOf` boundary; `SOURCE_CHECK_REQUIRED` means the Agent must not treat SpecForge as the sole source yet; `BLOCKED` means a conflict, reconciliation failure, authorization failure, or policy violation must be resolved first. Denials return no asset or relationship bodies.
+
+The receipt and cursor bind the exact Scope, caller grant, query, policy, catalog version, and source waterlines. PostgreSQL is authoritative for authored facts, observations, policies, receipts, and relationship events; graph stores are derived projections only. Set `SPECFORGE_KNOWLEDGE_READ_ENFORCEMENT=enforce` to reject ordinary legacy low-level reads. Explicit `knowledge:diagnostic` is reserved for governed diagnosis and is audited. `RUNTIME_DIAGNOSIS` remains not ready until policy-approved runtime evidence exists.
+
+**系统知识可信读取门禁：** 面向存量系统理解的 Agent 必须先调用 `evaluate_system_knowledge_readiness`，再调用 `read_system_knowledge`，并耗尽全部签名游标页面后才能描述完整结果。`SELF_CONTAINED` 只表示在返回的 `asOf` 边界内足够；`SOURCE_CHECK_REQUIRED` 表示仍需检查来源；`BLOCKED` 表示冲突、对账、授权或策略问题必须先处理。收据和游标绑定精确 Scope、调用授权、查询、策略、目录版本和来源水位；拒绝时不返回资产或关系正文。PostgreSQL 是权威存储，图数据库仅是派生投影。生产扫描器、持续同步、跨 Scope 聚合、Web 策略管理和自动修复仍未交付。
+
 ## Design-Fact Governance
 
 Baseline architectural decisions are recorded in `docs/adr/` and mapped in `docs/design-facts/baseline-manifest.json`. Use the local PostgreSQL connection before running:

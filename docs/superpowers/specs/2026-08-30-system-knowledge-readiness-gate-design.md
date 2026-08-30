@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted design for the exact Designer application-service Scope. Implementation has not started.
+Accepted design for the exact Designer application-service Scope. The first implementation increment is complete and locally verified; production source onboarding and operations remain deferred.
 
 - Owning application service: `com.huawei.celon.desiner`
 - Owning Scope: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`
@@ -431,6 +431,18 @@ DELTA 流只能证明变化，不能证明完整性或不存在。完整性需�
 第一增量交付 Core 策略与判定器、增量 PostgreSQL 策略和不可变收据、两个精确 Scope MCP 工具、原子第一页与水位绑定游标、企业最低与 Scope 收紧策略合成、原因码/修复建议/审计/有界指标、普通与诊断权限迁移、聚焦单元/数据库/MCP 授权/并发/分页/端到端测试，以及匹配的 ADR、Proposal、Context Pack、托管资产、有类型关系、Evidence、待办状态和 MCP 对账。
 
 第一增量注册 `RUNTIME_DIAGNOSIS`，但在 Scope 没有策略认可运行来源时返回 `SOURCE_CHECK_REQUIRED`，不铺设虚假运行证据。
+
+## Implementation Status
+
+The first increment is implemented for the exact Designer Scope. It includes the Core readiness evaluator, PostgreSQL policy and immutable receipt persistence, atomic `REPEATABLE READ` MCP reads, signed waterline-bound cursors, bounded readiness metrics, compatibility enforcement, prompts and governance guidance, and focused unit, authorization, pagination, concurrency, and end-to-end coverage. The matching ADR, DesignFactManifest, Proposal, Context Pack, managed assets, typed links, and evidence are synchronized through MCP.
+
+The implementation does not claim production source connectors, continuous legacy scanning, cross-Scope aggregation, Web policy administration, external production identity, automatic remediation, or production capacity certification. Those capabilities remain separate backlog facts and require their own exact-Scope design sessions and evidence.
+
+### 实施状态
+
+第一增量已针对精确 Designer Scope 实现。内容包括 Core 就绪判定器、PostgreSQL 策略与不可变收据、原子 `REPEATABLE READ` MCP 读取、绑定来源水位的签名游标、有界就绪指标、兼容模式门禁、提示词与治理指导，以及单元、授权、分页、并发和端到端聚焦测试。对应 ADR、DesignFactManifest、Proposal、Context Pack、托管资产、有类型关系和 Evidence 已通过 MCP 同步。
+
+本增量不声明已交付生产来源连接器、持续存量扫描、跨 Scope 聚合、Web 策略管理、外部生产身份、自动修复或生产容量认证。这些能力仍作为独立待办事实管理，并要求各自的精确 Scope 设计会话和证据。
 
 ## 延期工作
 

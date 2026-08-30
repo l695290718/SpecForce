@@ -829,11 +829,11 @@ git commit -m "test: verify system knowledge readiness lifecycle"
 - Consumes: verified command results from Tasks 1-8 and Design Change Session `design-change-session:214866ac-190d-4182-a7ac-6b0d869b40f9`.
 - Produces matching repository and MCP records with stable IDs: `adr-system-knowledge-readiness-gate`, `proposal-system-knowledge-readiness-gate`, `context-pack-system-knowledge-readiness-gate`, `api-specforge-system-knowledge-readiness`, `data-specforge-system-knowledge-readiness-receipt`, and `rule-specforge-system-knowledge-readiness`.
 
-- [ ] **Step 1: Write the bilingual ADR with exact evidence**
+- [x] **Step 1: Write the bilingual ADR with exact evidence**
 
 Document decision, context, rejected alternatives, authority boundary, policy composition, immutable receipt identity, REPEATABLE READ, staged compatibility, security/no-leak behavior, consequences, and rollback. Add exact command/result evidence from the completed phase. Mark runtime connectors, cross-Scope aggregation, Web administration, external identity, auto-remediation, and production capacity certification as deferred rather than implemented.
 
-- [ ] **Step 2: Add the managed design-fact manifest with typed links**
+- [x] **Step 2: Add the managed design-fact manifest with typed links**
 
 The manifest must use the repository's existing `DesignFactManifest` shape, the exact owning Scope, and English canonical plus Chinese localized content. Define one decision entry with these stable identities and managed relationships:
 
@@ -948,15 +948,15 @@ The manifest must use the repository's existing `DesignFactManifest` shape, the 
 
 Before synchronization, replace the empty `evidence` array with the exact successful commands and results captured in Tasks 1-8 and add complete localized overlays for every human-facing API, data-model, and rule field required by `scripts/sync-design-facts.ts`. The sync helper automatically adds Proposal `IMPLEMENTS_DECISION` ADR, Context Pack `IMPLEMENTS_CONTEXT_FOR` Proposal, ADR `DECIDES` each related asset, and Evidence `VALIDATES` ADR; the five managed links above add API/data access, rule governance, and Proposal impact without inventing relation codes.
 
-- [ ] **Step 3: Record deferred production work as owned backlog facts**
+- [x] **Step 3: Record deferred production work as owned backlog facts**
 
 Update `docs/TODO.md` with separate entries for live enterprise source operations, cross-Scope readiness, Web policy administration, automatic remediation, external production identity, final low-level-read enforcement cutover, and production capacity certification. Each entry names owner `SpecForge platform governance`, trigger, rationale, and current state. Do not describe these as delivered.
 
-- [ ] **Step 4: Update operator and Agent documentation**
+- [x] **Step 4: Update operator and Agent documentation**
 
 Document the three Profiles, exact-Scope token requirements, `evaluate_system_knowledge_readiness`, authoritative `read_system_knowledge`, `SOURCE_CHECK_REQUIRED` meaning, pagination obligations, observe/enforce migration setting, and the fact that `RUNTIME_DIAGNOSIS` remains unready without real runtime evidence.
 
-- [ ] **Step 5: Synchronize design facts only through MCP and reconcile**
+- [x] **Step 5: Synchronize design facts only through MCP and reconcile**
 
 Run:
 
@@ -968,7 +968,7 @@ pnpm design-facts:check
 
 Expected: all six assets and four typed relationships are persisted in the exact owning Scope, localization checks pass, and reconciliation reports no missing or divergent fact.
 
-- [ ] **Step 6: Run final focused verification once**
+- [x] **Step 6: Run final focused verification once**
 
 Run:
 
@@ -982,7 +982,7 @@ git diff --check
 
 Expected: all tests pass, all typechecks pass, design facts reconcile, and no whitespace errors are reported.
 
-- [ ] **Step 7: Close the existing Design Change Session with exact evidence**
+- [x] **Step 7: Close the existing Design Change Session with exact evidence**
 
 Run:
 
