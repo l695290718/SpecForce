@@ -36,7 +36,10 @@
     "graph-outbox:archive": "tsx scripts/archive-legacy-graph-outbox.ts",
     "format": "prettier --write .",
     "design:query": "tsx scripts/design-query.mts",
-    "governance:briefing": "tsx scripts/governance-briefing.mts"
+    "governance:briefing": "tsx scripts/governance-briefing.mts",
+    "designer-3a:v7:analyze": "tsx scripts/analyze-designer-3a-v7.ts",
+    "designer-3a:v7:publish": "tsx scripts/publish-designer-3a-v7.ts",
+    "designer-3a:v7:verify": "tsx scripts/verify-designer-3a-v7.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

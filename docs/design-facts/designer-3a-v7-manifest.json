@@ -1,0 +1,299 @@
+{
+  "version": 1,
+  "decisions": [
+    {
+      "id": "adr-designer-3a-v7-candidate-governance",
+      "repositoryAdr": "docs/adr/0044-designer-3a-v7-candidate-governance.md",
+      "mcpAdrId": "adr-designer-3a-v7-candidate-governance",
+      "scope": {
+        "applicationServiceId": "com.huawei.celon.desiner",
+        "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+      },
+      "proposalId": "proposal-designer-3a-v7-candidate-governance",
+      "contextPackId": "context-pack-designer-3a-v7-candidate-governance",
+      "relatedAssetIds": [
+        "api-specforge-3a-architecture-query",
+        "api-specforge-3a-projection-build",
+        "data-specforge-3a-projection-read-model",
+        "data-specforge-assets",
+        "rule-specforge-3a-projection-publication",
+        "api-specforge-3a-candidate-analysis",
+        "data-specforge-3a-candidate-set",
+        "rule-specforge-3a-candidate-closure"
+      ],
+      "managedAssets": [
+        {
+          "assetType": "api",
+          "asset": {
+            "id": "api-specforge-3a-candidate-analysis",
+            "name": "3A Architecture Candidate Analysis Contract",
+            "description": "Creates an exact-Scope, evidence-bound 3A Candidate Set from a published source Baseline and current design waterlines; it never publishes authoritative architecture directly.",
+            "method": "POST",
+            "path": "mcp://tools/analyze_3a_architecture_candidates",
+            "domainId": "domain-specforge-platform",
+            "providerSystem": "SpecForge MCP Server",
+            "consumers": ["Authorized coding Agent", "SpecForge architecture operations"],
+            "requestSchema": {
+              "architectureScope": "ArchitectureScopeRef",
+              "sourceBaselineId": "string",
+              "designChangeSessionId": "string",
+              "intent": "string",
+              "candidateBatch": "BIZ/SYS/TECH candidate facts",
+              "idempotencyKey": "string"
+            },
+            "responseSchema": { "candidateSet": "ThreeACandidateSet with revisions, snapshot, exclusions, and issues" },
+            "errorCodes": [
+              "SCOPE_ACCESS_DENIED",
+              "THREE_A_CANDIDATE_SOURCE_BASELINE_NOT_PUBLISHED",
+              "THREE_A_CANDIDATE_SOURCE_PROJECTION_NOT_READY",
+              "THREE_A_CANDIDATE_COUNT_CEILING_EXCEEDED",
+              "THREE_A_CANDIDATE_SYS_NOT_CLOSED",
+              "THREE_A_CANDIDATE_TECH_NOT_CLOSED"
+            ],
+            "authType": "Exact application-service knowledge:write and governance:run grant",
+            "idempotency": "The exact Scope and idempotency key return the same immutable candidate batch or an explicit digest conflict.",
+            "rateLimit": "Governed candidate analysis submissions only.",
+            "timeout": "10s request boundary; source reads are bounded and persistence is transactional.",
+            "compatibilityPolicy": "Candidate DTO changes are additive; incompatible candidate semantics require a new contract version.",
+            "exposure": "internal",
+            "createdAt": "2026-08-30T00:00:00.000Z",
+            "updatedAt": "2026-08-30T00:00:00.000Z",
+            "localizedContent": {
+              "en": {
+                "name": "3A Architecture Candidate Analysis Contract",
+                "description": "Creates an exact-Scope, evidence-bound 3A Candidate Set from a published source Baseline and current design waterlines; it never publishes authoritative architecture directly.",
+                "authType": "Exact application-service knowledge:write and governance:run grant",
+                "idempotency": "The exact Scope and idempotency key return the same immutable candidate batch or an explicit digest conflict.",
+                "rateLimit": "Governed candidate analysis submissions only.",
+                "timeout": "10s request boundary; source reads are bounded and persistence is transactional.",
+                "compatibilityPolicy": "Candidate DTO changes are additive; incompatible candidate semantics require a new contract version."
+              },
+              "zh": {
+                "name": "3A 架构候选分析契约",
+                "description": "基于已发布源 Baseline 和当前设计水位创建精确 Scope、带证据的 3A 候选集；不会直接发布权威架构。",
+                "authType": "精确应用服务 knowledge:write 和 governance:run 授权",
+                "idempotency": "相同 Scope 和幂等键返回同一个不可变候选批次，或返回明确的摘要冲突。",
+                "rateLimit": "仅允许受治理的候选分析提交。",
+                "timeout": "请求边界 10 秒；源数据读取有界且持久化使用事务。",
+                "compatibilityPolicy": "候选 DTO 只允许兼容扩展；不兼容的候选语义必须创建新版本契约。"
+              }
+            }
+          }
+        },
+        {
+          "assetType": "dataModel",
+          "asset": {
+            "id": "data-specforge-3a-candidate-set",
+            "name": "3A Architecture Candidate Set",
+            "description": "Stores an exact-Scope candidate snapshot, candidate architecture revisions, exclusions, blocking issues, waterlines, and immutable analysis evidence before review and promotion.",
+            "code": "ThreeACandidateSet",
+            "schemaVersion": 2,
+            "modelType": "logical",
+            "domainId": "domain-specforge-platform",
+            "tables": [
+              "ArchitectureFactBatch",
+              "ArchitectureUnitRevision",
+              "ArchitectureUnitMembershipRevision",
+              "ArchitectureUnitMappingRevision"
+            ],
+            "entities": ["Candidate Set"],
+            "entityDefinitions": [
+              {
+                "id": "candidate-set",
+                "name": "Candidate Set",
+                "ordinal": 0,
+                "description": "A bounded candidate architecture snapshot."
+              }
+            ],
+            "fields": [
+              {
+                "id": "candidate-id",
+                "entityId": "candidate-set",
+                "ordinal": 0,
+                "fieldName": "candidateId",
+                "displayName": "Candidate Set ID",
+                "dataType": "string",
+                "nullable": false,
+                "primaryKey": true,
+                "owner": "SpecForge Architecture"
+              }
+            ],
+            "dataRelations": [],
+            "relationships": [
+              "One Candidate Set belongs to one exact Scope.",
+              "One Candidate Set references one published source Baseline.",
+              "One Candidate Set owns candidate architecture revisions until promotion.",
+              "A stale source waterline invalidates a READY Candidate Set."
+            ],
+            "constraints": [
+              "PostgreSQL is authoritative.",
+              "All uniqueness and reads include exact application-service Scope.",
+              "Candidate revisions are not authoritative until review, promotion, reconciliation, and publication.",
+              "Candidate content is idempotent and snapshot-bound."
+            ],
+            "dataClassification": "internal architecture metadata",
+            "lifecycle": "GENERATING, READY, BLOCKED, STALE, APPROVED, REJECTED, PROMOTED",
+            "lineage": "MCP analyze_3a_architecture_candidates, published Baseline, projection manifest, design catalog, typed relationships, and Design Change Session",
+            "createdAt": "2026-08-30T00:00:00.000Z",
+            "updatedAt": "2026-08-30T00:00:00.000Z",
+            "localizedContent": {
+              "en": {
+                "name": "3A Architecture Candidate Set",
+                "description": "Stores an exact-Scope candidate snapshot, candidate architecture revisions, exclusions, blocking issues, waterlines, and immutable analysis evidence before review and promotion.",
+                "entities": {
+                  "candidate-set": {
+                    "displayName": "Candidate Set",
+                    "description": "A bounded candidate architecture snapshot."
+                  }
+                },
+                "fields": {
+                  "candidate-id": {
+                    "displayName": "Candidate Set ID",
+                    "meaning": "Stable identity of the candidate architecture set."
+                  }
+                },
+                "relationships": [
+                  "One Candidate Set belongs to one exact Scope.",
+                  "One Candidate Set references one published source Baseline.",
+                  "One Candidate Set owns candidate architecture revisions until promotion.",
+                  "A stale source waterline invalidates a READY Candidate Set."
+                ],
+                "constraints": [
+                  "PostgreSQL is authoritative.",
+                  "All uniqueness and reads include exact application-service Scope.",
+                  "Candidate revisions are not authoritative until review, promotion, reconciliation, and publication.",
+                  "Candidate content is idempotent and snapshot-bound."
+                ],
+                "lifecycle": "GENERATING, READY, BLOCKED, STALE, APPROVED, REJECTED, PROMOTED",
+                "lineage": "MCP analyze_3a_architecture_candidates, published Baseline, projection manifest, design catalog, typed relationships, and Design Change Session"
+              },
+              "zh": {
+                "name": "3A 架构候选集",
+                "description": "在审核和晋升前保存精确 Scope 的候选快照、候选架构修订、排除项、阻塞项、水位和不可变分析证据。",
+                "entities": { "candidate-set": { "displayName": "候选集", "description": "有界的候选架构快照。" } },
+                "fields": { "candidate-id": { "displayName": "候选集 ID", "meaning": "候选架构集的稳定标识。" } },
+                "relationships": [
+                  "一个候选集属于一个精确 Scope。",
+                  "一个候选集引用一个已发布源 Baseline。",
+                  "一个候选集在晋升前拥有候选架构修订。",
+                  "源水位过期会使 READY 候选集失效。"
+                ],
+                "constraints": [
+                  "PostgreSQL 保持权威。",
+                  "所有唯一性和读取都包含精确应用服务 Scope。",
+                  "候选修订在审核、晋升、对账和发布前不具备权威性。",
+                  "候选内容具有幂等性并绑定快照。"
+                ],
+                "lifecycle": "GENERATING、READY、BLOCKED、STALE、APPROVED、REJECTED、PROMOTED",
+                "lineage": "来自 MCP analyze_3a_architecture_candidates、已发布 Baseline、投影 Manifest、设计目录、有类型关系和 Design Change Session"
+              }
+            }
+          }
+        },
+        {
+          "assetType": "businessRule",
+          "asset": {
+            "id": "rule-specforge-3a-candidate-closure",
+            "name": "3A Candidate Cross-Layer Closure Rule",
+            "description": "A candidate architecture is reviewable only when every SYS unit realizes a BIZ unit, every TECH unit is used by a SYS unit, and every primary asset selector resolves to at most one unit.",
+            "code": "SPECFORGE_3A_CANDIDATE_CROSS_LAYER_CLOSURE",
+            "domainId": "domain-specforge-platform",
+            "ruleType": "validation",
+            "condition": "An authorized Agent submits a 3A Candidate Set for analysis or review.",
+            "action": "Validate exact Scope, evidence, layer ceilings, primary membership uniqueness, BIZ-to-SYS realization, and SYS-to-TECH dependency before marking the Candidate Set READY.",
+            "exception": "Missing, ambiguous, stale, cross-Scope, or orphaned facts block the Candidate Set without publishing partial architecture.",
+            "examples": [
+              "A SYS unit without a BIZ realization is rejected.",
+              "Two candidate units claiming the same primary asset are rejected.",
+              "A changed catalog digest makes a READY Candidate Set stale."
+            ],
+            "relatedAssets": [
+              {
+                "type": "api",
+                "id": "api-specforge-3a-candidate-analysis",
+                "label": "3A Architecture Candidate Analysis Contract"
+              },
+              { "type": "dataModel", "id": "data-specforge-3a-candidate-set", "label": "3A Architecture Candidate Set" }
+            ],
+            "severity": "high",
+            "createdAt": "2026-08-30T00:00:00.000Z",
+            "updatedAt": "2026-08-30T00:00:00.000Z",
+            "localizedContent": {
+              "en": {
+                "name": "3A Candidate Cross-Layer Closure Rule",
+                "description": "A candidate architecture is reviewable only when every SYS unit realizes a BIZ unit, every TECH unit is used by a SYS unit, and every primary asset selector resolves to at most one unit.",
+                "condition": "An authorized Agent submits a 3A Candidate Set for analysis or review.",
+                "action": "Validate exact Scope, evidence, layer ceilings, primary membership uniqueness, BIZ-to-SYS realization, and SYS-to-TECH dependency before marking the Candidate Set READY.",
+                "exception": "Missing, ambiguous, stale, cross-Scope, or orphaned facts block the Candidate Set without publishing partial architecture.",
+                "examples": [
+                  "A SYS unit without a BIZ realization is rejected.",
+                  "Two candidate units claiming the same primary asset are rejected.",
+                  "A changed catalog digest makes a READY Candidate Set stale."
+                ]
+              },
+              "zh": {
+                "name": "3A 候选跨层闭包规则",
+                "description": "只有每个 SYS 单元都实现某个 BIZ 单元、每个 TECH 单元都被 SYS 使用且每个主资产选择器最多解析到一个单元时，候选架构才可审核。",
+                "condition": "授权 Agent 提交 3A 候选集进行分析或审核。",
+                "action": "在候选集标记为 READY 前校验精确 Scope、证据、分层上限、主成员唯一性、BIZ 到 SYS 的实现关系以及 SYS 到 TECH 的依赖关系。",
+                "exception": "缺失、歧义、过期、跨 Scope 或孤立事实会阻塞候选集，不发布部分架构。",
+                "examples": [
+                  "没有 BIZ 实现关系的 SYS 单元会被拒绝。",
+                  "两个候选单元声明同一主资产会被拒绝。",
+                  "目录摘要变化会使 READY 候选集过期。"
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "managedRelationships": [
+        {
+          "sourceType": "api",
+          "sourceId": "api-specforge-mcp-tools",
+          "targetType": "api",
+          "targetId": "api-specforge-3a-candidate-analysis",
+          "relationType": "CONTAINS"
+        },
+        {
+          "sourceType": "api",
+          "sourceId": "api-specforge-3a-candidate-analysis",
+          "targetType": "dataModel",
+          "targetId": "data-specforge-3a-candidate-set",
+          "relationType": "WRITES"
+        },
+        {
+          "sourceType": "businessRule",
+          "sourceId": "rule-specforge-3a-candidate-closure",
+          "targetType": "api",
+          "targetId": "api-specforge-3a-candidate-analysis",
+          "relationType": "GOVERNS"
+        },
+        {
+          "sourceType": "businessRule",
+          "sourceId": "rule-specforge-3a-candidate-closure",
+          "targetType": "dataModel",
+          "targetId": "data-specforge-3a-candidate-set",
+          "relationType": "GOVERNS"
+        }
+      ],
+      "evidence": [
+        { "command": "pnpm --filter @specforge/core typecheck", "result": "Passed." },
+        { "command": "pnpm --filter @specforge/mcp-server typecheck", "result": "Passed." },
+        {
+          "command": "pnpm exec vitest run packages/core/src/architecture-authoring/candidate-analysis.test.ts packages/core/src/architecture-map/asset-mapping.test.ts",
+          "result": "2 files and 9 tests passed."
+        },
+        {
+          "command": "pnpm db:push",
+          "result": "Candidate Set columns and indexes applied to the configured PostgreSQL database."
+        }
+      ],
+      "owner": "SpecForge Architecture",
+      "proposalNonGoal": {
+        "en": "Continuous legacy scanning, connector delivery, cross-Scope aggregation, and external APPLY remain deferred federation increments.",
+        "zh": "持续存量扫描、连接器交付、跨 Scope 聚合和外部 APPLY 仍属于延期的联邦增量。"
+      }
+    }
+  ]
+}

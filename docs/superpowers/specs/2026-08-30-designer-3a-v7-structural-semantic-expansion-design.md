@@ -2,12 +2,29 @@
 
 ## Status
 
-- Design approved for specification; implementation has not started.
+- Design approved and governance-core implementation is complete; no concrete v7 architecture is published until an authorized Agent supplies an evidence-bound Candidate Set and the governed publication flow succeeds.
 - Owning application service: `com.huawei.celon.desiner`.
 - Owning Scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`.
 - Written-design session: `design-change-session:4cb5f6c8-c471-45d6-911e-f6fac2420696`.
 - Preflight design-context digest: `865eefd12d68ed7e1bea2dfe0f572128502253009eda7e8cda0b3ef4e9b1dc65`.
 - English is canonical. Chinese is the complete human-facing localization.
+
+## Implementation Boundary
+
+Implemented in this increment:
+
+- exact-Scope Candidate Set contract, lifecycle, snapshot waterlines, stale readback, cross-layer closure, count ceilings, and primary-membership conflict validation;
+- PostgreSQL Candidate Set metadata and migration;
+- MCP analysis and readback tools plus MCP-only analyze/publish/verify CLI orchestrators;
+- deterministic compatibility aliases for legacy asset-to-3A semantic identities; and
+- synchronized ADR, Proposal, Context Pack, managed API/data-model/rule assets, typed links, and focused evidence.
+
+Not published by this increment:
+
+- a fabricated or automatically inferred concrete Designer v7 architecture; and
+- continuous legacy scanning, connector delivery, cross-Scope aggregation, or external `APPLY`.
+
+The implementation deliberately requires an authorized Agent to provide the candidate facts through MCP. This preserves the evidence boundary and keeps v6 as the last known-good Baseline until a real Candidate Set passes review, promotion, reconciliation, and projection verification.
 
 ## Context
 
@@ -243,7 +260,7 @@ Verification is performed once after the implementation stage rather than after 
 
 ### 状态与背景
 
-- 设计已批准进入书面 Spec，尚未开始实施。
+- 设计已批准，治理核心实现已经完成；只有授权 Agent 提供带证据的候选集并通过受治理发布流程后，才会发布具体 v7 架构。
 - 所属应用服务为 `com.huawei.celon.desiner`。
 - 所属 Scope 路径为 `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`。
 - 书面设计会话为 `design-change-session:4cb5f6c8-c471-45d6-911e-f6fac2420696`。
@@ -256,6 +273,12 @@ v7 的目的不是简单增加图节点，而是形成可支撑变更决策和�
 当前 14 条资产到 3A 映射因身份格式不一致而 `BLOCKED`，例如覆盖终点使用 `data-specforge-assets`，结构成员使用 `dataModel:specforge-assets`。这是身份一致性缺陷，不代表需要新增 14 个架构单元，必须在 v7 发布前独立修复。
 
 SpecForge 是在线设计资产管理平台。每个应用服务 Scope 独立拥有自己的设计资产、架构知识、3A 基线、投影和仪表盘。平台 Schema、MCP 治理、投影算法和分析方法可以复用，但具体架构单元和设计事实不能跨 Scope 继承。Agent 即使被授权读取多个 Scope，v7 的编写和发布仍必须逐个精确 Scope 执行。
+
+### 实施边界
+
+本增量已经实现：精确 Scope 的 Candidate Set 契约、生命周期、快照水位、过期读回、跨层闭包、数量上限和主成员冲突校验；PostgreSQL 候选元数据及迁移；MCP 分析和读回工具，以及只通过 MCP 编排的分析、发布和验证脚本；历史资产到 3A 语义标识的确定性兼容别名；以及已同步的 ADR、Proposal、Context Pack、托管 API/数据模型/规则资产、有类型关系和针对性证据。
+
+本增量没有发布以下内容：伪造或自动推断的具体 Designer v7 架构，也没有实现持续存量扫描、连接器交付、跨 Scope 聚合或外部 `APPLY`。实现要求授权 Agent 通过 MCP 提供候选事实，以保持证据边界；在真实候选集通过审核、晋升、对账和投影验证前，v6 仍是最后已知良好的 Baseline。
 
 ### 目标与非目标
 

@@ -9,6 +9,7 @@ import { archiveSeedGraphOutbox, deletePersistedDesignData, isSeedMode, listPers
 import { applyDataModelChangeSet } from "./data-models/change-set";
 import { commitKnowledgeChangeSet, createIdentityCandidate, createKnowledgeAssertion, createKnowledgeReviewBundle, createProjectionManifest, createWorkingStream, decideKnowledgeReviewBundle, listKnowledgeAssertions, publishKnowledgeBaseline } from "./knowledge/persistence";
 import { promote3aArchitectureFacts, reconcile3aArchitectureFacts, submit3aArchitectureFactBatch } from "./knowledge/architecture-authoring";
+import { analyze3aArchitectureCandidates, get3aArchitectureCandidateSet } from "./knowledge/candidate-analysis";
 import { submitScanReport } from "./scanner/persistence";
 import { getScannerRelease } from "./scanner/release";
 import { finalizeKnowledgeScan, getScanCheckpoint, startKnowledgeScan } from "./scanner/session";
@@ -742,6 +743,40 @@ export function registerTools(server: McpServer): void {
     permissions: ["knowledge:write", "governance:run"],
     readOnly: false
   }, async (input) => submit3aArchitectureFactBatch(input as unknown as Parameters<typeof submit3aArchitectureFactBatch>[0]));
+
+  registerJsonTool(server, "analyze_3a_architecture_candidates", {
+    title: "Analyze 3A architecture candidates",
+    description: "Creates an exact-Scope, evidence-bound 3A Candidate Set through MCP. Candidate facts remain non-authoritative until the existing review, promotion, reconciliation, and Baseline publication lifecycle completes.",
+    inputSchema: {
+      architectureScope: architectureScopeSchema,
+      sourceBaselineId: z.string().min(1),
+      designChangeSessionId: z.string().min(1),
+      intent: z.string().min(1),
+      assetIds: z.array(z.string().min(1)).max(500).optional(),
+      idempotencyKey: z.string().min(1),
+      evidenceRefs: z.array(z.string().min(1)).min(1),
+      candidateBatch: z.object({
+        id: z.string().min(1),
+        provenance: z.object({ actor: z.string().min(1), model: z.string().min(1).optional(), tool: z.string().min(1).optional(), runId: z.string().min(1).optional() }),
+        evidenceRefs: z.array(z.string().min(1)).min(1),
+        units: z.array(architectureFactUnitSchema).max(100),
+        memberships: z.array(architectureFactMembershipSchema).max(1000),
+        mappings: z.array(architectureFactMappingSchema).max(500),
+        excludedCandidates: z.array(z.object({ assetType: z.string().min(1), assetId: z.string().min(1), reasonCode: z.string().min(1), evidenceRefs: z.array(z.string().min(1)), retryTrigger: z.string().min(1) })).optional(),
+        blockingIssues: z.array(z.string().min(1)).optional()
+      })
+    },
+    permissions: ["knowledge:write", "governance:run"],
+    readOnly: false
+  }, async (input) => analyze3aArchitectureCandidates(input as unknown as Parameters<typeof analyze3aArchitectureCandidates>[0]));
+
+  registerJsonTool(server, "get_3a_architecture_candidate_set", {
+    title: "Get 3A architecture Candidate Set",
+    description: "Reads one exact-Scope 3A Candidate Set with snapshot waterlines, exclusions, evidence, validation issues, and publication status.",
+    inputSchema: { architectureScope: architectureScopeSchema, candidateSetId: z.string().min(1) },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, async (input) => get3aArchitectureCandidateSet(input));
 
   registerJsonTool(server, "promote_3a_architecture_facts", {
     title: "Promote 3A architecture facts",

@@ -49,7 +49,10 @@ export function designEvidenceId(decisionId: string, index: number): string {
   return `evidence-${decisionId}-${index + 1}`;
 }
 
-type CallTool = (name: string, input: Record<string, unknown>) => Promise<{ ok?: boolean; isError?: boolean; message?: string }>;
+type CallTool = (
+  name: string,
+  input: Record<string, unknown>
+) => Promise<{ ok?: boolean; isError?: boolean; message?: string }>;
 type ExistingRecordType = "proposal" | "contextPack";
 
 interface AdrFields {
@@ -81,7 +84,16 @@ const supportedManifestLocalizedFields = new Set([
 
 const canonicalStringFields = new Set(["name", "title", "description", "context", "decision"]);
 const canonicalArrayFields = new Set(["alternatives", "consequences", "constraints"]);
-const proposalLocalizedStringFields = ["name", "title", "description", "background", "goal", "nonGoal", "scope", "rolloutPlan"] as const;
+const proposalLocalizedStringFields = [
+  "name",
+  "title",
+  "description",
+  "background",
+  "goal",
+  "nonGoal",
+  "scope",
+  "rolloutPlan"
+] as const;
 const proposalLocalizedOptionalStringFields = ["rollbackPlan"] as const;
 const proposalLocalizedArrayFields = ["specChanges", "risks"] as const;
 const contextPackLocalizedStringFields = ["name", "summary", "generatedMarkdown"] as const;
@@ -91,22 +103,32 @@ export async function synchronizeDesignFacts(input: {
   callTool: CallTool;
   manifest: DesignFactManifest;
   readAdr: (path: string) => Promise<AdrSource>;
-  readExisting?: (type: ExistingRecordType, id: string, scope: DesignFactManifestDecision["scope"]) => Promise<Record<string, unknown> | undefined>;
+  readExisting?: (
+    type: ExistingRecordType,
+    id: string,
+    scope: DesignFactManifestDecision["scope"]
+  ) => Promise<Record<string, unknown> | undefined>;
 }): Promise<DesignFactSyncReceipt[]> {
   const receipts: DesignFactSyncReceipt[] = [];
 
   for (const decision of input.manifest.decisions) {
     assertDecision(decision);
     const source = await input.readAdr(decision.repositoryAdr);
-    if (!source.english.trim() || !source.chinese.trim()) throw new Error(`DESIGN_FACT_LOCALIZATION_MISSING: ${decision.id}`);
+    if (!source.english.trim() || !source.chinese.trim())
+      throw new Error(`DESIGN_FACT_LOCALIZATION_MISSING: ${decision.id}`);
     const parsed = applyManifestLocalizedContent(decision, parseAdrSource(source));
 
     for (const managed of decision.managedAssets ?? []) {
-      await callOrThrow(input.callTool, "upsert_design_asset", {
-        assetType: managed.assetType,
-        asset: { ...managed.asset, architectureScope: decision.scope },
-        architectureScope: decision.scope
-      }, decision.id);
+      await callOrThrow(
+        input.callTool,
+        "upsert_design_asset",
+        {
+          assetType: managed.assetType,
+          asset: { ...managed.asset, architectureScope: decision.scope },
+          architectureScope: decision.scope
+        },
+        decision.id
+      );
     }
 
     const result = await input.callTool("create_adr", {
@@ -123,26 +145,73 @@ export async function synchronizeDesignFacts(input: {
       const contextPack = await input.readExisting("contextPack", decision.contextPackId, decision.scope);
       const syncedProposal = backfillProposal(decision, proposal, buildProposal(decision, parsed));
       const syncedContextPack = backfillContextPack(decision, contextPack, buildContextPack(decision, parsed));
-      await callOrThrow(input.callTool, "upsert_proposal", { proposal: syncedProposal, architectureScope: decision.scope }, decision.id);
-      await callOrThrow(input.callTool, "upsert_context_pack", { contextPack: syncedContextPack, architectureScope: decision.scope }, decision.id);
-      await callOrThrow(input.callTool, "link_assets", link("proposal", decision.proposalId, "adr", decision.mcpAdrId, "IMPLEMENTS_DECISION", decision.scope), decision.id);
-      await callOrThrow(input.callTool, "link_assets", link("contextPack", decision.contextPackId, "proposal", decision.proposalId, "IMPLEMENTS_CONTEXT_FOR", decision.scope), decision.id);
+      await callOrThrow(
+        input.callTool,
+        "upsert_proposal",
+        { proposal: syncedProposal, architectureScope: decision.scope },
+        decision.id
+      );
+      await callOrThrow(
+        input.callTool,
+        "upsert_context_pack",
+        { contextPack: syncedContextPack, architectureScope: decision.scope },
+        decision.id
+      );
+      await callOrThrow(
+        input.callTool,
+        "link_assets",
+        link("proposal", decision.proposalId, "adr", decision.mcpAdrId, "IMPLEMENTS_DECISION", decision.scope),
+        decision.id
+      );
+      await callOrThrow(
+        input.callTool,
+        "link_assets",
+        link(
+          "contextPack",
+          decision.contextPackId,
+          "proposal",
+          decision.proposalId,
+          "IMPLEMENTS_CONTEXT_FOR",
+          decision.scope
+        ),
+        decision.id
+      );
       for (const assetId of decision.relatedAssetIds) {
-        await callOrThrow(input.callTool, "link_assets", link("adr", decision.mcpAdrId, assetTypeFor(assetId), assetId, "DECIDES", decision.scope), decision.id);
+        await callOrThrow(
+          input.callTool,
+          "link_assets",
+          link("adr", decision.mcpAdrId, assetTypeFor(assetId), assetId, "DECIDES", decision.scope),
+          decision.id
+        );
       }
       for (const relationship of decision.managedRelationships ?? []) {
-        await callOrThrow(input.callTool, "link_assets", { ...relationship, architectureScope: decision.scope }, decision.id);
+        await callOrThrow(
+          input.callTool,
+          "link_assets",
+          { ...relationship, architectureScope: decision.scope },
+          decision.id
+        );
       }
     }
 
     for (const [index, evidence] of decision.evidence.entries()) {
       const evidenceId = designEvidenceId(decision.id, index);
-      await callOrThrow(input.callTool, "upsert_design_asset", {
-        assetType: "evidence",
-        asset: buildEvidence(decision, parsed, evidenceId, evidence),
-        architectureScope: decision.scope
-      }, decision.id);
-      await callOrThrow(input.callTool, "link_assets", link("evidence", evidenceId, "adr", decision.mcpAdrId, "VALIDATES", decision.scope), decision.id);
+      await callOrThrow(
+        input.callTool,
+        "upsert_design_asset",
+        {
+          assetType: "evidence",
+          asset: buildEvidence(decision, parsed, evidenceId, evidence),
+          architectureScope: decision.scope
+        },
+        decision.id
+      );
+      await callOrThrow(
+        input.callTool,
+        "link_assets",
+        link("evidence", evidenceId, "adr", decision.mcpAdrId, "VALIDATES", decision.scope),
+        decision.id
+      );
     }
 
     receipts.push({ id: decision.id, mcpAdrId: decision.mcpAdrId, status: "complete" });
@@ -153,7 +222,8 @@ export async function synchronizeDesignFacts(input: {
 
 function buildProposal(decision: DesignFactManifestDecision, parsed: ParsedAdr) {
   const now = new Date().toISOString();
-  const nonGoal = decision.proposalNonGoal?.en ?? "Deferred connector delivery and external APPLY remain outside this increment.";
+  const nonGoal =
+    decision.proposalNonGoal?.en ?? "Deferred connector delivery and external APPLY remain outside this increment.";
   const localizedNonGoal = decision.proposalNonGoal?.zh ?? "连接器交付和外部 APPLY 在本增量之外延期。";
   return {
     id: decision.proposalId,
@@ -271,8 +341,20 @@ function buildContextPack(decision: DesignFactManifestDecision, parsed: ParsedAd
     createdAt: now,
     architectureScope: decision.scope,
     localizedContent: {
-      en: { name: `${parsed.en.title} Context Pack`, summary: parsed.en.description, constraints: parsed.en.constraints, instructions: [parsed.en.decision], generatedMarkdown },
-      zh: { name: `${parsed.zh.title} 上下文包`, summary: parsed.zh.description, constraints: parsed.zh.constraints, instructions: [parsed.zh.decision], generatedMarkdown: generatedChineseMarkdown }
+      en: {
+        name: `${parsed.en.title} Context Pack`,
+        summary: parsed.en.description,
+        constraints: parsed.en.constraints,
+        instructions: [parsed.en.decision],
+        generatedMarkdown
+      },
+      zh: {
+        name: `${parsed.zh.title} 上下文包`,
+        summary: parsed.zh.description,
+        constraints: parsed.zh.constraints,
+        instructions: [parsed.zh.decision],
+        generatedMarkdown: generatedChineseMarkdown
+      }
     }
   };
 }
@@ -340,12 +422,25 @@ function buildEvidence(
   };
 }
 
-async function callOrThrow(callTool: CallTool, name: string, input: Record<string, unknown>, decisionId: string): Promise<void> {
+async function callOrThrow(
+  callTool: CallTool,
+  name: string,
+  input: Record<string, unknown>,
+  decisionId: string
+): Promise<void> {
   const result = await callTool(name, input);
-  if (result.isError || result.ok === false) throw new Error(`DESIGN_FACT_MCP_WRITE_FAILED: ${decisionId}${result.message ? `: ${result.message}` : ""}`);
+  if (result.isError || result.ok === false)
+    throw new Error(`DESIGN_FACT_MCP_WRITE_FAILED: ${decisionId}${result.message ? `: ${result.message}` : ""}`);
 }
 
-function link(sourceType: string, sourceId: string, targetType: string, targetId: string, relationType: string, architectureScope: DesignFactManifestDecision["scope"]) {
+function link(
+  sourceType: string,
+  sourceId: string,
+  targetType: string,
+  targetId: string,
+  relationType: string,
+  architectureScope: DesignFactManifestDecision["scope"]
+) {
   return { sourceType, sourceId, targetType, targetId, relationType, architectureScope };
 }
 
@@ -370,7 +465,10 @@ function assertDecision(decision: DesignFactManifestDecision): void {
   if (!decision.scope?.applicationServiceId || !decision.scope.scopePath) {
     throw new Error(`DESIGN_FACT_SCOPE_MISSING: ${decision.id}`);
   }
-  if (decision.proposalStatus && !["draft", "reviewing", "approved", "implemented", "archived"].includes(decision.proposalStatus)) {
+  if (
+    decision.proposalStatus &&
+    !["draft", "reviewing", "approved", "implemented", "archived"].includes(decision.proposalStatus)
+  ) {
     throw new Error(`DESIGN_FACT_PROPOSAL_STATUS_INVALID: ${decision.id}`);
   }
   for (const relatedAssetId of decision.relatedAssetIds) assetTypeFor(relatedAssetId);
@@ -402,7 +500,12 @@ function assertManagedAssetLocalization(decisionId: string, managed: ManagedDesi
       throw new Error(`DESIGN_FACT_MANAGED_ASSET_LOCALIZATION_MISSING: ${decisionId}:${managed.asset.id}:${locale}`);
     }
     const record = value as Record<string, unknown>;
-    if (typeof record.name !== "string" || !record.name.trim() || typeof record.description !== "string" || !record.description.trim()) {
+    if (
+      typeof record.name !== "string" ||
+      !record.name.trim() ||
+      typeof record.description !== "string" ||
+      !record.description.trim()
+    ) {
       throw new Error(`DESIGN_FACT_MANAGED_ASSET_LOCALIZATION_INCOMPLETE: ${decisionId}:${managed.asset.id}:${locale}`);
     }
   }
@@ -456,7 +559,10 @@ function mergeAdrLocalizedContent(decision: DesignFactManifestDecision, parsed: 
     }
   };
   return {
-    en: { ...canonical.en, ...supportedManifestOverlay(decision.id, "en", decision.localizedContent?.en, canonical.en) },
+    en: {
+      ...canonical.en,
+      ...supportedManifestOverlay(decision.id, "en", decision.localizedContent?.en, canonical.en)
+    },
     zh: { ...canonical.zh, ...supportedManifestOverlay(decision.id, "zh", decision.localizedContent?.zh, canonical.zh) }
   };
 }
@@ -476,10 +582,16 @@ function supportedManifestOverlay(
     if (canonicalStringFields.has(key) && typeof candidate !== "string") {
       throw new Error(`DESIGN_FACT_LOCALIZATION_VALUE_INVALID: ${decisionId}:${locale}.${key}`);
     }
-    if (canonicalArrayFields.has(key) && (!Array.isArray(candidate) || candidate.some((item) => typeof item !== "string"))) {
+    if (
+      canonicalArrayFields.has(key) &&
+      (!Array.isArray(candidate) || candidate.some((item) => typeof item !== "string"))
+    ) {
       throw new Error(`DESIGN_FACT_LOCALIZATION_VALUE_INVALID: ${decisionId}:${locale}.${key}`);
     }
-    if ((key === "name" || key === "title" || key === "description" || key === "context") && candidate !== canonical[key]) {
+    if (
+      (key === "name" || key === "title" || key === "description" || key === "context") &&
+      candidate !== canonical[key]
+    ) {
       throw new Error(`DESIGN_FACT_LOCALIZATION_CANONICAL_OVERRIDE: ${decisionId}:${locale}.${key}`);
     }
     overlay[key] = candidate;
@@ -489,26 +601,41 @@ function supportedManifestOverlay(
 
 function parseAdrSource(source: AdrSource): ParsedAdr {
   return {
-    en: parseAdrFields(source.english, source.title, {
-      context: ["context"],
-      decision: ["decision"],
-      alternatives: ["alternatives"],
-      consequences: ["consequences"],
-      constraints: ["constraints"],
-      evidence: ["evidence"]
-    }, false),
-    zh: parseAdrFields(source.chinese, source.title, {
-      context: ["背景"],
-      decision: ["决策"],
-      alternatives: ["备选方案"],
-      consequences: ["后果"],
-      constraints: ["约束"],
-      evidence: ["证据"]
-    }, true)
+    en: parseAdrFields(
+      source.english,
+      source.title,
+      {
+        context: ["context"],
+        decision: ["decision"],
+        alternatives: ["alternatives"],
+        consequences: ["consequences"],
+        constraints: ["constraints"],
+        evidence: ["evidence"]
+      },
+      false
+    ),
+    zh: parseAdrFields(
+      source.chinese,
+      source.title,
+      {
+        context: ["背景"],
+        decision: ["决策"],
+        alternatives: ["备选方案"],
+        consequences: ["后果"],
+        constraints: ["约束"],
+        evidence: ["证据"]
+      },
+      true
+    )
   };
 }
 
-function parseAdrFields(markdown: string, fallbackTitle: string, headings: Record<Exclude<keyof AdrFields, "title" | "description">, string[]>, localized: boolean): AdrFields {
+function parseAdrFields(
+  markdown: string,
+  fallbackTitle: string,
+  headings: Record<Exclude<keyof AdrFields, "title" | "description">, string[]>,
+  localized: boolean
+): AdrFields {
   const sections = localized
     ? [...extractMarkdownSections(markdown, 3), ...extractBoldLocalizedSections(markdown)]
     : extractMarkdownSections(markdown, 2);
@@ -519,21 +646,43 @@ function parseAdrFields(markdown: string, fallbackTitle: string, headings: Recor
   const constraints = listValue(sectionValue(sections, headings.constraints, markdown, "constraints"));
   const evidence = listValue(sectionValue(sections, headings.evidence, markdown, "evidence"));
   const title = localized
-    ? sections.find(([heading]) => ["标题", "title"].includes(heading.toLowerCase()))?.[1].trim() || localizedTitle(markdown)
+    ? sections.find(([heading]) => ["标题", "title"].includes(heading.toLowerCase()))?.[1].trim() ||
+      localizedTitle(markdown)
     : fallbackTitle;
-  return { title, description: firstParagraph(context), context, decision, alternatives, consequences, constraints, evidence };
+  return {
+    title,
+    description: firstParagraph(context),
+    context,
+    decision,
+    alternatives,
+    consequences,
+    constraints,
+    evidence
+  };
 }
 
 function extractMarkdownSections(markdown: string, level: 2 | 3): Array<[string, string]> {
   const headingPattern = new RegExp(`^#{${level}}\\s+(.+?)\\s*$`, "gm");
   const headings = [...markdown.matchAll(headingPattern)];
-  return headings.map((heading, index) => [heading[1].trim(), markdown.slice(heading.index! + heading[0].length, headings[index + 1]?.index ?? markdown.length).trim()] as [string, string]);
+  return headings.map(
+    (heading, index) =>
+      [
+        heading[1].trim(),
+        markdown.slice(heading.index! + heading[0].length, headings[index + 1]?.index ?? markdown.length).trim()
+      ] as [string, string]
+  );
 }
 
 function extractBoldLocalizedSections(markdown: string): Array<[string, string]> {
   const headingPattern = /^\*\*(.+?)[：:]\*\*\s*$/gm;
   const headings = [...markdown.matchAll(headingPattern)];
-  return headings.map((heading, index) => [heading[1].trim(), markdown.slice(heading.index! + heading[0].length, headings[index + 1]?.index ?? markdown.length).trim()] as [string, string]);
+  return headings.map(
+    (heading, index) =>
+      [
+        heading[1].trim(),
+        markdown.slice(heading.index! + heading[0].length, headings[index + 1]?.index ?? markdown.length).trim()
+      ] as [string, string]
+  );
 }
 
 function sectionValue(sections: Array<[string, string]>, aliases: string[], fallback: string, field: string): string {
@@ -567,7 +716,10 @@ function listValue(value: string): string[] {
 }
 
 function firstParagraph(value: string): string {
-  return value.split(/\r?\n\s*\r?\n/)[0].replace(/^[-*+]\s+/, "").trim();
+  return value
+    .split(/\r?\n\s*\r?\n/)[0]
+    .replace(/^[-*+]\s+/, "")
+    .trim();
 }
 
 function applyManifestLocalizedContent(decision: DesignFactManifestDecision, parsed: ParsedAdr): ParsedAdr {
@@ -604,7 +756,11 @@ function completeLocalizedFields(input: {
     localized[field] = firstNonEmptyString(input.current?.[field], input.topLevel?.[field], input.fallback[field]);
   }
   for (const field of input.optionalStringFields ?? []) {
-    const value = firstNonEmptyStringOrUndefined(input.current?.[field], input.topLevel?.[field], input.fallback[field]);
+    const value = firstNonEmptyStringOrUndefined(
+      input.current?.[field],
+      input.topLevel?.[field],
+      input.fallback[field]
+    );
     if (value !== undefined) localized[field] = value;
   }
   for (const field of input.requiredArrayFields ?? []) {
@@ -618,7 +774,7 @@ function localeRecord(existing: Record<string, unknown>, locale: "en" | "zh"): R
   if (!localizedContent || typeof localizedContent !== "object" || Array.isArray(localizedContent)) return undefined;
   const record = (localizedContent as Record<string, unknown>)[locale];
   return record && typeof record === "object" && !Array.isArray(record)
-    ? record as Record<string, unknown>
+    ? (record as Record<string, unknown>)
     : undefined;
 }
 
@@ -646,7 +802,12 @@ function firstNonEmptyStringArray(...values: Array<unknown>): string[] {
 }
 
 function localizedFallback(markdown: string): string {
-  return markdown.split(/\r?\n/).map((line) => line.trim()).find((line) => line && /[\u4e00-\u9fff]/u.test(line) && !line.startsWith("#")) ?? "";
+  return (
+    markdown
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find((line) => line && /[\u4e00-\u9fff]/u.test(line) && !line.startsWith("#")) ?? ""
+  );
 }
 
 function renderContextMarkdown(fields: AdrFields): string {
@@ -669,7 +830,9 @@ async function readRepositoryAdr(path: string): Promise<AdrSource> {
 }
 
 export function splitAdrSource(content: string): AdrSource {
-  const boldLocalizationMarkers = [...content.matchAll(/^(?:\*\*中文本地化覆盖[：:]\*\*|中文本地化[^\r\n]*[：:]|##\s+中文本地化覆盖\s*)$/gm)];
+  const boldLocalizationMarkers = [
+    ...content.matchAll(/^(?:\*\*中文本地化覆盖[：:]\*\*|中文本地化[^\r\n]*[：:]|##\s+中文本地化覆盖\s*)$/gm)
+  ];
   if (boldLocalizationMarkers.length) {
     const englishParts: string[] = [];
     const chineseParts: string[] = [];
@@ -680,8 +843,12 @@ export function splitAdrSource(content: string): AdrSource {
       const markerEnd = markerStart + marker[0].length;
       englishParts.push(content.slice(cursor, markerStart));
       const nextEnglishHeading = nextEnglishHeadingIndex(content, markerEnd);
-      const localizedSection = content.slice(markerEnd, nextEnglishHeading < 0 ? content.length : nextEnglishHeading).trim();
-      chineseParts.push(`### ${localizedHeadingFor(precedingEnglishHeading(content, markerStart))}\n\n${localizedSection}`);
+      const localizedSection = content
+        .slice(markerEnd, nextEnglishHeading < 0 ? content.length : nextEnglishHeading)
+        .trim();
+      chineseParts.push(
+        `### ${localizedHeadingFor(precedingEnglishHeading(content, markerStart))}\n\n${localizedSection}`
+      );
       cursor = nextEnglishHeading < 0 ? content.length : nextEnglishHeading;
     }
 
@@ -690,9 +857,10 @@ export function splitAdrSource(content: string): AdrSource {
   }
 
   const chineseHeading = content.search(/^##\s+[^\x00-\x7F]/m);
-  const [english, headedChinese = ""] = chineseHeading >= 0
-    ? [content.slice(0, chineseHeading), content.slice(chineseHeading)]
-    : content.split(/## .*Chinese Localization/);
+  const [english, headedChinese = ""] =
+    chineseHeading >= 0
+      ? [content.slice(0, chineseHeading), content.slice(chineseHeading)]
+      : content.split(/## .*Chinese Localization/);
   return adrSource(english, headedChinese || content.match(/[\u4e00-\u9fff][\s\S]*/)?.[0] || "");
 }
 
@@ -709,14 +877,18 @@ function precedingEnglishHeading(content: string, end: number): string {
 }
 
 function localizedHeadingFor(heading: string): string {
-  return ({
-    Context: "背景",
-    Decision: "决策",
-    Alternatives: "备选方案",
-    Consequences: "后果",
-    Constraints: "约束",
-    Evidence: "证据"
-  } as Record<string, string>)[heading] ?? heading;
+  return (
+    (
+      {
+        Context: "背景",
+        Decision: "决策",
+        Alternatives: "备选方案",
+        Consequences: "后果",
+        Constraints: "约束",
+        Evidence: "证据"
+      } as Record<string, string>
+    )[heading] ?? heading
+  );
 }
 
 function adrSource(english: string, chinese: string): AdrSource {
@@ -725,20 +897,33 @@ function adrSource(english: string, chinese: string): AdrSource {
 }
 
 function localizedTitle(content: string): string {
-  return content
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find((line) => line && !line.startsWith("#") && /[\u4e00-\u9fff]/u.test(line))
-    ?.slice(0, 80) ?? "Localized architecture decision";
+  return (
+    content
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find((line) => line && !line.startsWith("#") && /[\u4e00-\u9fff]/u.test(line))
+      ?.slice(0, 80) ?? "Localized architecture decision"
+  );
 }
 
 async function main(): Promise<void> {
-  const fullManifest = JSON.parse(await readFile("docs/design-facts/baseline-manifest.json", "utf8")) as DesignFactManifest;
-  const requestedIds = (process.env.SPECFORGE_DESIGN_FACT_IDS ?? "").split(",").map((id) => id.trim()).filter(Boolean);
-  const manifest: DesignFactManifest = requestedIds.length === 0
-    ? fullManifest
-    : { ...fullManifest, decisions: fullManifest.decisions.filter((decision) => requestedIds.includes(decision.id) || requestedIds.includes(decision.mcpAdrId)) };
-  if (requestedIds.length > 0 && manifest.decisions.length === 0) throw new Error(`DESIGN_FACT_SELECTION_EMPTY: ${requestedIds.join(",")}`);
+  const manifestPath = process.env.SPECFORGE_DESIGN_FACT_MANIFEST ?? "docs/design-facts/baseline-manifest.json";
+  const fullManifest = JSON.parse(await readFile(manifestPath, "utf8")) as DesignFactManifest;
+  const requestedIds = (process.env.SPECFORGE_DESIGN_FACT_IDS ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  const manifest: DesignFactManifest =
+    requestedIds.length === 0
+      ? fullManifest
+      : {
+          ...fullManifest,
+          decisions: fullManifest.decisions.filter(
+            (decision) => requestedIds.includes(decision.id) || requestedIds.includes(decision.mcpAdrId)
+          )
+        };
+  if (requestedIds.length > 0 && manifest.decisions.length === 0)
+    throw new Error(`DESIGN_FACT_SELECTION_EMPTY: ${requestedIds.join(",")}`);
   // The SDK is owned by the MCP workspace, not duplicated at the repository root.
   const requireFromMcpWorkspace = createRequire(resolve(process.cwd(), "apps/mcp-server/package.json"));
   const { Client } = requireFromMcpWorkspace("@modelcontextprotocol/sdk/client/index.js");
@@ -764,15 +949,23 @@ async function main(): Promise<void> {
       readAdr: readRepositoryAdr,
       readExisting: async (type, id, scope) => {
         const assetType = type === "contextPack" ? "contextPack" : "proposal";
-        const result = await client.callTool({ name: "get_asset_detail", arguments: { assetType, assetId: id, applicationServiceId: scope.applicationServiceId, format: "json" } });
+        const result = await client.callTool({
+          name: "get_asset_detail",
+          arguments: { assetType, assetId: id, applicationServiceId: scope.applicationServiceId, format: "json" }
+        });
         if (result.isError) return undefined;
-        const text = Array.isArray(result.content) ? result.content.map((item) => "text" in item ? item.text : "").join("") : "";
+        const text = Array.isArray(result.content)
+          ? result.content.map((item) => ("text" in item ? item.text : "")).join("")
+          : "";
         return (JSON.parse(text) as { asset?: Record<string, unknown> }).asset;
       },
       callTool: async (name, arguments_) => {
         const result = await client.callTool({ name, arguments: arguments_ });
         const message = Array.isArray(result.content)
-          ? result.content.map((item) => "text" in item ? item.text : "").filter(Boolean).join(" ")
+          ? result.content
+              .map((item) => ("text" in item ? item.text : ""))
+              .filter(Boolean)
+              .join(" ")
           : undefined;
         return { ok: !result.isError, isError: result.isError, message };
       }

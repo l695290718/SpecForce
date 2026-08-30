@@ -9,7 +9,18 @@ import {
   type ManagedDesignRelationship
 } from "./sync-design-facts";
 
-type Decision = Pick<DesignFactManifestDecision, "id" | "mcpAdrId" | "proposalId" | "contextPackId" | "relatedAssetIds" | "managedAssets" | "managedRelationships" | "evidence" | "scope">;
+type Decision = Pick<
+  DesignFactManifestDecision,
+  | "id"
+  | "mcpAdrId"
+  | "proposalId"
+  | "contextPackId"
+  | "relatedAssetIds"
+  | "managedAssets"
+  | "managedRelationships"
+  | "evidence"
+  | "scope"
+>;
 type Manifest = { decisions: Decision[] };
 type PersistedAdr = {
   id?: string;
@@ -64,7 +75,13 @@ export async function reconcileDesignFacts(input: {
   find: (type: RecordType, decision: Decision, assetId?: string) => Promise<PersistedAdr | undefined>;
   findLinks?: (decision: Decision) => Promise<Link[]>;
 }): Promise<DesignFactReconciliationReport> {
-  const report: DesignFactReconciliationReport = { missing: [], mismatched: [], outOfScope: [], blocked: [], verified: [] };
+  const report: DesignFactReconciliationReport = {
+    missing: [],
+    mismatched: [],
+    outOfScope: [],
+    blocked: [],
+    verified: []
+  };
   for (const decision of input.manifest.decisions) {
     try {
       const adr = await input.find("adr", decision);
@@ -78,36 +95,59 @@ export async function reconcileDesignFacts(input: {
         if (!proposal) report.missing.push(`${decision.id}:proposal`);
         else if (proposal.id !== decision.proposalId) report.mismatched.push(`${decision.id}:proposal`);
         else if (!matchesScope(proposal, decision.scope)) report.outOfScope.push(`${decision.id}:proposal`);
-        else if (!hasLocalizedContent(proposal, proposalLocalizationShape)) report.mismatched.push(`${decision.id}:proposal`);
+        else if (!hasLocalizedContent(proposal, proposalLocalizationShape))
+          report.mismatched.push(`${decision.id}:proposal`);
         else if (!contextPack) report.missing.push(`${decision.id}:contextPack`);
-        else if (contextPack.id !== decision.contextPackId || contextPack.proposalId !== decision.proposalId) report.mismatched.push(`${decision.id}:contextPack`);
+        else if (contextPack.id !== decision.contextPackId || contextPack.proposalId !== decision.proposalId)
+          report.mismatched.push(`${decision.id}:contextPack`);
         else if (!matchesScope(contextPack, decision.scope)) report.outOfScope.push(`${decision.id}:contextPack`);
-        else if (!hasLocalizedContent(contextPack, contextPackLocalizationShape)) report.mismatched.push(`${decision.id}:contextPack`);
+        else if (!hasLocalizedContent(contextPack, contextPackLocalizationShape))
+          report.mismatched.push(`${decision.id}:contextPack`);
         else if (input.findLinks) {
           const links = await input.findLinks(decision);
-          if (!hasLink(links, decision.scope, decision.proposalId, decision.mcpAdrId, "IMPLEMENTS_DECISION")) report.missing.push(`${decision.id}:proposal-adr-link`);
-          else if (!hasLink(links, decision.scope, decision.contextPackId, decision.proposalId, "IMPLEMENTS_CONTEXT_FOR")) report.missing.push(`${decision.id}:context-proposal-link`);
-          else if (decision.relatedAssetIds.some((assetId) => !hasLink(links, decision.scope, decision.mcpAdrId, assetId, "DECIDES"))) report.missing.push(`${decision.id}:adr-asset-link`);
+          if (!hasLink(links, decision.scope, decision.proposalId, decision.mcpAdrId, "IMPLEMENTS_DECISION"))
+            report.missing.push(`${decision.id}:proposal-adr-link`);
+          else if (
+            !hasLink(links, decision.scope, decision.contextPackId, decision.proposalId, "IMPLEMENTS_CONTEXT_FOR")
+          )
+            report.missing.push(`${decision.id}:context-proposal-link`);
+          else if (
+            decision.relatedAssetIds.some(
+              (assetId) => !hasLink(links, decision.scope, decision.mcpAdrId, assetId, "DECIDES")
+            )
+          )
+            report.missing.push(`${decision.id}:adr-asset-link`);
           else {
             for (const [index, expected] of decision.evidence.entries()) {
               const evidenceId = designEvidenceId(decision.id, index);
               const evidence = await input.find("evidence", decision, evidenceId);
               if (!evidence) report.missing.push(`${decision.id}:evidence`);
               else if (!matchesScope(evidence, decision.scope)) report.outOfScope.push(`${decision.id}:evidence`);
-              else if (evidence.command !== expected.command || evidence.result !== expected.result || !hasLocalizedContent(evidence, evidenceLocalizationShape)) report.mismatched.push(`${decision.id}:evidence`);
+              else if (
+                evidence.command !== expected.command ||
+                evidence.result !== expected.result ||
+                !hasLocalizedContent(evidence, evidenceLocalizationShape)
+              )
+                report.mismatched.push(`${decision.id}:evidence`);
               else if (evidence.status !== "passed") report.blocked.push(`${decision.id}:evidence`);
-              else if (!hasLink(links, decision.scope, evidenceId, decision.mcpAdrId, "VALIDATES")) report.missing.push(`${decision.id}:evidence-link`);
+              else if (!hasLink(links, decision.scope, evidenceId, decision.mcpAdrId, "VALIDATES"))
+                report.missing.push(`${decision.id}:evidence-link`);
             }
             for (const managed of decision.managedAssets ?? []) {
               const asset = await input.find(managed.assetType, decision, managed.asset.id);
               if (!asset) report.missing.push(`${decision.id}:managed-asset:${managed.asset.id}`);
-              else if (asset.id !== managed.asset.id) report.mismatched.push(`${decision.id}:managed-asset:${managed.asset.id}`);
-              else if (!matchesScope(asset, decision.scope)) report.outOfScope.push(`${decision.id}:managed-asset:${managed.asset.id}`);
-              else if (!hasLocalizedContent(asset, managedAssetLocalizationShape)) report.mismatched.push(`${decision.id}:managed-asset:${managed.asset.id}`);
+              else if (asset.id !== managed.asset.id)
+                report.mismatched.push(`${decision.id}:managed-asset:${managed.asset.id}`);
+              else if (!matchesScope(asset, decision.scope))
+                report.outOfScope.push(`${decision.id}:managed-asset:${managed.asset.id}`);
+              else if (!hasLocalizedContent(asset, managedAssetLocalizationShape))
+                report.mismatched.push(`${decision.id}:managed-asset:${managed.asset.id}`);
             }
             for (const relationship of decision.managedRelationships ?? []) {
               if (!hasManagedLink(links, decision.scope, relationship)) {
-                report.missing.push(`${decision.id}:managed-link:${relationship.sourceId}:${relationship.relationType}:${relationship.targetId}`);
+                report.missing.push(
+                  `${decision.id}:managed-link:${relationship.sourceId}:${relationship.relationType}:${relationship.targetId}`
+                );
               }
             }
             if (!hasDecisionIssue(report, decision.id)) report.verified.push(decision.id);
@@ -129,8 +169,10 @@ function matchesArchitectureScope(
   actualScope: { applicationServiceId?: string; scopePath?: string } | undefined,
   expectedScope: Decision["scope"]
 ): boolean {
-  return actualScope?.applicationServiceId === expectedScope.applicationServiceId
-    && actualScope?.scopePath === expectedScope.scopePath;
+  return (
+    actualScope?.applicationServiceId === expectedScope.applicationServiceId &&
+    actualScope?.scopePath === expectedScope.scopePath
+  );
 }
 
 function hasLocalizedContent(record: PersistedAdr, shape: LocalizationShape): boolean {
@@ -140,27 +182,45 @@ function hasLocalizedContent(record: PersistedAdr, shape: LocalizationShape): bo
 function hasLocaleFields(value: unknown, shape: LocalizationShape): boolean {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const localized = value as Record<string, unknown>;
-  if (!shape.stringFields.every((field) => typeof localized[field] === "string" && localized[field].trim())) return false;
+  if (!shape.stringFields.every((field) => typeof localized[field] === "string" && localized[field].trim()))
+    return false;
   return (shape.arrayFields ?? []).every((field) => {
     const entries = localized[field];
-    return Array.isArray(entries)
-      && entries.length > 0
-      && entries.every((entry) => typeof entry === "string" && entry.trim());
+    return (
+      Array.isArray(entries) &&
+      entries.length > 0 &&
+      entries.every((entry) => typeof entry === "string" && entry.trim())
+    );
   });
 }
 
 function hasDecisionIssue(report: DesignFactReconciliationReport, decisionId: string): boolean {
-  return [report.missing, report.mismatched, report.outOfScope, report.blocked].some((items) => items.some((item) => item === decisionId || item.startsWith(`${decisionId}:`)));
+  return [report.missing, report.mismatched, report.outOfScope, report.blocked].some((items) =>
+    items.some((item) => item === decisionId || item.startsWith(`${decisionId}:`))
+  );
 }
 
-function hasLink(links: Link[], expectedScope: Decision["scope"], sourceId: string, targetId: string, relationType: string): boolean {
-  return links.some((link) => (link.sourceLogicalId === sourceId || link.sourceId === sourceId)
-    && (link.targetLogicalId === targetId || link.targetId === targetId)
-    && (link.label === relationType || link.relationType === relationType)
-    && matchesArchitectureScope(link.architectureScope, expectedScope));
+function hasLink(
+  links: Link[],
+  expectedScope: Decision["scope"],
+  sourceId: string,
+  targetId: string,
+  relationType: string
+): boolean {
+  return links.some(
+    (link) =>
+      (link.sourceLogicalId === sourceId || link.sourceId === sourceId) &&
+      (link.targetLogicalId === targetId || link.targetId === targetId) &&
+      (link.label === relationType || link.relationType === relationType) &&
+      matchesArchitectureScope(link.architectureScope, expectedScope)
+  );
 }
 
-function hasManagedLink(links: Link[], expectedScope: Decision["scope"], relationship: ManagedDesignRelationship): boolean {
+function hasManagedLink(
+  links: Link[],
+  expectedScope: Decision["scope"],
+  relationship: ManagedDesignRelationship
+): boolean {
   return hasLink(links, expectedScope, relationship.sourceId, relationship.targetId, relationship.relationType);
 }
 
@@ -169,12 +229,23 @@ export function reconciliationExitCode(report: DesignFactReconciliationReport): 
 }
 
 async function main(): Promise<void> {
-  const fullManifest = JSON.parse(await readFile("docs/design-facts/baseline-manifest.json", "utf8")) as Manifest;
-  const requestedIds = (process.env.SPECFORGE_DESIGN_FACT_IDS ?? "").split(",").map((id) => id.trim()).filter(Boolean);
-  const manifest: Manifest = requestedIds.length === 0
-    ? fullManifest
-    : { ...fullManifest, decisions: fullManifest.decisions.filter((decision) => requestedIds.includes(decision.id) || requestedIds.includes(decision.mcpAdrId)) };
-  if (requestedIds.length > 0 && manifest.decisions.length === 0) throw new Error(`DESIGN_FACT_SELECTION_EMPTY: ${requestedIds.join(",")}`);
+  const manifestPath = process.env.SPECFORGE_DESIGN_FACT_MANIFEST ?? "docs/design-facts/baseline-manifest.json";
+  const fullManifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const requestedIds = (process.env.SPECFORGE_DESIGN_FACT_IDS ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  const manifest: Manifest =
+    requestedIds.length === 0
+      ? fullManifest
+      : {
+          ...fullManifest,
+          decisions: fullManifest.decisions.filter(
+            (decision) => requestedIds.includes(decision.id) || requestedIds.includes(decision.mcpAdrId)
+          )
+        };
+  if (requestedIds.length > 0 && manifest.decisions.length === 0)
+    throw new Error(`DESIGN_FACT_SELECTION_EMPTY: ${requestedIds.join(",")}`);
   const requireFromMcp = createRequire(resolve(process.cwd(), "apps/mcp-server/package.json"));
   const { Client } = requireFromMcp("@modelcontextprotocol/sdk/client/index.js");
   const { StdioClientTransport } = requireFromMcp("@modelcontextprotocol/sdk/client/stdio.js");
@@ -197,17 +268,39 @@ async function main(): Promise<void> {
     const report = await reconcileDesignFacts({
       manifest,
       find: async (type, decision, requestedAssetId) => {
-        const assetId = type === "adr" ? decision.mcpAdrId : type === "proposal" ? decision.proposalId : type === "contextPack" ? decision.contextPackId : requestedAssetId ?? designEvidenceId(decision.id, 0);
-        const result = await client.callTool({ name: "get_asset_detail", arguments: { assetType: type, assetId, applicationServiceId: decision.scope.applicationServiceId, format: "json" } });
+        const assetId =
+          type === "adr"
+            ? decision.mcpAdrId
+            : type === "proposal"
+              ? decision.proposalId
+              : type === "contextPack"
+                ? decision.contextPackId
+                : (requestedAssetId ?? designEvidenceId(decision.id, 0));
+        const result = await client.callTool({
+          name: "get_asset_detail",
+          arguments: {
+            assetType: type,
+            assetId,
+            applicationServiceId: decision.scope.applicationServiceId,
+            format: "json"
+          }
+        });
         if (result.isError) return undefined;
-        const text = Array.isArray(result.content) ? result.content.map((item) => "text" in item ? item.text : "").join("") : "";
+        const text = Array.isArray(result.content)
+          ? result.content.map((item) => ("text" in item ? item.text : "")).join("")
+          : "";
         const parsed = JSON.parse(text) as { asset?: PersistedAdr };
         return parsed.asset;
       },
       findLinks: async (decision) => {
-        const result = await client.callTool({ name: "list_asset_links", arguments: { applicationServiceId: decision.scope.applicationServiceId } });
+        const result = await client.callTool({
+          name: "list_asset_links",
+          arguments: { applicationServiceId: decision.scope.applicationServiceId }
+        });
         if (result.isError) return [];
-        const text = Array.isArray(result.content) ? result.content.map((item) => "text" in item ? item.text : "").join("") : "";
+        const text = Array.isArray(result.content)
+          ? result.content.map((item) => ("text" in item ? item.text : "")).join("")
+          : "";
         return JSON.parse(text) as Link[];
       }
     });
@@ -219,4 +312,8 @@ async function main(): Promise<void> {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch((error) => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; });
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  });

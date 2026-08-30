@@ -339,6 +339,18 @@ async function initializeMcpPersistenceSchema() {
       UNIQUE("applicationServiceId", "scopePath", "idempotencyKey")
     )
   `);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ArchitectureFactBatch" ADD COLUMN IF NOT EXISTS "candidateStatus" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ArchitectureFactBatch" ADD COLUMN IF NOT EXISTS "sourceBaselineId" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ArchitectureFactBatch" ADD COLUMN IF NOT EXISTS "catalogDigest" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ArchitectureFactBatch" ADD COLUMN IF NOT EXISTS "relationshipVersion" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ArchitectureFactBatch" ADD COLUMN IF NOT EXISTS "designContextDigest" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ArchitectureFactBatch" ADD COLUMN IF NOT EXISTS "analysisIntent" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ArchitectureFactBatch" ADD COLUMN IF NOT EXISTS "candidateCounts" JSONB NOT NULL DEFAULT '{}'::jsonb`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ArchitectureFactBatch" ADD COLUMN IF NOT EXISTS "excludedCandidates" JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ArchitectureFactBatch" ADD COLUMN IF NOT EXISTS "blockingIssues" JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "ArchitectureFactBatch" ADD COLUMN IF NOT EXISTS "snapshotCapturedAt" TIMESTAMP`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ArchitectureFactBatch_scope_candidate_status_idx" ON "ArchitectureFactBatch"("applicationServiceId", "scopePath", "candidateStatus", "createdAt")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ArchitectureFactBatch_scope_candidate_snapshot_idx" ON "ArchitectureFactBatch"("applicationServiceId", "scopePath", "sourceBaselineId", "catalogDigest")`);
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "ArchitectureUnitRevision" (
       "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),

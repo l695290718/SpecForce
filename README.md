@@ -218,6 +218,20 @@ pnpm design-facts:sync
 pnpm design-facts:check
 ```
 
+### Designer 3A v7 Candidate Flow
+
+3A expansion is explicit and MCP-governed. An authorized Agent first submits a bounded candidate JSON file through `analyze_3a_architecture_candidates`; the service records the source Baseline, catalog digest, relationship version, and design-context digest. Candidate revisions are not authoritative until ReviewBundle approval, promotion, reconciliation, and immutable Baseline publication.
+
+The repository provides MCP-only orchestration commands:
+
+```bash
+pnpm designer-3a:v7:analyze -- --candidate-file path/to/candidate.json --source-baseline knowledge-baseline:designer:3a:v6 --session design-change-session:<id> --intent "Expand Designer 3A semantics" --idempotency-key designer-3a-v7:<run>
+pnpm designer-3a:v7:publish -- --candidate-set architecture-fact-batch:<id> --review-bundle knowledge-review-bundle:<id> --decision knowledge-promotion-decision:<id> --stream working-stream:designer:3a --session design-change-session:<id> --baseline knowledge-baseline:designer:3a:v7
+pnpm designer-3a:v7:verify -- --candidate-set architecture-fact-batch:<id> --baseline knowledge-baseline:designer:3a:v7 --v6-baseline knowledge-baseline:designer:3a:v6
+```
+
+The Candidate Set is bounded at 6 BIZ, 12 SYS, and 5 TECH units. Every SYS unit must realize BIZ, every TECH unit must be used by SYS, and one primary asset cannot be assigned to multiple units. A stale Candidate Set must be re-analyzed. v6 remains the fallback Baseline when v7 publication is not converged.
+
 `design-facts:sync` writes the baseline ADR records through the MCP stdio boundary using each manifest entry's exact scope. `design-facts:check` reads them back through scoped MCP tools and exits non-zero for missing, mismatched, out-of-scope, or blocked records. A failed synchronization or check blocks completion under `AGENTS.md`.
 
 ## AI Provider Boundary

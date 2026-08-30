@@ -901,6 +901,16 @@ model ArchitectureFactBatch {
   mappingRevisionIds      Json     @default("[]") @db.JsonB
   canonicalBytes          Int
   contentDigest           String
+  candidateStatus         String?
+  sourceBaselineId        String?
+  catalogDigest           String?
+  relationshipVersion     String?
+  designContextDigest     String?
+  analysisIntent          String?
+  candidateCounts         Json     @default("{}") @db.JsonB
+  excludedCandidates      Json     @default("[]") @db.JsonB
+  blockingIssues          Json     @default("[]") @db.JsonB
+  snapshotCapturedAt      DateTime?
   applicationServiceId    String
   scopePath               String
   createdAt               DateTime @default(now())
@@ -910,6 +920,8 @@ model ArchitectureFactBatch {
   @@unique([applicationServiceId, scopePath, idempotencyKey], map: "ArchitectureFactBatch_scope_idempotency_key")
   @@index([applicationServiceId, scopePath, designChangeSessionId, status], map: "ArchitectureFactBatch_scope_session_status_idx")
   @@index([applicationServiceId, scopePath, contentDigest], map: "ArchitectureFactBatch_scope_digest_idx")
+  @@index([applicationServiceId, scopePath, candidateStatus, createdAt], map: "ArchitectureFactBatch_scope_candidate_status_idx")
+  @@index([applicationServiceId, scopePath, sourceBaselineId, catalogDigest], map: "ArchitectureFactBatch_scope_candidate_snapshot_idx")
 }
 
 model ArchitectureUnitRevision {
