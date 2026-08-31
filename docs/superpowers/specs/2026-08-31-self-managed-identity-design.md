@@ -131,6 +131,7 @@ Catalog inventory counts measure stored records, not system completeness, comple
 - `pnpm exec vitest run apps/web/lib/3a/principal.test.ts apps/mcp-server/src/auth.test.ts`: PASS, 9 tests.
 - `pnpm --filter @specforge/web typecheck`: PASS.
 - `SPECFORGE_NEXT_STANDALONE=0 pnpm --filter @specforge/web build`: PASS; all 36 routes generated, including `/login` and `/identity`. The default standalone trace is blocked only by symlink creation permissions in the Windows OneDrive workspace (`EPERM`), not by application compilation.
+- The first-run Web setup path is packaged as `/setup` and `POST /api/auth/bootstrap`; it creates exactly one administrator while the identity table is empty, returns no password, and directs the operator to `/login`.
 - `pnpm identity:cutover-check`: BLOCKED as expected for the current legacy deployment environment; it is read-only and does not disclose secret values.
 - The first front-end-issued managed Token must still be used for `evaluate_system_knowledge_readiness` and bounded reading before production identity is certified.
 

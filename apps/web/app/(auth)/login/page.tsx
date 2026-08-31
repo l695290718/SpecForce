@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 
 export default function LoginPage() {
   const [login, setLogin] = useState("");
@@ -35,6 +36,7 @@ export default function LoginPage() {
           {error ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
           <button disabled={busy} className="w-full rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60">{busy ? "正在登录…" : "登录"}</button>
         </form>
+        <Link className="mt-5 block text-center text-sm font-medium text-indigo-700 hover:underline" href="/setup">首次部署？初始化首个管理员</Link>
       </section>
     </main>
   );

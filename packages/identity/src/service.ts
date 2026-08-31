@@ -33,6 +33,21 @@ export class IdentityService {
     this.now = options.now ?? (() => new Date());
   }
 
+  async bootstrapFirstAdministrator(input: { login: string; displayName: string; password: string }): Promise<{ userId: string }> {
+    const passwordDigest = await hashPassword(input.password);
+    const user = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.deploymentBootstrap.findUnique({ where: { bootstrapKey: "identity-v1" } });
+      if (existing?.status === "COMPLETED" || await tx.userAccount.count() > 0) throw new Error("IDENTITY_BOOTSTRAP_ALREADY_COMPLETED");
+      if (existing) await tx.deploymentBootstrap.update({ where: { bootstrapKey: "identity-v1" }, data: { status: "CLAIMED", attemptCount: { increment: 1 }, startedAt: this.now(), errorMessage: null } });
+      else await tx.deploymentBootstrap.create({ data: { bootstrapKey: "identity-v1", status: "CLAIMED", version: "1", attemptCount: 1, startedAt: this.now() } });
+      const created = await tx.userAccount.create({ data: { login: input.login, displayName: input.displayName, passwordDigest, isAdministrator: true } });
+      await tx.securityAudit.create({ data: { actorType: "system", actorId: "identity-bootstrap", action: "BOOTSTRAP_ADMIN", targetType: "user", targetId: created.id, outcome: "ALLOW", metadata: {} } });
+      await tx.deploymentBootstrap.update({ where: { bootstrapKey: "identity-v1" }, data: { status: "COMPLETED", completedAt: this.now(), counts: JSON.stringify({ administrators: 1, grants: 0 }) } });
+      return created;
+    }, { isolationLevel: "Serializable" });
+    return { userId: user.id };
+  }
+
   async createUser(input: { login: string; displayName: string; password: string; isAdministrator?: boolean; actorId: string }): Promise<{ userId: string }> {
     const passwordDigest = await hashPassword(input.password);
     const user = await this.prisma.$transaction(async (tx) => {

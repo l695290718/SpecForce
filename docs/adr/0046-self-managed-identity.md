@@ -64,6 +64,7 @@ A single-enterprise deployment needs locally administered Web users and individu
 - `pnpm exec vitest run apps/web/lib/3a/principal.test.ts apps/mcp-server/src/auth.test.ts`: PASS, 9 tests.
 - `pnpm --filter @specforge/web typecheck`: PASS.
 - `SPECFORGE_NEXT_STANDALONE=0 pnpm --filter @specforge/web build`: PASS; all 36 static pages/routes generated, including `/login` and `/identity`. The default standalone trace completed compilation but the Windows OneDrive workspace denied symlink creation (`EPERM`); Docker's Linux build path remains the deployment verification path.
+- The first-run Web setup path is now packaged as `/setup` plus `POST /api/auth/bootstrap`; it creates exactly one administrator when the identity table is empty, returns no password, and redirects the operator to `/login`.
 - `pnpm identity:cutover-check`: BLOCKED as expected for the current legacy deployment environment; the check is read-only and reports no secret values.
 - Production migration, HTTPS/TLS configuration, and managed-Token knowledge-readiness acceptance remain pending.
 
