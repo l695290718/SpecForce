@@ -2,6 +2,53 @@
     "version":  1,
     "decisions":  [
                       {
+                          "id": "self-managed-identity",
+                          "repositoryAdr": "docs/adr/0046-self-managed-identity.md",
+                          "mcpAdrId": "adr-self-managed-identity",
+                          "scope": {
+                              "applicationServiceId": "com.huawei.celon.desiner",
+                              "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                          },
+                          "proposalId": "proposal-self-managed-identity",
+                          "contextPackId": "context-pack-self-managed-identity",
+                          "proposalStatus": "reviewing",
+                          "proposalNonGoal": {
+                              "en": "Design records only: no runtime identity implementation, grant changes, OIDC, multi-tenant SaaS, CodeHub integration or cross-service comparison delivery. Comparison requires separate design after identity acceptance.",
+                              "zh": "仅登记设计：不交付运行时身份实现、授权变更、OIDC、多租户 SaaS、CodeHub 集成或跨服务比较。比较需身份验收后独立设计。"
+                          },
+                          "relatedAssetIds": [
+                              "api-specforge-mcp-tools",
+                              "adr-design-context-preflight-gate",
+                              "adr-system-knowledge-readiness-gate"
+                          ],
+                          "owner": "SpecForge Security and Platform Governance",
+                          "status": "Design direction accepted; written specification awaiting review; implementation not started; local trusted-read credential denied.",
+                          "reason": "Single-enterprise deployments need individual account and Agent credential lifecycles with exact Scope-operation authorization. Current trusted-read evaluation returns PERMISSION_DENIED; production identity and multi-service comparison are not implemented by this record.",
+                          "retryTrigger": "Review the written specification and implementation plan; use an operator-approved exact-Scope knowledge:consume credential to retry readiness and bounded reading before a fresh implementation preflight. Comparison requires separately approved design after identity acceptance.",
+                          "evidence": [
+                              {
+                                  "command": "rg -n 'ScopedPrincipal|ScopeGrant|permissions:|decisionRef|subject|normalizeGrants|authorizePrincipalScope' packages/core/src/architecture/types.ts packages/core/src/architecture/principal.ts apps/mcp-server/src/knowledge-readiness/service.ts",
+                                  "result": "Read-only review located global operation permissions and current subject/grant bindings. This is evidence for the design corrections, not implemented identity behavior."
+                              },
+                              {
+                                  "command": "Get-Content apps/mcp-server/src/knowledge/risk-policy.ts -TotalCount 100",
+                                  "result": "Read-only review confirmed T1 actor-ID separation and T2/T3 human-type checks. Stable delegated identity and same-owner T1 review separation remain target behavior."
+                              },
+                              {
+                                  "command": "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent \"Document the approved single-enterprise self-managed identity design and six review corrections; no runtime implementation\" --affected \"adr-system-knowledge-readiness-gate,adr-design-context-preflight-gate,api-specforge-mcp-tools\" --evidence \"identity-design-review,identity-design-doc-check,identity-design-mcp-reconciliation\"",
+                                  "result": "Returned exact-Scope OPEN design-change-session:2032b5dc-2fda-4b35-a35c-decb4c35121d with 449 read assets and designContextDigest b865cf31d6804bac8322142d1cfdbc0ffae2eb40d58844be37eee5c237c1b7a5. Latest reconciliation was UNVERIFIED, not CONVERGED."
+                              },
+                              {
+                                  "command": "pnpm exec vitest run scripts/sync-design-facts.test.ts scripts/reconcile-design-facts.test.ts --exclude '**/.worktrees/**' --exclude '**/.pnpm-store/**'",
+                                  "result": "Passed: 2 files and 33 tests. Document synchronization/reconciliation machinery only; the proposed authentication runtime is not implemented or tested."
+                              },
+                              {
+                                  "command": "git diff --check",
+                                  "result": "Passed with Windows line-ending normalization warnings only."
+                              }
+                          ]
+                      },
+                      {
                           "id":  "adr-application-service-scope-isolation",
                           "repositoryAdr":  "docs/adr/0001-application-service-scope-isolation.md",
                           "mcpAdrId":  "adr-application-service-scope-isolation",

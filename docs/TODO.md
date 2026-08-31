@@ -48,33 +48,33 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **设计引用：** ADR-0017、ADR-0021、ADR-0007；2026-08-09 本地契约证据。
 
-## 3. Production Identity, Tenant Authorization, And Multi-Service Comparison
+## 3. Self-Managed Identity, Exact-Scope Authorization, And Multi-Service Comparison
 
-**Status:** Deferred.
+**Status:** Local-account approach and six review corrections accepted; written design awaiting review. Implementation has not started. Identity/authorization comes first; bounded multi-service comparison is a separately designed dependent increment.
 
 **Owner:** SpecForge Security and Platform Governance.
 
-**Rationale:** The provider-neutral `ScopedPrincipal` foundation and exact application-service fail-closed boundary are local contracts, not production identity. Agents with explicit grants may eventually compare or aggregate multiple application services, but every participating service must be permission-filtered before any design asset is read, joined, or presented.
+**Rationale:** A single-enterprise deployment will use administrator-managed Web accounts and independently revocable Agent tokens. Permissions must intersect per exact Scope and operation, not as separate global unions. Stable Agent identity, owner-aware review separation, transactionally ordered revocation, protected bootstrap/recovery, and a reviewed migration replace shared/static identity assumptions. PostgreSQL remains authoritative. Cross-service inventory is not proof of complete system knowledge.
 
-**Trigger:** Start after the enterprise identity provider, tenant model, OAuth/RBAC policy, token lifecycle, and auditable cross-service authorization decisions are approved for production; the target grants and cross-service comparison scope must be explicitly authorized.
+**Trigger:** Review `docs/superpowers/specs/2026-08-31-self-managed-identity-design.md`, approve an implementation plan and acquire a fresh exact-Scope preflight. Resolve the current local credential's `PERMISSION_DENIED` from `evaluate_system_knowledge_readiness` using an operator-approved exact-Scope `knowledge:consume` credential before implementation; do not expand permissions automatically. Comparison starts only after the identity migration and acceptance matrix pass and its separate specification is approved. OIDC, multi-tenant SaaS and CodeHub are not prerequisites or included deliverables.
 
-**Completion evidence:** Authenticated Web and MCP requests enforce tenant and application-service grants in integration tests, including denied cross-service reads and writes. Multi-service comparison proves permission-filtered reads, audit records, exact Scope isolation, and fail-closed behavior for missing or expired grants.
+**Completion evidence:** Web, MCP including reused transports, exports, statistics, graph reads and task downloads all use current exact-Scope/operation grants. Tests cover permission cross products, revoke/write races, token rotation and review independence, session expiry, last-admin protection, CSRF, audit atomicity and reviewed parent-to-leaf migration without data loss or static/seed fallback. Comparison separately proves explicit-selection authorization, bounded reads, per-Scope metric/version/trust provenance, unknown-not-zero and no cross-Scope writes. Synchronize bilingual design facts and typed links and close the implementation session; no runtime completion is claimed by this design-only record.
 
-**Design references:** ADR-0001, ADR-0002, ADR-0010, ADR-0021, ADR-0022; local `ScopedPrincipal` contract evidence dated 2026-08-09.
+**Design references:** ADR-0046, ADR-0045, ADR-0039, ADR-0001, ADR-0002, ADR-0010, ADR-0021, ADR-0022; `docs/superpowers/specs/2026-08-31-self-managed-identity-design.md`. MCP tracking: `proposal-self-managed-identity` (`reviewing`) and `context-pack-self-managed-identity`.
 
 **中文本地化：**
 
-**状态：** 延期。
+**状态：** 本地账号方案与六项审查修正已认可，书面设计待审阅，尚未开始实现。先做身份/授权，有界跨服务比较依赖其验收并单独设计。
 
 **负责人：** SpecForge 安全与平台治理团队。
 
-**理由：** 与平台无关的 `ScopedPrincipal` 基础和精确应用服务失败关闭边界只是本地契约，不等同于生产身份体系。未来拥有明确授权的 Agent 可以比较或聚合多个应用服务，但读取、关联或展示任何设计资产前，必须先对每个参与的应用服务执行权限过滤。
+**理由：** 单企业部署采用管理员维护的 Web 账号和可独立撤销的 Agent Token；权限按精确 Scope 与操作求交，不能分别合并两个全局集合。稳定 Agent 身份、按归属判断审批独立、事务排序撤销、受保护初始化/恢复和审阅迁移取代共享/静态身份假设。PostgreSQL 保持权威，跨服务库存不等于完整系统知识。
 
-**启动条件：** 企业身份提供商、租户模型、OAuth/RBAC 策略、Token 生命周期和可审计的跨服务授权决策完成生产评审后启动；目标授权范围和跨服务比较范围必须获得明确授权。
+**启动条件：** 审阅 `docs/superpowers/specs/2026-08-31-self-managed-identity-design.md`、批准实施计划并取得新精确 Scope 预检。当前本地凭据调用 `evaluate_system_knowledge_readiness` 返回 `PERMISSION_DENIED`，需管理员提供已批准的精确 Scope `knowledge:consume` 凭据，实施前重试，禁止自动扩大权限。身份迁移与验收矩阵通过后，才审阅并实施独立比较方案。OIDC、多租户 SaaS 和 CodeHub 不是本次前置条件或交付项。
 
-**完成证据：** 已认证的 Web 和 MCP 请求在集成测试中执行租户及应用服务权限校验，包括拒绝跨服务读写。多服务比较必须证明权限过滤读取、审计记录、精确 Scope 隔离，以及缺少或过期授权时的失败关闭行为。
+**完成证据：** Web、含复用连接的 MCP、导出、统计、图读取和任务下载均使用当前精确 Scope/操作授权。覆盖权限交叉提权、撤销/写入竞态、轮换与审批独立、会话到期、最后管理员、CSRF、审计原子性、无数据丢失的父到叶子迁移和拒绝 static/seed 回退。比较另证明显式选择集授权、有界读取、逐 Scope 口径/版本/可信来源、未知不等于零且不跨 Scope 写入。同步双语设计事实与关系并关闭实施会话；本设计文档不宣称运行功能完成。
 
-**设计引用：** ADR-0001、ADR-0002、ADR-0010、ADR-0021、ADR-0022；2026-08-09 `ScopedPrincipal` 本地契约证据。
+**设计引用：** ADR-0046、ADR-0045、ADR-0039、ADR-0001、ADR-0002、ADR-0010、ADR-0021、ADR-0022；`docs/superpowers/specs/2026-08-31-self-managed-identity-design.md`。MCP 跟踪记录为 `proposal-self-managed-identity`（`reviewing`）与 `context-pack-self-managed-identity`。
 
 ## 4. Live Enterprise Source Connectors And Continuous Synchronization
 
