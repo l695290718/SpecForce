@@ -1,3 +1,4 @@
+import { hash, verify } from "@node-rs/argon2";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { IssuedOpaqueCredential } from "./types";
 
@@ -22,4 +23,13 @@ export function verifyCredentialSecret(secret: string, expectedDigest: string, p
   const actual = Buffer.from(digestSecret(secret, pepper), "hex");
   const expected = Buffer.from(expectedDigest, "hex");
   return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+export async function hashPassword(password: string): Promise<string> {
+  if (password.length < 12) throw new Error("PASSWORD_TOO_SHORT");
+  return hash(password, { memoryCost: 19_456, timeCost: 2, parallelism: 1, outputLen: 32 });
+}
+
+export async function verifyPassword(password: string, passwordDigest: string): Promise<boolean> {
+  return verify(passwordDigest, password);
 }

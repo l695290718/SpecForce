@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { currentRequestPrincipal, principalFromAuthInfo, withRequestPrincipal } from "./auth";
+import { currentRequestPrincipal, principalFromAuthInfo, principalFromManagedAgent, withRequestPrincipal } from "./auth";
 
 describe("MCP principal boundary", () => {
   it("normalizes static bearer claims without retaining the credential", () => {
@@ -47,5 +47,25 @@ describe("MCP principal boundary", () => {
       expect(currentRequestPrincipal()).toBe(principal);
     });
     expect(currentRequestPrincipal()).toBeUndefined();
+  });
+
+  it("keeps managed operations bound to their exact scopes", () => {
+    const principal = principalFromManagedAgent({
+      subjectId: "agent-1", actorType: "agent", actorId: "agent-1", ownerUserId: "user-1", credentialId: "credential-1",
+      authorizationVersion: 4n, credentialVersion: 2n,
+      ownerGrants: [
+        { applicationServiceId: "com.huawei.celon.desiner", operation: "asset:read" },
+        { applicationServiceId: "com.huawei.celon.policyhub", operation: "governance:run" }
+      ],
+      credentialCeiling: [
+        { applicationServiceId: "com.huawei.celon.desiner", operation: "asset:read" },
+        { applicationServiceId: "com.huawei.celon.policyhub", operation: "governance:run" }
+      ]
+    });
+    expect(principal.operationGrants).toEqual([
+      { scopeId: "com.huawei.celon.desiner", operation: "asset:read" },
+      { scopeId: "com.huawei.celon.policyhub", operation: "governance:run" }
+    ]);
+    expect(principal.operationGrants).not.toContainEqual({ scopeId: "com.huawei.celon.policyhub", operation: "asset:read" });
   });
 });

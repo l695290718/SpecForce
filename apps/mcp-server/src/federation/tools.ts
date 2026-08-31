@@ -372,7 +372,10 @@ function authorizeCaller(caller: FederationCaller, permissions: Permission[], in
   if (!registered || registered.level !== "applicationService" || registered.scopePath !== scope.scopePath) {
     throw new FederationToolError("SCOPE_MISMATCH");
   }
-  if (permissions.some((permission) => !caller.permissions.includes(permission))) {
+  const operationGrants = caller.operationGrants;
+  if (operationGrants
+    ? permissions.some((permission) => !operationGrants.some((grant) => grant.scopeId === registered.id && grant.operation === permission))
+    : permissions.some((permission) => !caller.permissions.includes(permission))) {
     throw new FederationToolError("PERMISSION_DENIED");
   }
   if (permissions.includes("asset:write") && !hasExactFederationScopeGrant(caller, registered, "write")) throw new FederationToolError("PERMISSION_DENIED");

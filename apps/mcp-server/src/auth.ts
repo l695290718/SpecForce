@@ -1,4 +1,5 @@
 import { normalizePrincipalClaims, type Permission, type PrincipalAuthSource, type ScopedPrincipal } from "@specforge/core";
+import type { ResolvedAgentPrincipal } from "@specforge/identity";
 import { AsyncLocalStorage } from "node:async_hooks";
 
 export interface McpActor {
@@ -51,6 +52,21 @@ export function principalFromAuthInfo(authInfo: McpAuthInfo | undefined): Scoped
   }, { allowSeed: process.env.SPECFORGE_MCP_SEED === "1" });
 }
 
+export function principalFromManagedAgent(resolved: ResolvedAgentPrincipal): ScopedPrincipal {
+  const operationGrants = resolved.ownerGrants.filter((owner) => resolved.credentialCeiling.some((ceiling) => ceiling.applicationServiceId === owner.applicationServiceId && ceiling.operation === owner.operation));
+  const grants = uniqueScopeActions(operationGrants.map((grant) => ({ scopeId: grant.applicationServiceId, action: scopeActionForOperation(grant.operation) })));
+  return normalizePrincipalClaims({
+    actorType: "agent",
+    subject: resolved.actorId,
+    tenantId: process.env.SPECFORGE_MCP_TENANT_ID ?? "local-development",
+    authSource: "managed-token",
+    grants,
+    permissions: [...new Set(operationGrants.map((grant) => grant.operation))],
+    operationGrants: operationGrants.map((grant) => ({ scopeId: grant.applicationServiceId, operation: grant.operation })),
+    decisionRef: `credential:${resolved.credentialId}:authorization:${resolved.authorizationVersion.toString()}`
+  });
+}
+
 export function withRequestPrincipal<T>(principal: ScopedPrincipal, callback: () => Promise<T>): Promise<T> {
   return principalStorage.run(principal, callback);
 }
@@ -65,4 +81,12 @@ function stringValue(value: unknown): string {
 
 function isRecord(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function scopeActionForOperation(permission: Permission): "read" | "write" {
+  return permission === "asset:write" || permission === "proposal:write" || permission === "adr:write" || permission === "knowledge:write" ? "write" : "read";
+}
+
+function uniqueScopeActions(grants: Array<{ scopeId: string; action: "read" | "write" }>) {
+  return grants.filter((grant, index) => grants.findIndex((other) => other.scopeId === grant.scopeId && other.action === grant.action) === index);
 }

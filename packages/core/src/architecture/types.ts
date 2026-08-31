@@ -29,18 +29,25 @@ export interface ScopeGrant {
   action: ScopeAction;
 }
 
+export interface PrincipalOperationGrant {
+  scopeId: string;
+  operation: import("../types").Permission;
+}
+
 export interface ScopedActor {
   actorType: "agent" | "user" | "system";
   actorId: string;
   grants: ScopeGrant[];
 }
 
-export type PrincipalAuthSource = "seed" | "static-bearer" | "oidc" | "system";
+export type PrincipalAuthSource = "seed" | "static-bearer" | "managed-token" | "web-session" | "oidc" | "system";
 
 export interface ScopedPrincipal extends ScopedActor {
   subject: string;
   tenantId: string;
   authSource: PrincipalAuthSource;
   permissions: import("../types").Permission[];
+  /** Present for managed identities; binds each operation to one exact application-service Scope. */
+  operationGrants?: PrincipalOperationGrant[];
   decisionRef: string;
 }

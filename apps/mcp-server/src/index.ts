@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage } from "node:http";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createSpecForgeMcpServer, loadConfig } from "./server";
+import { resolveMcpBearer } from "./identity/mcp-resolver";
 
 async function main() {
   const config = loadConfig();
@@ -15,8 +16,10 @@ async function main() {
 }
 
 async function startHttpServer(): Promise<void> {
+  const identityMode = process.env.SPECFORGE_IDENTITY_MODE ?? "development";
   const expectedToken = process.env.SPECFORGE_MCP_BEARER_TOKEN;
-  if (!expectedToken) throw new Error("SPECFORGE_MCP_BEARER_TOKEN is required for HTTP transport.");
+  if (identityMode === "local-account" && expectedToken) throw new Error("PRODUCTION_AUTH_CONFIG_INVALID");
+  if (identityMode !== "local-account" && !expectedToken) throw new Error("SPECFORGE_MCP_BEARER_TOKEN is required for development HTTP transport.");
   const server = createSpecForgeMcpServer();
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   await server.connect(transport);
@@ -25,12 +28,8 @@ async function startHttpServer(): Promise<void> {
       response.writeHead(404).end();
       return;
     }
-    if (request.headers.authorization !== `Bearer ${expectedToken}`) {
-      response.writeHead(401, { "content-type": "application/json" }).end(JSON.stringify({ error: "AUTHENTICATION_REQUIRED" }));
-      return;
-    }
     try {
-      const auth = buildAuthInfo();
+      const auth = identityMode === "local-account" ? await resolveMcpBearer(request.headers.authorization) : buildAuthInfo(request.headers.authorization, expectedToken!);
       const body = request.method === "POST" ? await readJsonBody(request) : undefined;
       await transport.handleRequest(Object.assign(request, { auth }) as IncomingMessage & { auth: never }, response, body);
     } catch (error) {
@@ -43,7 +42,8 @@ async function startHttpServer(): Promise<void> {
   console.error(`[specforge-mcp] streamable HTTP listening on :${port}/mcp`);
 }
 
-function buildAuthInfo() {
+function buildAuthInfo(authorization: string | undefined, expectedToken: string) {
+  if (authorization !== `Bearer ${expectedToken}`) throw new Error("AUTHENTICATION_REQUIRED");
   const configuredClaims = process.env.SPECFORGE_MCP_TOKEN_CLAIMS;
   if (configuredClaims) {
     try {

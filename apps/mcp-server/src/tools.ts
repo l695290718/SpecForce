@@ -1,6 +1,6 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { Permission } from "@specforge/core";
+import { scopeById, type Permission, type ScopedPrincipal } from "@specforge/core";
 import { z } from "zod";
 import { auditToolCall } from "./audit";
 import { validateIntegrationContractV1 as validateIntegrationContractEnvelope } from "./integration-contract";
@@ -120,6 +120,7 @@ function registerJsonTool<T extends z.ZodRawShape>(
         try {
           if (config.seedOnly && !isSeedMode()) throw new Error("Seed cleanup is not enabled.");
           await allowAllPolicy.authorize(actor, config.permissions);
+          authorizeManagedToolPrincipal(principal, config.permissions, input as Record<string, unknown>);
           if (config.legacyKnowledgeRead || legacyKnowledgeReadTools.has(name)) assertLegacyKnowledgeReadAllowed(principal);
           const output = await handler(input as z.output<z.ZodObject<T>>);
           auditToolCall({ actor, action: name, ...target, toolInput: input, output, status: "success" });
@@ -1196,4 +1197,21 @@ export function registerTools(server: McpServer): void {
     permissions: ["asset:write"],
     readOnly: false
   }, (input) => createAssessmentContextPackDraft(input as Parameters<typeof createAssessmentContextPackDraft>[0]));
+}
+
+function authorizeManagedToolPrincipal(principal: ScopedPrincipal | undefined, permissions: Permission[], input: Record<string, unknown>): void {
+  if (!principal?.operationGrants) return;
+  const scope = input.architectureScope;
+  if (!isArchitectureScope(scope)) throw new Error("SCOPE_ACCESS_DENIED");
+  const registered = scopeById(scope.applicationServiceId);
+  if (!registered || registered.level !== "applicationService" || registered.scopePath !== scope.scopePath) throw new Error("SCOPE_ACCESS_DENIED");
+  if (permissions.some((permission) => !principal.operationGrants?.some((grant) => grant.scopeId === registered.id && grant.operation === permission))) {
+    throw new Error("OPERATION_DENIED");
+  }
+}
+
+function isArchitectureScope(value: unknown): value is { applicationServiceId: string; scopePath: string } {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
+    && typeof (value as { applicationServiceId?: unknown }).applicationServiceId === "string"
+    && typeof (value as { scopePath?: unknown }).scopePath === "string";
 }

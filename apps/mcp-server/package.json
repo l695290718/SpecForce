@@ -21,6 +21,7 @@
     "@modelcontextprotocol/sdk": "1.29.0",
     "@prisma/client": "^6.1.0",
     "@specforge/core": "workspace:*",
+    "@specforge/identity": "workspace:*",
     "@specforge/knowledge-query": "workspace:*",
     "@specforge/scan-contract": "workspace:*",
     "@specforge/scoped-read": "workspace:*",
