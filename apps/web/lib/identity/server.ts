@@ -25,7 +25,7 @@ export async function currentWebUser() {
   const secret = (await cookies()).get(cookieName)?.value;
   const pepper = process.env.SPECFORGE_IDENTITY_SECRET_PEPPER;
   if (!secret || !pepper) return undefined;
-  const session = await prisma.webSession.findUnique({ where: { secretDigest: digestSecret(secret, pepper) }, include: { user: true } });
+  const session = await prisma.webSession.findUnique({ where: { secretDigest: digestSecret(secret, pepper) }, include: { user: { include: { grants: true } } } });
   if (!session || session.status !== "ACTIVE" || session.user.status !== "ACTIVE" || session.idleExpiresAt <= new Date() || session.expiresAt <= new Date()) return undefined;
   return { ...session.user, sessionId: session.id, csrfDigest: session.csrfDigest };
 }

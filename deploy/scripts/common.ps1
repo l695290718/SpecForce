@@ -55,7 +55,17 @@ function Assert-DeploymentEnvironment {
     throw "SPECFORGE_WEB_PRINCIPAL_CLAIMS is required when SPECFORGE_WEB_AUTH_MODE=static."
   }
   if ($webAuthMode -notin @("static", "production")) {
-    throw "SPECFORGE_WEB_AUTH_MODE must be static or production."
+    if ($webAuthMode -ne "local-account") { throw "SPECFORGE_WEB_AUTH_MODE must be static, local-account, or production." }
+  }
+  $identityMode = if ($Values.SPECFORGE_IDENTITY_MODE) { $Values.SPECFORGE_IDENTITY_MODE.ToLowerInvariant() } else { "development" }
+  if ($identityMode -eq "local-account") {
+    if ($webAuthMode -ne "local-account") { throw "SPECFORGE_WEB_AUTH_MODE must be local-account when SPECFORGE_IDENTITY_MODE=local-account." }
+    if (-not $Values.SPECFORGE_IDENTITY_SECRET_PEPPER -or $Values.SPECFORGE_IDENTITY_SECRET_PEPPER.Length -lt 32 -or $Values.SPECFORGE_IDENTITY_SECRET_PEPPER -like "*replace-with*") { throw "SPECFORGE_IDENTITY_SECRET_PEPPER must be a non-placeholder value of at least 32 characters." }
+    if (-not $Values.SPECFORGE_WEB_ORIGIN) { throw "SPECFORGE_WEB_ORIGIN is required when SPECFORGE_IDENTITY_MODE=local-account." }
+    if ($Values.SPECFORGE_MCP_BEARER_TOKEN) { throw "SPECFORGE_MCP_BEARER_TOKEN is forbidden when SPECFORGE_IDENTITY_MODE=local-account." }
+    if (-not $Values.SPECFORGE_TLS_TERMINATION) { throw "SPECFORGE_TLS_TERMINATION must identify the external or managed TLS boundary." }
+  } elseif ($identityMode -ne "development") {
+    throw "SPECFORGE_IDENTITY_MODE must be development or local-account."
   }
   $webPort = if ($Values.SPECFORGE_WEB_PORT) { [int]$Values.SPECFORGE_WEB_PORT } else { 3010 }
   if ($webPort -lt 1 -or $webPort -gt 65535) { throw "SPECFORGE_WEB_PORT must be between 1 and 65535." }

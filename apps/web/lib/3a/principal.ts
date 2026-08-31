@@ -1,6 +1,7 @@
-import { authorizePrincipalScope, defaultHuaweiActor, normalizePrincipalClaims, scopeById, seedHuaweiActor, type ArchitectureScopeRef, type ScopedPrincipal } from "@specforge/core";
+import { authorizePrincipalScope, defaultHuaweiActor, normalizePrincipalClaims, scopeById, seedHuaweiActor, type ArchitectureScopeRef, type Permission, type ScopedPrincipal } from "@specforge/core";
+import { currentWebUser } from "../identity/server";
 
-export type WebAuthMode = "seed" | "production" | "static";
+export type WebAuthMode = "seed" | "production" | "static" | "local-account";
 
 export interface CookieReader {
   get(name: string): { value: string } | undefined;
@@ -29,6 +30,7 @@ export interface ResolvedThreeARequest {
 export async function resolveWebPrincipal(input: WebPrincipalResolutionInput): Promise<ScopedPrincipal> {
   if (input.authMode === "seed") return seedWebPrincipal();
   if (input.authMode === "static") return configuredWebPrincipal();
+  if (input.authMode === "local-account") return localAccountWebPrincipal();
   if (!input.provider) throw new Error("WEB_PRINCIPAL_RESOLVER_REQUIRED");
   return input.provider.resolve({ headers: input.headers, cookies: input.cookies });
 }
@@ -36,6 +38,7 @@ export async function resolveWebPrincipal(input: WebPrincipalResolutionInput): P
 export function resolveWebAuthMode(): WebAuthMode {
   const configured = process.env.SPECFORGE_WEB_AUTH_MODE?.trim().toLowerCase();
   if (configured === "static") return "static";
+  if (configured === "local-account") return "local-account";
   if (configured === "production") return "production";
   if (configured === "seed" && process.env.NODE_ENV !== "production") return "seed";
   return process.env.NODE_ENV === "production" ? "production" : "seed";
@@ -50,6 +53,7 @@ export async function resolveThreeARequest(input: ThreeARequestResolutionInput):
   } catch {
     throw new Error("SCOPE_ACCESS_DENIED");
   }
+  if (input.authMode === "local-account" && !principal.operationGrants?.some((grant) => grant.scopeId === input.architectureScope.applicationServiceId && grant.operation === "knowledge:read")) throw new Error("SCOPE_ACCESS_DENIED");
   return { architectureScope: input.architectureScope, principal };
 }
 
@@ -86,6 +90,28 @@ function configuredWebPrincipal(): ScopedPrincipal {
     grants: actor.grants,
     permissions: actor.permissions ?? claims.permissions,
     decisionRef: actor.decisionRef ?? claims.decisionRef
+  });
+}
+
+async function localAccountWebPrincipal(): Promise<ScopedPrincipal> {
+  const user = await currentWebUser();
+  if (!user) throw new Error("AUTHENTICATION_REQUIRED");
+  const operations = user.grants.map((grant) => grant.operation as Permission);
+  const scopeIds = [...new Set(user.grants.map((grant) => grant.applicationServiceId))];
+  const readOperations = new Set<Permission>(["asset:read", "proposal:read", "graph:read", "knowledge:read", "knowledge:consume", "knowledge:diagnostic", "context-pack:generate", "governance:run"]);
+  const writeOperations = new Set<Permission>(["asset:write", "proposal:write", "knowledge:write", "adr:write"]);
+  return normalizePrincipalClaims({
+    actorType: "user",
+    subject: user.id,
+    tenantId: process.env.SPECFORGE_TENANT_ID ?? "local-enterprise",
+    authSource: "web-session",
+    grants: scopeIds.flatMap((scopeId) => [
+      ...(user.grants.some((grant) => grant.applicationServiceId === scopeId && readOperations.has(grant.operation as Permission)) ? [{ scopeId, action: "read" as const }] : []),
+      ...(user.grants.some((grant) => grant.applicationServiceId === scopeId && writeOperations.has(grant.operation as Permission)) ? [{ scopeId, action: "write" as const }] : [])
+    ]),
+    permissions: [...new Set(operations)],
+    operationGrants: user.grants.map((grant) => ({ scopeId: grant.applicationServiceId, operation: grant.operation })),
+    decisionRef: `web-session:${user.sessionId}`
   });
 }
 

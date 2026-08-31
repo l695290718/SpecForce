@@ -50,29 +50,29 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 ## 3. Self-Managed Identity, Exact-Scope Authorization, And Multi-Service Comparison
 
-**Status:** Local-account approach and six review corrections accepted; written design awaiting review. Implementation has not started. Identity/authorization comes first; bounded multi-service comparison is a separately designed dependent increment.
+**Status:** Local-account approach and six review corrections accepted; the local-account implementation increment is delivered and locally verified. Production cutover, reviewed migration application and managed-Token readiness acceptance remain pending. Bounded multi-service comparison is a separately designed dependent increment.
 
 **Owner:** SpecForge Security and Platform Governance.
 
 **Rationale:** A single-enterprise deployment will use administrator-managed accounts and independently revocable Agent tokens. Administrators grant exact Scope-operation tuples; authorized users issue, rotate and revoke credentials only for their own Agents, and the server caps every Token to the user's current tuples. Permissions must intersect per exact Scope and operation, not as separate global unions. Stable Agent identity, owner-aware review separation, transactionally ordered revocation, protected bootstrap/recovery, and a reviewed migration replace shared/static identity assumptions. PostgreSQL remains authoritative. Cross-service inventory is not proof of complete system knowledge.
 
-**Trigger:** Review `docs/superpowers/specs/2026-08-31-self-managed-identity-design.md`, approve an implementation plan and acquire a fresh exact-Scope preflight. The current `PERMISSION_DENIED` is from a local design-context seed fixture that deliberately omits `knowledge:consume`; it is not a bootstrap blocker. After the front end issues the first owner-bounded Token, use that Token for readiness and bounded-read acceptance without expanding permissions or weakening the gate. Comparison starts only after the identity migration and acceptance matrix pass and its separate specification is approved. OIDC, multi-tenant SaaS and CodeHub are not prerequisites or included deliverables.
+**Trigger:** During a maintenance window, apply the reviewed migration report, configure HTTPS/TLS and non-default secrets, then issue the first owner-bounded Token through the Web control plane and use it for readiness and bounded-read acceptance. The cutover gate must pass before production identity is certified. Comparison starts only after the identity acceptance matrix passes and its separate specification is approved. OIDC, multi-tenant SaaS and CodeHub are not prerequisites or included deliverables.
 
-**Completion evidence:** Web, MCP including reused transports, exports, statistics, graph reads and task downloads all use current exact-Scope/operation grants. Tests cover permission cross products, revoke/write races, token rotation and review independence, session expiry, last-admin protection, CSRF, audit atomicity and reviewed parent-to-leaf migration without data loss or static/seed fallback. Comparison separately proves explicit-selection authorization, bounded reads, per-Scope metric/version/trust provenance, unknown-not-zero and no cross-Scope writes. Synchronize bilingual design facts and typed links and close the implementation session; no runtime completion is claimed by this design-only record.
+**Completion evidence:** Local-account persistence, exact operation policy, MCP resolver, Web sessions/CSRF, administration routes/screens, bootstrap/recovery, migration report/application and read-only deployment cutover gate are implemented. Focused identity/MCP/Web checks pass; `identity:cutover-check` correctly blocks the current legacy environment. Production migration, HTTPS/TLS, owner-issued Token readiness acceptance and final MCP session closure remain open.
 
 **Design references:** ADR-0046, ADR-0045, ADR-0039, ADR-0001, ADR-0002, ADR-0010, ADR-0021, ADR-0022; `docs/superpowers/specs/2026-08-31-self-managed-identity-design.md`. MCP tracking: `proposal-self-managed-identity` (`reviewing`) and `context-pack-self-managed-identity`.
 
 **中文本地化：**
 
-**状态：** 本地账号方案与六项审查修正已认可，书面设计待审阅，尚未开始实现。先做身份/授权，有界跨服务比较依赖其验收并单独设计。
+**状态：** 本地账号方案与六项审查修正已认可，本地账号实现增量已交付并通过聚焦验证。生产切换、审阅迁移、Token 就绪验收仍待完成；有界跨服务比较依赖其验收并单独设计。
 
 **负责人：** SpecForge 安全与平台治理团队。
 
 **理由：** 单企业部署采用管理员维护的账号和可独立撤销的 Agent Token；管理员授予精确 Scope-operation 组合，获得授权的用户只能为自己的 Agent 签发、轮换和撤销凭据，服务端将每个 Token 限制在用户当前组合内。权限按精确 Scope 与操作求交，不能分别合并两个全局集合。稳定 Agent 身份、按归属判断审批独立、事务排序撤销、受保护初始化/恢复和审阅迁移取代共享/静态身份假设。PostgreSQL 保持权威，跨服务库存不等于完整系统知识。
 
-**启动条件：** 审阅 `docs/superpowers/specs/2026-08-31-self-managed-identity-design.md`、批准实施计划并取得新精确 Scope 预检。当前 `PERMISSION_DENIED` 来自特意不含 `knowledge:consume` 的 local design-context seed 夹具，不阻塞初始化；前端签发首个所有者有界 Token 后，使用该 Token 做就绪和有界读取验收，不自动扩大权限或弱化门禁。身份迁移与验收矩阵通过后，才审阅并实施独立比较方案。OIDC、多租户 SaaS 和 CodeHub 不是本次前置条件或交付项。
+**启动条件：** 在维护窗口应用审阅迁移报告，配置 HTTPS/TLS 与非默认密钥，通过前端签发首个所有者有界 Token，并使用该 Token 做就绪和有界读取验收。切换门禁通过后才可声明生产身份完成；身份验收矩阵通过后，才审阅并实施独立比较方案。OIDC、多租户 SaaS 和 CodeHub 不是本次前置条件或交付项。
 
-**完成证据：** Web、含复用连接的 MCP、导出、统计、图读取和任务下载均使用当前精确 Scope/操作授权。覆盖权限交叉提权、撤销/写入竞态、轮换与审批独立、会话到期、最后管理员、CSRF、审计原子性、无数据丢失的父到叶子迁移和拒绝 static/seed 回退。比较另证明显式选择集授权、有界读取、逐 Scope 口径/版本/可信来源、未知不等于零且不跨 Scope 写入。同步双语设计事实与关系并关闭实施会话；本设计文档不宣称运行功能完成。
+**完成证据：** 已实现本地身份持久化、精确操作策略、MCP 解析器、Web 会话/CSRF、管理接口和页面、初始化/恢复、迁移报告与应用、只读部署切换门禁；聚焦身份/MCP/Web 检查通过，门禁正确阻止当前旧环境。生产迁移、HTTPS/TLS、所有者 Token 就绪验收和最终 MCP 会话关闭仍待完成。
 
 **设计引用：** ADR-0046、ADR-0045、ADR-0039、ADR-0001、ADR-0002、ADR-0010、ADR-0021、ADR-0022；`docs/superpowers/specs/2026-08-31-self-managed-identity-design.md`。MCP 跟踪记录为 `proposal-self-managed-identity`（`reviewing`）与 `context-pack-self-managed-identity`。
 

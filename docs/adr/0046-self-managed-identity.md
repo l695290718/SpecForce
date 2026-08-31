@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted design direction with the six review corrections. Written specification awaiting review; implementation has not started. This ADR does not certify production identity or cross-service comparison.
+Accepted design direction with the six review corrections. The local-account implementation increment is delivered and locally verified; production cutover and managed-Token knowledge-readiness acceptance remain pending. This ADR does not certify production identity or cross-service comparison.
 
 - Stable ADR ID: `adr-self-managed-identity`.
 - Proposal: `proposal-self-managed-identity` (`reviewing`).
@@ -12,6 +12,10 @@ Accepted design direction with the six review corrections. Written specification
 - Scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`.
 - Design session: `design-change-session:2032b5dc-2fda-4b35-a35c-decb4c35121d`.
 - Specification: `docs/superpowers/specs/2026-08-31-self-managed-identity-design.md`.
+
+### Delivery Update
+
+The current implementation session is `design-change-session:887d3af4-98ca-44c1-83de-a97eb5d6c9bc`. The local-account increment is delivered and locally verified. Production cutover and managed-Token knowledge-readiness acceptance remain pending.
 
 ## Context
 
@@ -53,6 +57,14 @@ A single-enterprise deployment needs locally administered Web users and individu
 - The current design session records the fixture limitation and its post-issuance retry trigger; it must not be treated as runtime implementation convergence.
 
 ## Evidence
+
+### Current Implementation Evidence
+
+- `pnpm --filter @specforge/identity test`: PASS, 4 tests.
+- `pnpm exec vitest run apps/web/lib/3a/principal.test.ts apps/mcp-server/src/auth.test.ts`: PASS, 9 tests.
+- `pnpm --filter @specforge/web typecheck`: PASS.
+- `pnpm identity:cutover-check`: BLOCKED as expected for the current legacy deployment environment; the check is read-only and reports no secret values.
+- Production migration, HTTPS/TLS configuration, and managed-Token knowledge-readiness acceptance remain pending.
 
 - `rg -n 'ScopedPrincipal|ScopeGrant|permissions:|decisionRef|subject|normalizeGrants|authorizePrincipalScope' packages/core/src/architecture/types.ts packages/core/src/architecture/principal.ts apps/mcp-server/src/knowledge-readiness/service.ts`: located global operation permissions and current subject/grant bindings.
 - `Get-Content apps/mcp-server/src/knowledge/risk-policy.ts -TotalCount 100`: confirmed T1 actor-ID separation and T2/T3 human-type checks, motivating stable identity and delegation contracts.

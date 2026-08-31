@@ -12,6 +12,10 @@ Design revision following the approved six-point review. English is canonical; t
 - Owning Scope: `com.huawei.celon.desiner`.
 - Exact path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`.
 
+### Delivery Update
+
+The current implementation session is `design-change-session:887d3af4-98ca-44c1-83de-a97eb5d6c9bc`. The local-account increment is delivered and locally verified. It includes additive Prisma identity persistence, Argon2id password hashing, opaque managed credentials, exact operation checks, MCP resolution, Web sessions/CSRF, administration routes and screens, bootstrap/recovery, migration reporting/application, and a read-only deployment cutover gate. Production migration, HTTPS/TLS configuration, and managed-Token knowledge-readiness acceptance remain pending.
+
 The first implementation increment is local accounts, stable Agent identities, managed credentials, a shared authorization boundary, and safe migration. Multi-service comparison is a dependent, separately planned increment; section 9 constrains that future design rather than declaring it implemented.
 
 ## 1. Deployment And Alternatives
@@ -120,6 +124,14 @@ Comparison is read-only over a user-selected bounded set of authorized services.
 Catalog inventory counts measure stored records, not system completeness, complexity or readiness. They may be compared with explicit freshness/coverage limits; they are not a way to bypass `read_system_knowledge`. Any Agent consumption of system meaning remains separately gated per Scope and Profile. A failed/unscanned service is unavailable/unknown, not zero; pagination and trust completeness are different. Do not declare one globally consistent snapshot from independently read service versions. Reuse bounded Atlas and scoped-read mechanisms, but define concrete budgets and comparison-specific continuation bindings in the separate specification. No unbounded join or unrestricted enterprise dashboard.
 
 ## 10. Evidence And Current Limitation
+
+### Current Implementation Evidence
+
+- `pnpm --filter @specforge/identity test`: PASS, 4 tests.
+- `pnpm exec vitest run apps/web/lib/3a/principal.test.ts apps/mcp-server/src/auth.test.ts`: PASS, 9 tests.
+- `pnpm --filter @specforge/web typecheck`: PASS.
+- `pnpm identity:cutover-check`: BLOCKED as expected for the current legacy deployment environment; it is read-only and does not disclose secret values.
+- The first front-end-issued managed Token must still be used for `evaluate_system_knowledge_readiness` and bounded reading before production identity is certified.
 
 - Repository review located the global `ScopedPrincipal.permissions`, inherited `hasScopeAccess`, exact `authorizePrincipalScope`, actor-based candidate approval, environment MCP token and optional cursor grant binding. These support the six corrections, not a claim that the corrections are implemented.
 - Exact-Scope preflight returned the session above, `readAssetCount=449`, `designContextDigest=b865cf31d6804bac8322142d1cfdbc0ffae2eb40d58844be37eee5c237c1b7a5`, and reconciliation `UNVERIFIED` (not `CONVERGED`).

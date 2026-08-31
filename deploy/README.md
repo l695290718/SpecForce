@@ -77,6 +77,18 @@ Required in `deploy/.env`:
 
 Production must replace the example 3A secret and configure the Web authentication provider. The 3A boundary fails closed when cursor keys are missing or invalid.
 
+## Self-Managed Identity Cutover
+
+The deployment profile supports the local-account identity path without a shared Web principal. Set `SPECFORGE_IDENTITY_MODE=local-account`, `SPECFORGE_WEB_AUTH_MODE=local-account`, a unique pepper, an HTTPS Web origin, and an explicit TLS termination boundary. Run the read-only cutover gate before switching traffic:
+
+```powershell
+pnpm identity:cutover-check
+```
+
+The gate fails when seed identity, static Web claims, a shared MCP bearer, placeholder secrets, HTTP origin, or default cursor keys remain. It does not revoke sessions or apply grants. Create the first administrator with `pnpm identity:bootstrap` from a protected deployment host, then use the Web control plane to create Agents and issue their one-time credentials. Keep the reviewed migration report and its administrator approval as a separate maintenance-window step.
+
+For bundled Compose, the application receives its internal PostgreSQL URL from Compose. Run database-backed identity commands inside the Web image or provide an explicit PostgreSQL `DATABASE_URL`; never place a production password in a command argument.
+
 ## Configuration Verification
 
 Render both bundled and external topologies without starting containers:

@@ -100,7 +100,7 @@ export function defaultThreeAQueryHandlerDependencies(): ThreeAQueryHandlerDepen
   return {
     resolveRequest: (request, architectureScope) => resolveThreeARequest({
       architectureScope,
-      authMode: process.env.NODE_ENV === "production" ? "production" : "seed",
+      authMode: process.env.SPECFORGE_WEB_AUTH_MODE === "local-account" ? "local-account" : process.env.NODE_ENV === "production" ? "production" : "seed",
       headers: request.headers,
       cookies: { get: () => undefined }
     }),
