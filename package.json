@@ -43,6 +43,7 @@
     ,"identity:bootstrap": "tsx scripts/identity-bootstrap.ts"
     ,"identity:recover": "tsx scripts/identity-recover.ts"
     ,"identity:migrate-report": "tsx scripts/identity-migrate-report.ts"
+    ,"identity:apply-migration": "tsx scripts/identity-apply-migration.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
