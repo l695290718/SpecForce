@@ -42,6 +42,7 @@
     "designer-3a:v7:verify": "tsx scripts/verify-designer-3a-v7.ts"
     ,"identity:bootstrap": "tsx scripts/identity-bootstrap.ts"
     ,"identity:recover": "tsx scripts/identity-recover.ts"
+    ,"identity:migrate-report": "tsx scripts/identity-migrate-report.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
