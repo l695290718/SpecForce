@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { identity, requireWebUser } from "../../../../lib/identity/server";
+import { identity, requireMutationUser } from "../../../../lib/identity/server";
 
 export async function POST(request: Request) {
   try {
-    const actor = await requireWebUser();
+    const actor = await requireMutationUser(request);
     const input = await request.json() as { agentId: string; ceiling: Array<{ applicationServiceId: string; operation: never }>; expiresAt: string };
     const result = await identity().createAgentCredential({ ownerUserId: actor.id, agentId: input.agentId, ceiling: input.ceiling, expiresAt: new Date(input.expiresAt), actorId: actor.id });
     return NextResponse.json(result);

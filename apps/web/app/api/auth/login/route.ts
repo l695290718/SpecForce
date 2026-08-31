@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loginUser, sessionCookie } from "../../../../lib/identity/server";
+import { csrfCookie, loginUser, sessionCookie } from "../../../../lib/identity/server";
 
 export async function POST(request: Request) {
   try {
@@ -8,6 +8,7 @@ export async function POST(request: Request) {
     const result = await loginUser(input.login, input.password);
     const response = NextResponse.json({ userId: result.userId, sessionId: result.sessionId });
     response.cookies.set(sessionCookie(result.secret));
+    response.cookies.set(csrfCookie(result.csrf));
     return response;
   } catch { return NextResponse.json({ error: "AUTHENTICATION_REQUIRED" }, { status: 401 }); }
 }

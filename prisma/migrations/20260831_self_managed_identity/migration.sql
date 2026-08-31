@@ -32,6 +32,7 @@ CREATE TABLE "AgentCredential" (
     id TEXT NOT NULL,
     "agentId" TEXT NOT NULL,
     "secretDigest" TEXT NOT NULL,
+    "csrfDigest" TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'ACTIVE',
     version INTEGER NOT NULL DEFAULT 1,
     "expiresAt" TIMESTAMP(3) NOT NULL,

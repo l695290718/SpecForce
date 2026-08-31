@@ -305,6 +305,7 @@ model WebSession {
   id           String   @id @default(cuid())
   userId       String
   secretDigest String   @unique
+  csrfDigest   String
   status       String   @default("ACTIVE")
   idleExpiresAt DateTime
   expiresAt    DateTime
