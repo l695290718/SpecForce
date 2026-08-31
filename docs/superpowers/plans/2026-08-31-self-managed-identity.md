@@ -17,7 +17,7 @@
 - Web account administration is not a design-asset write boundary. ADRs, Proposals, Context Packs and typed links remain MCP-authored.
 - English is canonical; every human-facing design record has a Chinese overlay.
 - Before each runtime task, run `pnpm design-context:preflight` with the exact Designer Scope. After focused verification, synchronize matching MCP facts and close the same session.
-- The current local design-context identity lacks `knowledge:consume`. An approved credential must complete `evaluate_system_knowledge_readiness` and bounded `read_system_knowledge` before Task 2 begins. Do not add a bypass or self-grant.
+- The local design-context seed fixture deliberately lacks `knowledge:consume`, while the old HTTP static-claims fixture includes it; neither is a managed user credential. Use the existing exact-Scope design preflight to start implementation. After Task 6 issues a managed Token through the front end, use that Token for `knowledge:consume` and bounded-read acceptance without weakening readiness.
 
 ---
 
@@ -38,57 +38,34 @@
 | `apps/mcp-server/src/index.ts` | Production HTTP/stdio transport policy; no shared production bearer fallback. |
 | `apps/web/lib/identity/*.ts` | Session resolver, CSRF/origin checks and server-only account administration adapters. |
 | `apps/web/app/api/auth/**/route.ts` | Login, logout and session routes. |
-| `apps/web/app/api/admin/**/route.ts` | Administrator account, grant and Agent credential routes. |
+| `apps/web/app/api/admin/**/route.ts` | Administrator account and exact-grant routes. |
+| `apps/web/app/api/agent-credentials/**/route.ts` | Owner-only Agent credential issue, rotate and revoke routes. |
 | `apps/web/lib/request-principal.ts` | Route-independent Web principal resolution using the identity service. |
 | `apps/web/app/(auth)/**` | Minimal login and administrator account-management screens. |
 | `scripts/identity-{bootstrap,migrate-report,cutover-check}.ts` | Protected local bootstrap, reviewed legacy mapping report and deployment safety validation. |
 | `deploy/{compose.yaml,.env.example,Dockerfile}` | Required identity secrets, production mode startup validation and one-time bootstrap guidance. |
 | `docs/adr/0046-self-managed-identity.md` | Update with implementation evidence only after the behavior is delivered. |
 
-## Task 1: Clear The Authorized-Read Prerequisite And Open The Runtime Session
+## Task 1: Open The Runtime Session Without Circular Credential Bootstrap
 
 **Files:**
 
-- Modify: `docs/adr/0046-self-managed-identity.md` only if the prerequisite status changes.
 - Create: `.specforge/design-context/<new-session>.json` through the existing command.
 
 **Interfaces:**
 
-- Consumes: `evaluate_system_knowledge_readiness`, `read_system_knowledge`, and exact Scope `com.huawei.celon.desiner`.
-- Produces: an `ALLOW` readiness receipt for `ARCHITECTURE_OVERVIEW`, a bounded read receipt, and an OPEN runtime `DesignChangeSession`.
+- Consumes: the existing exact-Scope design-context preflight and `adr-self-managed-identity`.
+- Produces: one OPEN runtime `DesignChangeSession`; managed-Token knowledge-readiness evidence is produced after Task 6.
 
-- [ ] **Step 1: Obtain an existing approved `knowledge:consume` credential from the deployment operator**
-
-Do not change a grant, seed actor or environment fallback. Run the MCP calls with the operator-provided credential and exact Scope:
-
-```text
-evaluate_system_knowledge_readiness({
-  architectureScope: { applicationServiceId: "com.huawei.celon.desiner", scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner" },
-  knowledgeProfile: "ARCHITECTURE_OVERVIEW",
-  selectors: [{ assetTypes: ["adr", "api", "dataModel", "businessRule"] }],
-  purpose: "Implement self-managed identity", locale: "en"
-})
-```
-
-Expected: `accessDecision: "ALLOW"` and a nonempty `receiptId`. Otherwise stop and retain the blocked state in ADR-0046.
-
-- [ ] **Step 2: Read the bounded approved context**
-
-```text
-read_system_knowledge({ same request fields, receiptId: "<receipt from step 1>", pageSize: 20 })
-```
-
-Expected: an exact-Scope response with its waterline and any explicit partial/cursor state; record the receipt and waterline in the implementation notes.
-
-- [ ] **Step 3: Open a fresh implementation design session**
+- [ ] **Step 1: Open a fresh implementation design session**
 
 Run:
 
 ```powershell
-pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent "Implement self-managed identity and exact Scope-operation authorization" --affected "adr-self-managed-identity,api-specforge-mcp-tools,adr-design-context-preflight-gate,adr-system-knowledge-readiness-gate" --evidence "identity-readiness-allow,identity-context-read,identity-runtime-tests"
+pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent "Implement self-managed identity and exact Scope-operation authorization" --affected "adr-self-managed-identity,api-specforge-mcp-tools,adr-design-context-preflight-gate,adr-system-knowledge-readiness-gate" --evidence "identity-flow-review,identity-runtime-tests,identity-managed-token-readiness"
 ```
 
-Expected: one new OPEN session receipt. Commit no code in this task.
+Expected: one new OPEN session receipt. Do not synthesize a `knowledge:consume` claim or use the old static fixture as acceptance evidence. Commit no code in this task.
 
 ## Task 2: Introduce Identity Storage And Pure Operation Policy
 
@@ -389,7 +366,7 @@ git commit -m "feat: authenticate MCP with managed agent credentials"
 - Create: `apps/web/lib/identity/{server,csrf,forms}.ts`.
 - Create: `apps/web/lib/identity/{server,csrf}.test.ts`.
 - Modify: `apps/web/lib/{request-principal.ts,3a/principal.ts}`.
-- Create: `apps/web/app/api/auth/{login,logout}/route.ts`, `apps/web/app/api/admin/{users,grants,agent-credentials}/route.ts`.
+- Create: `apps/web/app/api/auth/{login,logout}/route.ts`, `apps/web/app/api/admin/{users,grants}/route.ts`, `apps/web/app/api/agent-credentials/{agents,issue,rotate,revoke}/route.ts`.
 - Create: `apps/web/app/(auth)/login/page.tsx`, `apps/web/app/(admin)/identity/page.tsx`.
 - Modify: `apps/web/middleware.ts` if it exists; otherwise create it only for route protection and no business authorization.
 
@@ -426,7 +403,7 @@ Login verifies an enabled local account and password, creates a session with idl
 
 - [ ] **Step 4: Implement administration endpoints and minimal screens**
 
-Only an authenticated platform administrator may create/disable users, create an Agent identity, issue one displayed Agent secret, revoke/rotate credentials, grant/revoke exact operation tuples or run password reset. All mutations require recent authentication, CSRF/origin checks and append `SecurityAudit`. The UI displays credential metadata and expiry, never re-displays a secret; it gives the secret once in a server response body intended for immediate copying.
+Only an authenticated platform administrator may create/disable users, grant/revoke exact operation tuples or run password reset. An authenticated user with recent authentication may create an Agent identity only for themselves, issue one displayed secret only for an Agent they own, and rotate/revoke only their own credentials. The server rejects a requested Token ceiling that is not a subset of the user's current exact Scope-operation grants. All mutations require CSRF/origin checks and append `SecurityAudit`. The UI displays credential metadata and expiry, never re-displays a secret, and gives the secret once in a server response body intended for immediate copying.
 
 - [ ] **Step 5: Add first-admin and recovery commands**
 
@@ -443,7 +420,19 @@ pnpm exec vitest run apps/web/lib/identity apps/web/app/api/auth apps/web/app/ap
 
 Expected: login, logout, expiry, disable, CSRF, recent-auth, one-time bootstrap, last-admin protection and recovery invalidation pass.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Verify a front-end-issued Token against MCP readiness**
+
+Create an enabled user with an exact `knowledge:consume` grant on the Designer Scope. Through the owner route, create that user's Agent and issue its credential. Call `evaluate_system_knowledge_readiness` and `read_system_knowledge` through HTTP MCP using its Bearer Token.
+
+Expected: the Token resolves to its stable Agent and cannot exceed the owner's Scope-operation grants. A readiness result of `ALLOW`, `SOURCE_CHECK_REQUIRED`, or `BLOCKED` is valid according to the selected profile evidence; `PERMISSION_DENIED` is not. Record the result and waterline as acceptance evidence.
+
+Run:
+
+```powershell
+pnpm exec vitest run apps/web/app/api/agent-credentials apps/mcp-server/src/identity/mcp-resolver.test.ts apps/mcp-server/src/knowledge-readiness/readiness.e2e.test.ts
+```
+
+- [ ] **Step 8: Commit**
 
 ```powershell
 git add apps/web apps/mcp-server/package.json packages/identity scripts

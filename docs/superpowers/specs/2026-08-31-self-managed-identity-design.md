@@ -22,7 +22,7 @@ Selected: administrator-managed local accounts and revocable opaque Agent tokens
 
 ## 2. Control Plane And Data Plane
 
-Security administration manages accounts, Agent ownership, sessions, token ceilings, grants and credential audit records through authenticated, same-origin Web administration APIs and a deployment-local bootstrap/recovery command. Its PostgreSQL transactions must not depend on an MCP token that has not yet been created.
+Security administration creates, disables and recovers accounts, grants exact Scope-operation tuples, and audits those actions through authenticated same-origin Web administration APIs and a deployment-local bootstrap/recovery command. An authorized user then creates, rotates and revokes credentials only for their own stable Agent identities through the same Web control plane. The server intersects the requested Token ceiling with that user's current grants before issuing a Token. Its PostgreSQL transactions must not depend on an MCP token that has not yet been created.
 
 Authored ADRs, Proposals, Context Packs, contracts and typed design links still enter through MCP. A security administration API is not an alternative design-asset write endpoint. PostgreSQL remains authoritative; a graph projection cannot authenticate, grant access or approve a write.
 
@@ -41,7 +41,7 @@ These are conceptual records, not a claim that the Prisma tables already exist. 
 | Web session | Opaque random session digest, user ID, credential version, idle and absolute expiry, revocation state. No Agent tokens in browser session state. |
 | Security audit | Actor, credential/session identifier, owner, action, target, outcome and request correlation. No raw credentials, passwords or unauthorized asset bodies. |
 
-Each Agent token is minted for an existing Agent identity owned by the user. Several tools may use distinct credentials for the same Agent; distinct Agents are explicitly registered, not inferred from token count. User disable invalidates all their sessions and owned Agent credentials. Rotation replaces the secret without changing the stable subject.
+Each Agent token is minted by its authorized owner for an existing Agent identity they own. Several tools may use distinct credentials for the same Agent; distinct Agents are explicitly registered, not inferred from token count. Token creation accepts only requested exact Scope-operation tuples that are already held by the user, and always records the owner, requested ceiling, expiry and issuance audit. User disable invalidates all their sessions and owned Agent credentials. Rotation replaces the secret without changing the stable subject.
 
 Approval independence follows stable authorship and delegation, not credential count: an Agent cannot approve its own generated candidate; two Agents under the same owner do not count as independent for a T1 review. T2/T3 continue to require an interactive human identity. This does not introduce a two-human rule for T2/T3: a human owner may explicitly review an Agent draft unless a separately governed policy requires a different human. An Agent token must never present itself as a human session.
 
@@ -109,7 +109,7 @@ One consolidated verification pass per completed implementation increment must d
 | Credential hygiene | Secret not logged or cached in browser; CSRF, expiry, throttling and audit failures reject correctly. |
 | Governance delivery | Matching bilingual ADR/Proposal/Context Pack and typed links, exact-Scope MCP reconciliation, and the same design-session closure. |
 
-No runtime tests for this new identity system have been run because implementation has not started. An implementation plan must choose the vetted libraries and concrete endpoints before editing runtime code and must not expand to an independent identity service or multi-tenant platform.
+No runtime tests for this new identity system have been run because implementation has not started. An implementation plan must choose the vetted libraries and concrete endpoints before editing runtime code and must not expand to an independent identity service or multi-tenant platform. After the first front-end-issued managed Token exists, the acceptance suite must use it to test `knowledge:consume`; this is not a bootstrap prerequisite for implementing local identity.
 
 ## 9. Dependent Multi-Service Comparison Boundary
 
@@ -123,7 +123,7 @@ Catalog inventory counts measure stored records, not system completeness, comple
 
 - Repository review located the global `ScopedPrincipal.permissions`, inherited `hasScopeAccess`, exact `authorizePrincipalScope`, actor-based candidate approval, environment MCP token and optional cursor grant binding. These support the six corrections, not a claim that the corrections are implemented.
 - Exact-Scope preflight returned the session above, `readAssetCount=449`, `designContextDigest=b865cf31d6804bac8322142d1cfdbc0ffae2eb40d58844be37eee5c237c1b7a5`, and reconciliation `UNVERIFIED` (not `CONVERGED`).
-- `evaluate_system_knowledge_readiness` using the current local MCP credential returned `PERMISSION_DENIED`. No trusted body or readiness success is claimed, and no permissions were expanded. Owner: SpecForge Security and Platform Governance. Retry: an authorized operator supplies an already approved exact-Scope `knowledge:consume` credential, then rerun evaluation and bounded reading before implementation.
+- `evaluate_system_knowledge_readiness` using the current local design-context seed credential returned `PERMISSION_DENIED` because that seed fixture deliberately omits `knowledge:consume`; the old HTTP static-claims fixture includes it. Neither fixture is a managed user credential. This is evidence for removing the circular bootstrap prerequisite, not a reason to weaken readiness. After the identity increment issues a bounded Token through the Web control plane, rerun evaluation and bounded reading with that Token as acceptance evidence.
 - Design synchronization and written-spec review cannot certify production identity, a complete source inventory or live enterprise connectivity. CodeHub remains a separate externally blocked backlog item.
 
 Security references: [OWASP authorization](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html), [OWASP session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html). These inform least privilege, repeated authorization and session lifecycle requirements; they are not a certification of this project.
@@ -140,13 +140,13 @@ Security references: [OWASP authorization](https://cheatsheetseries.owasp.org/ch
 
 ### 2. 管理接口与设计资产接口
 
-账号、Agent 归属、会话、Token 上限、授权和安全审计通过已认证的同源 Web 管理接口及部署本地初始化/恢复命令维护，不能依赖尚未创建的 MCP Token。ADR、Proposal、Context Pack、契约与有类型设计关系仍只能通过 MCP 写入。PostgreSQL 保持权威，图投影不能授予权限。平台管理员默认没有设计资产读取权；可显式授权，包括留痕的自授权，但需近期交互认证并记录发起人、目标、Scope、操作与原因。初始数据授权为空，普通 Agent Token 不具备账号管理能力。
+账号创建、禁用、恢复和精确 Scope-operation 授权通过已认证的同源 Web 管理接口及部署本地初始化/恢复命令维护，不能依赖尚未创建的 MCP Token。获得授权的用户可以在前端只为自己拥有的稳定 Agent 创建、轮换和撤销 Token；服务端把用户当前授权与请求上限求交后才签发。ADR、Proposal、Context Pack、契约与有类型设计关系仍只能通过 MCP 写入。PostgreSQL 保持权威，图投影不能授予权限。平台管理员默认没有设计资产读取权；可显式授权，包括留痕的自授权，但需近期交互认证并记录发起人、目标、Scope、操作与原因。初始数据授权为空，普通 Agent Token 不具备账号管理能力。
 
 ### 3. 身份与持久化契约
 
 概念记录包括用户、Agent、Agent 凭据、Scope-operation 授权、Web 会话和安全审计，不宣称已有对应 Prisma 表。优先迁移兼容记录，不能形成两套授权权威。用户保存稳定 ID、密码哈希、启用状态和凭据/授权版本；Agent 保存稳定 ID 与所属用户，首增量不支持更换所有者。凭据保存公开定位 ID、密文摘要、Agent ID、权限上限、期限、撤销状态和版本。Web 会话独立保存摘要、期限和撤销状态，不存 Agent Token。审计不得包含密码、原始 Token 或未授权正文。
 
-一个 Agent 可有多个 Token，轮换不改变工作台和扫描会话归属；创建 Token 不等于创建 Agent。用户禁用后，所有会话与所属 Agent 凭据失效。Agent 自审不允许；同一所有者的两个 Agent 不算 T1 独立审批。T2/T3 必须由交互登录的人审批；本增量不新增双人审批规则，所有者仍可显式审核自己的 Agent 草稿，除非另有更严格策略。Token 不得伪装成人。历史断言缺少委托归属时，不能靠不同字符串证明独立，应转人工审核或依据证据登记身份映射，不伪造或静默重写作者。
+一个 Agent 可有多个 Token，授权用户只能为自己拥有的 Agent 创建 Token；轮换不改变工作台和扫描会话归属；创建 Token 不等于创建 Agent。Token 请求只能包含用户当前拥有的精确 Scope-operation 组合，并记录所有者、上限、期限和签发审计。用户禁用后，所有会话与所属 Agent 凭据失效。Agent 自审不允许；同一所有者的两个 Agent 不算 T1 独立审批。T2/T3 必须由交互登录的人审批；本增量不新增双人审批规则，所有者仍可显式审核自己的 Agent 草稿，除非另有更严格策略。Token 不得伪装成人。历史断言缺少委托归属时，不能靠不同字符串证明独立，应转人工审核或依据证据登记身份映射，不伪造或静默重写作者。
 
 ### 4. 精确 Scope 授权
 
@@ -180,7 +180,7 @@ Agent 请求按 `(企业, 应用服务, 操作)` 判断：凭据、Agent、所�
 
 每个实施增量完成后集中验证：Scope 与操作不交叉提权；撤销覆盖长连接、Cookie、游标、导出和下载；写入/撤销两种竞态顺序符合事务契约；轮换身份稳定且同所有者多凭据不能伪造独立审批；首次初始化、最后管理员、密码重置和重启安全；授权迁移经批准、新服务默认无权且历史资产保留；Web/MCP/派生读取入口统一；秘密保护、CSRF、到期、限流与审计失败均生效；双语 MCP 设计记录及关系对账和原会话关闭完整。
 
-新身份功能尚未编码，因此没有相应运行测试证据。实施计划须先确定成熟库和具体接口，不扩大成独立身份服务或多租户平台。
+新身份功能尚未编码，因此没有相应运行测试证据。实施计划须先确定成熟库和具体接口，不扩大成独立身份服务或多租户平台。首个前端签发的受控 Token 产生后，验收套件必须使用它测试 `knowledge:consume`；该测试不是实现本地身份的初始化前置条件。
 
 ### 9. 后续跨服务比较边界
 
@@ -192,4 +192,4 @@ Agent 请求按 `(企业, 应用服务, 操作)` 判断：凭据、Agent、所�
 
 仓库审查定位了全局操作权限、父 Scope 继承、精确授权、按 actor 审批隔离、环境 MCP Token 和可选游标授权绑定，支持六项设计修正，但不证明已经修复。精确 Scope 预检返回上述会话、449 条读取资产和摘要，最近对账为 `UNVERIFIED`，不是已收敛。
 
-当前本地 MCP 凭据调用 `evaluate_system_knowledge_readiness` 返回 `PERMISSION_DENIED`；未取得可信正文，不宣称就绪，不扩大权限。负责人为安全与平台治理团队；触发条件为管理员提供已批准的精确 Scope `knowledge:consume` 凭据，实施前重新评估和有界读取。设计同步和书面审阅不能证明生产身份、完整来源目录或企业连接可用；CodeHub 继续单独受外部阻塞。上方 OWASP 引用用于授权与会话要求，不是项目安全认证。
+当前本地 design-context seed 凭据调用 `evaluate_system_knowledge_readiness` 返回 `PERMISSION_DENIED`，因为该夹具特意不含 `knowledge:consume`；旧 HTTP static-claims 夹具则含有该权限，两者都不是真实用户凭据。此现象说明不能把尚未签发的受控 Token 当成身份实现的初始化前置条件，也不能因此弱化可信读取。前端签发首个受控 Token 后，使用该 Token 重新评估和有界读取作为验收证据。设计同步和书面审阅不能证明生产身份、完整来源目录或企业连接可用；CodeHub 继续单独受外部阻塞。上方 OWASP 引用用于授权与会话要求，不是项目安全认证。

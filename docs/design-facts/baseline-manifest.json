@@ -22,9 +22,9 @@
                               "adr-system-knowledge-readiness-gate"
                           ],
                           "owner": "SpecForge Security and Platform Governance",
-                          "status": "Design direction accepted; written specification awaiting review; implementation not started; local trusted-read credential denied.",
-                          "reason": "Single-enterprise deployments need individual account and Agent credential lifecycles with exact Scope-operation authorization. Current trusted-read evaluation returns PERMISSION_DENIED; production identity and multi-service comparison are not implemented by this record.",
-                          "retryTrigger": "Review the written specification and implementation plan; use an operator-approved exact-Scope knowledge:consume credential to retry readiness and bounded reading before a fresh implementation preflight. Comparison requires separately approved design after identity acceptance.",
+                          "status": "Design direction accepted; written specification and implementation plan approved; implementation not started; local seed trusted-read denial is a post-issuance acceptance fixture limitation, not bootstrap blocking.",
+                          "reason": "Single-enterprise deployments need administrator-granted exact Scope-operation tuples and owner-issued bounded Agent credentials. The local design-context seed deliberately omits knowledge:consume while the old HTTP static-claims fixture includes it; neither is a managed user credential. Production identity and multi-service comparison are not implemented by this record.",
+                          "retryTrigger": "Open a fresh implementation preflight. After the Web control plane issues a Token bounded to its owner's exact knowledge:consume grant, use that Token to retry readiness and bounded reading as acceptance evidence. Comparison requires separately approved design after identity acceptance.",
                           "evidence": [
                               {
                                   "command": "rg -n 'ScopedPrincipal|ScopeGrant|permissions:|decisionRef|subject|normalizeGrants|authorizePrincipalScope' packages/core/src/architecture/types.ts packages/core/src/architecture/principal.ts apps/mcp-server/src/knowledge-readiness/service.ts",

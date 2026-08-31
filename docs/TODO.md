@@ -54,9 +54,9 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **Owner:** SpecForge Security and Platform Governance.
 
-**Rationale:** A single-enterprise deployment will use administrator-managed Web accounts and independently revocable Agent tokens. Permissions must intersect per exact Scope and operation, not as separate global unions. Stable Agent identity, owner-aware review separation, transactionally ordered revocation, protected bootstrap/recovery, and a reviewed migration replace shared/static identity assumptions. PostgreSQL remains authoritative. Cross-service inventory is not proof of complete system knowledge.
+**Rationale:** A single-enterprise deployment will use administrator-managed accounts and independently revocable Agent tokens. Administrators grant exact Scope-operation tuples; authorized users issue, rotate and revoke credentials only for their own Agents, and the server caps every Token to the user's current tuples. Permissions must intersect per exact Scope and operation, not as separate global unions. Stable Agent identity, owner-aware review separation, transactionally ordered revocation, protected bootstrap/recovery, and a reviewed migration replace shared/static identity assumptions. PostgreSQL remains authoritative. Cross-service inventory is not proof of complete system knowledge.
 
-**Trigger:** Review `docs/superpowers/specs/2026-08-31-self-managed-identity-design.md`, approve an implementation plan and acquire a fresh exact-Scope preflight. Resolve the current local credential's `PERMISSION_DENIED` from `evaluate_system_knowledge_readiness` using an operator-approved exact-Scope `knowledge:consume` credential before implementation; do not expand permissions automatically. Comparison starts only after the identity migration and acceptance matrix pass and its separate specification is approved. OIDC, multi-tenant SaaS and CodeHub are not prerequisites or included deliverables.
+**Trigger:** Review `docs/superpowers/specs/2026-08-31-self-managed-identity-design.md`, approve an implementation plan and acquire a fresh exact-Scope preflight. The current `PERMISSION_DENIED` is from a local design-context seed fixture that deliberately omits `knowledge:consume`; it is not a bootstrap blocker. After the front end issues the first owner-bounded Token, use that Token for readiness and bounded-read acceptance without expanding permissions or weakening the gate. Comparison starts only after the identity migration and acceptance matrix pass and its separate specification is approved. OIDC, multi-tenant SaaS and CodeHub are not prerequisites or included deliverables.
 
 **Completion evidence:** Web, MCP including reused transports, exports, statistics, graph reads and task downloads all use current exact-Scope/operation grants. Tests cover permission cross products, revoke/write races, token rotation and review independence, session expiry, last-admin protection, CSRF, audit atomicity and reviewed parent-to-leaf migration without data loss or static/seed fallback. Comparison separately proves explicit-selection authorization, bounded reads, per-Scope metric/version/trust provenance, unknown-not-zero and no cross-Scope writes. Synchronize bilingual design facts and typed links and close the implementation session; no runtime completion is claimed by this design-only record.
 
@@ -68,9 +68,9 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **负责人：** SpecForge 安全与平台治理团队。
 
-**理由：** 单企业部署采用管理员维护的 Web 账号和可独立撤销的 Agent Token；权限按精确 Scope 与操作求交，不能分别合并两个全局集合。稳定 Agent 身份、按归属判断审批独立、事务排序撤销、受保护初始化/恢复和审阅迁移取代共享/静态身份假设。PostgreSQL 保持权威，跨服务库存不等于完整系统知识。
+**理由：** 单企业部署采用管理员维护的账号和可独立撤销的 Agent Token；管理员授予精确 Scope-operation 组合，获得授权的用户只能为自己的 Agent 签发、轮换和撤销凭据，服务端将每个 Token 限制在用户当前组合内。权限按精确 Scope 与操作求交，不能分别合并两个全局集合。稳定 Agent 身份、按归属判断审批独立、事务排序撤销、受保护初始化/恢复和审阅迁移取代共享/静态身份假设。PostgreSQL 保持权威，跨服务库存不等于完整系统知识。
 
-**启动条件：** 审阅 `docs/superpowers/specs/2026-08-31-self-managed-identity-design.md`、批准实施计划并取得新精确 Scope 预检。当前本地凭据调用 `evaluate_system_knowledge_readiness` 返回 `PERMISSION_DENIED`，需管理员提供已批准的精确 Scope `knowledge:consume` 凭据，实施前重试，禁止自动扩大权限。身份迁移与验收矩阵通过后，才审阅并实施独立比较方案。OIDC、多租户 SaaS 和 CodeHub 不是本次前置条件或交付项。
+**启动条件：** 审阅 `docs/superpowers/specs/2026-08-31-self-managed-identity-design.md`、批准实施计划并取得新精确 Scope 预检。当前 `PERMISSION_DENIED` 来自特意不含 `knowledge:consume` 的 local design-context seed 夹具，不阻塞初始化；前端签发首个所有者有界 Token 后，使用该 Token 做就绪和有界读取验收，不自动扩大权限或弱化门禁。身份迁移与验收矩阵通过后，才审阅并实施独立比较方案。OIDC、多租户 SaaS 和 CodeHub 不是本次前置条件或交付项。
 
 **完成证据：** Web、含复用连接的 MCP、导出、统计、图读取和任务下载均使用当前精确 Scope/操作授权。覆盖权限交叉提权、撤销/写入竞态、轮换与审批独立、会话到期、最后管理员、CSRF、审计原子性、无数据丢失的父到叶子迁移和拒绝 static/seed 回退。比较另证明显式选择集授权、有界读取、逐 Scope 口径/版本/可信来源、未知不等于零且不跨 Scope 写入。同步双语设计事实与关系并关闭实施会话；本设计文档不宣称运行功能完成。
 

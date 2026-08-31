@@ -19,14 +19,14 @@ A single-enterprise deployment needs locally administered Web users and individu
 
 ## Decision
 
-1. Deliver local accounts and opaque managed Agent tokens first, within the existing deployment. Separate security administration APIs/local bootstrap commands from MCP-only design-asset writes. PostgreSQL owns identities, grants, sessions, audits and authored facts; graphs remain projections. An administrator has no implicit data-read grant; explicit self-grants require recent authentication and an audit trail.
+1. Deliver local accounts and opaque managed Agent tokens first, within the existing deployment. Separate security administration APIs/local bootstrap commands from MCP-only design-asset writes. Administrators create accounts and grant exact Scope-operation tuples; an authorized user issues, rotates and revokes credentials only for Agent identities they own, with the server intersecting every requested Token ceiling with that user's current grants. PostgreSQL owns identities, grants, sessions, audits and authored facts; graphs remain projections. An administrator has no implicit data-read grant; explicit self-grants require recent authentication and an audit trail.
 2. Authorize each exact `(enterprise, application service, operation)` using current owner permissions intersected with the token ceiling and server policy. Do not combine independent unions of services and operations. Keep diagnostic permission explicit. Resolve database authority in server infrastructure and apply a pure shared Core policy at Web, MCP, export, statistics, graph and task-result boundaries.
 3. Separate stable user ID, stable Agent ID, owner ID and credential ID. Rotation preserves Agent workspaces and scan-session attribution. Two credentials or same-owner Agents cannot manufacture independent T1 review; T2/T3 still require interactive human approval without adding an implicit two-human requirement. Unknown historical delegation needs human review or audited evidence-backed mapping.
 4. Check authoritative credential/grant state on each request, including reused MCP transports; fail closed on database failure. Revocation affects checks after its commit, not already delivered data. Mutation and revocation share deterministic guard-row locking and re-read state inside the guarded transaction. New deferred effects and result reads reauthorize; committed outbox delivery retains original attribution. Bind continuations to credential context, authorization revision, exact Scope, policy and waterlines; forbid production default signing secrets.
 5. Bootstrap the first administrator through a deployment-local, one-time, transactionally protected operation with no default password or automatic data grants. Separate Web sessions from Agent tokens; require vetted password/session primitives, HTTPS, CSRF defenses, expiry, throttling, redacted audit and recent authentication for sensitive administration. Protect the last administrator; password reset revokes dependent credentials. Recovery/restart must not revive revoked access.
 6. Replace mixed static/inherited registry decisions with one database-backed authority. Migrate parent grants only through an administrator-approved snapshot of current leaves and operations, rejecting stale reports. Preserve assets/history, reject missing Scope, and do not import mock privileges. Production cutover invalidates old sessions/cursors and rejects static/seed/shared-token fallbacks, including unsupported stdio access. Rollback preserves revocations and authority or enters maintenance.
 7. Defer multi-service comparison implementation until identity acceptance, then produce a separate specification. Authorize the complete explicit selection before reading bodies; retain per-service provenance, metric semantics, versions, coverage and trust. Inventory counts are not proof of system completeness. Agent system meaning remains readiness-gated per Scope/Profile; missing/unavailable is not zero, and independent snapshots are not a global snapshot.
-8. Record this increment as design-only. Before implementation, review the written specification, choose concrete interfaces and vetted libraries in a plan, obtain a fresh exact-Scope preflight and resolve the denied trusted-read credential. Do not interpret this ADR, a reviewing Proposal or its Context Pack as implemented authentication.
+8. Record this increment as design-only. Before implementation, review the written specification, choose concrete interfaces and vetted libraries in a plan, and obtain a fresh exact-Scope preflight. The local design-context seed fixture's denied trusted read is not a bootstrap blocker because it deliberately lacks `knowledge:consume`; after the Web control plane issues the first bounded managed Token, use that Token to verify readiness and bounded reading. Do not interpret this ADR, a reviewing Proposal or its Context Pack as implemented authentication.
 
 ## Alternatives
 
@@ -42,15 +42,15 @@ A single-enterprise deployment needs locally administered Web users and individu
 - Authoritative checks and guard locks favor consistent revocation over unchecked authentication caching; load and deadlock behavior need focused implementation evidence.
 - Existing deployments require an explicit reviewed migration, not automatic promotion of mock users and inherited permissions.
 - Multi-service comparison remains tracked follow-on work owned by Security and Platform Governance, triggered by verified identity migration and separate design approval.
-- Trusted knowledge consumption is currently blocked for the local MCP credential (`PERMISSION_DENIED`). Owner: Security and Platform Governance. Retry with an operator-approved exact-Scope `knowledge:consume` credential; do not self-grant or weaken readiness enforcement.
+- Trusted knowledge consumption currently returns `PERMISSION_DENIED` for the local design-context seed fixture because its explicit fixture claims omit `knowledge:consume`; the old HTTP static-claims fixture is also unsuitable because it is not a managed user credential. This does not block identity bootstrap. Owner: Security and Platform Governance. After front-end issuance, retry with an owner-issued exact-Scope `knowledge:consume` Token; do not weaken readiness enforcement.
 
 ## Constraints
 
 - All design writes use the exact owning Designer Scope and matching repository/MCP IDs, English canonical content and complete Chinese overlays.
 - This record describes target behavior only; no runtime, schema, deployment, token or user grant changes are delivered in this document increment.
 - Account management does not create an alternative design-asset write path. Existing design assets and historical actor attribution remain intact.
-- Implementation requires the written-spec review, an implementation plan, resolved trusted-read prerequisite and fresh preflight. CodeHub, OIDC, enterprise live connectors and capacity certification remain independent backlog items.
-- The current design session must not be described as fully converged while its trusted-read prerequisite is denied; record the failure and retry trigger even if document synchronization succeeds.
+- Implementation requires the written-spec review, an implementation plan and fresh preflight. The managed-Token trusted-read test is a required acceptance check after the Web credential issuance path exists. CodeHub, OIDC, enterprise live connectors and capacity certification remain independent backlog items.
+- The current design session records the fixture limitation and its post-issuance retry trigger; it must not be treated as runtime implementation convergence.
 
 ## Evidence
 
@@ -80,14 +80,14 @@ A single-enterprise deployment needs locally administered Web users and individu
 
 ### 决策
 
-1. 先在现有部署交付本地账号和不透明托管 Agent Token。安全管理 API/本地初始化命令与 MCP-only 设计资产写入分开；PostgreSQL 对身份、授权、会话、审计和设计事实保持权威，图只是投影。管理员默认无数据读取权，显式自授权需要近期认证与审计。
+1. 先在现有部署交付本地账号和不透明托管 Agent Token。安全管理 API/本地初始化命令与 MCP-only 设计资产写入分开；管理员创建账号并授予精确 Scope-operation 组合，获得授权的用户只能为自己拥有的 Agent 签发、轮换和撤销凭据，服务端把请求上限与用户当前授权求交。PostgreSQL 对身份、授权、会话、审计和设计事实保持权威，图只是投影。管理员默认无数据读取权，显式自授权需要近期认证与审计。
 2. 按精确 `(企业, 应用服务, 操作)` 计算所有者当前权限、Token 上限和服务端策略交集，不能分别合并服务与操作集合。诊断权限独立授予；服务端解析数据库权威，Core 纯策略统一用于 Web、MCP、导出、统计、图和任务结果。
 3. 分离稳定用户 ID、Agent ID、所有者 ID 和凭据 ID。轮换不改变工作台和扫描会话归属；两个凭据或同所有者 Agent 不能伪造 T1 独立审批。T2/T3 仍要求交互人审，不隐式新增双人审批；未知历史委托归属转人工或凭证据留痕映射。
 4. 每请求从权威库检查凭据和授权，复用 MCP 连接也复查；数据库失败则拒绝。撤销影响其提交后的检查，不追回已送达数据。写入与撤销共用固定顺序保护行锁，在受保护事务内重新读取状态。新延期效果和结果读取重新授权，已提交 Outbox 保留原始归属；续页绑定凭据上下文、授权版本、精确 Scope、策略和水位，生产禁止默认签名密钥。
 5. 首管理员通过部署本地、仅一次、事务保护的操作创建，不设默认密码或自动数据授权。Web 会话与 Agent Token 分开，采用成熟密码/会话组件、HTTPS、CSRF、到期、限流、脱敏审计和敏感管理近期认证。保护最后管理员；密码重置撤销依赖凭据，恢复/重启不得复活已撤销权限。
 6. 用数据库权威替代混合静态/继承注册表判断。父级授权仅按管理员批准的当前叶子服务和操作快照迁移，过期报告拒绝。保留资产与历史、拒绝缺 Scope、不导入 mock 权限。生产切换使旧会话/游标失效，拒绝 static/seed/共享 Token 回退以及不受支持的 stdio 入口；回滚保留撤销与授权权威，或进入维护。
 7. 跨服务比较待身份验收后独立设计实施。显式选择集全部授权后才读正文；逐服务保留来源、指标口径、版本、覆盖和可信状态。库存数量不代表系统完整；Agent 系统语义逐 Scope/Profile 过就绪门禁；缺失/不可用不是零，独立快照不能冒充全局快照。
-8. 本增量仅登记设计。实施前审阅书面规格，计划中确定具体接口与成熟库，取得新精确 Scope 预检并解决可信读取凭据拒绝。不得把 ADR、审阅中的 Proposal 或 Context Pack 解释为已实现认证。
+8. 本增量仅登记设计。实施前审阅书面规格，计划中确定具体接口与成熟库，并取得新精确 Scope 预检。local design-context seed 夹具的可信读取拒绝不是初始化阻塞，因为它特意不包含 `knowledge:consume`；Web 控制面签发首个有界 Token 后，使用该 Token 验证就绪和有界读取。不得把 ADR、审阅中的 Proposal 或 Context Pack 解释为已实现认证。
 
 ### 备选方案
 
@@ -103,12 +103,12 @@ A single-enterprise deployment needs locally administered Web users and individu
 - 权威检查和保护锁优先保证撤销一致性，负载与死锁行为仍需实施证据。
 - 现有部署需显式审阅迁移，不能自动提升 mock 用户或继承权限。
 - 跨服务比较作为后续待办，由安全与平台治理团队负责，触发条件是身份迁移验证通过且独立设计获批。
-- 当前本地 MCP 凭据的可信知识消费返回 `PERMISSION_DENIED`。负责人为安全与平台治理团队；管理员提供已批准的精确 Scope `knowledge:consume` 凭据后重试，不自行加权或弱化门禁。
+- 当前 local design-context seed 夹具的可信知识消费返回 `PERMISSION_DENIED`，因为其显式夹具声明不含 `knowledge:consume`；旧 HTTP static-claims 夹具也不适合，因为它不是真实用户凭据。这不阻塞身份初始化。负责人为安全与平台治理团队；前端签发后用所有者签发的精确 Scope `knowledge:consume` Token 重试，不弱化就绪门禁。
 
 ### 约束
 
 - 设计写入使用精确 Designer Scope、匹配的仓库/MCP ID、英文规范内容与完整中文覆盖。
-- 本记录仅描述目标行为，没有运行时、Schema、部署、Token 或用户授权变更。
+- 本记录仅描述目标行为，没有运行时、Schema、部署、Token 或用户授权变更；受控 Token 的可信读取测试在前端签发路径出现后才作为验收执行。
 - 账号管理不能成为设计资产写入旁路；保留现有设计资产与历史归属。
 - 实施需要书面审阅、实施计划、可信读取前提解决和新预检；CodeHub、OIDC、企业连接器和容量认证独立延期。
 - 当前会话的可信读取前提仍被拒绝时，不能宣称完全收敛；即使文档同步成功也需记录失败与重试条件。
