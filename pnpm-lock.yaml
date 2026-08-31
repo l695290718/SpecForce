@@ -159,6 +159,9 @@ importers:
       '@specforge/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@specforge/identity':
+        specifier: workspace:*
+        version: link:../../packages/identity
       '@specforge/knowledge-query':
         specifier: workspace:*
         version: link:../../packages/knowledge-query
