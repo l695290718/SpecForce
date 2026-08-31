@@ -59,6 +59,10 @@
                                   "result": "Passed."
                               },
                               {
+                                  "command": "SPECFORGE_NEXT_STANDALONE=0 pnpm --filter @specforge/web build",
+                                  "result": "Passed: all 36 routes generated, including /login and /identity. Default standalone tracing is blocked only by Windows OneDrive symlink permissions (EPERM)."
+                              },
+                              {
                                   "command": "pnpm identity:cutover-check",
                                   "result": "Returned BLOCKED as expected for the current legacy deployment environment; the read-only gate detected legacy identity configuration without exposing secret values."
                               }

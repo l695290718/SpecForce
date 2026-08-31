@@ -1,5 +1,5 @@
-import { hash, verify } from "@node-rs/argon2";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createRequire } from "node:module";
 import type { IssuedOpaqueCredential } from "./types";
 
 const agentTokenPrefix = "sfat_";
@@ -27,9 +27,20 @@ export function verifyCredentialSecret(secret: string, expectedDigest: string, p
 
 export async function hashPassword(password: string): Promise<string> {
   if (password.length < 12) throw new Error("PASSWORD_TOO_SHORT");
-  return hash(password, { memoryCost: 19_456, timeCost: 2, parallelism: 1, outputLen: 32 });
+  return loadArgon2().hash(password, { memoryCost: 19_456, timeCost: 2, parallelism: 1, outputLen: 32 });
 }
 
 export async function verifyPassword(password: string, passwordDigest: string): Promise<boolean> {
-  return verify(passwordDigest, password);
+  return loadArgon2().verify(passwordDigest, password);
+}
+
+type Argon2Module = {
+  hash(password: string, options: { memoryCost: number; timeCost: number; parallelism: number; outputLen: number }): Promise<string>;
+  verify(digest: string, password: string): Promise<boolean>;
+};
+
+function loadArgon2(): Argon2Module {
+  const nodeRequire = createRequire(import.meta.url);
+  const moduleName = "@node-rs/argon2";
+  return nodeRequire(moduleName) as Argon2Module;
 }
