@@ -44,6 +44,7 @@
     ,"identity:recover": "tsx scripts/identity-recover.ts"
     ,"identity:migrate-report": "tsx scripts/identity-migrate-report.ts"
     ,"identity:apply-migration": "tsx scripts/identity-apply-migration.ts"
+    ,"identity:verify-config": "tsx scripts/verify-identity-config.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
