@@ -184,6 +184,9 @@ model ArchitectureScope {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  scopeOperationGrants      ScopeOperationGrant[]
+  credentialOperationGrants AgentCredentialScopeGrant[]
+
   @@index([parentId])
   @@index([level])
 }
@@ -213,6 +216,139 @@ model ActorScopeGrant {
 
   @@unique([actorType, actorId, scopeId, action])
   @@index([actorType, actorId])
+}
+
+model UserAccount {
+  id                   String   @id @default(cuid())
+  login                String   @unique
+  displayName          String
+  passwordDigest       String
+  status               String   @default("ACTIVE")
+  isAdministrator      Boolean  @default(false)
+  authorizationVersion BigInt   @default(1)
+  credentialVersion    BigInt   @default(1)
+  disabledAt           DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  agents AgentIdentity[]
+  grants ScopeOperationGrant[] @relation("ScopeGrantSubject")
+  sessions WebSession[]
+
+  @@index([status, login])
+}
+
+model AgentIdentity {
+  id          String   @id @default(cuid())
+  ownerUserId String
+  name        String
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner       UserAccount       @relation(fields: [ownerUserId], references: [id], onDelete: Restrict)
+  credentials AgentCredential[]
+
+  @@unique([ownerUserId, name])
+  @@index([ownerUserId, status])
+}
+
+model AgentCredential {
+  id           String   @id @default(cuid())
+  agentId      String
+  secretDigest String   @unique
+  status       String   @default("ACTIVE")
+  version      Int      @default(1)
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  agent       AgentIdentity              @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  grantCeiling AgentCredentialScopeGrant[]
+
+  @@index([secretDigest, status, expiresAt])
+  @@index([agentId, status, expiresAt])
+}
+
+model ScopeOperationGrant {
+  id                   String   @id @default(cuid())
+  subjectId            String
+  applicationServiceId String
+  operation            String
+  createdByUserId      String?
+  createdAt            DateTime @default(now())
+
+  subject              UserAccount       @relation("ScopeGrantSubject", fields: [subjectId], references: [id], onDelete: Restrict)
+  scope                ArchitectureScope @relation(fields: [applicationServiceId], references: [id], onDelete: Restrict)
+
+  @@unique([subjectId, applicationServiceId, operation])
+  @@index([subjectId, applicationServiceId, operation])
+  @@index([applicationServiceId, operation])
+}
+
+model AgentCredentialScopeGrant {
+  id                   String   @id @default(cuid())
+  credentialId         String
+  applicationServiceId String
+  operation            String
+  createdAt            DateTime @default(now())
+
+  credential           AgentCredential   @relation(fields: [credentialId], references: [id], onDelete: Restrict)
+  scope                ArchitectureScope @relation(fields: [applicationServiceId], references: [id], onDelete: Restrict)
+
+  @@unique([credentialId, applicationServiceId, operation])
+  @@index([credentialId, applicationServiceId, operation])
+}
+
+model WebSession {
+  id           String   @id @default(cuid())
+  userId       String
+  secretDigest String   @unique
+  status       String   @default("ACTIVE")
+  idleExpiresAt DateTime
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, status, expiresAt])
+  @@index([status, idleExpiresAt, expiresAt])
+}
+
+model SecurityAudit {
+  id           String   @id @default(cuid())
+  actorType    String
+  actorId      String
+  action       String
+  targetType   String
+  targetId     String
+  outcome      String
+  reason       String?
+  correlationId String?
+  metadata     Json     @default("{}") @db.JsonB
+  createdAt    DateTime @default(now())
+
+  @@index([actorType, actorId, createdAt])
+  @@index([targetType, targetId, createdAt])
+  @@index([createdAt])
+}
+
+model LegacyScopeGrantMigrationReport {
+  id              String   @id @default(cuid())
+  status          String   @default("DRAFT")
+  registryDigest  String
+  grantDigest     String
+  proposedTuples  Json     @default("[]") @db.JsonB
+  approvedByUserId String?
+  approvedAt      DateTime?
+  appliedAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status, createdAt])
 }
 
 model AgentServiceWorkspace {
