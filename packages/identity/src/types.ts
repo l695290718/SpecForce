@@ -33,3 +33,31 @@ export interface IssuedOpaqueCredential {
   secret: string;
   digest: string;
 }
+
+/** Safe control-plane metadata. It deliberately excludes every secret and digest. */
+export interface CredentialSummary {
+  id: string;
+  agentId: string;
+  status: string;
+  expiresAt: string;
+  revokedAt?: string;
+  createdAt: string;
+  ceiling: ScopedOperationGrant[];
+}
+
+export interface OwnedAgentSummary {
+  id: string;
+  name: string;
+  status: string;
+  createdAt: string;
+  credentials: CredentialSummary[];
+}
+
+export interface UserGrantSummary {
+  id: string;
+  login: string;
+  displayName: string;
+  status: string;
+  isAdministrator: boolean;
+  grants: ScopedOperationGrant[];
+}

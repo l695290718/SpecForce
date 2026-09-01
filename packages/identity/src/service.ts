@@ -2,7 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { Permission } from "@specforge/core";
 import { digestSecret, createOpaqueCredential, hashPassword } from "./credentials";
 import { PrismaIdentityRepository, type PersistedAgentCredential } from "./repository";
-import type { AuthorizationSubject, ScopedOperationGrant } from "./types";
+import type { AuthorizationSubject, CredentialSummary, OwnedAgentSummary, ScopedOperationGrant, UserGrantSummary } from "./types";
 
 export class IdentityError extends Error {
   constructor(readonly code: "CREDENTIAL_INACTIVE" | "OWNER_ACCESS_DENIED" | "OPERATION_DENIED" | "IDENTITY_NOT_FOUND" | "INVALID_CREDENTIAL_EXPIRY") {
@@ -67,6 +67,72 @@ export class IdentityService {
       return created;
     });
     return { agentId: agent.id };
+  }
+
+  async listOwnedAgents(ownerUserId: string): Promise<OwnedAgentSummary[]> {
+    const agents = await this.prisma.agentIdentity.findMany({
+      where: { ownerUserId },
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        createdAt: true,
+        credentials: {
+          orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+          select: {
+            id: true,
+            agentId: true,
+            status: true,
+            expiresAt: true,
+            revokedAt: true,
+            createdAt: true,
+            grantCeiling: { select: { applicationServiceId: true, operation: true } }
+          }
+        }
+      }
+    });
+    return agents.map((agent) => ({
+      id: agent.id,
+      name: agent.name,
+      status: agent.status,
+      createdAt: agent.createdAt.toISOString(),
+      credentials: agent.credentials.map((credential): CredentialSummary => ({
+        id: credential.id,
+        agentId: credential.agentId,
+        status: credential.status,
+        expiresAt: credential.expiresAt.toISOString(),
+        revokedAt: credential.revokedAt?.toISOString(),
+        createdAt: credential.createdAt.toISOString(),
+        ceiling: credential.grantCeiling
+          .map((grant) => ({ applicationServiceId: grant.applicationServiceId, operation: grant.operation as ScopedOperationGrant["operation"] }))
+          .sort(compareGrant)
+      }))
+    }));
+  }
+
+  async listUsersWithGrants(): Promise<UserGrantSummary[]> {
+    const users = await this.prisma.userAccount.findMany({
+      orderBy: [{ login: "asc" }, { id: "asc" }],
+      select: {
+        id: true,
+        login: true,
+        displayName: true,
+        status: true,
+        isAdministrator: true,
+        grants: { select: { applicationServiceId: true, operation: true } }
+      }
+    });
+    return users.map((user) => ({
+      id: user.id,
+      login: user.login,
+      displayName: user.displayName,
+      status: user.status,
+      isAdministrator: user.isAdministrator,
+      grants: user.grants
+        .map((grant) => ({ applicationServiceId: grant.applicationServiceId, operation: grant.operation as ScopedOperationGrant["operation"] }))
+        .sort(compareGrant)
+    }));
   }
 
   async grantOperation(input: { userId: string; applicationServiceId: string; operation: Permission; actorId: string }): Promise<void> {
@@ -182,4 +248,8 @@ function verifyActiveCredential(credential: PersistedAgentCredential, now: Date)
 
 function audit(actorId: string, action: string, targetType: string, targetId: string) {
   return { actorType: "user", actorId, action, targetType, targetId, outcome: "ALLOW", metadata: {} };
+}
+
+function compareGrant(left: ScopedOperationGrant, right: ScopedOperationGrant) {
+  return left.applicationServiceId.localeCompare(right.applicationServiceId) || left.operation.localeCompare(right.operation);
 }
