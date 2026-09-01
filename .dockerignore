@@ -1,0 +1,15 @@
+.git
+.next
+.pnpm-store
+.specforge
+.superpowers
+.tmp
+.worktrees
+artifacts
+dist
+node_modules
+**/node_modules
+**/.next
+*.log
+*.out.log
+*.err.log

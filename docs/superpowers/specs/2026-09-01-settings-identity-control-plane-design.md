@@ -2,7 +2,7 @@
 
 ## Status And Ownership
 
-This specification defines the approved consolidation of SpecForge's self-managed identity controls into the Settings workspace. English is canonical; the Chinese section is the complete human-facing localization overlay. This document describes the target behavior and does not claim implementation.
+This specification defines the approved consolidation of SpecForge's self-managed identity controls into the Settings workspace. English is canonical; the Chinese section is the complete human-facing localization overlay. The Settings implementation is delivered and locally verified, except for a live managed-token issuance acceptance under local-account authentication.
 
 - Owner: SpecForge Security and Platform Governance.
 - Owning Scope: `com.huawei.celon.desiner`.
@@ -78,11 +78,17 @@ Tabs use semantic controls with selected state, forms have labels and field-leve
 
 Keeping `/settings` as a database card with a link to `/identity` was rejected because it preserves a fragmented and undiscoverable workflow. Creating a separate administration application was rejected because the single-enterprise deployment does not need another runtime or security boundary. Duplicating the identity forms in both routes was rejected because it would create divergent behavior and verification surfaces.
 
+## 9. Delivery Evidence And Remaining Boundary
+
+Implemented: safe owner/admin read models; authenticated Agent and user/grant read APIs; exact-grant deletion; bilingual Settings sections; one-time in-memory Token display; loading and safe-error states; runtime redaction; and `/identity` compatibility routing. The focused identity/settings tests and both relevant typechecks passed. The Docker Web image was rebuilt and `http://127.0.0.1:3010/healthz` plus the scoped Settings route returned HTTP 200. Browser verification confirmed default Agents content and the Runtime static-auth warning.
+
+Not claimed: issuing a live managed Token. The current deployed `static` authentication mode has no local-account Web session, so mutating controls correctly return the translated authentication denial. Re-run issuance, rotation, revocation, and exact-Scope ceiling acceptance after a local-account authenticated test user and session are intentionally provisioned.
+
 ## 中文本地化覆盖
 
 ### 状态与归属
 
-本文定义已确认的设置中心身份控制台整合方案。英文为规范内容，本节是完整的中文本地化覆盖。本文只描述目标行为，不声明已经实现。负责人是 SpecForge 安全与平台治理团队；归属 Scope、ADR、Proposal、Context Pack 和设计会话与上方元数据一致。
+本文定义已确认的设置中心身份控制台整合方案。英文为规范内容，本节是完整的中文本地化覆盖。设置实现已经交付并完成本地验证，但尚未在本地账号认证下执行真实受控 Token 签发验收。负责人是 SpecForge 安全与平台治理团队；归属 Scope、ADR、Proposal、Context Pack 和设计会话与上方元数据一致。
 
 ### 1. 问题与目标
 
@@ -149,3 +155,9 @@ Keeping `/settings` as a database card with a link to `/identity` was rejected b
 ### 8. 未采用方案
 
 没有采用“设置页只放 `/identity` 跳转”，因为工作流仍然割裂；没有新建独立管理应用，因为单企业部署不需要新增运行时和安全边界；没有在两个路由复制表单，因为这会形成行为和验证分叉。
+
+### 9. 交付证据与剩余边界
+
+已经实现：安全的本人/管理员读取模型、认证 Agent 与用户/授权读取接口、精确授权撤销、双语设置区域、一次性内存 Token 展示、加载与安全错误状态、运行环境脱敏和 `/identity` 兼容路由。聚焦身份/设置测试以及两个相关类型检查均通过。Docker Web 镜像已重建，`http://127.0.0.1:3010/healthz` 与带 Scope 的设置路由都返回 HTTP 200；浏览器验证确认默认 Agent 内容与运行页的 static 认证提示。
+
+未声明通过：真实托管 Token 的签发。当前部署的 `static` 认证模式没有本地账号 Web 会话，因此变更控件会正确返回翻译后的认证拒绝。等明确准备本地账号认证测试用户和会话后，再验证签发、轮换、撤销和精确 Scope 上限。

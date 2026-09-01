@@ -58,6 +58,14 @@ A single-enterprise deployment needs locally administered Web users and individu
 
 ## Evidence
 
+### Settings Control-Plane Delivery
+
+Implemented the Settings control-plane consolidation in the exact Designer Scope. `/settings` now exposes bilingual Agents and Tokens, Users and Permissions, and Runtime sections. The route defaults to Agents and Tokens, retains the exact Scope in section links, loads only owned Agent and safe credential metadata, and makes the static-authentication limitation explicit. The legacy `/identity` surface now renders the Settings workspace instead of retaining duplicate forms.
+
+The Web read boundary exposes only safe summaries: Agent and credential identifiers, lifecycle metadata, and exact operation ceilings; password digests and credential secret digests are not selected or returned. User/grant listing remains administrator-gated. New grant revocation requires the existing same-origin mutation checks, an administrator, an exact tuple, an explicit reason, and the existing transactional audit path. Token plaintext is held in client memory only for the immediate issuance or rotation result and is cleared when dismissed or when the component unmounts.
+
+Focused evidence: `pnpm exec vitest run packages/identity/src/service-read.test.ts packages/identity/src/policy.test.ts packages/identity/src/credentials.test.ts` passed 6 tests; `pnpm exec vitest run apps/web/components/settings/settings-state.test.ts apps/web/lib/__tests__/locale.test.ts` passed; `pnpm --filter @specforge/identity typecheck` and `pnpm --filter @specforge/web typecheck` passed. Docker rebuilt the Web image and the 3010 service returned `health=200 settings=200`. Browser verification confirmed the three Settings sections, default Agent content, exact Scope links, safe unauthenticated feedback under static mode, and redacted runtime database configuration. A live credential issue remains unverified because the deployed static-auth mode intentionally has no local-account session; this is not represented as passed.
+
 ### Current Implementation Evidence
 
 - `pnpm --filter @specforge/identity test`: PASS, 4 tests.
@@ -128,6 +136,14 @@ A single-enterprise deployment needs locally administered Web users and individu
 - 当前会话的可信读取前提仍被拒绝时，不能宣称完全收敛；即使文档同步成功也需记录失败与重试条件。
 
 ### 证据
+
+#### 设置控制台交付
+
+已在精确 Designer Scope 内实现设置控制台整合。`/settings` 现在提供完整双语的“Agent 与 Token”“用户与权限”“运行环境”区域，默认打开 Agent 与 Token，区域链接保留精确 Scope，只读取本人 Agent 与安全凭据元数据，并明确提示 static 认证限制。旧 `/identity` 不再保留重复表单，而是呈现新的设置工作区。
+
+Web 读取边界只返回安全摘要：Agent 和凭据 ID、生命周期元数据、精确操作上限；不会选择或返回密码摘要和凭据秘密摘要。用户及授权列表仍受管理员权限保护。新增授权撤销复用既有同源变更检查，要求管理员、精确组合、明确原因，并走原有事务审计路径。Token 明文仅保存在签发或轮换即时结果的客户端内存中，关闭结果或组件卸载后清除。
+
+聚焦证据：`pnpm exec vitest run packages/identity/src/service-read.test.ts packages/identity/src/policy.test.ts packages/identity/src/credentials.test.ts` 通过 6 项测试；`pnpm exec vitest run apps/web/components/settings/settings-state.test.ts apps/web/lib/__tests__/locale.test.ts` 通过；`pnpm --filter @specforge/identity typecheck` 和 `pnpm --filter @specforge/web typecheck` 通过。Docker 已重建 Web 镜像，3010 服务返回 `health=200 settings=200`。浏览器验证通过三个设置区域、默认 Agent 内容、精确 Scope 链接、static 模式下安全的未认证反馈及脱敏运行环境连接。因为当前 static 模式刻意没有本地账号会话，尚未验证真实凭据签发；不能把它标记为已通过。
 
 - 上方 `rg -n 'ScopedPrincipal|ScopeGrant|permissions:|decisionRef|subject|normalizeGrants|authorizePrincipalScope' ...` 命令定位了全局操作权限及当前主体/授权绑定。
 - `Get-Content apps/mcp-server/src/knowledge/risk-policy.ts -TotalCount 100` 确认 T1 按 actor ID 隔离、T2/T3 按用户类型人审，需要稳定身份和委托契约。
