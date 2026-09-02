@@ -2,6 +2,58 @@
     "version":  1,
     "decisions":  [
                       {
+                          "id": "first-class-feature-assets",
+                          "repositoryAdr": "docs/adr/0047-first-class-feature-assets.md",
+                          "mcpAdrId": "adr-first-class-feature-assets",
+                          "scope": {
+                              "applicationServiceId": "com.huawei.celon.desiner",
+                              "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+                          },
+                          "proposalId": "proposal-first-class-feature-assets",
+                          "contextPackId": "context-pack-first-class-feature-assets",
+                          "proposalStatus": "reviewing",
+                          "proposalNonGoal": {
+                              "en": "This design does not claim runtime implementation, cross-Scope Feature reuse, enterprise templates, automated implementation discovery, or production-scale graph certification.",
+                              "zh": "本设计不声明运行实现、跨 Scope 特性复用、企业模板、自动实现发现或生产规模图认证。"
+                          },
+                          "relatedAssetIds": [
+                              "proposal-specforge-self-design",
+                              "adr-design-fact-dual-record-governance",
+                              "api-specforge-mcp-tools",
+                              "data-specforge-asset-graph"
+                          ],
+                          "owner": "SpecForge Product Architecture and Design Governance",
+                          "status": "Accepted design; P0, P1, and P2 implementation have not started.",
+                          "reason": "SpecForge needs first-class, independently versioned Service and Functional Feature assets to trace stakeholder value through functional behavior to contracts, data, implementation, and current-version evidence without weakening exact-Scope isolation.",
+                          "retryTrigger": "After the written specification is reviewed, create a new exact-Scope implementation session and execute the separately approved P0 implementation plan before claiming any runtime capability.",
+                          "evidence": [
+                              {
+                                  "command": "Industry review: OMG ISO/IEC/IEEE 29148 summary; SEBoK Function glossary; ITU-T Q.1290; OASIS SOA service functionality",
+                                  "result": "Sources support external-value Features, functional decomposition, and reusable service capabilities; the exact Service/Functional Feature taxonomy is explicitly defined by SpecForge."
+                              },
+                              {
+                                  "command": "rg inspection of prisma/schema.prisma, packages/core/src/types.ts, and packages/core/src/relationships/ontology.ts",
+                                  "result": "Confirmed generic DesignAsset persistence, canonical English with Chinese overlay, exact-Scope identity, and the typed relationship ledger."
+                              },
+                              {
+                                  "command": "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Design-first-class-Feature-assets --affected proposal-specforge-self-design,adr-design-fact-dual-record-governance,api-specforge-mcp-tools,data-specforge-asset-graph",
+                                  "result": "Opened exact-Scope design-change-session:8c02a714-28d0-49bd-8154-77d26adc42e1 after reading 463 assets; reconciliation was UNVERIFIED rather than blocked."
+                              },
+                              {
+                                  "command": "pnpm exec vitest run scripts/sync-design-facts.test.ts scripts/reconcile-design-facts.test.ts --exclude '**/.worktrees/**' --exclude '**/.pnpm-store/**'",
+                                  "result": "Passed 2 files and 33 tests for design-fact synchronization and reconciliation contracts."
+                              },
+                              {
+                                  "command": "$env:SPECFORGE_DESIGN_FACT_IDS='first-class-feature-assets'; pnpm design-facts:sync",
+                                  "result": "Returned complete for adr-first-class-feature-assets after structural bilingual validation; the rejected first attempt did not partially persist the record."
+                              },
+                              {
+                                  "command": "$env:SPECFORGE_DESIGN_FACT_IDS='first-class-feature-assets'; pnpm design-facts:check",
+                                  "result": "Verified first-class-feature-assets with missing=0, mismatched=0, outOfScope=0, and blocked=0."
+                              }
+                          ]
+                      },
+                      {
                           "id": "self-managed-identity",
                           "repositoryAdr": "docs/adr/0046-self-managed-identity.md",
                           "mcpAdrId": "adr-self-managed-identity",
