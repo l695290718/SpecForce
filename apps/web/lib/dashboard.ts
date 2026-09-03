@@ -25,7 +25,7 @@ export function buildDashboardScopeView(
 ): DashboardScopeView {
   const assetCounts = designAssetTypes.map((type) => ({
     type,
-    count: catalog[assetCollections[type]].length
+    count: catalog[assetCollections[type]]?.length ?? 0
   }));
   const designAssetCount = assetCounts.reduce((sum, item) => sum + item.count, 0);
   const proposalLinkedAssetCount = new Set(

@@ -54,7 +54,7 @@ export function mapAssetSearchProjection(input: AssetSearchProjectionInput): Ass
     localizedNameZh,
     localizedSummaryZh,
     ...(optionalText(asset.domainId) ? { domainId: optionalText(asset.domainId) } : {}),
-    ...(optionalText(asset.status) ? { status: optionalText(asset.status) } : {}),
+    ...(optionalText(asset.lifecycleStatus ?? asset.status) ? { status: optionalText(asset.lifecycleStatus ?? asset.status) } : {}),
     updatedAt,
     catalogVersion,
     contentDigest: digestCanonicalAsset(input.asset),

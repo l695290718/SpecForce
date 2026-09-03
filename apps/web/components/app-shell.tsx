@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Boxes, ClipboardList, FileCode2, Home, LayoutDashboard, ListChecks, LoaderCircle, Network, Search, Settings, Waypoints, ScanSearch } from "lucide-react";
+import { Activity, Boxes, ClipboardList, FileCode2, Home, LayoutDashboard, ListChecks, LoaderCircle, Network, Search, Settings, Tags, Waypoints, ScanSearch } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
@@ -87,6 +87,7 @@ export function AppShell({ children, readableScopes }: { children: ReactNode; re
           <NavItem href={withScope("/")} icon={<Home size={16} />} isActive={pathname === "/"} labelKey="nav.overview" onNavigate={startNavigation} />
           <NavItem href={withScope("/workspace")} icon={<LayoutDashboard size={16} />} isActive={pathname === "/workspace"} labelKey="nav.workspace" onNavigate={startNavigation} />
           <NavItem href={withScope("/architecture/3a")} icon={<Waypoints size={16} />} isActive={pathname.startsWith("/architecture/3a")} labelKey="nav.threeA" onNavigate={startNavigation} />
+          <NavItem href={withScope("/features")} icon={<Tags size={16} />} isActive={pathname.startsWith("/features")} labelKey="nav.features" onNavigate={startNavigation} />
           <div className="px-3 pt-4 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500"><T k="nav.designAssets" /></div>
           {assetLinks.map(([labelKey, href]) => <NavItem href={withScope(href)} icon={<Boxes size={16} />} isActive={pathname.startsWith(href)} key={href} labelKey={labelKey} onNavigate={startNavigation} />)}
           <NavItem href={withScope("/assets/adrs")} icon={<FileCode2 size={16} />} isActive={pathname.startsWith("/assets/adrs")} labelKey="nav.adrs" onNavigate={startNavigation} />

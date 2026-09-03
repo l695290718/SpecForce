@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. P0 core governance and atomic MCP delivery are implemented and locally verified; P1 and P2 remain pending.
+Accepted. P0 core governance and atomic MCP delivery plus P1 search, coverage, and read-only Web delivery are implemented and locally verified; P2 remains pending.
 
 - Stable ADR ID: `adr-first-class-feature-assets`.
 - Proposal: `proposal-first-class-feature-assets` (`reviewing`).
@@ -12,6 +12,7 @@ Accepted. P0 core governance and atomic MCP delivery are implemented and locally
 - Scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`.
 - Design session: `design-change-session:8c02a714-28d0-49bd-8154-77d26adc42e1`.
 - P0 implementation session: `design-change-session:57f4bbdc-737e-4909-a967-e1bd8c447397`.
+- P1 implementation session: `design-change-session:651a22ca-02c2-4184-9385-76515e9285a5`.
 - Specification: `docs/superpowers/specs/2026-09-02-first-class-feature-assets-design.md`.
 
 ## Context
@@ -58,7 +59,12 @@ SpecForge can govern contracts, rules, data, behavior, architecture, decisions, 
 - `pnpm --filter @specforge/core typecheck` and `pnpm --filter @specforge/mcp-server typecheck` both exited `0`.
 - P0 uses the existing durable `RelationshipCommandReceipt` with command type `APPLY_FEATURE_CHANGE_SET`; no second Feature asset table or redundant receipt subsystem was introduced.
 - Implemented P0 behavior comprises the two Feature types, complete localization validation, relationship ontology v3, atomic Change Set service, search projection update, durable relationship events/Outbox, audit, stable errors, and bounded diagnostic reads.
-- P1 Web workspace/search coverage UX and P2 downstream knowledge/evidence reconciliation are not claimed by this P0 increment.
+- `pnpm exec vitest run packages/core/src/features/coverage.test.ts apps/mcp-server/src/features/projection.test.ts apps/mcp-server/src/scoped-read-projection.test.ts apps/web/lib/features.test.ts apps/web/components/features/feature-graph-model.test.ts apps/web/components/features/feature-workspace.test.tsx apps/web/lib/__tests__/assets-scope.test.ts apps/web/lib/__tests__/scope-links.test.ts` passed 23 discovered files and 115 tests; existing worktree copies were also discovered by the repository Vitest configuration.
+- `pnpm --filter @specforge/core typecheck`, `pnpm --filter @specforge/mcp-server typecheck`, and `pnpm --filter @specforge/web typecheck` all exited `0`.
+- `$env:SPECFORGE_NEXT_STANDALONE='0'; pnpm --filter @specforge/web build` compiled successfully, generated all 41 pages, and emitted `/features` plus its three read-only API routes. The default Windows OneDrive standalone packaging reached successful compilation and page generation but could not create pnpm symlinks (`EPERM`); Linux Docker standalone packaging remains the production verification boundary.
+- Browser acceptance at `/features?scope=com.huawei.celon.desiner` verified service/function/graph navigation, exact Scope retention, read-only copy, empty authorized results without `503`, zero console errors, and a 390 px viewport with `scrollWidth === innerWidth`.
+- Implemented P1 behavior comprises kind-aware coverage/evidence/consistency derivation, bilingual lifecycle search projection, HMAC-bound scoped pagination, read-only list/detail routes, and a bounded Sigma WebGL graph with pan, zoom, node dragging, type filters, and impact-path highlighting.
+- P2 downstream knowledge, context-pack, requirement-assessment, and evidence/drift reconciliation are not claimed by this P1 increment.
 
 ## Constraints
 
@@ -76,7 +82,7 @@ SpecForge can govern contracts, rules, data, behavior, architecture, decisions, 
 
 ### 状态
 
-设计已接受。P0 核心治理与原子 MCP 交付已经实现并完成本地验证；P1 与 P2 仍待实施。稳定 ADR、Proposal、Context Pack、负责人、精确 Scope、设计会话和规格路径见文首元数据。
+设计已接受。P0 核心治理与原子 MCP 交付以及 P1 搜索、覆盖与只读 Web 交付已经实现并完成本地验证；P2 仍待实施。稳定 ADR、Proposal、Context Pack、负责人、精确 Scope、设计会话和规格路径见文首元数据。
 
 ### 背景
 
@@ -118,11 +124,16 @@ SpecForge 已能治理契约、规则、数据、行为、架构、决策、变�
 - 仅选择 `first-class-feature-assets` 的 MCP 同步返回 `complete`；首次写入因中文 ADR 数组结构不匹配而被无部分落库地拒绝，修正后成功。
 - 同一设计事实的对账结果中缺失、不匹配、越 Scope 和阻塞均为零，并验证 `first-class-feature-assets`。
 - P0 实施会话为 `design-change-session:57f4bbdc-737e-4909-a967-e1bd8c447397`。
+- P1 实施会话为 `design-change-session:651a22ca-02c2-4184-9385-76515e9285a5`。
 - Feature 核心、本地化、本体、MCP 工具与 PostgreSQL 集成的聚焦测试共 7 个文件、103 项测试通过；其中数据库集成套件覆盖原子提交、幂等重放、预演不落库、版本冲突、双语有界读取、Scope 拒绝、图读取与初步覆盖。
 - Core 与 MCP Server 的 TypeScript 检查均以退出码 `0` 完成。
 - P0 复用现有 `RelationshipCommandReceipt` 并使用命令类型 `APPLY_FEATURE_CHANGE_SET`，没有新增第二套 Feature 资产表或重复回执子系统。
-- 当前仅声明 P0 的两类特性、完整本地化校验、关系本体 v3、原子 Change Set、搜索投影更新、关系事件/Outbox、审计、稳定错误和有界诊断读取已经实现。
-- P1 Web 工作区与覆盖体验、P2 下游知识和证据漂移对账仍未声明实现。
+- P1 聚焦命令通过 23 个被发现文件与 115 项测试；仓库 Vitest 配置同时发现了现有 worktree 副本。
+- Core、MCP Server 和 Web 的 TypeScript 检查均以退出码 `0` 完成。
+- 关闭 standalone 后的 Web 生产构建编译成功并生成全部 41 个页面，包含 `/features` 及三条只读 API。Windows OneDrive 下的默认 standalone 构建已完成编译和页面生成，但 pnpm 符号链接创建被系统以 `EPERM` 拒绝；Linux Docker standalone 构建仍是生产打包验证边界。
+- 浏览器验收确认服务/功能/图谱导航、精确 Scope 保留、只读提示、授权空结果不返回 `503`、控制台零错误，以及 390 像素窄屏没有横向溢出。
+- 当前声明 P1 的分类覆盖/证据/一致性推导、双语生命周期搜索投影、HMAC 绑定的 Scope 分页、只读列表/详情路由，以及支持平移、缩放、节点拖动、类型过滤和影响路径高亮的有界 Sigma WebGL 图已经实现。
+- P2 下游系统知识、上下文包、需求评估和证据/漂移对账仍未声明实现。
 
 ### 约束
 
