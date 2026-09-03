@@ -98,6 +98,14 @@ const scopedDerived = vi.hoisted(() => ({
   runScopedGovernanceChecks: vi.fn().mockResolvedValue({ status: "passed", results: [] })
 }));
 
+const features = vi.hoisted(() => ({
+  applyFeatureChangeSet: vi.fn().mockResolvedValue({ changedAssetIds: ["sf-a", "ff-a"], replayed: false }),
+  listFeatures: vi.fn().mockResolvedValue({ items: [], hasMore: false }),
+  getFeature: vi.fn().mockResolvedValue({ assetType: "serviceFeature", asset: { id: "sf-a" }, version: "1" }),
+  queryFeatureGraph: vi.fn().mockResolvedValue({ nodes: [], edges: [], partial: false }),
+  validateFeatureCoverage: vi.fn().mockResolvedValue({ assetId: "sf-a", coverageStatus: "UNMAPPED" })
+}));
+
 const knowledge = vi.hoisted(() => ({
   commitKnowledgeChangeSet: vi.fn().mockResolvedValue({ id: "changeset-1", status: "COMMITTED" }),
   createIdentityCandidate: vi.fn().mockResolvedValue({ id: "identity-1", decision: "UNDECIDED" }),
@@ -154,6 +162,7 @@ vi.mock("./scanner/session", () => ({
   finalizeKnowledgeScan: governedScanner.finalizeKnowledgeScan
 }));
 vi.mock("./scanner/batch-persistence", () => ({ submitScanBatch: governedScanner.submitScanBatch }));
+vi.mock("./features", () => features);
 
 import { registerTools } from "./tools";
 
@@ -237,6 +246,22 @@ describe("seed cleanup MCP boundary", () => {
 });
 
 describe("scoped localized derived tools", () => {
+  it("registers the atomic Feature write and bounded diagnostic reads", () => {
+    const tools = captureTools();
+    expect(tools.get("apply_feature_change_set")?.config._meta).toMatchObject({ permissions: ["asset:write"], write: true });
+    expect(tools.get("list_features")?.config._meta).toMatchObject({ permissions: ["asset:read"], write: false });
+    expect(tools.get("query_feature_graph")?.config._meta).toMatchObject({ permissions: ["asset:read", "graph:read"], write: false });
+  });
+
+  it("routes a Feature Change Set through the atomic service", async () => {
+    process.env.SPECFORGE_MCP_SEED = "1";
+    const architectureScope = { applicationServiceId: "com.huawei.celon.desiner", scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner" };
+    const input = { architectureScope, designChangeSessionId: "session-a", correlationId: "correlation-a", idempotencyKey: "feature-a", assets: [], relationships: [] };
+    const result = await captureTools().get("apply_feature_change_set")!.handler(input);
+    expect(result.isError).not.toBe(true);
+    expect(features.applyFeatureChangeSet).toHaveBeenCalledWith(input);
+  });
+
   it.each([
     "get_asset_graph",
     "analyze_proposal_impact",

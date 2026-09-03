@@ -12,6 +12,8 @@ export const assetCollections = {
   integration: "integrations",
   quality: "qualityRequirements",
   observability: "observabilityDesigns",
+  serviceFeature: "serviceFeatures",
+  functionalFeature: "functionalFeatures",
   adr: "adrs",
   proposal: "proposals",
   contextPack: "contextPacks",
@@ -23,7 +25,7 @@ export function getStore(catalog?: SpecForgeDataStore): SpecForgeDataStore {
 }
 
 export function listAssets<T extends Asset = Asset>(assetType: AssetType, catalog?: SpecForgeDataStore): T[] {
-  return getStore(catalog)[assetCollections[assetType]] as T[];
+  return (getStore(catalog)[assetCollections[assetType]] ?? []) as T[];
 }
 
 export function getAsset<T extends Asset = Asset>(assetType: AssetType, assetId: string, catalog?: SpecForgeDataStore): T {
@@ -70,6 +72,8 @@ export function assetLabel(assetType: AssetType, locale: AssetLocale = "en"): st
       integration: "Integration Contract",
       quality: "Quality Requirement",
       observability: "Observability Design",
+      serviceFeature: "Service Feature",
+      functionalFeature: "Functional Feature",
       adr: "ADR",
       proposal: "Proposal",
       contextPack: "AI Context Pack",
@@ -85,6 +89,8 @@ export function assetLabel(assetType: AssetType, locale: AssetLocale = "en"): st
       integration: "集成契约",
       quality: "质量要求",
       observability: "可观测性设计",
+      serviceFeature: "服务特性",
+      functionalFeature: "功能特性",
       adr: "架构决策记录",
       proposal: "变更提案",
       contextPack: "Agent 上下文包",

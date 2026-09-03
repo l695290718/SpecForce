@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted design; implementation has not started.
+Accepted. P0 core governance and atomic MCP delivery are implemented and locally verified; P1 and P2 remain pending.
 
 - Stable ADR ID: `adr-first-class-feature-assets`.
 - Proposal: `proposal-first-class-feature-assets` (`reviewing`).
@@ -11,6 +11,7 @@ Accepted design; implementation has not started.
 - Scope: `com.huawei.celon.desiner`.
 - Scope path: `pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner`.
 - Design session: `design-change-session:8c02a714-28d0-49bd-8154-77d26adc42e1`.
+- P0 implementation session: `design-change-session:57f4bbdc-737e-4909-a967-e1bd8c447397`.
 - Specification: `docs/superpowers/specs/2026-09-02-first-class-feature-assets-design.md`.
 
 ## Context
@@ -52,7 +53,12 @@ SpecForge can govern contracts, rules, data, behavior, architecture, decisions, 
 - `pnpm exec vitest run scripts/sync-design-facts.test.ts scripts/reconcile-design-facts.test.ts --exclude '**/.worktrees/**' --exclude '**/.pnpm-store/**'` passed 2 files and 33 tests for the synchronization and reconciliation contracts.
 - `$env:SPECFORGE_DESIGN_FACT_IDS='first-class-feature-assets'; pnpm design-facts:sync` returned `complete` for `adr-first-class-feature-assets`; the first attempted write was rejected without partial persistence until the Chinese ADR arrays matched the canonical structure.
 - `$env:SPECFORGE_DESIGN_FACT_IDS='first-class-feature-assets'; pnpm design-facts:check` returned no missing, mismatched, out-of-Scope, or blocked records and verified `first-class-feature-assets`.
-- No implementation or runtime verification is claimed by this ADR.
+- `pnpm exec vitest run packages/core/src/features/validation.test.ts packages/core/src/features/change-set.test.ts packages/core/src/__tests__/asset-localization.test.ts packages/core/src/__tests__/relationship-ontology.test.ts packages/core/src/__tests__/relationship-extraction.test.ts apps/mcp-server/src/features/service.integration.test.ts apps/mcp-server/src/tools.test.ts --exclude '**/.worktrees/**' --exclude '**/.pnpm-store/**'` passed 7 files and 103 tests.
+- The PostgreSQL-backed Feature integration suite passed four scenarios: atomic mixed-asset commit, stable idempotent replay, non-persisting dry-run, stale-version rejection, bounded bilingual reads, exact-Scope denial, graph read, and preliminary coverage.
+- `pnpm --filter @specforge/core typecheck` and `pnpm --filter @specforge/mcp-server typecheck` both exited `0`.
+- P0 uses the existing durable `RelationshipCommandReceipt` with command type `APPLY_FEATURE_CHANGE_SET`; no second Feature asset table or redundant receipt subsystem was introduced.
+- Implemented P0 behavior comprises the two Feature types, complete localization validation, relationship ontology v3, atomic Change Set service, search projection update, durable relationship events/Outbox, audit, stable errors, and bounded diagnostic reads.
+- P1 Web workspace/search coverage UX and P2 downstream knowledge/evidence reconciliation are not claimed by this P0 increment.
 
 ## Constraints
 
@@ -70,7 +76,7 @@ SpecForge can govern contracts, rules, data, behavior, architecture, decisions, 
 
 ### 状态
 
-设计已接受，尚未开始实现。稳定 ADR、Proposal、Context Pack、负责人、精确 Scope、设计会话和规格路径见文首元数据。
+设计已接受。P0 核心治理与原子 MCP 交付已经实现并完成本地验证；P1 与 P2 仍待实施。稳定 ADR、Proposal、Context Pack、负责人、精确 Scope、设计会话和规格路径见文首元数据。
 
 ### 背景
 
@@ -111,7 +117,12 @@ SpecForge 已能治理契约、规则、数据、行为、架构、决策、变�
 - 设计事实同步与对账脚本的 2 个测试文件、33 项测试全部通过。
 - 仅选择 `first-class-feature-assets` 的 MCP 同步返回 `complete`；首次写入因中文 ADR 数组结构不匹配而被无部分落库地拒绝，修正后成功。
 - 同一设计事实的对账结果中缺失、不匹配、越 Scope 和阻塞均为零，并验证 `first-class-feature-assets`。
-- 本 ADR 不声明任何实现或运行验证已经完成。
+- P0 实施会话为 `design-change-session:57f4bbdc-737e-4909-a967-e1bd8c447397`。
+- Feature 核心、本地化、本体、MCP 工具与 PostgreSQL 集成的聚焦测试共 7 个文件、103 项测试通过；其中数据库集成套件覆盖原子提交、幂等重放、预演不落库、版本冲突、双语有界读取、Scope 拒绝、图读取与初步覆盖。
+- Core 与 MCP Server 的 TypeScript 检查均以退出码 `0` 完成。
+- P0 复用现有 `RelationshipCommandReceipt` 并使用命令类型 `APPLY_FEATURE_CHANGE_SET`，没有新增第二套 Feature 资产表或重复回执子系统。
+- 当前仅声明 P0 的两类特性、完整本地化校验、关系本体 v3、原子 Change Set、搜索投影更新、关系事件/Outbox、审计、稳定错误和有界诊断读取已经实现。
+- P1 Web 工作区与覆盖体验、P2 下游知识和证据漂移对账仍未声明实现。
 
 ### 约束
 

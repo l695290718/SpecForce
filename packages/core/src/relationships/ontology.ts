@@ -18,16 +18,19 @@ const impactableNodeTypes = [
   "integration",
   "quality",
   "observability",
+  "serviceFeature",
+  "functionalFeature",
   "adr",
   "applicationService"
 ] as const satisfies readonly AssetNodeType[];
 
 const ownedNodeTypes = impactableNodeTypes.filter((nodeType) => nodeType !== "domain");
 const serviceNodeTypes = ["applicationService"] as const satisfies readonly AssetNodeType[];
+const functionalFeatureNodeTypes = ["functionalFeature"] as const satisfies readonly AssetNodeType[];
 const apiNodeTypes = ["api", "apiOperation"] as const satisfies readonly AssetNodeType[];
 const dataNodeTypes = ["dataEntity", "dataField"] as const satisfies readonly AssetNodeType[];
 const dataAccessTargetTypes = ["dataModel", ...dataNodeTypes] as const satisfies readonly AssetNodeType[];
-const dataAccessSourceTypes = [...serviceNodeTypes, ...apiNodeTypes] as const satisfies readonly AssetNodeType[];
+const dataAccessSourceTypes = [...serviceNodeTypes, ...apiNodeTypes, ...functionalFeatureNodeTypes] as const satisfies readonly AssetNodeType[];
 
 const relationshipDefinitions = [
   {
@@ -56,14 +59,38 @@ const relationshipDefinitions = [
   },
   {
     code: "CONSUMES",
-    allowedSourceTypes: serviceNodeTypes,
-    allowedTargetTypes: apiNodeTypes,
+    allowedSourceTypes: [...serviceNodeTypes, ...functionalFeatureNodeTypes],
+    allowedTargetTypes: [...apiNodeTypes, "event"],
     forwardPropagation: false,
     reversePropagation: true,
     strength: "strong",
     defaultConfidence: 0.95,
     terminal: false,
-    description: "Service to API",
+    description: "Service or Functional Feature consumes API or Event",
+    version: RELATIONSHIP_ONTOLOGY_VERSION
+  },
+  {
+    code: "CONTRIBUTES_TO",
+    allowedSourceTypes: functionalFeatureNodeTypes,
+    allowedTargetTypes: ["serviceFeature"],
+    forwardPropagation: true,
+    reversePropagation: true,
+    strength: "strong",
+    defaultConfidence: 1,
+    terminal: false,
+    description: "Functional Feature contributes to Service Feature",
+    version: RELATIONSHIP_ONTOLOGY_VERSION
+  },
+  {
+    code: "EXPOSES",
+    allowedSourceTypes: apiNodeTypes,
+    allowedTargetTypes: functionalFeatureNodeTypes,
+    forwardPropagation: true,
+    reversePropagation: true,
+    strength: "strong",
+    defaultConfidence: 0.95,
+    terminal: false,
+    description: "API or operation exposes a Functional Feature",
     version: RELATIONSHIP_ONTOLOGY_VERSION
   },
   {
@@ -128,14 +155,14 @@ const relationshipDefinitions = [
   },
   {
     code: "SUBSCRIBES",
-    allowedSourceTypes: serviceNodeTypes,
+    allowedSourceTypes: [...serviceNodeTypes, ...functionalFeatureNodeTypes],
     allowedTargetTypes: ["event"],
     forwardPropagation: false,
     reversePropagation: true,
     strength: "strong",
     defaultConfidence: 0.9,
     terminal: false,
-    description: "Service to Event",
+    description: "Service or Functional Feature subscribes to Event",
     version: RELATIONSHIP_ONTOLOGY_VERSION
   },
   {
@@ -165,7 +192,7 @@ const relationshipDefinitions = [
   {
     code: "CONTROLS",
     allowedSourceTypes: ["stateMachine"],
-    allowedTargetTypes: ["dataEntity", "api", "apiOperation"],
+    allowedTargetTypes: ["dataEntity", "api", "apiOperation", "functionalFeature"],
     forwardPropagation: true,
     reversePropagation: true,
     strength: "medium",
@@ -333,13 +360,13 @@ const relationshipDefinitions = [
   {
     code: "VALIDATES",
     allowedSourceTypes: ["evidence"],
-    allowedTargetTypes: ["adr", "integration"],
+    allowedTargetTypes: ["adr", "integration", "serviceFeature", "functionalFeature"],
     forwardPropagation: false,
     reversePropagation: true,
     strength: "weak",
     defaultConfidence: 1,
     terminal: true,
-    description: "Verification evidence to ADR decision or integration contract attestation",
+    description: "Verification evidence to decision, integration attestation, or Feature version",
     version: RELATIONSHIP_ONTOLOGY_VERSION
   }
 ] as const satisfies readonly RelationshipTypeDefinition[];

@@ -56,6 +56,23 @@ describe("relationship ontology", () => {
     );
   });
 
+  it("defines directional Feature relationship semantics", () => {
+    expect(() => relationshipApi.validateRelationshipEndpoints?.("CONTRIBUTES_TO", "functionalFeature", "serviceFeature")).not.toThrow();
+    expect(() => relationshipApi.validateRelationshipEndpoints?.("CONTRIBUTES_TO", "serviceFeature", "functionalFeature")).toThrow("RELATIONSHIP_ENDPOINT_INVALID");
+    expect(() => relationshipApi.validateRelationshipEndpoints?.("EXPOSES", "apiOperation", "functionalFeature")).not.toThrow();
+    expect(() => relationshipApi.validateRelationshipEndpoints?.("EMITS", "functionalFeature", "event")).not.toThrow();
+    expect(() => relationshipApi.validateRelationshipEndpoints?.("CONSUMES", "functionalFeature", "event")).not.toThrow();
+    expect(() => relationshipApi.validateRelationshipEndpoints?.("READS", "functionalFeature", "dataField")).not.toThrow();
+    expect(() => relationshipApi.validateRelationshipEndpoints?.("CONTROLS", "stateMachine", "functionalFeature")).not.toThrow();
+    expect(() => relationshipApi.validateRelationshipEndpoints?.("VALIDATES", "evidence", "serviceFeature")).not.toThrow();
+    expect(relationshipApi.relationshipOntology?.get("CONTRIBUTES_TO")).toMatchObject({
+      forwardPropagation: true,
+      reversePropagation: true,
+      strength: "strong",
+      version: "specforge.relationships.v3"
+    });
+  });
+
   it("requires an explicit authorization boundary for traversal plans", () => {
     expect(relationshipApi.createTraversalPlan).toBeTypeOf("function");
     expect(() => relationshipApi.createTraversalPlan?.({ startNodes: [rootIn(designerService, "customer-model")], allowedScopes: [] })).toThrow(

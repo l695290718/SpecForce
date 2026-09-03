@@ -91,6 +91,8 @@ export const legacyRelationMigrationRegistry: LegacyRelationMigrationRegistry = 
     IMPLEMENTS_DECISION: direct("IMPLEMENTS_DECISION"),
     "IMPLEMENTS-DECISION": direct("IMPLEMENTS_DECISION"),
     VALIDATES: direct("VALIDATES"),
+    CONTRIBUTES_TO: direct("CONTRIBUTES_TO"),
+    EXPOSES: direct("EXPOSES"),
     "READS-WRITES": direct("READS", "WRITES"),
   }
 };

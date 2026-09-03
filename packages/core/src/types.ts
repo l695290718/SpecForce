@@ -1,5 +1,11 @@
 import type { ArchitectureScopeRef } from "./architecture/types";
 import type { DataEntityDefinition, DataRelation } from "./data-model-v2";
+import type {
+  FunctionalFeature,
+  FunctionalFeatureLocalizedFields,
+  ServiceFeature,
+  ServiceFeatureLocalizedFields
+} from "./features/types";
 
 export type AssetType =
   | "domain"
@@ -11,6 +17,8 @@ export type AssetType =
   | "integration"
   | "quality"
   | "observability"
+  | "serviceFeature"
+  | "functionalFeature"
   | "adr"
   | "proposal"
   | "contextPack"
@@ -167,6 +175,8 @@ export interface AssetLocalizedContentMap {
   integration: LocalizedContent<IntegrationContractLocalizedFields>;
   quality: LocalizedContent<QualityRequirementLocalizedFields>;
   observability: LocalizedContent<ObservabilityDesignLocalizedFields>;
+  serviceFeature: LocalizedContent<ServiceFeatureLocalizedFields>;
+  functionalFeature: LocalizedContent<FunctionalFeatureLocalizedFields>;
   adr: LocalizedContent<AdrLocalizedFields>;
   proposal: LocalizedContent<ProposalLocalizedFields>;
   contextPack: LocalizedContent<ContextPackLocalizedFields>;
@@ -522,6 +532,8 @@ export interface SpecForgeDataStore {
   integrations: IntegrationContract[];
   qualityRequirements: QualityRequirement[];
   observabilityDesigns: ObservabilityDesign[];
+  serviceFeatures?: ServiceFeature[];
+  functionalFeatures?: FunctionalFeature[];
   adrs: Adr[];
   proposals: Proposal[];
   contextPacks: ContextPack[];
@@ -539,6 +551,8 @@ export interface AssetTypeMap {
   integration: IntegrationContract;
   quality: QualityRequirement;
   observability: ObservabilityDesign;
+  serviceFeature: ServiceFeature;
+  functionalFeature: FunctionalFeature;
   adr: Adr;
   proposal: Proposal;
   contextPack: ContextPack;

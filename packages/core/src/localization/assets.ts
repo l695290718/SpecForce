@@ -278,6 +278,16 @@ const registry: DefinitionMap = {
       "architectureScope"
     ]
   },
+  serviceFeature: {
+    requiredStringFields: ["name", "description", "scenario", "valueOutcome", "benefitHypothesis"],
+    requiredArrayFields: ["actors", "serviceBoundary", "acceptanceCriteria"],
+    technicalFieldNames: ["id", "domainId", "lifecycleStatus", "owner", "tags", "createdAt", "updatedAt", "architectureScope"]
+  },
+  functionalFeature: {
+    requiredStringFields: ["name", "description", "trigger", "observableBehavior"],
+    requiredArrayFields: ["preconditions", "postconditions", "exceptionBehaviors", "acceptanceCriteria"],
+    technicalFieldNames: ["id", "domainId", "lifecycleStatus", "owner", "tags", "createdAt", "updatedAt", "architectureScope"]
+  },
   evidence: {
     requiredStringFields: ["name", "description", "command", "result"],
     technicalFieldNames: [

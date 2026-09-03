@@ -27,7 +27,9 @@ export type RelationshipCode =
   | "USES"
   | "IMPLEMENTS_CONTEXT_FOR"
   | "IMPLEMENTS_DECISION"
-  | "VALIDATES";
+  | "VALIDATES"
+  | "CONTRIBUTES_TO"
+  | "EXPOSES";
 
 export type AssetNodeType = AssetType | "applicationService" | "dataEntity" | "dataField" | "apiOperation";
 
@@ -79,4 +81,4 @@ export interface ExtractedRelationshipMetadata {
   };
 }
 
-export const RELATIONSHIP_ONTOLOGY_VERSION = "specforge.relationships.v2" as const;
+export const RELATIONSHIP_ONTOLOGY_VERSION = "specforge.relationships.v3" as const;

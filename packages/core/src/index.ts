@@ -41,3 +41,4 @@ export * from "./connectors";
 export * from "./coverage";
 export * from "./governance/briefing";
 export * from "./knowledge-readiness";
+export * from "./features";

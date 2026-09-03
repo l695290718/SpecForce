@@ -972,7 +972,7 @@ export async function upsertDesignAsset(input: UpsertDesignAssetInput) {
   return { id: canonicalAsset.id, type: input.assetType, status: "upserted" };
 }
 
-async function upsertAssetSearchProjection(
+export async function upsertAssetSearchProjection(
   transaction: Prisma.TransactionClient,
   input: {
     architectureScope: ArchitectureScopeRef;

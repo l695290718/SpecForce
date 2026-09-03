@@ -1,12 +1,14 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { scopeById, type Permission, type ScopedPrincipal } from "@specforge/core";
+import { FeatureChangeSetError, scopeById, type FeatureChangeSetRequest, type Permission, type ScopedPrincipal } from "@specforge/core";
 import { z } from "zod";
 import { auditToolCall } from "./audit";
 import { validateIntegrationContractV1 as validateIntegrationContractEnvelope } from "./integration-contract";
 import { allowAllPolicy, getDefaultActor, principalFromAuthInfo, withRequestPrincipal, type McpAuthInfo } from "./auth";
 import { archiveSeedGraphOutbox, deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, prepareDataModelUpgrade, queryPersistedAssetLinks, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
 import { applyDataModelChangeSet } from "./data-models/change-set";
+import { applyFeatureChangeSet, getFeature, listFeatures, queryFeatureGraph, validateFeatureCoverage } from "./features";
+import { applyFeatureChangeSetShape, featureDetailShape, featureGraphShape, featureListShape } from "./features/schemas";
 import { commitKnowledgeChangeSet, createIdentityCandidate, createKnowledgeAssertion, createKnowledgeReviewBundle, createProjectionManifest, createWorkingStream, decideKnowledgeReviewBundle, listKnowledgeAssertions, publishKnowledgeBaseline } from "./knowledge/persistence";
 import { promote3aArchitectureFacts, reconcile3aArchitectureFacts, submit3aArchitectureFactBatch } from "./knowledge/architecture-authoring";
 import { analyze3aArchitectureCandidates, get3aArchitectureCandidateSet } from "./knowledge/candidate-analysis";
@@ -47,7 +49,11 @@ const legacyKnowledgeReadTools = new Set([
   "analyze_proposal_impact",
   "export_context_pack",
   "list_asset_links",
-  "query_asset_links"
+  "query_asset_links",
+  "list_features",
+  "get_feature",
+  "query_feature_graph",
+  "validate_feature_coverage",
 ]);
 
 function textResult(value: unknown): CallToolResult {
@@ -129,7 +135,11 @@ function registerJsonTool<T extends z.ZodRawShape>(
           const message = error instanceof Error ? error.message : "Unknown tool error";
           if (isSeedMode()) console.error(`[specforge-seed] ${name}: ${message}`);
           auditToolCall({ actor, action: name, ...target, toolInput: input, output: "failed", status: "failed", errorMessage: message });
-          return errorResult(`SpecForge tool call failed: ${name}. Check input and asset identifiers.`);
+          if (error instanceof FeatureChangeSetError) {
+            return errorResult(JSON.stringify({ code: error.code, details: error.details }));
+          }
+          const safeCode = /^(?:FEATURE_[A-Z_]+|SCOPE_ACCESS_DENIED|OPERATION_DENIED)$/u.test(message) ? message : "TOOL_CALL_FAILED";
+          return errorResult(JSON.stringify({ code: safeCode, tool: name }));
         }
       };
       return principal ? withRequestPrincipal(principal, execute) : execute();
@@ -137,7 +147,7 @@ function registerJsonTool<T extends z.ZodRawShape>(
   );
 }
 
-const assetTypeSchema = z.enum(["domain", "dataModel", "api", "event", "businessRule", "stateMachine", "integration", "quality", "observability", "adr", "proposal", "contextPack", "evidence"]);
+const assetTypeSchema = z.enum(["domain", "dataModel", "api", "event", "businessRule", "stateMachine", "integration", "quality", "observability", "serviceFeature", "functionalFeature", "adr", "proposal", "contextPack", "evidence"]);
 const assetLocaleSchema = z.enum(["zh", "en"]);
 const architectureScopeSchema = z.object({
   applicationServiceId: z.string().min(1),
@@ -229,6 +239,7 @@ export function registerTools(server: McpServer): void {
       readOnly: false
     },
     async (input) => {
+      if (input.assetType === "serviceFeature" || input.assetType === "functionalFeature") throw new Error("FEATURE_CHANGE_SET_REQUIRED");
       if (input.assetType === "integration") validateIntegrationContractV1(input.asset, input.architectureScope);
       return upsertDesignAsset({ ...input, asset: { ...input.asset, architectureScope: input.architectureScope } } as unknown as Parameters<typeof upsertDesignAsset>[0]);
     }
@@ -330,6 +341,75 @@ export function registerTools(server: McpServer): void {
       readOnly: true
     },
     async (input) => searchPersistedDesignAssets({ ...input, limit: input.pageSize ?? input.limit, pageSize: input.pageSize, cursor: input.cursor })
+  );
+
+  registerJsonTool(
+    server,
+    "apply_feature_change_set",
+    {
+      title: "Apply Feature change set",
+      description: "Atomically validates or applies scoped Service Features, Functional Features, and typed relationships in PostgreSQL.",
+      inputSchema: applyFeatureChangeSetShape,
+      permissions: ["asset:write"],
+      readOnly: false
+    },
+    async (input) => applyFeatureChangeSet(input as unknown as FeatureChangeSetRequest)
+  );
+
+  registerJsonTool(
+    server,
+    "list_features",
+    {
+      title: "List Features",
+      description: "Returns a bounded, paginated Feature list in one exact Scope for diagnostics and compatible readers.",
+      inputSchema: featureListShape,
+      permissions: ["asset:read"],
+      readOnly: true,
+      legacyKnowledgeRead: true
+    },
+    async (input) => listFeatures(input)
+  );
+
+  registerJsonTool(
+    server,
+    "get_feature",
+    {
+      title: "Get Feature",
+      description: "Returns one bilingual Feature revision in one exact Scope for diagnostics and compatible readers.",
+      inputSchema: featureDetailShape,
+      permissions: ["asset:read"],
+      readOnly: true,
+      legacyKnowledgeRead: true
+    },
+    async (input) => getFeature(input)
+  );
+
+  registerJsonTool(
+    server,
+    "query_feature_graph",
+    {
+      title: "Query Feature graph",
+      description: "Returns a bounded current Feature neighborhood without bypassing system-knowledge readiness.",
+      inputSchema: featureGraphShape,
+      permissions: ["asset:read", "graph:read"],
+      readOnly: true,
+      legacyKnowledgeRead: true
+    },
+    async (input) => queryFeatureGraph(input)
+  );
+
+  registerJsonTool(
+    server,
+    "validate_feature_coverage",
+    {
+      title: "Validate Feature coverage",
+      description: "Returns bounded preliminary traceability coverage for one Feature in one exact Scope.",
+      inputSchema: featureDetailShape,
+      permissions: ["asset:read", "graph:read"],
+      readOnly: true,
+      legacyKnowledgeRead: true
+    },
+    async (input) => validateFeatureCoverage({ architectureScope: input.architectureScope, assetId: input.assetId })
   );
 
   registerJsonTool(

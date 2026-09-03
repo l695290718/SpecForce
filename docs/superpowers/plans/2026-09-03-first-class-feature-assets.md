@@ -4,7 +4,7 @@
 
 **Goal:** Deliver scoped, bilingual Service Feature and Functional Feature assets with atomic MCP writes, typed traceability, a read-only Web workspace, and readiness-gated downstream consumption.
 
-**Architecture:** Features remain generic `DesignAsset` records and reuse authored revisions, search projections, relationship events, and graph Outbox processing. A dedicated Feature application layer validates one bounded Change Set and commits its assets, revisions, relationships, Outbox rows, and idempotency receipt in one PostgreSQL transaction; Web reads use scoped PostgreSQL projections, while agent understanding continues through the system-knowledge readiness gate.
+**Architecture:** Features remain generic `DesignAsset` records and reuse authored revisions, search projections, relationship events, graph Outbox processing, and the existing durable relationship command receipt ledger. A dedicated Feature application layer validates one bounded Change Set and commits its assets, revisions, relationships, Outbox rows, audit entry, and `APPLY_FEATURE_CHANGE_SET` receipt in one PostgreSQL transaction; Web reads use scoped PostgreSQL projections, while agent understanding continues through the system-knowledge readiness gate.
 
 **Tech Stack:** TypeScript 5.7, pnpm 9, Zod 3, Prisma 6/PostgreSQL 16, MCP SDK 1.29, Next.js 15/React 19, Graphology/Sigma 3 WebGL, Vitest 2.
 
@@ -326,7 +326,6 @@ git commit -m "feat(core): validate atomic feature change sets"
 
 **Files:**
 - Modify: `prisma/schema.prisma`
-- Create: `prisma/migrations/20260903_first_class_feature_change_set_receipt/migration.sql`
 - Create: `apps/mcp-server/src/features/repository.ts`
 - Create: `apps/mcp-server/src/features/service.ts`
 - Create: `apps/mcp-server/src/features/service.integration.test.ts`
@@ -335,7 +334,7 @@ git commit -m "feat(core): validate atomic feature change sets"
 
 **Interfaces:**
 - Consumes: `validateFeatureChangeSet`, Prisma transaction client, transaction-bound relationship repository/service, `AuthoredAssetRevision.catalogVersion`, and existing search/Outbox writers.
-- Produces: `applyFeatureChangeSet(input, principal)`, `FeatureChangeSetReceipt`, deterministic replay, and optimistic comparison against each asset's latest authored revision version.
+- Produces: `applyFeatureChangeSet(input)`, a stored `APPLY_FEATURE_CHANGE_SET` result in `RelationshipCommandReceipt`, deterministic replay, and optimistic comparison against each asset's latest authored revision version.
 
 - [ ] **Step 1: Add failing integration tests**
 
@@ -360,30 +359,17 @@ pnpm exec vitest run apps/mcp-server/src/features/service.integration.test.ts
 
 Expected: failure because `applyFeatureChangeSet` and its receipt persistence are absent.
 
-- [ ] **Step 3: Add the durable batch receipt**
+- [x] **Step 3: Reuse the durable command receipt ledger**
 
-Add one receipt model; do not add Feature asset tables:
+Use the existing receipt model with a Feature command discriminator; do not add Feature asset or duplicate receipt tables:
 
-```prisma
-model FeatureChangeSetReceipt {
-  id                   String   @id @default(cuid())
-  enterpriseId         String
-  applicationServiceId String
-  scopePath            String
-  idempotencyKey       String
-  requestDigest        String
-  correlationId        String
-  sessionId            String
-  status               String
-  result               Json
-  createdAt            DateTime @default(now())
-
-  @@unique([enterpriseId, applicationServiceId, scopePath, idempotencyKey], map: "FeatureChangeSetReceipt_scope_idempotency_key")
-  @@index([enterpriseId, applicationServiceId, scopePath, createdAt], map: "FeatureChangeSetReceipt_scope_created_idx")
-}
+```ts
+await repository.createReceipt(relationshipScope, {
+  idempotencyKey: input.idempotencyKey,
+  commandHash: requestDigest,
+  commandType: "APPLY_FEATURE_CHANGE_SET"
+});
 ```
-
-Mirror the additive DDL in `ensureMcpPersistenceSchema()` in `persistence.ts` for one-command startup compatibility, and add the same table/index definitions to the migration SQL.
 
 - [ ] **Step 4: Implement one authoritative transaction**
 
@@ -422,7 +408,7 @@ Expected: Prisma generation succeeds, atomicity/idempotency tests pass, and MCP 
 - [ ] **Step 6: Commit Task 4**
 
 ```powershell
-git add prisma/schema.prisma prisma/migrations/20260903_first_class_feature_change_set_receipt apps/mcp-server/src/features apps/mcp-server/src/persistence.ts
+git add apps/mcp-server/src/features apps/mcp-server/src/persistence.ts
 git commit -m "feat(mcp): persist atomic feature change sets"
 ```
 
@@ -498,7 +484,7 @@ Expected: sync succeeds, reconciliation has empty missing/mismatched/out-of-Scop
 - [ ] **Step 6: Commit Task 5 and P0 records**
 
 ```powershell
-git add apps/mcp-server/src/features apps/mcp-server/src/tools.ts apps/mcp-server/src/smoke.ts docs/adr/0047-first-class-feature-assets.md scripts/design-facts-baseline.json
+git add apps/mcp-server/src/features apps/mcp-server/src/tools.ts apps/mcp-server/src/smoke.ts docs/adr/0047-first-class-feature-assets.md docs/design-facts/baseline-manifest.json
 git commit -m "feat(mcp): expose scoped feature change sets"
 ```
 
@@ -776,7 +762,7 @@ Expected: reconciliation has no missing, mismatched, out-of-Scope, or blocked fa
 - [ ] **Step 6: Commit Task 9 and P1 records**
 
 ```powershell
-git add apps/web/components/features apps/web/lib/i18n.ts docs/adr/0047-first-class-feature-assets.md scripts/design-facts-baseline.json
+git add apps/web/components/features apps/web/lib/i18n.ts docs/adr/0047-first-class-feature-assets.md docs/design-facts/baseline-manifest.json
 git commit -m "feat(web): visualize bounded feature relationships"
 ```
 
@@ -975,7 +961,7 @@ Expected: MCP synchronization succeeds, reconciliation reports no missing/mismat
 - [ ] **Step 7: Commit Task 12 and final records**
 
 ```powershell
-git add packages/core/src/features apps/mcp-server/src/features docs/adr/0047-first-class-feature-assets.md scripts/design-facts-baseline.json
+git add packages/core/src/features apps/mcp-server/src/features docs/adr/0047-first-class-feature-assets.md docs/design-facts/baseline-manifest.json
 git commit -m "feat: reconcile feature evidence and drift"
 ```
 

@@ -362,8 +362,8 @@ function uniqueAssets(records: Array<{ type: AssetType; asset: Asset }>): Array<
 function assetKey(type: AssetType, id: string): string { return `${type}:${id}`; }
 
 function layerFor(type: AssetType): "BIZ" | "SYS" | "TECH" {
-  if (["domain", "businessRule", "proposal"].includes(type)) return "BIZ";
-  if (["api", "event", "dataModel", "stateMachine", "integration", "quality"].includes(type)) return "SYS";
+  if (["domain", "businessRule", "proposal", "serviceFeature"].includes(type)) return "BIZ";
+  if (["api", "event", "dataModel", "stateMachine", "integration", "quality", "functionalFeature"].includes(type)) return "SYS";
   return "TECH";
 }
 
@@ -371,7 +371,7 @@ function aspectFor(type: AssetType): KnowledgeAssertion["aspect"] {
   if (["businessRule", "quality"].includes(type)) return "constraint";
   if (["api", "event", "integration"].includes(type)) return "contract";
   if (["dataModel"].includes(type)) return "information";
-  if (["stateMachine"].includes(type)) return "behavior";
+  if (["stateMachine", "serviceFeature", "functionalFeature"].includes(type)) return "behavior";
   return "structure";
 }
 
@@ -386,6 +386,8 @@ function factTypeFor(type: AssetType): string {
     integration: "integration-contract",
     quality: "quality-requirement",
     observability: "observability-design",
+    serviceFeature: "service-feature",
+    functionalFeature: "functional-feature",
     adr: "architecture-decision",
     proposal: "change-proposal",
     contextPack: "agent-context-pack",

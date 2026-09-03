@@ -13,8 +13,8 @@
                           "contextPackId": "context-pack-first-class-feature-assets",
                           "proposalStatus": "reviewing",
                           "proposalNonGoal": {
-                              "en": "This design does not claim runtime implementation, cross-Scope Feature reuse, enterprise templates, automated implementation discovery, or production-scale graph certification.",
-                              "zh": "本设计不声明运行实现、跨 Scope 特性复用、企业模板、自动实现发现或生产规模图认证。"
+                              "en": "This P0 increment does not claim the P1 Web Feature workspace, P2 downstream knowledge and evidence reconciliation, cross-Scope Feature reuse, enterprise templates, automated implementation discovery, or production-scale graph certification.",
+                              "zh": "本 P0 增量不声明 P1 Web 特性工作区、P2 下游知识与证据对账、跨 Scope 特性复用、企业模板、自动实现发现或生产规模图认证。"
                           },
                           "relatedAssetIds": [
                               "proposal-specforge-self-design",
@@ -23,9 +23,9 @@
                               "data-specforge-asset-graph"
                           ],
                           "owner": "SpecForge Product Architecture and Design Governance",
-                          "status": "Accepted design; P0, P1, and P2 implementation have not started.",
+                          "status": "Accepted; P0 core Feature governance and atomic MCP Change Set are implemented and locally verified. P1 and P2 remain pending.",
                           "reason": "SpecForge needs first-class, independently versioned Service and Functional Feature assets to trace stakeholder value through functional behavior to contracts, data, implementation, and current-version evidence without weakening exact-Scope isolation.",
-                          "retryTrigger": "After the written specification is reviewed, create a new exact-Scope implementation session and execute the separately approved P0 implementation plan before claiming any runtime capability.",
+                          "retryTrigger": "Open the approved P1 exact-Scope implementation session and complete scoped Web list, detail, coverage, and bounded WebGL graph acceptance before claiming the Feature workspace.",
                           "evidence": [
                               {
                                   "command": "Industry review: OMG ISO/IEC/IEEE 29148 summary; SEBoK Function glossary; ITU-T Q.1290; OASIS SOA service functionality",
@@ -50,6 +50,18 @@
                               {
                                   "command": "$env:SPECFORGE_DESIGN_FACT_IDS='first-class-feature-assets'; pnpm design-facts:check",
                                   "result": "Verified first-class-feature-assets with missing=0, mismatched=0, outOfScope=0, and blocked=0."
+                              },
+                              {
+                                  "command": "pnpm design-context:preflight -- --intent Implement-P0-first-class-Feature-contracts-ontology-atomic-MCP-Change-Set-and-scoped-reads --affected adr-first-class-feature-assets,proposal-first-class-feature-assets,context-pack-first-class-feature-assets",
+                                  "result": "Opened exact-Scope implementation session design-change-session:57f4bbdc-737e-4909-a967-e1bd8c447397 with a matching design-context digest."
+                              },
+                              {
+                                  "command": "pnpm exec vitest run packages/core/src/features/validation.test.ts packages/core/src/features/change-set.test.ts packages/core/src/__tests__/asset-localization.test.ts packages/core/src/__tests__/relationship-ontology.test.ts packages/core/src/__tests__/relationship-extraction.test.ts apps/mcp-server/src/features/service.integration.test.ts apps/mcp-server/src/tools.test.ts --exclude '**/.worktrees/**' --exclude '**/.pnpm-store/**'",
+                                  "result": "Passed 7 files and 103 tests; the PostgreSQL integration suite covered atomic commit, idempotent replay, dry-run, optimistic version rejection, scoped bilingual reads, graph reads, and coverage."
+                              },
+                              {
+                                  "command": "pnpm --filter @specforge/core typecheck; pnpm --filter @specforge/mcp-server typecheck",
+                                  "result": "Both TypeScript checks exited 0."
                               }
                           ]
                       },
