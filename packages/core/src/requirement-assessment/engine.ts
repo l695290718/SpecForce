@@ -52,6 +52,16 @@ export async function evaluateRequirement(input: {
     policyRevision: input.snapshot.coveragePolicyRevision
   });
   const findings = deterministicCoverageFindings(coverage, input.snapshot.orderedAssetManifest.map((asset) => asset.id));
+  const featureAssets = input.snapshot.orderedAssetManifest.filter((asset) => asset.assetType === "serviceFeature" || asset.assetType === "functionalFeature");
+  if (featureAssets.some((asset) => asset.featureCoverageStatus !== "COMPLETE")) {
+    findings.push({
+      code: "FEATURE_COVERAGE_PARTIAL",
+      severity: "warning",
+      title: { en: "Feature traceability is incomplete", zh: "特性追踪覆盖不完整" },
+      detail: { en: "One or more Service or Functional Features lack complete current traceability.", zh: "一个或多个服务特性或功能特性缺少完整的当前追踪关系。" },
+      evidenceIds: featureAssets.filter((asset) => asset.featureCoverageStatus !== "COMPLETE").map((asset) => asset.id)
+    });
+  }
   const governanceFindings = input.snapshot.governanceBlockers.map((blocker) => ({ ...blocker, severity: "blocking" as const, evidenceIds: [] }));
   if (!input.snapshot.authorizationAllowed) {
     governanceFindings.push({
@@ -93,6 +103,10 @@ export async function evaluateRequirement(input: {
   const blocking = allFindings.some((finding) => finding.severity === "blocking");
   const verdict: FeasibilityVerdict = blocking ? "BLOCKED" : coverage.coverage === 0 ? "INSUFFICIENT_EVIDENCE" : coverage.coverage < 1 ? "CONDITIONAL" : "FEASIBLE";
   const confidence = Math.min(coverage.confidenceCap, providerConfidence(providerOutput, 0.55));
+  const unknowns = [
+    ...coverage.missingKinds.map((kind) => ({ en: `Missing evidence: ${kind}`, zh: `缺少证据：${kind}` })),
+    ...featureAssets.filter((asset) => asset.featureCoverageStatus !== "COMPLETE").map((asset) => ({ en: `Feature coverage is incomplete: ${asset.id}`, zh: `特性覆盖不完整：${asset.id}` }))
+  ];
   return {
     briefId: input.brief.id,
     briefRevision: input.brief.revision,
@@ -104,7 +118,7 @@ export async function evaluateRequirement(input: {
     deterministicFindings: allFindings,
     impactRoots: input.snapshot.orderedAssetManifest.map((asset) => ({ assetType: asset.assetType, assetId: asset.id })),
     assumptions: [{ en: "The assessment uses the immutable evidence snapshot supplied by SpecForge.", zh: "评估使用 SpecForge 提供的不可变证据快照。" }],
-    unknowns: coverage.missingKinds.map((kind) => ({ en: `Missing evidence: ${kind}`, zh: `缺少证据：${kind}` })),
+    unknowns,
     options: [{ title: { en: "Evidence-bounded implementation", zh: "基于证据边界的实现" }, summary: { en: "Implement only the covered change set and review unknowns first.", zh: "只实现已覆盖的变更集合，并先审查未知项。" } }],
     workBreakdown: tasks.map((task) => ({ ...task, title: { en: `Assess ${task.kind}`, zh: `评估 ${task.kind}` } })),
     estimate,

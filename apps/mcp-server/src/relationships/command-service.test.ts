@@ -331,11 +331,11 @@ class InMemoryRelationshipRepository implements RelationshipCommandRepository {
   async upsertNode(scopeInput: RelationshipScope, node: RelationshipNodeInput) {
     const existing = await this.findNode(scopeInput, node);
     if (existing) {
-      const updated = { ...existing, ...node, parentNodeId: node.parentNodeId ?? null, nodePath: node.nodePath ?? existing.nodePath, displayName: node.displayName ?? existing.displayName, metadata: node.metadata ?? {}, version: existing.version + 1n };
+      const updated = { ...existing, ...node, parentNodeId: node.parentNodeId ?? null, nodePath: node.nodePath ?? existing.nodePath, displayName: node.displayName ?? existing.displayName, metadata: node.metadata ?? {}, lifecycleStatus: node.lifecycleStatus ?? existing.lifecycleStatus, version: existing.version + 1n };
       this.nodes.splice(this.nodes.indexOf(existing), 1, updated);
       return updated;
     }
-    const created: RelationshipNodeRecord = { ...scopeInput, ...node, dbId: `node-${this.nodes.length + 1}`, parentNodeId: node.parentNodeId ?? null, nodePath: node.nodePath ?? `${node.nodeType}/${node.logicalId}`, displayName: node.displayName ?? node.logicalId, metadata: node.metadata ?? {}, version: 1n, lifecycleStatus: "ACTIVE" };
+    const created: RelationshipNodeRecord = { ...scopeInput, ...node, dbId: `node-${this.nodes.length + 1}`, parentNodeId: node.parentNodeId ?? null, nodePath: node.nodePath ?? `${node.nodeType}/${node.logicalId}`, displayName: node.displayName ?? node.logicalId, metadata: node.metadata ?? {}, version: 1n, lifecycleStatus: node.lifecycleStatus ?? "ACTIVE" };
     this.nodes.push(created);
     return created;
   }
@@ -351,6 +351,10 @@ class InMemoryRelationshipRepository implements RelationshipCommandRepository {
   async listParserRelationships(scopeInput: RelationshipScope, rootAssetType: AssetType, rootAssetId: string) {
     const nodeIds = new Set(this.nodes.filter((node) => sameScope(node, scopeInput) && node.rootAssetType === rootAssetType && node.rootAssetId === rootAssetId).map((node) => node.dbId));
     return this.current.filter((row) => sameScope(row, scopeInput) && row.source === "asset-parser" && nodeIds.has(row.sourceNodeId));
+  }
+  async listRelationshipsByNodeIds(scopeInput: RelationshipScope, nodeIds: string[]) {
+    const ids = new Set(nodeIds);
+    return this.current.filter((row) => sameScope(row, scopeInput) && row.lifecycleStatus === "ACTIVE" && (ids.has(row.sourceNodeId) || ids.has(row.targetNodeId)));
   }
   async findLegacyCurrentBySourceReference(applicationServiceId: string, scopePath: string, sourceReference: string) {
     return this.current.filter((row) => row.applicationServiceId === applicationServiceId && row.scopePath === scopePath && row.source === "legacy-asset-link" && row.sourceReference === sourceReference);

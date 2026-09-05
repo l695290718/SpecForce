@@ -11,12 +11,16 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/connector-worker/package.json apps/connector-worker/package.json
 COPY apps/mcp-server/package.json apps/mcp-server/package.json
 COPY packages/core/package.json packages/core/package.json
+COPY packages/identity/package.json packages/identity/package.json
 COPY packages/scan-contract/package.json packages/scan-contract/package.json
+COPY packages/scoped-read/package.json packages/scoped-read/package.json
 COPY prisma ./prisma
 COPY apps/connector-worker ./apps/connector-worker
 COPY apps/mcp-server ./apps/mcp-server
 COPY packages/core ./packages/core
+COPY packages/identity ./packages/identity
 COPY packages/scan-contract ./packages/scan-contract
+COPY packages/scoped-read ./packages/scoped-read
 
 RUN pnpm install --frozen-lockfile \
   && pnpm db:generate \

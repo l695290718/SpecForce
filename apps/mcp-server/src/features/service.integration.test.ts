@@ -77,6 +77,14 @@ describe.runIf(enabled)("atomic Feature Change Set persistence", () => {
     expect(await prisma.authoredAssetRevision.count({ where: { ...scope, assetId: service.id } })).toBe(1);
   });
 
+  it("invalidates active relationships when a Feature is retired", async () => {
+    const retired = { ...service, lifecycleStatus: "RETIRED" as const, updatedAt: "2026-09-03T00:02:00.000Z", localizedContent: { zh: { ...service.localizedContent!.zh!, description: "已退休的设计辅助。" } } };
+    await applyFeatureChangeSet({ ...input, idempotencyKey: `${prefix}-retire`, correlationId: `${prefix}-retire-correlation`, assets: [{ assetType: "serviceFeature", asset: retired, expectedVersion: "1" }], relationships: [] });
+    const relation = await prisma.relationshipCurrent.findFirst({ where: { ...configuredRelationshipScope(scope), sourceReference: `feature-change-set:${input.idempotencyKey}:0` } });
+    expect(relation).toMatchObject({ lifecycleStatus: "INVALIDATED" });
+    expect(await prisma.relationshipEvent.count({ where: { ...configuredRelationshipScope(scope), source: "feature-change-set" } })).toBeGreaterThan(0);
+  });
+
   it("returns bounded localized reads and rejects a mismatched scope path", async () => {
     const list = await listFeatures({ architectureScope: scope, kind: "serviceFeature", query: "atomic", locale: "zh", limit: 10 });
     const detail = await getFeature({ architectureScope: scope, assetId: service.id, locale: "zh" });

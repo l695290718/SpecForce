@@ -116,14 +116,14 @@ export class RelationshipCommandService {
       for (const node of graph.nodes) {
         validateEndpointScope(scope, node);
         const parentNode = node.parentLogicalId ? nodes.get(node.parentLogicalId) : undefined;
-        const input = nodeInput(node, parentNode?.dbId, assetUpdatedAt(command.asset));
+        const input = nodeInput(node, parentNode?.dbId, assetUpdatedAt(command.asset), assetLifecycleStatus(command.asset));
         const existing = await repository.findNode(scope, node);
         const persisted = existing && !isEffectiveNodeChange(existing, input) ? existing : await repository.upsertNode(scope, input);
         nodes.set(node.logicalId, persisted);
         if (!existing || persisted !== existing) changes.push({ kind: "node", node: persisted, priorVersion: existing?.version });
       }
       const expectedParserKeys = new Set<string>();
-      for (const relationship of graph.relationships) {
+      for (const relationship of assetLifecycleStatus(command.asset) === "RETIRED" ? [] : graph.relationships) {
         const sourceNode = nodes.get(relationship.sourceLogicalId);
         const targetNode = nodes.get(relationship.targetLogicalId)
           ?? await repository.findNode(scope, relationship.targetNode)
@@ -135,8 +135,15 @@ export class RelationshipCommandService {
         const change: PendingRelationshipChange = { kind: "relationship", current: currentInput, existing, action: "UPSERT" };
         if (isEffectiveRelationshipChange(change)) changes.push(change);
       }
-      for (const existing of await repository.listParserRelationships(scope, command.assetType, command.asset.id)) {
-        if (existing.lifecycleStatus === "ACTIVE" && !expectedParserKeys.has(currentKey(existing))) changes.push({ kind: "relationship", existing, action: "INVALIDATE", current: { ...existing, lifecycleStatus: "INVALIDATED", validTo: new Date() } });
+      if (assetLifecycleStatus(command.asset) === "RETIRED") {
+        const retiredNodeIds = [...nodes.values()].map((node) => node.dbId);
+        for (const existing of await repository.listRelationshipsByNodeIds(scope, retiredNodeIds)) {
+          changes.push({ kind: "relationship", existing, action: "INVALIDATE", current: { ...existing, lifecycleStatus: "INVALIDATED", validTo: new Date() } });
+        }
+      } else {
+        for (const existing of await repository.listParserRelationships(scope, command.assetType, command.asset.id)) {
+          if (existing.lifecycleStatus === "ACTIVE" && !expectedParserKeys.has(currentKey(existing))) changes.push({ kind: "relationship", existing, action: "INVALIDATE", current: { ...existing, lifecycleStatus: "INVALIDATED", validTo: new Date() } });
+        }
       }
       if (!changes.length) return noOpReceipt(undefined, await repository.currentGraphVersion(scope));
       return persistChanges(repository, this.context, command, receipt, changes);
@@ -177,7 +184,7 @@ async function persistChanges(repository: RelationshipCommandRepository, context
   for (const [ordinal, change] of changes.entries()) {
     if (change.kind === "relationship") {
       const relationship = await repository.writeCurrent(context.scope, change.current, (change.existing?.version ?? 0n) + 1n);
-      const event = await appendGraphEvent(repository, context, command, receipt, ordinal, graphVersion, { relationshipId: relationship.dbId, action: change.action, priorVersion: change.existing?.version, newVersion: relationship.version, source: relationship.source, snapshot: relationshipSnapshot(relationship), eventType: change.action === "UPSERT" ? "RELATIONSHIP_UPSERT" : "RELATIONSHIP_DELETE" });
+      const event = await appendGraphEvent(repository, context, command, receipt, ordinal, graphVersion, { relationshipId: relationship.dbId, action: change.action, priorVersion: change.existing?.version, newVersion: relationship.version, source: relationship.source, snapshot: relationshipSnapshot(relationship), eventType: change.action === "UPSERT" ? "RELATIONSHIP_UPSERT" : change.action === "INVALIDATE" ? "RELATIONSHIP_INVALIDATE" : "RELATIONSHIP_DELETE" });
       primaryEvent ??= event; relationshipId ??= relationship.dbId;
     } else {
       const event = await appendGraphEvent(repository, context, command, receipt, ordinal, graphVersion, { assetNodeId: change.node.dbId, action: "NODE_UPSERT", priorVersion: change.priorVersion, newVersion: change.node.version, source: "asset-parser", snapshot: nodeSnapshot(change.node), eventType: "ASSET_NODE_UPSERT" });
@@ -206,11 +213,12 @@ function canonicalize(value: unknown): unknown {
   if (value && typeof value === "object") return Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([, nested]) => nested !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([key, nested]) => [key, canonicalize(nested)]));
   return value;
 }
-function nodeInput(node: AssetNodeIdentity, parentNodeId?: string, assetUpdatedAt?: string): RelationshipNodeInput { return { ...node, parentNodeId, nodePath: `${node.nodeType}/${node.logicalId}`, displayName: node.logicalId, metadata: assetUpdatedAt ? { assetUpdatedAt } : {} }; }
+function nodeInput(node: AssetNodeIdentity, parentNodeId?: string, assetUpdatedAt?: string, lifecycleStatus?: string): RelationshipNodeInput { return { ...node, parentNodeId, nodePath: `${node.nodeType}/${node.logicalId}`, displayName: node.logicalId, metadata: assetUpdatedAt ? { assetUpdatedAt } : {}, lifecycleStatus }; }
 function assetUpdatedAt(asset: Asset): string | undefined { return "updatedAt" in asset && typeof asset.updatedAt === "string" ? asset.updatedAt : undefined; }
+function assetLifecycleStatus(asset: Asset): string | undefined { return "lifecycleStatus" in asset && typeof asset.lifecycleStatus === "string" ? asset.lifecycleStatus : undefined; }
 function currentKey(row: Pick<RelationshipCurrentRecord, "sourceNodeId" | "targetNodeId" | "relationType" | "source" | "sourceReference">): string { return `${row.sourceNodeId}:${row.targetNodeId}:${row.relationType}:${row.source}:${row.sourceReference}`; }
 function isEffectiveRelationshipChange(change: PendingRelationshipChange): boolean { const existing = change.existing; return !existing || existing.lifecycleStatus !== change.current.lifecycleStatus || existing.strength !== change.current.strength || existing.confidence !== change.current.confidence || existing.validTo?.getTime() !== change.current.validTo?.getTime() || JSON.stringify(existing.metadata) !== JSON.stringify(change.current.metadata); }
-function isEffectiveNodeChange(existing: RelationshipNodeRecord, input: RelationshipNodeInput): boolean { return existing.rootAssetType !== input.rootAssetType || existing.rootAssetId !== input.rootAssetId || existing.parentNodeId !== (input.parentNodeId ?? null) || existing.nodePath !== (input.nodePath ?? `${input.nodeType}/${input.logicalId}`) || existing.displayName !== (input.displayName ?? input.logicalId) || JSON.stringify(existing.metadata) !== JSON.stringify(input.metadata ?? {}); }
+function isEffectiveNodeChange(existing: RelationshipNodeRecord, input: RelationshipNodeInput): boolean { return existing.rootAssetType !== input.rootAssetType || existing.rootAssetId !== input.rootAssetId || existing.parentNodeId !== (input.parentNodeId ?? null) || existing.nodePath !== (input.nodePath ?? `${input.nodeType}/${input.logicalId}`) || existing.displayName !== (input.displayName ?? input.logicalId) || existing.lifecycleStatus !== (input.lifecycleStatus ?? "ACTIVE") || JSON.stringify(existing.metadata) !== JSON.stringify(input.metadata ?? {}); }
 function relationshipSnapshot(relationship: RelationshipCurrentRecord): Record<string, unknown> { return { relationshipId: relationship.dbId, sourceNodeId: relationship.sourceNodeId, targetNodeId: relationship.targetNodeId, relationType: relationship.relationType, strength: relationship.strength, confidence: relationship.confidence, source: relationship.source, sourceReference: relationship.sourceReference, lifecycleStatus: relationship.lifecycleStatus, version: relationship.version.toString(), metadata: relationship.metadata }; }
 function nodeSnapshot(node: RelationshipNodeRecord): Record<string, unknown> { return { assetNodeId: node.dbId, nodeType: node.nodeType, logicalId: node.logicalId, rootAssetType: node.rootAssetType, rootAssetId: node.rootAssetId, version: node.version.toString(), lifecycleStatus: node.lifecycleStatus, metadata: node.metadata }; }
 function receiptResult(receipt: RelationshipCommandReceipt): Record<string, unknown> { return { relationshipId: receipt.relationshipId ?? null, assetNodeId: receipt.assetNodeId ?? null, eventId: receipt.eventId ?? null }; }

@@ -6,18 +6,18 @@ import { renderAssetSummary } from "../summary/render";
 import type { AssetLocale, AssetRef, ContextPack, DerivedViewOptions, Proposal } from "../types";
 
 const sectionTitles = [
-  "1. Feature Summary", "2. Business Background", "3. Goals", "4. Non-goals", "5. Impacted Assets",
-  "6. Domain Model Context", "7. Data Model Context", "8. API Contracts", "9. Event Contracts", "10. Business Rules",
-  "11. State Machines", "12. Architecture Decisions", "13. Quality Requirements", "14. Observability Requirements",
-  "15. Implementation Tasks", "16. Test Suggestions", "17. Constraints and Do-not Rules"
+  "1. Service Features", "2. Functional Features", "3. Feature Summary", "4. Business Background", "5. Goals", "6. Non-goals", "7. Impacted Assets",
+  "8. Domain Model Context", "9. Data Model Context", "10. API Contracts", "11. Event Contracts", "12. Business Rules",
+  "13. State Machines", "14. Architecture Decisions", "15. Quality Requirements", "16. Observability Requirements",
+  "17. Implementation Tasks", "18. Test Suggestions", "19. Constraints and Do-not Rules"
 ];
 
 const localizedSectionTitles = {
   en: sectionTitles,
   zh: [
-    "1. 特性摘要", "2. 业务背景", "3. 目标", "4. 非目标", "5. 受影响资产", "6. 领域模型上下文",
-    "7. 数据模型上下文", "8. API 契约", "9. 事件契约", "10. 业务规则", "11. 状态机", "12. 架构决策",
-    "13. 质量要求", "14. 可观测性要求", "15. 实施任务", "16. 测试建议", "17. 约束和禁止事项"
+    "1. 服务特性", "2. 功能特性", "3. 特性摘要", "4. 业务背景", "5. 目标", "6. 非目标", "7. 受影响资产", "8. 领域模型上下文",
+    "9. 数据模型上下文", "10. API 契约", "11. 事件契约", "12. 业务规则", "13. 状态机", "14. 架构决策",
+    "15. 质量要求", "16. 可观测性要求", "17. 实施任务", "18. 测试建议", "19. 约束和禁止事项"
   ]
 } as const;
 
@@ -119,23 +119,25 @@ export async function generateContextPack(proposalId: string, options: GenerateC
     const doNotRules = deriveDoNotRules(proposal, locale);
     const markdown = [
       locale === "zh" ? "# Agent 上下文包" : "# Agent Context Pack", "",
-      `## ${titles[0]}`, proposal.description, "",
-      `## ${titles[1]}`, proposal.background, "",
-      `## ${titles[2]}`, proposal.goal, "",
-      `## ${titles[3]}`, proposal.nonGoal, "",
-      `## ${titles[4]}`, localizedIncludedAssets.map((asset) => `- ${asset.label} (${asset.type}/${asset.id})`).join("\n"), "",
-      `## ${titles[5]}`, await summaries(refsOfType(includedAssets, ["domain"]), derivedOptions), "",
-      `## ${titles[6]}`, await summaries(refsOfType(includedAssets, ["dataModel"]), derivedOptions), "",
-      `## ${titles[7]}`, await summaries(refsOfType(includedAssets, ["api"]), derivedOptions), "",
-      `## ${titles[8]}`, await summaries(refsOfType(includedAssets, ["event"]), derivedOptions), "",
-      `## ${titles[9]}`, await summaries(refsOfType(includedAssets, ["businessRule"]), derivedOptions), "",
-      `## ${titles[10]}`, await summaries(refsOfType(includedAssets, ["stateMachine"]), derivedOptions), "",
-      `## ${titles[11]}`, await summaries(refsOfType(includedAssets, ["adr"]), derivedOptions), "",
-      `## ${titles[12]}`, await summaries(refsOfType(includedAssets, ["quality"]), derivedOptions), "",
-      `## ${titles[13]}`, await summaries(refsOfType(includedAssets, ["observability"]), derivedOptions), "",
-      `## ${titles[14]}`, ...impact.implementationTasks.map((task) => `- ${task}`), "",
-      `## ${titles[15]}`, ...testSuggestions.map((item) => `- ${item}`), "",
-      `## ${titles[16]}`, ...doNotRules.map((item) => `- ${item}`)
+      `## ${titles[0]}`, await summaries(refsOfType(includedAssets, ["serviceFeature"]), derivedOptions), "",
+      `## ${titles[1]}`, await summaries(refsOfType(includedAssets, ["functionalFeature"]), derivedOptions), "",
+      `## ${titles[2]}`, proposal.description, "",
+      `## ${titles[3]}`, proposal.background, "",
+      `## ${titles[4]}`, proposal.goal, "",
+      `## ${titles[5]}`, proposal.nonGoal, "",
+      `## ${titles[6]}`, localizedIncludedAssets.map((asset) => `- ${asset.label} (${asset.type}/${asset.id})`).join("\n"), "",
+      `## ${titles[7]}`, await summaries(refsOfType(includedAssets, ["domain"]), derivedOptions), "",
+      `## ${titles[8]}`, await summaries(refsOfType(includedAssets, ["dataModel"]), derivedOptions), "",
+      `## ${titles[9]}`, await summaries(refsOfType(includedAssets, ["api"]), derivedOptions), "",
+      `## ${titles[10]}`, await summaries(refsOfType(includedAssets, ["event"]), derivedOptions), "",
+      `## ${titles[11]}`, await summaries(refsOfType(includedAssets, ["businessRule"]), derivedOptions), "",
+      `## ${titles[12]}`, await summaries(refsOfType(includedAssets, ["stateMachine"]), derivedOptions), "",
+      `## ${titles[13]}`, await summaries(refsOfType(includedAssets, ["adr"]), derivedOptions), "",
+      `## ${titles[14]}`, await summaries(refsOfType(includedAssets, ["quality"]), derivedOptions), "",
+      `## ${titles[15]}`, await summaries(refsOfType(includedAssets, ["observability"]), derivedOptions), "",
+      `## ${titles[16]}`, ...impact.implementationTasks.map((task) => `- ${task}`), "",
+      `## ${titles[17]}`, ...testSuggestions.map((item) => `- ${item}`), "",
+      `## ${titles[18]}`, ...doNotRules.map((item) => `- ${item}`)
     ].join("\n");
 
     return { proposal, impact, includedAssets: localizedIncludedAssets, constraints, markdown };

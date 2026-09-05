@@ -9,6 +9,7 @@ export interface EvidenceAsset {
   contentDigest: string;
   evidenceKinds?: string[];
   summary?: LocalizedText;
+  featureCoverageStatus?: "UNMAPPED" | "PARTIAL" | "COMPLETE";
 }
 
 export interface EvidenceRelationship {
@@ -107,7 +108,8 @@ export async function buildEvidenceSnapshot(input: {
     ...(relationships.complete ? ["relationship"] : []),
     ...(governance.authorizationAllowed ? ["authorization"] : []),
     ...(governance.reconciliationStatus.toUpperCase() === "CONVERGED" ? ["reconciliation"] : []),
-    ...(projection.semanticsAvailable ? ["projection"] : [])
+    ...(projection.semanticsAvailable ? ["projection"] : []),
+    ...(assets.filter((asset) => asset.assetType === "serviceFeature" || asset.assetType === "functionalFeature").every((asset) => asset.featureCoverageStatus === "COMPLETE") && assets.some((asset) => asset.assetType === "serviceFeature" || asset.assetType === "functionalFeature") ? ["feature-coverage"] : [])
   ])].sort();
   const validAtWaterline = `${catalog.catalogWaterline}:${relationships.relationshipWaterline}`;
   const digestInput = {

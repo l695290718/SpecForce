@@ -38,7 +38,7 @@ const targetTypesByObservation: Record<ScannerObservationType, string[]> = {
   "data-model": ["dataModel"],
   "system-component": ["integration", "domain", "stateMachine"],
   "documentation": ["adr", "evidence"],
-  "source-file": ["domain", "dataModel", "api", "event", "businessRule", "stateMachine", "integration", "quality", "observability", "adr"]
+  "source-file": ["domain", "dataModel", "api", "event", "businessRule", "stateMachine", "integration", "quality", "observability", "adr", "functionalFeature"],
 };
 
 const ignoredTokens = new Set(["src", "source", "contracts", "contract", "openapi", "asyncapi", "schema", "json", "yaml", "yml", "ts", "tsx", "js", "jsx", "java", "kt", "py", "go", "rs", "cs", "api", "event", "model", "service"]);

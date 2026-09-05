@@ -12,6 +12,7 @@ export interface RelationshipNodeInput extends AssetNodeIdentity {
   nodePath?: string;
   displayName?: string;
   metadata?: Record<string, unknown>;
+  lifecycleStatus?: string;
 }
 
 export interface RelationshipNodeRecord extends RelationshipScope {
@@ -94,6 +95,7 @@ export interface RelationshipCommandRepository {
   findCurrent(scope: RelationshipScope, identity: Pick<RelationshipCurrentRecord, "sourceNodeId" | "targetNodeId" | "relationType" | "source" | "sourceReference">): Promise<RelationshipCurrentRecord | undefined>;
   writeCurrent(scope: RelationshipScope, input: Omit<RelationshipCurrentRecord, "dbId" | "version" | keyof RelationshipScope>, version: bigint): Promise<RelationshipCurrentRecord>;
   listParserRelationships(scope: RelationshipScope, rootAssetType: AssetType, rootAssetId: string): Promise<RelationshipCurrentRecord[]>;
+  listRelationshipsByNodeIds(scope: RelationshipScope, nodeIds: string[]): Promise<RelationshipCurrentRecord[]>;
   findLegacyCurrentBySourceReference(applicationServiceId: string, scopePath: string, sourceReference: string): Promise<RelationshipCurrentRecord[]>;
   deleteLegacyAssetLink(scope: RelationshipScope, sourceReference: string): Promise<void>;
   appendEvent(event: RelationshipEventRecord): Promise<RelationshipEventRecord>;
@@ -195,7 +197,7 @@ export class PrismaRelationshipRepository implements RelationshipCommandReposito
       nodePath: node.nodePath ?? `${node.nodeType}/${node.logicalId}`,
       displayName: node.displayName ?? node.logicalId,
       metadata: toInputJson(node.metadata ?? {}),
-      lifecycleStatus: "ACTIVE"
+      lifecycleStatus: node.lifecycleStatus ?? "ACTIVE"
     };
     const persisted = existing
       ? await this.client.assetNode.update({
@@ -261,6 +263,14 @@ export class PrismaRelationshipRepository implements RelationshipCommandReposito
         source: "asset-parser",
         sourceNode: { rootAssetType, rootAssetId }
       }
+    });
+    return relationships.map(currentRecord);
+  }
+
+  async listRelationshipsByNodeIds(scope: RelationshipScope, nodeIds: string[]): Promise<RelationshipCurrentRecord[]> {
+    if (!nodeIds.length) return [];
+    const relationships = await this.client.relationshipCurrent.findMany({
+      where: { ...scope, lifecycleStatus: "ACTIVE", OR: [{ sourceNodeId: { in: nodeIds } }, { targetNodeId: { in: nodeIds } }] }
     });
     return relationships.map(currentRecord);
   }

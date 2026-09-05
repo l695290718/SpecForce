@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. P0 core governance and atomic MCP delivery plus P1 search, coverage, and read-only Web delivery are implemented and locally verified; P2 remains pending.
+Accepted. P0 core governance, P1 search/coverage/read-only Web delivery, and P2 knowledge/downstream reconciliation are implemented and locally verified.
 
 - Stable ADR ID: `adr-first-class-feature-assets`.
 - Proposal: `proposal-first-class-feature-assets` (`reviewing`).
@@ -13,6 +13,7 @@ Accepted. P0 core governance and atomic MCP delivery plus P1 search, coverage, a
 - Design session: `design-change-session:8c02a714-28d0-49bd-8154-77d26adc42e1`.
 - P0 implementation session: `design-change-session:57f4bbdc-737e-4909-a967-e1bd8c447397`.
 - P1 implementation session: `design-change-session:651a22ca-02c2-4184-9385-76515e9285a5`.
+- P2 implementation session: `design-change-session:35142ca0-2b85-4813-b7a0-61ccae6bd8b9`.
 - Specification: `docs/superpowers/specs/2026-09-02-first-class-feature-assets-design.md`.
 
 ## Context
@@ -29,6 +30,8 @@ SpecForge can govern contracts, rules, data, behavior, architecture, decisions, 
 6. Keep the Web Feature workspace read-only. Provide scoped pagination, bilingual details, and a bounded interactive relationship graph.
 7. Separate authored lifecycle from computed coverage, evidence, and consistency dimensions. Verification evidence is valid only for the current Feature version/content digest.
 8. Deliver in P0 core governance, P1 Web/search/coverage, and P2 system-knowledge/downstream reconciliation increments. Each requires its own implementation preflight, evidence, MCP synchronization, and reconciliation.
+9. Include Service and Functional Features in readiness-gated bounded system knowledge, Context Packs, impact analysis, and requirement assessments; incomplete Feature coverage remains an explicit uncertainty.
+10. Bind implementation evidence to Feature version/content digest. Mark stale evidence and implementation drift explicitly, and invalidate active relationships when a Feature is retired in the same MCP transaction while retaining authored history.
 
 ## Consequences
 
@@ -37,6 +40,7 @@ SpecForge can govern contracts, rules, data, behavior, architecture, decisions, 
 - Positive: atomic Change Sets prevent partially persisted Feature graphs.
 - Tradeoff: the asset type union, localization maps, repository catalog, ontology, projections, MCP contracts, Web navigation, and downstream consumers must all evolve together.
 - Tradeoff: derived delivery truth requires version-bound evidence and cannot be inferred reliably from relationship presence alone.
+- Tradeoff: readiness and assessment consumers must carry Feature coverage and provenance, while retirement invalidation adds graph-ledger writes to Feature updates.
 - Deferred: cross-Scope Feature reuse, enterprise templates, automated implementation discovery, and production-scale graph certification require separate decisions.
 
 ## Alternatives
@@ -64,7 +68,12 @@ SpecForge can govern contracts, rules, data, behavior, architecture, decisions, 
 - `$env:SPECFORGE_NEXT_STANDALONE='0'; pnpm --filter @specforge/web build` compiled successfully, generated all 41 pages, and emitted `/features` plus its three read-only API routes. The default Windows OneDrive standalone packaging reached successful compilation and page generation but could not create pnpm symlinks (`EPERM`); Linux Docker standalone packaging remains the production verification boundary.
 - Browser acceptance at `/features?scope=com.huawei.celon.desiner` verified service/function/graph navigation, exact Scope retention, read-only copy, empty authorized results without `503`, zero console errors, and a 390 px viewport with `scrollWidth === innerWidth`.
 - Implemented P1 behavior comprises kind-aware coverage/evidence/consistency derivation, bilingual lifecycle search projection, HMAC-bound scoped pagination, read-only list/detail routes, and a bounded Sigma WebGL graph with pan, zoom, node dragging, type filters, and impact-path highlighting.
-- P2 downstream knowledge, context-pack, requirement-assessment, and evidence/drift reconciliation are not claimed by this P1 increment.
+- `pnpm exec vitest run packages/core/src/features packages/core/src/context-pack/generate.test.ts packages/core/src/requirement-assessment apps/mcp-server/src/relationships/command-service.test.ts apps/mcp-server/src/features apps/mcp-server/src/knowledge-readiness --exclude '**/.worktrees/**' --exclude '**/.pnpm-store/**'` passed 17 files and 52 tests; 11 database-dependent tests were skipped because the integration switch was not enabled.
+- `pnpm typecheck` exited `0` for Core, knowledge-query, knowledge-projector, MCP Server, and Web.
+- `$env:SPECFORGE_NEXT_STANDALONE='0'; pnpm build` compiled and generated all 41 Web pages and Feature routes successfully; existing React Hook and dynamic identity dependency warnings remain non-blocking.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -ConfigurationOnly` passed Compose topology validation.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -Live` built all six images, started the PostgreSQL/bootstrap/projector/3A/Web/worker chain, restarted Web, and passed asset-count persistence verification. The connector-worker image was corrected to include its identity and scoped-read workspace dependencies.
+- P2 downstream knowledge, Context Pack, requirement-assessment, evidence/drift reconciliation, and transactional retirement relationship invalidation are implemented and locally verified. Cross-Scope reuse, enterprise templates, automated implementation discovery, and production-scale graph certification remain deferred.
 
 ## Constraints
 
@@ -82,7 +91,7 @@ SpecForge can govern contracts, rules, data, behavior, architecture, decisions, 
 
 ### 状态
 
-设计已接受。P0 核心治理与原子 MCP 交付以及 P1 搜索、覆盖与只读 Web 交付已经实现并完成本地验证；P2 仍待实施。稳定 ADR、Proposal、Context Pack、负责人、精确 Scope、设计会话和规格路径见文首元数据。
+设计已接受。P0 核心治理、P1 搜索/覆盖/只读 Web 交付以及 P2 系统知识/下游对账已经实现并完成本地验证。稳定 ADR、Proposal、Context Pack、负责人、精确 Scope、设计会话和规格路径见文首元数据。
 
 ### 背景
 
@@ -98,6 +107,8 @@ SpecForge 已能治理契约、规则、数据、行为、架构、决策、变�
 6. Web 特性工作区保持只读，提供 Scope 分页、双语详情和有边界交互关系图。
 7. 将人工生命周期与计算得到的覆盖、证据和一致性维度分离；验证证据只有绑定当前 Feature 版本/摘要时才有效。
 8. 分 P0 核心治理、P1 Web/搜索/覆盖和 P2 系统知识/下游对账交付；每阶段都需要独立实施预检、证据、MCP 同步和对账。
+9. 将服务特性和功能特性纳入就绪门禁后的有界系统知识、上下文包、影响分析和需求评估；不完整的 Feature 覆盖必须作为显式不确定性保留。
+10. 将实现证据绑定到 Feature 版本/内容摘要，明确标记证据过期和实现漂移；Feature 退休时在同一 MCP 事务中使活动关系失效，同时保留编写历史。
 
 ### 后果
 
@@ -106,6 +117,7 @@ SpecForge 已能治理契约、规则、数据、行为、架构、决策、变�
 - 原子 Change Set 防止残缺 Feature 图。
 - 资产类型、本地化、目录、关系本体、投影、MCP、Web 和下游消费者需要协同演进。
 - 交付事实依赖绑定版本的证据，不能只凭存在关系就可靠推导。
+- 就绪门禁和评估消费者需要携带 Feature 覆盖与来源信息，退休失效会为 Feature 更新增加图账本写入。
 - 跨 Scope 复用、企业模板、自动实现发现和生产规模图认证分别延期决策。
 
 ### 备选方案
@@ -132,8 +144,12 @@ SpecForge 已能治理契约、规则、数据、行为、架构、决策、变�
 - Core、MCP Server 和 Web 的 TypeScript 检查均以退出码 `0` 完成。
 - 关闭 standalone 后的 Web 生产构建编译成功并生成全部 41 个页面，包含 `/features` 及三条只读 API。Windows OneDrive 下的默认 standalone 构建已完成编译和页面生成，但 pnpm 符号链接创建被系统以 `EPERM` 拒绝；Linux Docker standalone 构建仍是生产打包验证边界。
 - 浏览器验收确认服务/功能/图谱导航、精确 Scope 保留、只读提示、授权空结果不返回 `503`、控制台零错误，以及 390 像素窄屏没有横向溢出。
-- 当前声明 P1 的分类覆盖/证据/一致性推导、双语生命周期搜索投影、HMAC 绑定的 Scope 分页、只读列表/详情路由，以及支持平移、缩放、节点拖动、类型过滤和影响路径高亮的有界 Sigma WebGL 图已经实现。
-- P2 下游系统知识、上下文包、需求评估和证据/漂移对账仍未声明实现。
+- P2 聚焦测试通过 17 个文件、52 项测试；11 个数据库集成测试因未启用集成开关而跳过。
+- `pnpm typecheck` 对 Core、knowledge-query、knowledge-projector、MCP Server 和 Web 全部通过。
+- `$env:SPECFORGE_NEXT_STANDALONE='0'; pnpm build` 成功编译并生成全部 41 个 Web 页面及 Feature 路由；既有 React Hook 和动态身份依赖警告不阻塞构建。
+- Compose 配置校验和 Live 验证均通过；Live 验证构建六个镜像，启动 PostgreSQL/Bootstrap/投影/3A/Web/Worker 链路，重启 Web 后资产数量保持不变。为此修正了 connector-worker 镜像遗漏的 identity 与 scoped-read 工作区依赖。
+- P2 已实现就绪门禁后的 Feature 系统知识、双语上下文包、需求评估中的 Feature 覆盖发现与证据类型、绑定版本/摘要的漂移对账，以及带持久图事件/Outbox 的退休关系事务失效。
+- 当前声明 P2 下游系统知识、上下文包、需求评估、证据/漂移对账和退休关系失效已经实现并完成本地验证。跨 Scope 复用、企业模板、自动实现发现和生产规模图认证仍延期。
 
 ### 约束
 

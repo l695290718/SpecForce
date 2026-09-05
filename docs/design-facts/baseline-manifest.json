@@ -13,8 +13,8 @@
                           "contextPackId": "context-pack-first-class-feature-assets",
                           "proposalStatus": "reviewing",
                           "proposalNonGoal": {
-                              "en": "This P0 increment does not claim the P1 Web Feature workspace, P2 downstream knowledge and evidence reconciliation, cross-Scope Feature reuse, enterprise templates, automated implementation discovery, or production-scale graph certification.",
-                              "zh": "本 P0 增量不声明 P1 Web 特性工作区、P2 下游知识与证据对账、跨 Scope 特性复用、企业模板、自动实现发现或生产规模图认证。"
+                              "en": "This increment does not claim cross-Scope Feature reuse, enterprise templates, automated implementation discovery, or production-scale graph certification.",
+                              "zh": "本增量不声明跨 Scope 特性复用、企业模板、自动实现发现或生产规模图认证。"
                           },
                           "relatedAssetIds": [
                               "proposal-specforge-self-design",
@@ -23,9 +23,9 @@
                               "data-specforge-asset-graph"
                           ],
                           "owner": "SpecForge Product Architecture and Design Governance",
-                          "status": "Accepted; P0 core Feature governance and atomic MCP Change Set are implemented and locally verified. P1 and P2 remain pending.",
+                          "status": "Accepted; P0 core governance, P1 Web/search/coverage, and P2 knowledge/downstream reconciliation are implemented and locally verified. Cross-Scope reuse and production-scale graph certification remain deferred.",
                           "reason": "SpecForge needs first-class, independently versioned Service and Functional Feature assets to trace stakeholder value through functional behavior to contracts, data, implementation, and current-version evidence without weakening exact-Scope isolation.",
-                          "retryTrigger": "Open the approved P1 exact-Scope implementation session and complete scoped Web list, detail, coverage, and bounded WebGL graph acceptance before claiming the Feature workspace.",
+                          "retryTrigger": "Approve an independent exact-Scope design for cross-Scope Feature reuse, enterprise templates, automated implementation discovery, or production-scale graph certification before extending this increment.",
                           "evidence": [
                               {
                                   "command": "Industry review: OMG ISO/IEC/IEEE 29148 summary; SEBoK Function glossary; ITU-T Q.1290; OASIS SOA service functionality",
@@ -62,6 +62,26 @@
                               {
                                   "command": "pnpm --filter @specforge/core typecheck; pnpm --filter @specforge/mcp-server typecheck",
                                   "result": "Both TypeScript checks exited 0."
+                              },
+                              {
+                                  "command": "pnpm exec vitest run packages/core/src/features packages/core/src/context-pack/generate.test.ts packages/core/src/requirement-assessment apps/mcp-server/src/relationships/command-service.test.ts apps/mcp-server/src/features apps/mcp-server/src/knowledge-readiness --exclude '**/.worktrees/**' --exclude '**/.pnpm-store/**'",
+                                  "result": "Passed 17 files and 52 tests; 11 database-dependent tests were skipped because the integration switch was not enabled."
+                              },
+                              {
+                                  "command": "pnpm typecheck",
+                                  "result": "Exited 0 for Core, knowledge-query, knowledge-projector, MCP Server, and Web."
+                              },
+                              {
+                                  "command": "$env:SPECFORGE_NEXT_STANDALONE='0'; pnpm build",
+                                  "result": "Compiled and generated all 41 Web pages and Feature routes successfully; existing React Hook and dynamic identity dependency warnings remained non-blocking."
+                              },
+                              {
+                                  "command": "powershell -NoProfile -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -ConfigurationOnly",
+                                  "result": "Compose topology configuration verified."
+                              },
+                              {
+                                  "command": "powershell -NoProfile -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -Live",
+                                  "result": "Built six images, started the PostgreSQL/bootstrap/projector/3A/Web/worker chain, restarted Web, and passed asset-count persistence verification after fixing connector-worker workspace dependency copies."
                               }
                           ]
                       },

@@ -6,7 +6,7 @@ export const genericSystemAnalysisProfile: AnalysisProfile = {
   supportedLayers: ["BIZ", "SYS", "TECH"],
   supportedAspects: ["structure", "behavior", "information", "contract", "constraint"],
   requiresDdd: false,
-  extractorKinds: ["repository", "openapi", "asyncapi", "database-schema", "document"],
+  extractorKinds: ["repository", "openapi", "asyncapi", "database-schema", "document", "feature-assets"],
   version: "1"
 };
 
