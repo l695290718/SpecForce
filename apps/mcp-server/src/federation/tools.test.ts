@@ -256,7 +256,7 @@ describe("federation MCP tools", () => {
     });
   });
 
-  it("permits a seeded exact-Scope readiness evaluation", async () => {
+  it("permits a seeded exact-Scope design catalog curation evaluation", async () => {
     const previousSeed = process.env.SPECFORGE_MCP_SEED;
     const previousScope = process.env.SPECFORGE_MCP_SEED_SCOPE;
     process.env.SPECFORGE_MCP_SEED = "1";
@@ -264,7 +264,7 @@ describe("federation MCP tools", () => {
     try {
       const result = await callSeedTool("evaluate_system_knowledge_readiness", {
         architectureScope: designerScope,
-        knowledgeProfile: "ARCHITECTURE_OVERVIEW",
+        knowledgeProfile: "DESIGN_CATALOG_CURATION",
         selectors: [],
         purpose: "seeded exact-Scope permission regression",
         locale: "en"
@@ -273,7 +273,7 @@ describe("federation MCP tools", () => {
       expect(result.isError).toBeUndefined();
       expect(knowledgeReadiness.evaluateScopedKnowledgeReadiness).toHaveBeenCalledWith(
         persistence.prisma,
-        expect.objectContaining({ architectureScope: designerScope }),
+        expect.objectContaining({ architectureScope: designerScope, knowledgeProfile: "DESIGN_CATALOG_CURATION" }),
         expect.objectContaining({ permissions: expect.arrayContaining(["knowledge:consume"]) })
       );
     } finally {

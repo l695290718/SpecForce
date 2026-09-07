@@ -30,7 +30,7 @@ const architectureScopeSchema = z.object({
   scopePath: z.string().min(1)
 });
 
-const knowledgeProfileSchema = z.enum(["ARCHITECTURE_OVERVIEW", "CHANGE_ASSESSMENT", "RUNTIME_DIAGNOSIS"]);
+const knowledgeProfileSchema = z.enum(["DESIGN_CATALOG_CURATION", "ARCHITECTURE_OVERVIEW", "CHANGE_ASSESSMENT", "RUNTIME_DIAGNOSIS"]);
 const knowledgeSourceRoleSchema = z.enum(["DESIGN_CATALOG", "SOURCE_CODE", "API_SCHEMA", "DATA_SCHEMA", "TEST_EVIDENCE", "DEPLOYMENT", "RUNTIME_TELEMETRY"]);
 const knowledgeDimensionSchema = z.enum(["DESIGN_INTENT", "IMPLEMENTATION", "RUNTIME"]);
 const knowledgeSourceRequirementSchema = z.object({
@@ -343,7 +343,7 @@ function deniedKnowledgeRead() {
 }
 
 function recordKnowledgeOutcome(scope: ArchitectureScopeRef, result: { accessDecision: "ALLOW" | "DENY"; profileId?: string; reasonCodes: readonly string[]; receiptId?: string; asOf?: string }, startedAt: number, input: { receiptId?: string; cursor?: string }): void {
-  if (result.profileId === "ARCHITECTURE_OVERVIEW" || result.profileId === "CHANGE_ASSESSMENT" || result.profileId === "RUNTIME_DIAGNOSIS") {
+  if (result.profileId === "DESIGN_CATALOG_CURATION" || result.profileId === "ARCHITECTURE_OVERVIEW" || result.profileId === "CHANGE_ASSESSMENT" || result.profileId === "RUNTIME_DIAGNOSIS") {
     recordReadinessEvaluation(scope, {
       profileId: result.profileId,
       accessDecision: result.accessDecision,
