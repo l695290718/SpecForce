@@ -18,6 +18,10 @@ const continuousPersistence = vi.hoisted(() => ({
   getContinuousObservationCursor: vi.fn()
 }));
 
+const knowledgeReadiness = vi.hoisted(() => ({
+  evaluateScopedKnowledgeReadiness: vi.fn()
+}));
+
 const persistence = vi.hoisted(() => ({
   ensureMcpPersistenceSchema: vi.fn(),
   readableScope: vi.fn((applicationServiceId: string) => applicationServiceId === "com.huawei.celon.desiner" ? designerScope : siblingScope),
@@ -63,6 +67,7 @@ const scopedDerived = vi.hoisted(() => ({
 
 vi.mock("./persistence", () => federationPersistence);
 vi.mock("./continuous-persistence", () => continuousPersistence);
+vi.mock("../knowledge-readiness/service", () => knowledgeReadiness);
 vi.mock("../persistence", () => persistence);
 vi.mock("../scoped-derived", () => scopedDerived);
 
@@ -157,6 +162,12 @@ async function callTool(name: string, input: unknown, extra: ToolExtra = authori
   return tool.handler(input, extra);
 }
 
+async function callSeedTool(name: string, input: unknown) {
+  const tool = captureToolsWithFederationRegistration().get(name);
+  if (!tool) throw new Error(`Tool not registered: ${name}`);
+  return tool.handler(input, undefined);
+}
+
 function errorCode(result: { content: Array<{ text: string }> }): string | undefined {
   return JSON.parse(result.content[0]!.text).error?.code;
 }
@@ -189,6 +200,14 @@ beforeEach(() => {
   persistence.prisma.federationOutbox.count.mockResolvedValue(2);
   persistence.prisma.sourceObservation.count.mockResolvedValue(1);
   persistence.prisma.reconciliationSnapshot.findFirst.mockResolvedValue({ root: "root-1", status: "CONVERGED", createdAt: new Date("2026-07-19T00:00:00.000Z") });
+  knowledgeReadiness.evaluateScopedKnowledgeReadiness.mockResolvedValue({
+    accessDecision: "ALLOW",
+    profileId: "ARCHITECTURE_OVERVIEW",
+    reasonCodes: [],
+    remediationActions: [],
+    receiptId: "seed-receipt",
+    asOf: "2026-09-07T00:00:00.000Z"
+  });
 });
 
 afterEach(() => vi.restoreAllMocks());
@@ -235,6 +254,34 @@ describe("federation MCP tools", () => {
       relationships: [],
       reasonCodes: ["KNOWLEDGE_SCOPE_ACCESS_DENIED"]
     });
+  });
+
+  it("permits a seeded exact-Scope readiness evaluation", async () => {
+    const previousSeed = process.env.SPECFORGE_MCP_SEED;
+    const previousScope = process.env.SPECFORGE_MCP_SEED_SCOPE;
+    process.env.SPECFORGE_MCP_SEED = "1";
+    process.env.SPECFORGE_MCP_SEED_SCOPE = designerScope.applicationServiceId;
+    try {
+      const result = await callSeedTool("evaluate_system_knowledge_readiness", {
+        architectureScope: designerScope,
+        knowledgeProfile: "ARCHITECTURE_OVERVIEW",
+        selectors: [],
+        purpose: "seeded exact-Scope permission regression",
+        locale: "en"
+      });
+
+      expect(result.isError).toBeUndefined();
+      expect(knowledgeReadiness.evaluateScopedKnowledgeReadiness).toHaveBeenCalledWith(
+        persistence.prisma,
+        expect.objectContaining({ architectureScope: designerScope }),
+        expect.objectContaining({ permissions: expect.arrayContaining(["knowledge:consume"]) })
+      );
+    } finally {
+      if (previousSeed === undefined) delete process.env.SPECFORGE_MCP_SEED;
+      else process.env.SPECFORGE_MCP_SEED = previousSeed;
+      if (previousScope === undefined) delete process.env.SPECFORGE_MCP_SEED_SCOPE;
+      else process.env.SPECFORGE_MCP_SEED_SCOPE = previousScope;
+    }
   });
 
   it("prepares an exact-Scope design context before implementation", async () => {

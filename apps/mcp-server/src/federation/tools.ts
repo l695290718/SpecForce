@@ -303,7 +303,7 @@ function requestActor(extra: FederationRequestExtra | undefined): FederationCall
         clientId: "local-design-context",
         authSource: "seed",
         tenantId: "local-development",
-        scopes: ["asset:read", "asset:write", "governance:run", "graph:read"],
+        scopes: ["asset:read", "asset:write", "governance:run", "graph:read", "knowledge:consume"],
         extra: {
           actor: {
             actorType: "agent",
