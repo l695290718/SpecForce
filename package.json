@@ -39,7 +39,8 @@
     "governance:briefing": "tsx scripts/governance-briefing.mts",
     "designer-3a:v7:analyze": "tsx scripts/analyze-designer-3a-v7.ts",
     "designer-3a:v7:publish": "tsx scripts/publish-designer-3a-v7.ts",
-    "designer-3a:v7:verify": "tsx scripts/verify-designer-3a-v7.ts"
+    "designer-3a:v7:verify": "tsx scripts/verify-designer-3a-v7.ts",
+    "feature-catalog:backfill": "tsx scripts/backfill-feature-catalog.ts"
     ,"identity:bootstrap": "tsx scripts/identity-bootstrap.ts"
     ,"identity:recover": "tsx scripts/identity-recover.ts"
     ,"identity:migrate-report": "tsx scripts/identity-migrate-report.ts"
