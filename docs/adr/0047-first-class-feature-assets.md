@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. P0 core governance, P1 search/coverage/read-only Web delivery, and P2 knowledge/downstream reconciliation are implemented and locally verified.
+Accepted. P0 core governance, P1 search/coverage/read-only Web delivery, and P2 knowledge/downstream reconciliation are implemented and locally verified. The readiness-gated Feature catalog backfill command is implemented and locally verified; the live catalog backfill remains blocked until this Scope has a current `SOURCE_CODE` knowledge source and reconciliation snapshot.
 
 - Stable ADR ID: `adr-first-class-feature-assets`.
 - Proposal: `proposal-first-class-feature-assets` (`reviewing`).
@@ -32,6 +32,7 @@ SpecForge can govern contracts, rules, data, behavior, architecture, decisions, 
 8. Deliver in P0 core governance, P1 Web/search/coverage, and P2 system-knowledge/downstream reconciliation increments. Each requires its own implementation preflight, evidence, MCP synchronization, and reconciliation.
 9. Include Service and Functional Features in readiness-gated bounded system knowledge, Context Packs, impact analysis, and requirement assessments; incomplete Feature coverage remains an explicit uncertainty.
 10. Bind implementation evidence to Feature version/content digest. Mark stale evidence and implementation drift explicitly, and invalidate active relationships when a Feature is retired in the same MCP transaction while retaining authored history.
+11. Build any catalog-wide Feature backfill only from receipt-bound, exact-Scope system knowledge. The planner creates bilingual Service/Functional Features and direct ontology-valid links, records unsupported or unproven mappings as explicit exceptions, and sends one bounded, idempotent MCP Change Set. It must not synthesize child-node identities that the knowledge read contract did not supply.
 
 ## Consequences
 
@@ -74,6 +75,7 @@ SpecForge can govern contracts, rules, data, behavior, architecture, decisions, 
 - `powershell -NoProfile -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -ConfigurationOnly` passed Compose topology validation.
 - `powershell -NoProfile -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -Live` built all six images, started the PostgreSQL/bootstrap/projector/3A/Web/worker chain, restarted Web, and passed asset-count persistence verification. The connector-worker image was corrected to include its identity and scoped-read workspace dependencies.
 - P2 downstream knowledge, Context Pack, requirement-assessment, evidence/drift reconciliation, and transactional retirement relationship invalidation are implemented and locally verified. Cross-Scope reuse, enterprise templates, automated implementation discovery, and production-scale graph certification remain deferred.
+- The catalog-backfill planner and MCP-only command are implemented. `pnpm feature-catalog:backfill -- --dry-run --session design-change-session:9e65bd4d-89cb-4720-8b39-568885f55b80 --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner` correctly stopped before any write with `KNOWLEDGE_COVERAGE_INCOMPLETE` and `KNOWLEDGE_SOURCE_NOT_CONFIGURED`; production Feature records were not claimed or created.
 
 ## Constraints
 
@@ -91,7 +93,7 @@ SpecForge can govern contracts, rules, data, behavior, architecture, decisions, 
 
 ### 状态
 
-设计已接受。P0 核心治理、P1 搜索/覆盖/只读 Web 交付以及 P2 系统知识/下游对账已经实现并完成本地验证。稳定 ADR、Proposal、Context Pack、负责人、精确 Scope、设计会话和规格路径见文首元数据。
+设计已接受。P0 核心治理、P1 搜索/覆盖/只读 Web 交付以及 P2 系统知识/下游对账已经实现并完成本地验证。就绪门禁后的特性目录回填命令已实现并完成本地验证；真实目录回填仍被阻塞，直到此 Scope 具备当前 `SOURCE_CODE` 知识来源和对账快照。稳定 ADR、Proposal、Context Pack、负责人、精确 Scope、设计会话和规格路径见文首元数据。
 
 ### 背景
 
@@ -109,6 +111,7 @@ SpecForge 已能治理契约、规则、数据、行为、架构、决策、变�
 8. 分 P0 核心治理、P1 Web/搜索/覆盖和 P2 系统知识/下游对账交付；每阶段都需要独立实施预检、证据、MCP 同步和对账。
 9. 将服务特性和功能特性纳入就绪门禁后的有界系统知识、上下文包、影响分析和需求评估；不完整的 Feature 覆盖必须作为显式不确定性保留。
 10. 将实现证据绑定到 Feature 版本/内容摘要，明确标记证据过期和实现漂移；Feature 退休时在同一 MCP 事务中使活动关系失效，同时保留编写历史。
+11. 任何目录级 Feature 回填只能消费受回执绑定的精确 Scope 系统知识。规划器创建双语服务/功能特性和本体合法的直接关系，将不支持或无法证明的映射记录为明确例外，并发送单个有界、幂等的 MCP Change Set；不得为知识读取契约未提供的子节点身份编造端点。
 
 ### 后果
 
@@ -150,6 +153,7 @@ SpecForge 已能治理契约、规则、数据、行为、架构、决策、变�
 - Compose 配置校验和 Live 验证均通过；Live 验证构建六个镜像，启动 PostgreSQL/Bootstrap/投影/3A/Web/Worker 链路，重启 Web 后资产数量保持不变。为此修正了 connector-worker 镜像遗漏的 identity 与 scoped-read 工作区依赖。
 - P2 已实现就绪门禁后的 Feature 系统知识、双语上下文包、需求评估中的 Feature 覆盖发现与证据类型、绑定版本/摘要的漂移对账，以及带持久图事件/Outbox 的退休关系事务失效。
 - 当前声明 P2 下游系统知识、上下文包、需求评估、证据/漂移对账和退休关系失效已经实现并完成本地验证。跨 Scope 复用、企业模板、自动实现发现和生产规模图认证仍延期。
+- 特性目录回填规划器和仅经 MCP 的命令已经实现。`pnpm feature-catalog:backfill -- --dry-run --session design-change-session:9e65bd4d-89cb-4720-8b39-568885f55b80 --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner` 在任何写入前正确因 `KNOWLEDGE_COVERAGE_INCOMPLETE` 与 `KNOWLEDGE_SOURCE_NOT_CONFIGURED` 停止；未声明或创建生产 Feature 记录。
 
 ### 约束
 

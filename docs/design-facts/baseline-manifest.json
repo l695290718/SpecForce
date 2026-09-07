@@ -23,9 +23,9 @@
                               "data-specforge-asset-graph"
                           ],
                           "owner": "SpecForge Product Architecture and Design Governance",
-                          "status": "Accepted; P0 core governance, P1 Web/search/coverage, and P2 knowledge/downstream reconciliation are implemented and locally verified. Cross-Scope reuse and production-scale graph certification remain deferred.",
-                          "reason": "SpecForge needs first-class, independently versioned Service and Functional Feature assets to trace stakeholder value through functional behavior to contracts, data, implementation, and current-version evidence without weakening exact-Scope isolation.",
-                          "retryTrigger": "Approve an independent exact-Scope design for cross-Scope Feature reuse, enterprise templates, automated implementation discovery, or production-scale graph certification before extending this increment.",
+                          "status": "Accepted; P0 core governance, P1 Web/search/coverage, P2 knowledge/downstream reconciliation, and the readiness-gated Feature catalog backfill command are implemented and locally verified. The live catalog backfill is blocked until this Scope has current SOURCE_CODE knowledge and a reconciliation snapshot; cross-Scope reuse and production-scale graph certification remain deferred.",
+                          "reason": "SpecForge needs first-class, independently versioned Service and Functional Feature assets to trace stakeholder value through functional behavior to contracts, data, implementation, and current-version evidence without weakening exact-Scope isolation. Catalog-wide backfill must consume only receipt-bound knowledge and preserve ontology limits rather than inventing node identities.",
+                          "retryTrigger": "Configure a current SOURCE_CODE knowledge source and create a full-scan reconciliation snapshot for the exact Scope, then rerun the Feature catalog dry-run and apply command. Cross-Scope reuse, enterprise templates, automated implementation discovery, and production-scale graph certification require separate approved designs.",
                           "evidence": [
                               {
                                   "command": "Industry review: OMG ISO/IEC/IEEE 29148 summary; SEBoK Function glossary; ITU-T Q.1290; OASIS SOA service functionality",
@@ -82,6 +82,14 @@
                               {
                                   "command": "powershell -NoProfile -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -Live",
                                   "result": "Built six images, started the PostgreSQL/bootstrap/projector/3A/Web/worker chain, restarted Web, and passed asset-count persistence verification after fixing connector-worker workspace dependency copies."
+                              },
+                              {
+                                  "command": "pnpm exec vitest run apps/mcp-server/src/features/catalog-backfill.test.ts scripts/backfill-feature-catalog.test.ts && pnpm --filter @specforge/mcp-server typecheck",
+                                  "result": "Passed 2 test files and 7 tests; verified bilingual deterministic planning, ontology-valid endpoints, receipt-bound pagination, dry-run atomic Change Set, readiness denial without writes, and stable idempotency keys."
+                              },
+                              {
+                                  "command": "pnpm feature-catalog:backfill -- --dry-run --session design-change-session:9e65bd4d-89cb-4720-8b39-568885f55b80 --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner",
+                                  "result": "Stopped before read/write apply with FEATURE_CATALOG_READINESS_DENIED: KNOWLEDGE_COVERAGE_INCOMPLETE and KNOWLEDGE_SOURCE_NOT_CONFIGURED. Retry after SOURCE_CODE ingestion and exact-Scope reconciliation."
                               }
                           ]
                       },
