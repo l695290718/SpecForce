@@ -55,6 +55,7 @@ describe("runFeatureCatalogBackfill", () => {
       "read_system_knowledge",
       "apply_feature_change_set"
     ]);
+    expect(fake.calls[0]?.arguments).toMatchObject({ knowledgeProfile: "DESIGN_CATALOG_CURATION" });
     expect(fake.calls[1]?.arguments).toMatchObject({ receiptId: "readiness-receipt", pageSize: 200 });
     expect(fake.calls[2]?.arguments).toMatchObject({ receiptId: "readiness-receipt", cursor: "next" });
     expect(fake.calls.at(-1)?.arguments).toMatchObject({ dryRun: true, designChangeSessionId: options.sessionId });

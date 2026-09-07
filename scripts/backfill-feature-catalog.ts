@@ -41,7 +41,7 @@ export interface FeatureCatalogBackfillDependencies {
   writePlan?(plan: FeatureCatalogBackfillPlan): Promise<string>;
 }
 
-const knowledgeProfile = "ARCHITECTURE_OVERVIEW";
+const knowledgeProfile = "DESIGN_CATALOG_CURATION";
 const purpose = "Backfill exact-Scope bilingual Feature catalog from governed system knowledge.";
 
 function resultText(result: McpToolResult): string {
