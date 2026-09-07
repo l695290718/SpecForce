@@ -56,9 +56,16 @@ export const enterpriseMinimumPolicy: KnowledgeReadinessPolicy = {
   id: "enterprise-minimum-v1",
   version: 1,
   profileRequirements: {
+    DESIGN_CATALOG_CURATION: [designCatalog],
     ARCHITECTURE_OVERVIEW: [designCatalog, sourceCode],
     CHANGE_ASSESSMENT: [designCatalog, sourceCode, apiSchema, dataSchema, testEvidence],
     RUNTIME_DIAGNOSIS: [sourceCode, runtimeTelemetry]
+  },
+  profileGuards: {
+    DESIGN_CATALOG_CURATION: { requirePublishedBaseline: false, reconciliation: "NOT_BLOCKED" },
+    ARCHITECTURE_OVERVIEW: { requirePublishedBaseline: true, reconciliation: "CONVERGED" },
+    CHANGE_ASSESSMENT: { requirePublishedBaseline: true, reconciliation: "CONVERGED" },
+    RUNTIME_DIAGNOSIS: { requirePublishedBaseline: true, reconciliation: "CONVERGED" }
   },
   blockOnUnresolvedConflict: true,
   blockOnNonConvergedReconciliation: true,

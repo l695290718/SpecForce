@@ -1,5 +1,5 @@
 export type KnowledgeDimension = "DESIGN_INTENT" | "IMPLEMENTATION" | "RUNTIME";
-export type KnowledgeProfileId = "ARCHITECTURE_OVERVIEW" | "CHANGE_ASSESSMENT" | "RUNTIME_DIAGNOSIS";
+export type KnowledgeProfileId = "DESIGN_CATALOG_CURATION" | "ARCHITECTURE_OVERVIEW" | "CHANGE_ASSESSMENT" | "RUNTIME_DIAGNOSIS";
 export type KnowledgeTrustStatus = "SELF_CONTAINED" | "SOURCE_CHECK_REQUIRED" | "BLOCKED";
 export type KnowledgeSourceRole =
   | "DESIGN_CATALOG"
@@ -42,6 +42,10 @@ export interface KnowledgeReadinessPolicy {
   id: string;
   version: number;
   profileRequirements: Record<KnowledgeProfileId, readonly KnowledgeSourceRequirement[]>;
+  profileGuards: Record<KnowledgeProfileId, {
+    requirePublishedBaseline: boolean;
+    reconciliation: "CONVERGED" | "NOT_BLOCKED";
+  }>;
   blockOnUnresolvedConflict: boolean;
   blockOnNonConvergedReconciliation: boolean;
   responseBudget: {

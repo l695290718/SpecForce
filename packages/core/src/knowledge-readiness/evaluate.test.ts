@@ -30,6 +30,31 @@ describe("system knowledge readiness", () => {
     expect(evaluateKnowledgeReadiness({ profileId: "ARCHITECTURE_OVERVIEW", policy, snapshot: healthy, now }).trustStatus).toBe("SELF_CONTAINED");
   });
 
+  it("allows catalog-only Feature curation without a published source baseline", () => {
+    const snapshot = {
+      ...healthy,
+      baseline: null,
+      reconciliation: { id: "rec-1", status: "UNVERIFIED", digest: "r".repeat(64), createdAt: now },
+      sources: [healthy.sources[0]!]
+    };
+
+    expect(evaluateKnowledgeReadiness({ profileId: "DESIGN_CATALOG_CURATION", policy: enterpriseMinimumPolicy, snapshot, now }).trustStatus).toBe("SELF_CONTAINED");
+    expect(evaluateKnowledgeReadiness({ profileId: "ARCHITECTURE_OVERVIEW", policy: enterpriseMinimumPolicy, snapshot, now }).reasonCodes).toContain("KNOWLEDGE_SOURCE_NOT_CONFIGURED");
+  });
+
+  it("blocks catalog curation when reconciliation is explicitly blocked", () => {
+    const snapshot = {
+      ...healthy,
+      baseline: null,
+      reconciliation: { id: "rec-1", status: "BLOCKED", digest: "r".repeat(64), createdAt: now },
+      sources: [healthy.sources[0]!]
+    };
+
+    const decision = evaluateKnowledgeReadiness({ profileId: "DESIGN_CATALOG_CURATION", policy: enterpriseMinimumPolicy, snapshot, now });
+    expect(decision.trustStatus).toBe("BLOCKED");
+    expect(decision.reasonCodes).toContain("KNOWLEDGE_RECONCILIATION_BLOCKED");
+  });
+
   it.each([
     ["delta only", { ...healthy, sources: healthy.sources.map((source) => source.role === "SOURCE_CODE" ? { ...source, fullSnapshotCompleted: false } : source) }, "KNOWLEDGE_FULL_SNAPSHOT_REQUIRED"],
     ["pending promotion", { ...healthy, pendingCandidateCount: 1 }, "KNOWLEDGE_PENDING_PROMOTION"],

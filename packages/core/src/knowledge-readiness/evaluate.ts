@@ -55,12 +55,16 @@ export function evaluateKnowledgeReadiness(input: {
   now: Date;
 }): KnowledgeReadinessDecision {
   const requirements = input.policy.profileRequirements[input.profileId];
+  const profileGuard = input.policy.profileGuards[input.profileId];
   const dimensionReasons = new Map<KnowledgeDimension, KnowledgeReasonCode[]>(dimensionOrder.map((dimension) => [dimension, []]));
   const validUntilCandidates = [input.now.getTime() + input.policy.receiptTtlSeconds * 1000];
 
-  if (!input.snapshot.baseline) dimensionReasons.get("DESIGN_INTENT")!.push("KNOWLEDGE_SOURCE_NOT_CONFIGURED");
-  if (input.snapshot.reconciliation === null) dimensionReasons.get("DESIGN_INTENT")!.push("KNOWLEDGE_COVERAGE_INCOMPLETE");
-  else if (input.snapshot.reconciliation.status !== "CONVERGED" && input.policy.blockOnNonConvergedReconciliation) dimensionReasons.get("DESIGN_INTENT")!.push("KNOWLEDGE_RECONCILIATION_BLOCKED");
+  if (profileGuard.requirePublishedBaseline && !input.snapshot.baseline) dimensionReasons.get("DESIGN_INTENT")!.push("KNOWLEDGE_SOURCE_NOT_CONFIGURED");
+  if (input.snapshot.reconciliation?.status === "BLOCKED") dimensionReasons.get("DESIGN_INTENT")!.push("KNOWLEDGE_RECONCILIATION_BLOCKED");
+  else if (profileGuard.reconciliation === "CONVERGED") {
+    if (input.snapshot.reconciliation === null) dimensionReasons.get("DESIGN_INTENT")!.push("KNOWLEDGE_COVERAGE_INCOMPLETE");
+    else if (input.snapshot.reconciliation.status !== "CONVERGED" && input.policy.blockOnNonConvergedReconciliation) dimensionReasons.get("DESIGN_INTENT")!.push("KNOWLEDGE_RECONCILIATION_BLOCKED");
+  }
   if (input.snapshot.unresolvedConflictCount > 0 && input.policy.blockOnUnresolvedConflict) dimensionReasons.get("IMPLEMENTATION")!.push("KNOWLEDGE_CONFLICT_UNRESOLVED");
   if (input.snapshot.pendingCandidateCount > 0) dimensionReasons.get("IMPLEMENTATION")!.push("KNOWLEDGE_PENDING_PROMOTION");
 
@@ -73,7 +77,7 @@ export function evaluateKnowledgeReadiness(input: {
   }
 
   const dimensionStatuses = dimensionOrder
-    .filter((dimension) => requirements.some((requirement) => requirement.dimension === dimension) || (dimension === "DESIGN_INTENT" && (!input.snapshot.baseline || input.snapshot.reconciliation === null)))
+    .filter((dimension) => requirements.some((requirement) => requirement.dimension === dimension) || (dimension === "DESIGN_INTENT" && ((profileGuard.requirePublishedBaseline && !input.snapshot.baseline) || (profileGuard.reconciliation === "CONVERGED" && input.snapshot.reconciliation === null) || input.snapshot.reconciliation?.status === "BLOCKED")))
     .map((dimension) => {
       const reasons = uniqueSorted(dimensionReasons.get(dimension)!);
       const status: KnowledgeTrustStatus = reasons.includes("KNOWLEDGE_CONFLICT_UNRESOLVED") || reasons.includes("KNOWLEDGE_RECONCILIATION_BLOCKED") ? "BLOCKED" : reasons.length ? "SOURCE_CHECK_REQUIRED" : "SELF_CONTAINED";
