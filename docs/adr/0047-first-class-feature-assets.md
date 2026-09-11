@@ -215,3 +215,23 @@ SpecForge 已能治理契约、规则、数据、行为、架构、决策、变�
 - 验证：`pnpm exec vitest run apps/web/components/features/feature-graph-model.test.ts apps/web/components/features/feature-workspace.test.tsx apps/web/lib/features.test.ts --exclude '**/.worktrees/**' --exclude '**/.pnpm-store/**'` 通过 3 个文件、8 个测试；`pnpm --filter @specforge/web typecheck` 退出码为 `0`。
 - 验证：修复客户端错误引入服务端模块的问题后，Docker Web 构建成功生成 `/features`；3010 端口的 `/healthz`、默认特性主视图和 `graphMode=all` 均返回 `200` 且没有错误边界。
 - 设计会话：`design-change-session:b6c6526b-1826-4297-9ede-353cfd96de75`，精确 Scope 为 `com.huawei.celon.desiner`；预检对账为 `UNVERIFIED`，未阻塞。
+
+### Feature Catalog Restoration (2026-09-11)
+
+- Finding: the authoritative Docker PostgreSQL contained the original design-asset seed, but no `serviceFeature` or `functionalFeature` records. Local `.tmp` and `.specforge/feature-catalog` files were only disposable investigation artifacts and were not the source of truth.
+- Correction: the MCP Feature Change Set validator now includes Feature endpoints submitted in the same atomic batch when validating relationships. This preserves one-transaction asset plus relationship creation and avoids incorrectly rejecting a relation whose new Feature endpoint does not exist yet.
+- MCP execution: exact-Scope `DESIGN_CATALOG_CURATION` readiness allowed the bounded backfill. Dry-run planned 8 Service Features, 7 Functional Features, 34 ontology-valid relationships, and 27 direct mappings. Apply persisted all 15 Feature assets and 34 relationships with catalog version `45` and graph version `173`.
+- Explicit exceptions: two Context Packs remain `ONTOLOGY_DIRECT_FEATURE_LINK_UNSUPPORTED`; one Proposal remains `GRAPH_ENDPOINT_NOT_PROJECTED`. These were retained as typed exceptions and were not converted into invented relationships.
+- Verification: PostgreSQL readback for `com.huawei.celon.desiner` reports 8 `serviceFeature` assets, 7 `functionalFeature` assets, 7 `functionalFeature` nodes, 8 `serviceFeature` nodes, and 34 active Feature relationships. `/features?view=service`, `/features?view=functional`, and `/features?view=graph` on port `3010` returned `200` without an error boundary.
+- Focused code verification: `pnpm exec vitest run packages/core/src/features/change-set.test.ts apps/mcp-server/src/features/catalog-backfill.test.ts apps/mcp-server/src/scoped-derived.test.ts --exclude '**/.worktrees/**' --exclude '**/.pnpm-store/**'` passed 3 files and 22 tests; `pnpm --filter @specforge/mcp-server typecheck` exited `0`.
+- Design session: `design-change-session:ff767737-c30c-4b14-ae58-cd212641ba62`, exact Scope `com.huawei.celon.desiner`.
+
+### 特性目录恢复（2026-09-11）
+
+- 发现：权威 Docker PostgreSQL 中原有设计资产铺底仍在，但没有 `serviceFeature` 或 `functionalFeature` 记录。本地 `.tmp` 和 `.specforge/feature-catalog` 只是可丢弃的排查产物，不是权威数据源。
+- 修正：MCP Feature Change Set 校验器现在会把同一原子批次中即将提交的 Feature 端点纳入关系校验，保持资产与关系一次事务提交，避免新 Feature 端点尚未存在时被错误拒绝。
+- MCP 执行：精确 Scope 的 `DESIGN_CATALOG_CURATION` 就绪门禁通过。有界 dry-run 计划生成 8 个服务特性、7 个功能特性、34 条本体合法关系和 27 个直接映射；apply 通过 MCP 持久化全部 15 个 Feature 资产及 34 条关系，目录版本为 `45`，图版本为 `173`。
+- 明确例外：2 个 Context Pack 保留 `ONTOLOGY_DIRECT_FEATURE_LINK_UNSUPPORTED`，1 个 Proposal 保留 `GRAPH_ENDPOINT_NOT_PROJECTED`。这些例外以有类型形式保留，没有虚构关系。
+- 验证：对 `com.huawei.celon.desiner` 的 PostgreSQL 回读显示 8 个 `serviceFeature` 资产、7 个 `functionalFeature` 资产、7 个功能特性节点、8 个服务特性节点和 34 条活动特性关系。3010 端口的服务特性、功能特性和关系图页面均返回 `200`，且没有错误边界。
+- 聚焦代码验证：`pnpm exec vitest run packages/core/src/features/change-set.test.ts apps/mcp-server/src/features/catalog-backfill.test.ts apps/mcp-server/src/scoped-derived.test.ts --exclude '**/.worktrees/**' --exclude '**/.pnpm-store/**'` 通过 3 个文件、22 个测试；`pnpm --filter @specforge/mcp-server typecheck` 退出码为 `0`。
+- 设计会话：`design-change-session:ff767737-c30c-4b14-ae58-cd212641ba62`，精确 Scope 为 `com.huawei.celon.desiner`。

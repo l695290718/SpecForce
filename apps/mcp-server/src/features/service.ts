@@ -197,11 +197,21 @@ async function loadValidationCatalog(
       })
     : [];
   const requestedKeys = new Set(requestedEndpoints.map((endpoint) => `${endpoint.nodeType}:${endpoint.logicalId}`));
+  const submittedFeatureEndpoints = input.assets.map((mutation) => ({
+    ...scope,
+    nodeType: mutation.assetType,
+    logicalId: mutation.asset.id,
+    rootAssetType: mutation.assetType,
+    rootAssetId: mutation.asset.id
+  }));
   return {
     assets: existingAssets.map((asset) => ({ id: asset.id, assetType: asset.type, version: versionById.get(asset.id) ?? "0" })),
-    endpoints: nodes
+    endpoints: [
+      ...nodes
       .filter((node) => requestedKeys.has(`${node.nodeType}:${node.logicalId}`))
-      .map((node) => ({ ...scope, nodeType: node.nodeType as never, logicalId: node.logicalId, rootAssetType: node.rootAssetType as never, rootAssetId: node.rootAssetId }))
+      .map((node) => ({ ...scope, nodeType: node.nodeType as never, logicalId: node.logicalId, rootAssetType: node.rootAssetType as never, rootAssetId: node.rootAssetId })),
+      ...submittedFeatureEndpoints
+    ]
   };
 }
 
