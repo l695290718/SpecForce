@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. P0 core governance, P1 search/coverage/read-only Web delivery, and P2 knowledge/downstream reconciliation are implemented and locally verified. The readiness-gated Feature catalog backfill command is implemented and locally verified; the live catalog backfill remains blocked until this Scope has a current `SOURCE_CODE` knowledge source and reconciliation snapshot.
+Accepted. P0 core governance, P1 search/coverage/read-only Web delivery, P2 knowledge/downstream reconciliation, and Scope governance Feature coverage repair are implemented and locally verified. The readiness-gated Feature catalog backfill command is implemented and locally verified. Catalog curation uses the catalog-only Profile; source-code inventory remains a separate, stricter future capability.
 
 - Stable ADR ID: `adr-first-class-feature-assets`.
 - Proposal: `proposal-first-class-feature-assets` (`reviewing`).
@@ -14,6 +14,9 @@ Accepted. P0 core governance, P1 search/coverage/read-only Web delivery, and P2 
 - P0 implementation session: `design-change-session:57f4bbdc-737e-4909-a967-e1bd8c447397`.
 - P1 implementation session: `design-change-session:651a22ca-02c2-4184-9385-76515e9285a5`.
 - P2 implementation session: `design-change-session:35142ca0-2b85-4813-b7a0-61ccae6bd8b9`.
+- Catalog-read repair session: `design-change-session:abc0062b-50a2-4d6f-8370-4bc4b22c61d8`.
+- Feature relationship coverage audit session: `design-change-session:28454fd1-cfa8-4dec-85ce-8f8193c7dcbb`.
+- Scope governance coverage repair session: `design-change-session:a57589bc-a668-4a86-82a3-278fd143f412`.
 - Specification: `docs/superpowers/specs/2026-09-02-first-class-feature-assets-design.md`.
 
 ## Context
@@ -32,7 +35,7 @@ SpecForge can govern contracts, rules, data, behavior, architecture, decisions, 
 8. Deliver in P0 core governance, P1 Web/search/coverage, and P2 system-knowledge/downstream reconciliation increments. Each requires its own implementation preflight, evidence, MCP synchronization, and reconciliation.
 9. Include Service and Functional Features in readiness-gated bounded system knowledge, Context Packs, impact analysis, and requirement assessments; incomplete Feature coverage remains an explicit uncertainty.
 10. Bind implementation evidence to Feature version/content digest. Mark stale evidence and implementation drift explicitly, and invalidate active relationships when a Feature is retired in the same MCP transaction while retaining authored history.
-11. Build any catalog-wide Feature backfill only from receipt-bound, exact-Scope system knowledge. The planner creates bilingual Service/Functional Features and direct ontology-valid links, records unsupported or unproven mappings as explicit exceptions, and sends one bounded, idempotent MCP Change Set. It must not synthesize child-node identities that the knowledge read contract did not supply.
+11. Build any catalog-wide Feature backfill only from receipt-bound, exact-Scope `DESIGN_CATALOG_CURATION` knowledge. The planner creates bilingual Service/Functional Features and direct ontology-valid links, records unsupported or unproven mappings as explicit exceptions, and sends one bounded, idempotent MCP Change Set. It must not synthesize child-node identities that the knowledge read contract did not supply. Source-code inventory remains separate and may only use source-dependent Profiles after governed scanning.
 
 ## Consequences
 
@@ -43,6 +46,7 @@ SpecForge can govern contracts, rules, data, behavior, architecture, decisions, 
 - Tradeoff: derived delivery truth requires version-bound evidence and cannot be inferred reliably from relationship presence alone.
 - Tradeoff: readiness and assessment consumers must carry Feature coverage and provenance, while retirement invalidation adds graph-ledger writes to Feature updates.
 - Deferred: cross-Scope Feature reuse, enterprise templates, automated implementation discovery, and production-scale graph certification require separate decisions.
+- Deferred coverage facts: 16 Proposal assets have no persisted typed relationship and therefore no evidence-bound Feature target; `integration-specforge-mcp-agent` is connected to an API but the current ontology does not permit a direct Integration-to-Feature link; Context Packs remain reachable through their governed Proposal path rather than a direct Feature link. Owner: Product Architecture and Design Governance. Retry when the Proposal's typed impact targets are authored, or when an ontology change for Integration/Context Pack semantics is separately approved and synchronized.
 
 ## Alternatives
 
@@ -75,7 +79,14 @@ SpecForge can govern contracts, rules, data, behavior, architecture, decisions, 
 - `powershell -NoProfile -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -ConfigurationOnly` passed Compose topology validation.
 - `powershell -NoProfile -ExecutionPolicy Bypass -File deploy/scripts/verify-compose.ps1 -Live` built all six images, started the PostgreSQL/bootstrap/projector/3A/Web/worker chain, restarted Web, and passed asset-count persistence verification. The connector-worker image was corrected to include its identity and scoped-read workspace dependencies.
 - P2 downstream knowledge, Context Pack, requirement-assessment, evidence/drift reconciliation, and transactional retirement relationship invalidation are implemented and locally verified. Cross-Scope reuse, enterprise templates, automated implementation discovery, and production-scale graph certification remain deferred.
-- The catalog-backfill planner and MCP-only command are implemented. `pnpm feature-catalog:backfill -- --dry-run --session design-change-session:9e65bd4d-89cb-4720-8b39-568885f55b80 --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner` correctly stopped before any write with `KNOWLEDGE_COVERAGE_INCOMPLETE` and `KNOWLEDGE_SOURCE_NOT_CONFIGURED`; production Feature records were not claimed or created.
+- The earlier `ARCHITECTURE_OVERVIEW` dry-run correctly stopped before any write because it required `SOURCE_CODE`; that Profile was the wrong boundary for authored Feature catalog curation. The correction uses `DESIGN_CATALOG_CURATION` under `design-change-session:e2b4f990-1953-4dc2-8336-fe128736cfa4` and preserves strict source-dependent Profiles.
+- A live catalog read exposed that new `serviceFeature` and `functionalFeature` records were not initialized in the scoped in-memory catalog, causing `undefined.push()` and making MCP preflight fail with a generic federation error. The catalog now initializes both collections and the graph builder treats absent optional collections as empty for older catalogs. `pnpm db:push` synchronized the locally deployed canonical schema before verification; no authored asset payload was changed.
+- `pnpm exec vitest run --root . --exclude "**/.worktrees/**" --exclude "**/.pnpm-store/**" packages/core/src/__tests__/core.test.ts apps/mcp-server/src/scoped-derived.test.ts` passed the Feature catalog and legacy graph regressions. The exact-Scope preflight then opened `design-change-session:abc0062b-50a2-4d6f-8370-4bc4b22c61d8`, read 520 assets, and returned `UNVERIFIED` rather than a blocked reconciliation.
+- `pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent "Complete evidenced Feature relationship coverage" --affected "adr-first-class-feature-assets,adr-system-knowledge-readiness-gate,data-specforge-asset-graph" --evidence "feature-relationship-readback=knowledge-readiness:cbb90cd3b86bda35d179aaa0d9defb08,feature-gaps=identified,scope=com.huawei.celon.desiner"` returned OPEN session `design-change-session:28454fd1-cfa8-4dec-85ce-8f8193c7dcbb`, read 523 exact-Scope assets and 755 relationships, and returned reconciliation `UNVERIFIED` rather than blocked.
+- MCP `evaluate_system_knowledge_readiness` with `DESIGN_CATALOG_CURATION`, followed by paginated `read_system_knowledge` in the exact Scope, reported 8 Service Features, 23 Functional Features, 461 Feature-linked relationships, and 149 non-evidence Feature relationships. Domain and ADR coverage was complete; no unlinked Proposal had an evidenced target; the single Integration was connected to an API but direct Integration-to-Feature mapping was ontology-unsupported.
+- `pnpm feature-catalog:backfill -- --dry-run --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session design-change-session:28454fd1-cfa8-4dec-85ce-8f8193c7dcbb --page-size 200` correctly refused full replay with `FEATURE_VERSION_CONFLICT` for an existing Feature asset; no relationship or authored asset was written. The audit therefore used a relation-only decision and did not invent links.
+- `apply_feature_change_set` in `design-change-session:a57589bc-a668-4a86-82a3-278fd143f412` passed dry-run and atomically persisted `ff-scope-governance-identity` plus two exact-Scope relationships: `ff-scope-governance-identity --CONTRIBUTES_TO--> sf-scope-governance` and `api-specforge-scoped-read --EXPOSES--> ff-scope-governance-identity`. The receipt advanced the catalog to `2075` and graph to `9813`.
+- MCP `evaluate_system_knowledge_readiness(DESIGN_CATALOG_CURATION)` followed by paginated `read_system_knowledge` and `validate_feature_coverage` returned 32 Features, 757 relationships, `COMPLETE=32`, `PARTIAL=0`, and `UNMAPPED=0`; both `ff-scope-governance-identity` and `sf-scope-governance` returned `COMPLETE`.
 
 ## Constraints
 
@@ -84,6 +95,7 @@ SpecForge can govern contracts, rules, data, behavior, architecture, decisions, 
 - Direct Feature reads cannot bypass system-knowledge readiness enforcement for Agent understanding.
 - Missing, stale, denied, or unavailable evidence is reported explicitly and never converted to zero impact or verified status.
 - Repository and MCP records must share stable IDs and exact Scope before this design is considered synchronized.
+- Deferred coverage fact: 16 Proposal assets have no persisted typed relationship and therefore no bindable Feature target; `integration-specforge-mcp-agent` is connected to an API but the current ontology does not permit Integration to connect directly to a Feature; Context Packs remain reachable through their governed Proposal path rather than a direct Feature link. Owner: Product Architecture and Design Governance. Retry after typed Proposal impact targets are authored, or after Integration/Context Pack ontology semantics are separately approved and synchronized.
 
 ## 中文本地化覆盖内容
 
@@ -93,7 +105,7 @@ SpecForge can govern contracts, rules, data, behavior, architecture, decisions, 
 
 ### 状态
 
-设计已接受。P0 核心治理、P1 搜索/覆盖/只读 Web 交付以及 P2 系统知识/下游对账已经实现并完成本地验证。就绪门禁后的特性目录回填命令已实现并完成本地验证；真实目录回填仍被阻塞，直到此 Scope 具备当前 `SOURCE_CODE` 知识来源和对账快照。稳定 ADR、Proposal、Context Pack、负责人、精确 Scope、设计会话和规格路径见文首元数据。
+设计已接受。P0 核心治理、P1 搜索/覆盖/只读 Web 交付、P2 系统知识/下游对账以及范围与身份治理特性覆盖修复已经实现并完成本地验证。就绪门禁后的特性目录回填命令已实现并完成本地验证。目录编排使用仅目录的 Profile；源码库存仍是独立且更严格的后续能力。稳定 ADR、Proposal、Context Pack、负责人、精确 Scope、设计会话和规格路径见文首元数据。
 
 ### 背景
 
@@ -111,7 +123,7 @@ SpecForge 已能治理契约、规则、数据、行为、架构、决策、变�
 8. 分 P0 核心治理、P1 Web/搜索/覆盖和 P2 系统知识/下游对账交付；每阶段都需要独立实施预检、证据、MCP 同步和对账。
 9. 将服务特性和功能特性纳入就绪门禁后的有界系统知识、上下文包、影响分析和需求评估；不完整的 Feature 覆盖必须作为显式不确定性保留。
 10. 将实现证据绑定到 Feature 版本/内容摘要，明确标记证据过期和实现漂移；Feature 退休时在同一 MCP 事务中使活动关系失效，同时保留编写历史。
-11. 任何目录级 Feature 回填只能消费受回执绑定的精确 Scope 系统知识。规划器创建双语服务/功能特性和本体合法的直接关系，将不支持或无法证明的映射记录为明确例外，并发送单个有界、幂等的 MCP Change Set；不得为知识读取契约未提供的子节点身份编造端点。
+11. 任何目录级 Feature 回填只能消费受回执绑定的精确 Scope `DESIGN_CATALOG_CURATION` 知识。规划器创建双语服务/功能特性和本体合法的直接关系，将不支持或无法证明的映射记录为明确例外，并发送单个有界、幂等的 MCP Change Set；不得为知识读取契约未提供的子节点身份编造端点。源码库存保持独立，只有在受治理扫描后才能使用依赖源码的 Profile。
 
 ### 后果
 
@@ -122,6 +134,7 @@ SpecForge 已能治理契约、规则、数据、行为、架构、决策、变�
 - 交付事实依赖绑定版本的证据，不能只凭存在关系就可靠推导。
 - 就绪门禁和评估消费者需要携带 Feature 覆盖与来源信息，退休失效会为 Feature 更新增加图账本写入。
 - 跨 Scope 复用、企业模板、自动实现发现和生产规模图认证分别延期决策。
+- 覆盖延期事实：16 个 Proposal 没有持久化的有类型关系，因此没有可绑定的 Feature 目标；`integration-specforge-mcp-agent` 虽连接 API，但当前本体不允许 Integration 直接连接 Feature；Context Pack 通过受治理 Proposal 间接到达，而不是直接连接 Feature。负责人是产品架构与设计治理；待 Proposal 补充有类型影响目标，或单独批准并同步 Integration/Context Pack 本体语义后重试。
 
 ### 备选方案
 
@@ -153,7 +166,14 @@ SpecForge 已能治理契约、规则、数据、行为、架构、决策、变�
 - Compose 配置校验和 Live 验证均通过；Live 验证构建六个镜像，启动 PostgreSQL/Bootstrap/投影/3A/Web/Worker 链路，重启 Web 后资产数量保持不变。为此修正了 connector-worker 镜像遗漏的 identity 与 scoped-read 工作区依赖。
 - P2 已实现就绪门禁后的 Feature 系统知识、双语上下文包、需求评估中的 Feature 覆盖发现与证据类型、绑定版本/摘要的漂移对账，以及带持久图事件/Outbox 的退休关系事务失效。
 - 当前声明 P2 下游系统知识、上下文包、需求评估、证据/漂移对账和退休关系失效已经实现并完成本地验证。跨 Scope 复用、企业模板、自动实现发现和生产规模图认证仍延期。
-- 特性目录回填规划器和仅经 MCP 的命令已经实现。`pnpm feature-catalog:backfill -- --dry-run --session design-change-session:9e65bd4d-89cb-4720-8b39-568885f55b80 --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner` 在任何写入前正确因 `KNOWLEDGE_COVERAGE_INCOMPLETE` 与 `KNOWLEDGE_SOURCE_NOT_CONFIGURED` 停止；未声明或创建生产 Feature 记录。
+- 之前的 `ARCHITECTURE_OVERVIEW` 预演因要求 `SOURCE_CODE` 而在任何写入前正确停止；该 Profile 不适用于已编写 Feature 目录编排。修正后在 `design-change-session:e2b4f990-1953-4dc2-8336-fe128736cfa4` 中使用 `DESIGN_CATALOG_CURATION`，同时保留严格的依赖源码 Profile。
+- 一次在线目录读取暴露出新的 `serviceFeature` 和 `functionalFeature` 记录没有在范围内存目录中初始化，导致 `undefined.push()`，进而让 MCP 预检返回泛化联邦错误。现在目录会初始化这两个集合，图构建器也会把旧目录中缺失的可选集合视为空集合。验证前使用 `pnpm db:push` 同步了本地部署的规范 Schema；没有改变任何已编写资产载荷。
+- `pnpm exec vitest run --root . --exclude "**/.worktrees/**" --exclude "**/.pnpm-store/**" packages/core/src/__tests__/core.test.ts apps/mcp-server/src/scoped-derived.test.ts` 通过了 Feature 目录和旧图谱回归。随后精确 Scope 预检创建 `design-change-session:abc0062b-50a2-4d6f-8370-4bc4b22c61d8`，读取 520 项资产，并返回 `UNVERIFIED` 而非阻塞对账。
+- `pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent "Complete evidenced Feature relationship coverage" --affected "adr-first-class-feature-assets,adr-system-knowledge-readiness-gate,data-specforge-asset-graph" --evidence "feature-relationship-readback=knowledge-readiness:cbb90cd3b86bda35d179aaa0d9defb08,feature-gaps=identified,scope=com.huawei.celon.desiner"` 返回 OPEN 会话 `design-change-session:28454fd1-cfa8-4dec-85ce-8f8193c7dcbb`，读取 523 项精确 Scope 资产和 755 条关系，对账为 `UNVERIFIED` 而非阻塞。
+- MCP `evaluate_system_knowledge_readiness` 使用 `DESIGN_CATALOG_CURATION`，随后在精确 Scope 内分页调用 `read_system_knowledge`，得到 8 个服务特性、23 个功能特性、461 条带 Feature 的关系和 149 条非证据 Feature 关系。领域和 ADR 覆盖完整；未关联 Proposal 没有可证明的目标；唯一 Integration 虽连接到 API，但当前本体不支持 Integration 到 Feature 的直接映射。
+- `pnpm feature-catalog:backfill -- --dry-run --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session design-change-session:28454fd1-cfa8-4dec-85ce-8f8193c7dcbb --page-size 200` 对已有 Feature 的全量重放正确返回 `FEATURE_VERSION_CONFLICT`；没有写入关系或资产。此次审计因此采用仅关系的判断，并没有臆造关系。
+- `apply_feature_change_set` 在 `design-change-session:a57589bc-a668-4a86-82a3-278fd143f412` 中预演通过，并以一个原子事务写入 `ff-scope-governance-identity` 和两条精确 Scope 关系：`ff-scope-governance-identity --CONTRIBUTES_TO--> sf-scope-governance`、`api-specforge-scoped-read --EXPOSES--> ff-scope-governance-identity`。回执将目录推进到 `2075`、图推进到 `9813`。
+- MCP `evaluate_system_knowledge_readiness(DESIGN_CATALOG_CURATION)`、分页 `read_system_knowledge` 与 `validate_feature_coverage` 回读得到 32 个 Feature、757 条关系，`COMPLETE=32`、`PARTIAL=0`、`UNMAPPED=0`；`ff-scope-governance-identity` 与 `sf-scope-governance` 均为 `COMPLETE`。
 
 ### 约束
 
@@ -162,3 +182,36 @@ SpecForge 已能治理契约、规则、数据、行为、架构、决策、变�
 - Agent 不能使用直接 Feature 查询绕过系统知识门禁。
 - 缺失、过期、拒绝或不可用证据必须明确报告，不能转换为零影响或已验证状态。
 - 仓库与 MCP 记录只有在稳定 ID 与精确 Scope 匹配后才算同步。
+- 延期事实：16 个 Proposal 没有持久化的有类型关系，因此没有可绑定的 Feature 目标；`integration-specforge-mcp-agent` 虽连接 API，但当前本体不允许 Integration 直接连接 Feature；Context Pack 通过受治理 Proposal 间接到达，而不是直接连接 Feature。负责人是产品架构与设计治理；待 Proposal 补充有类型影响目标，或单独批准并同步 Integration/Context Pack 本体语义后重试。
+
+### Workspace Catalog Regression Repair (2026-09-08)
+
+- Cause: after persisted `serviceFeature` and `functionalFeature` assets were introduced, the optional Feature collections were not initialized in the scoped in-memory catalog. Workspace rendering then called `push()` on `undefined`.
+- Decision: retain the shared `DesignAsset` lifecycle and exact-Scope reads; initialize both collections during Web catalog assembly, and route the two Feature entries in the workspace distribution to the existing read-only Service Feature and Functional Feature views. No data, authorization, or MCP write boundary changed.
+- Verification: `pnpm exec vitest run apps/web/lib/__tests__/assets-scope.test.ts apps/web/lib/__tests__/dashboard.test.ts --exclude '**/.worktrees/**' --exclude '**/.pnpm-store/**'` passed 2 files and 10 tests; `pnpm --filter @specforge/web typecheck` exited `0`; the Docker Web image was rebuilt and `http://localhost:3010` returned 200 without a Next error boundary for `/workspace`, `/features`, `/assets/apis`, `/assets/data-models`, and `/architecture/3a`.
+- Design session: `design-change-session:c6cd15ab-fa0e-47a6-9b10-7d3016b46d44` in exact Scope `com.huawei.celon.desiner`.
+
+### 工作台目录回归修复（2026-09-08）
+
+- 原因：新增 `serviceFeature` 和 `functionalFeature` 持久化资产后，范围目录的可选 Feature 集合没有初始化，工作台读取目录时对 `undefined` 调用 `push()`，导致服务端渲染失败。
+- 决策：保持 Feature 复用通用 `DesignAsset` 和精确 Scope 读取，只在 Web 目录组装时初始化两个集合；工作台资产分布中的两类 Feature 分别导航到现有的服务特性与功能特性只读工作区。没有修改数据、权限或 MCP 写入边界。
+- 验证：`pnpm exec vitest run apps/web/lib/__tests__/assets-scope.test.ts apps/web/lib/__tests__/dashboard.test.ts --exclude '**/.worktrees/**' --exclude '**/.pnpm-store/**'` 通过 2 个文件、10 个测试；`pnpm --filter @specforge/web typecheck` 退出码为 0；Docker Web 镜像重建并在 `http://localhost:3010` 验证 `/workspace`、`/features`、`/assets/apis`、`/assets/data-models` 和 `/architecture/3a` 均为 200，且无 Next 错误边界。
+- 设计会话：`design-change-session:c6cd15ab-fa0e-47a6-9b10-7d3016b46d44`，精确 Scope 为 `com.huawei.celon.desiner`。
+
+### Feature Relationship Graph Readability (2026-09-09)
+
+- Decision: make the semantic Feature map the default graph mode. It renders a bounded three-column model of Service Features, Functional Features, and directly supporting design assets. The previous all-node relationship graph remains available as an explicit Full graph mode for governance and exploratory analysis.
+- Decision: hide edge labels by default to preserve readable topology; show node type labels, a bilingual semantic legend, and selected-node direct relationships in the detail rail. Keep Sigma zoom, reset, drag, focus, and path highlighting available.
+- Decision: graph mode is a read-only projection choice. It does not alter authored assets, relationship events, Scope authorization, PostgreSQL authority, or MCP write boundaries. Mode switching always reloads the exact owning Scope and resets type filters to the returned graph.
+- Verification: `pnpm exec vitest run apps/web/components/features/feature-graph-model.test.ts apps/web/components/features/feature-workspace.test.tsx apps/web/lib/features.test.ts --exclude '**/.worktrees/**' --exclude '**/.pnpm-store/**'` passed 3 files and 8 tests; `pnpm --filter @specforge/web typecheck` exited `0`.
+- Verification: Docker Web build compiled the `/features` route successfully after correcting a client/server import boundary; `Invoke-WebRequest` returned `200` without an error boundary for `/healthz`, the default Feature map, and `graphMode=all` on port `3010`.
+- Design session: `design-change-session:b6c6526b-1826-4297-9ede-353cfd96de75`, exact Scope `com.huawei.celon.desiner`; preflight reconciliation was `UNVERIFIED` and not blocked.
+
+### 特性关系图可读性（2026-09-09）
+
+- 决策：默认使用语义化特性主视图，按“服务特性、功能特性、直接支撑设计资产”三列展示；原有全节点关系图保留为显式的“全量关系”模式，用于治理和探索分析。
+- 决策：默认隐藏边上的关系文字，避免拓扑拥挤；通过双语语义图例、节点类型名称和选中节点详情中的直接关系摘要表达语义。继续保留 Sigma 缩放、复位、拖拽、聚焦和路径高亮能力。
+- 决策：图谱模式只是只读投影选择，不改变已编写资产、关系事件、Scope 授权、PostgreSQL 权威性或 MCP 写入边界。模式切换始终重新读取当前精确 Scope，并根据新图重置类型过滤器。
+- 验证：`pnpm exec vitest run apps/web/components/features/feature-graph-model.test.ts apps/web/components/features/feature-workspace.test.tsx apps/web/lib/features.test.ts --exclude '**/.worktrees/**' --exclude '**/.pnpm-store/**'` 通过 3 个文件、8 个测试；`pnpm --filter @specforge/web typecheck` 退出码为 `0`。
+- 验证：修复客户端错误引入服务端模块的问题后，Docker Web 构建成功生成 `/features`；3010 端口的 `/healthz`、默认特性主视图和 `graphMode=all` 均返回 `200` 且没有错误边界。
+- 设计会话：`design-change-session:b6c6526b-1826-4297-9ede-353cfd96de75`，精确 Scope 为 `com.huawei.celon.desiner`；预检对账为 `UNVERIFIED`，未阻塞。

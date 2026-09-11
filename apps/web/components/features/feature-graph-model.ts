@@ -5,15 +5,15 @@ export interface FeatureGraphNodeAttributes { label: string; fullLabel: string; 
 export interface FeatureGraphEdgeAttributes { relationType: string; label: string; color: string; size: number; hidden: boolean; }
 export type FeatureGraph = MultiDirectedGraph<FeatureGraphNodeAttributes, FeatureGraphEdgeAttributes>;
 
-const colors: Record<string, string> = { serviceFeature: "#2563eb", functionalFeature: "#7c3aed", api: "#0891b2", apiOperation: "#06b6d4", dataModel: "#059669", dataEntity: "#10b981", dataField: "#34d399", event: "#db2777", businessRule: "#d97706", stateMachine: "#ea580c", quality: "#475569", evidence: "#64748b" };
+export const featureGraphColors: Record<string, string> = { serviceFeature: "#2563eb", functionalFeature: "#7c3aed", api: "#0891b2", apiOperation: "#06b6d4", dataModel: "#059669", dataEntity: "#10b981", dataField: "#34d399", event: "#db2777", businessRule: "#d97706", stateMachine: "#ea580c", quality: "#475569", observability: "#475569", evidence: "#64748b", adr: "#64748b", proposal: "#64748b", domain: "#64748b" };
 
 export function buildFeatureGraphModel(response: FeatureGraphResponse, options: { visibleTypes?: ReadonlySet<string> } = {}): FeatureGraph {
   const graph = new MultiDirectedGraph<FeatureGraphNodeAttributes, FeatureGraphEdgeAttributes>();
   const count = Math.max(response.nodes.length, 1);
   response.nodes.forEach((node, index) => {
-    const angle = (Math.PI * 2 * index) / count;
+    const position = response.mode === "all" ? circularPosition(index, count) : layeredPosition(node.nodeType, index, response.nodes);
     const hidden = Boolean(options.visibleTypes?.size && !options.visibleTypes.has(node.nodeType));
-    graph.addNode(node.id, { label: truncate(node.label, 34), fullLabel: node.label, nodeType: node.nodeType, logicalId: node.logicalId, summary: node.summary ?? "", x: Math.cos(angle) * (8 + count / 10), y: Math.sin(angle) * (8 + count / 10), size: node.nodeType === "serviceFeature" ? 13 : node.nodeType === "functionalFeature" ? 10 : 6, color: colors[node.nodeType] ?? "#64748b", hidden });
+    graph.addNode(node.id, { label: truncate(node.label, 28), fullLabel: node.label, nodeType: node.nodeType, logicalId: node.logicalId, summary: node.summary ?? "", x: position.x, y: position.y, size: node.nodeType === "serviceFeature" ? 15 : node.nodeType === "functionalFeature" ? 11 : 7, color: featureGraphColors[node.nodeType] ?? "#64748b", hidden });
   });
   response.edges.forEach((edge) => {
     if (!graph.hasNode(edge.source) || !graph.hasNode(edge.target)) return;
@@ -21,6 +21,20 @@ export function buildFeatureGraphModel(response: FeatureGraphResponse, options: 
     graph.addDirectedEdgeWithKey(edge.id, edge.source, edge.target, { relationType: edge.relationType, label: edge.relationType, color: edge.relationType === "CONTRIBUTES_TO" ? "#6366f1" : "#94a3b8", size: edge.relationType === "CONTRIBUTES_TO" ? 2.2 : 1, hidden });
   });
   return graph;
+}
+
+function circularPosition(index: number, count: number): { x: number; y: number } {
+  const angle = (Math.PI * 2 * index) / count;
+  return { x: Math.cos(angle) * (12 + count / 8), y: Math.sin(angle) * (12 + count / 8) };
+}
+
+function layeredPosition(nodeType: string, index: number, nodes: FeatureGraphResponse["nodes"]): { x: number; y: number } {
+  const columns: Record<string, number> = { serviceFeature: -34, functionalFeature: -8 };
+  const x = columns[nodeType] ?? 24;
+  const group = nodes.filter((candidate) => (columns[candidate.nodeType] ?? 24) === x);
+  const groupIndex = group.findIndex((candidate) => candidate.id === nodes[index]?.id);
+  const spacing = x === 24 ? 9 : 13;
+  return { x, y: (groupIndex - (group.length - 1) / 2) * spacing };
 }
 
 export function highlightImpactPath(graph: FeatureGraph, source: string, target: string): string[] {

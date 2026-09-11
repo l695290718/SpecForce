@@ -25,7 +25,7 @@ type Area = (typeof areas)[number];
 type FeatureEndpoint = { nodeType: "serviceFeature" | "functionalFeature"; logicalId: string };
 type DirectMapping = { assetId: string; featureId: string; featureType: FeatureEndpoint["nodeType"]; relationType: RelationshipCode };
 type IndirectMapping = { assetId: string; featureId: string; featureType: FeatureEndpoint["nodeType"]; viaAssetId: string };
-type MappingException = { assetId: string; assetType: string; reason: "ONTOLOGY_DIRECT_FEATURE_LINK_UNSUPPORTED" | "NO_EVIDENCED_INDIRECT_PATH" };
+export type FeatureCatalogMappingException = { assetId: string; assetType: string; reason: "ONTOLOGY_DIRECT_FEATURE_LINK_UNSUPPORTED" | "NO_EVIDENCED_INDIRECT_PATH" | "GRAPH_ENDPOINT_NOT_PROJECTED" };
 
 export interface FeatureCatalogBackfillInput {
   architectureScope: ArchitectureScopeRef;
@@ -39,7 +39,7 @@ export interface FeatureCatalogBackfillPlan {
   relationships: FeatureChangeSetRequest["relationships"];
   directMappings: DirectMapping[];
   indirectMappings: IndirectMapping[];
-  exceptions: MappingException[];
+  exceptions: FeatureCatalogMappingException[];
   digest: string;
 }
 
@@ -63,7 +63,7 @@ export function buildFeatureCatalogBackfillPlan(input: FeatureCatalogBackfillInp
   const relationships: FeatureChangeSetRequest["relationships"] = [];
   const directMappings: DirectMapping[] = [];
   const indirectMappings: IndirectMapping[] = [];
-  const exceptions: MappingException[] = [];
+  const exceptions: FeatureCatalogMappingException[] = [];
   const directFeatureByAsset = new Map<string, FeatureEndpoint>();
 
   for (const feature of functionalByCluster.values()) {

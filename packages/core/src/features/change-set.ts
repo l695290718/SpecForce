@@ -150,7 +150,7 @@ function assertExactScope(
 }
 
 function endpointKey(endpoint: AssetNodeIdentity): string {
-  return `${endpoint.applicationServiceId}:${endpoint.scopePath}:${endpoint.nodeType}:${endpoint.logicalId}`;
+  return `${endpoint.applicationServiceId}:${endpoint.scopePath}:${endpoint.nodeType}:${endpoint.logicalId}:${endpoint.rootAssetType}:${endpoint.rootAssetId}:${endpoint.parentLogicalId ?? ""}`;
 }
 
 function fail(code: string, details?: FeatureChangeSetError["details"]): never {

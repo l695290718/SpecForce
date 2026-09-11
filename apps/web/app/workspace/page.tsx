@@ -162,7 +162,9 @@ function routeForType(type: string): string {
     integration: "/assets/integrations",
     quality: "/assets/quality",
     observability: "/assets/observability",
-    adr: "/assets/adrs"
+    adr: "/assets/adrs",
+    serviceFeature: "/features?view=service",
+    functionalFeature: "/features?view=functional"
   };
   return routes[type] ?? "/";
 }

@@ -148,13 +148,14 @@ export async function applyFeatureChangeSet(input: FeatureChangeSetRequest): Pro
         primaryEventId: result.eventIds[0] ?? null
       });
       return result;
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10_000, timeout: 60_000 });
   } catch (error) {
     if (error instanceof FeatureChangeSetError) throw error;
     const message = error instanceof Error ? error.message : "";
     if (/could not serialize|deadlock|VERSION_MISMATCH/u.test(message)) {
       throw new FeatureChangeSetError("FEATURE_VERSION_CONFLICT");
     }
+    console.error(`[apply_feature_change_set] ${message || "unknown transaction failure"}`);
     throw new FeatureChangeSetError("FEATURE_TRANSACTION_FAILED");
   }
 }

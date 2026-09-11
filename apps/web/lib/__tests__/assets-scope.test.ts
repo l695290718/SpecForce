@@ -11,11 +11,12 @@ vi.mock("../db", () => ({
     designAsset: { findMany: db.findMany },
     proposal: { findMany: db.findMany, findUnique: db.findUnique, count: db.count },
     contextPack: { findMany: db.findMany, findUnique: db.findUnique, count: db.count },
+    assetLink: { findMany: db.findMany },
     $queryRawUnsafe: vi.fn().mockResolvedValue([])
   }
 }));
 
-import { getContextPacksWithDatabase, getGovernanceTargetsWithDatabase, getProposalsWithDatabase, getRouteAssetsWithDatabase } from "../assets";
+import { getContextPacksWithDatabase, getGovernanceTargetsWithDatabase, getProposalsWithDatabase, getRouteAssetsWithDatabase, getScopedAssetCatalog } from "../assets";
 
 describe("scoped asset repository", () => {
   it("rejects an unknown scope instead of falling back to Designer assets", async () => {
@@ -28,6 +29,22 @@ describe("scoped asset repository", () => {
     expect(db.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ applicationServiceId: "com.huawei.celon.policyhub" })
     }));
+  });
+
+  it("keeps feature collections initialized when the scoped catalog contains feature assets", async () => {
+    db.findMany.mockResolvedValueOnce([{
+      id: "sf-policy-evaluation",
+      type: "serviceFeature",
+      payload: JSON.stringify({ id: "sf-policy-evaluation", name: "Policy Evaluation", description: "Evaluates policy decisions." }),
+      applicationServiceId: "com.huawei.celon.policyhub",
+      scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.policyhub"
+    }]);
+
+    const catalog = await getScopedAssetCatalog("com.huawei.celon.policyhub");
+
+    expect(catalog.serviceFeatures).toHaveLength(1);
+    expect(catalog.serviceFeatures?.[0]?.id).toBe("sf-policy-evaluation");
+    expect(catalog.functionalFeatures).toEqual([]);
   });
 
   it("localizes human-facing database asset fields without changing technical identifiers", async () => {

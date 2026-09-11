@@ -33,11 +33,15 @@ export interface FeatureRelationshipView extends FeatureGovernanceRelationship {
 export interface FeatureDetail extends FeatureListItem { asset: FeatureAsset; relationships: FeatureRelationshipView[]; }
 export interface FeatureGraphResponse {
   architectureScope: ArchitectureScopeRef;
+  mode: FeatureGraphMode;
   nodes: Array<{ id: string; logicalId: string; nodeType: string; label: string; summary?: string; lifecycleStatus?: string }>;
   edges: Array<{ id: string; source: string; target: string; relationType: string }>;
   partial: boolean;
   graphVersion: string;
 }
+export type FeatureGraphMode = "feature" | "all";
+
+const featureGraphSupportTypes = new Set(["api", "apiOperation", "dataModel", "dataEntity", "dataField", "event", "businessRule", "stateMachine", "quality", "observability"]);
 
 type FeatureRow = { assetId: string; assetType: string; canonicalName: string; canonicalSummary: string; localizedNameZh: string; localizedSummaryZh: string; status: string | null; updatedAt: Date; catalogVersion: bigint; contentDigest: string };
 
@@ -87,12 +91,13 @@ export async function getScopedFeatureDetail(scopeId: string, assetId: string, l
   return { ...mapListItem(projection as FeatureRow, locale, architectureScope, governance), asset, relationships };
 }
 
-export async function getScopedFeatureGraph(scopeId: string, options: { root?: string; depth?: number; limit?: number; locale?: AssetLocale }, principal: ScopedPrincipal): Promise<FeatureGraphResponse> {
+export async function getScopedFeatureGraph(scopeId: string, options: { root?: string; depth?: number; limit?: number; locale?: AssetLocale; mode?: FeatureGraphMode }, principal: ScopedPrincipal): Promise<FeatureGraphResponse> {
   const scope = requireReadableApplicationService(scopeId, principal);
   const architectureScope = scopeDatabaseWhere(scope);
+  const mode = options.mode ?? "feature";
   const limit = Math.max(1, Math.min(options.limit ?? 300, 500));
   const depth = Math.max(1, Math.min(options.depth ?? 2, 3));
-  const roots = await prisma.assetNode.findMany({ where: { ...architectureScope, nodeType: { in: ["serviceFeature", "functionalFeature"] }, ...(options.root ? { logicalId: options.root } : {}) }, orderBy: [{ nodeType: "asc" }, { logicalId: "asc" }], take: options.root ? 1 : Math.min(100, limit) });
+  const roots = await prisma.assetNode.findMany({ where: { ...architectureScope, ...(mode === "feature" ? { nodeType: { in: ["serviceFeature", "functionalFeature"] } } : {}), ...(options.root ? { logicalId: options.root } : {}) }, orderBy: [{ nodeType: "asc" }, { logicalId: "asc" }], take: options.root ? 1 : Math.min(mode === "feature" ? 100 : 80, limit) });
   if (options.root && roots.length === 0) throw new FeatureReadError("FEATURE_NOT_FOUND", 404);
   const nodes = new Map(roots.map((node) => [node.dbId, node]));
   const edges = new Map<string, Awaited<ReturnType<typeof readGraphEdges>>[number]>();
@@ -101,6 +106,7 @@ export async function getScopedFeatureGraph(scopeId: string, options: { root?: s
     const relations = await readGraphEdges(architectureScope, frontier, Math.min(limit, 1_000));
     const next: string[] = [];
     for (const relation of relations) {
+      if (mode === "feature" && ![relation.sourceNode.nodeType, relation.targetNode.nodeType].every((type) => isFeatureType(type) || featureGraphSupportTypes.has(type))) continue;
       if (edges.size >= limit) break;
       edges.set(relation.dbId, relation);
       for (const node of [relation.sourceNode, relation.targetNode]) {
@@ -116,6 +122,7 @@ export async function getScopedFeatureGraph(scopeId: string, options: { root?: s
   const graphVersion = await prisma.relationshipEvent.aggregate({ where: architectureScope, _max: { graphVersion: true } });
   return {
     architectureScope,
+    mode,
     nodes: [...nodes.values()].map((node) => { const projected = projectionById.get(node.logicalId); return { id: node.dbId, logicalId: node.logicalId, nodeType: node.nodeType, label: projected ? locale === "zh" ? projected.localizedNameZh : projected.canonicalName : node.displayName, ...(projected ? { summary: locale === "zh" ? projected.localizedSummaryZh : projected.canonicalSummary, lifecycleStatus: projected.status ?? undefined } : {}) }; }),
     edges: [...edges.values()].map((edge) => ({ id: edge.dbId, source: edge.sourceNodeId, target: edge.targetNodeId, relationType: edge.relationType })),
     partial: nodes.size >= limit || edges.size >= limit,

@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { scopeById, type ArchitectureScopeRef } from "@specforge/core";
+import { contentDigest, scopeById, type ArchitectureScopeRef } from "@specforge/core";
 import {
   buildFeatureCatalogBackfillPlan,
   type FeatureCatalogBackfillPlan
@@ -105,12 +105,13 @@ export async function runFeatureCatalogBackfill(
     cursor = page.nextCursor;
   } while (cursor);
 
-  const plan = buildFeatureCatalogBackfillPlan({
+  let plan = buildFeatureCatalogBackfillPlan({
     architectureScope: options.architectureScope,
     assets,
     relationships,
     now: options.now ?? readiness.asOf ?? new Date().toISOString()
   });
+  ({ plan } = await validateProjectedEndpoints(client, options, plan));
   if (plan.assets.length > 100 || plan.relationships.length > 1_000) throw new Error("FEATURE_CATALOG_CHANGE_SET_BUDGET_EXCEEDED");
   if (options.mode === "apply" && plan.exceptions.some((exception) => exception.reason === "NO_EVIDENCED_INDIRECT_PATH")) {
     throw new Error("FEATURE_CATALOG_UNMAPPED_ASSETS");
@@ -118,15 +119,9 @@ export async function runFeatureCatalogBackfill(
 
   const artifactPath = dependencies.writePlan ? await dependencies.writePlan(plan) : undefined;
   const idempotencyKey = `feature-catalog-backfill:${options.sessionId}:${plan.digest}`;
-  const changeSet = await call<unknown>(client, "apply_feature_change_set", {
-    architectureScope: options.architectureScope,
-    designChangeSessionId: options.sessionId,
-    correlationId: `feature-catalog-backfill:${plan.digest}`,
-    idempotencyKey,
-    dryRun: options.mode === "dry-run",
-    assets: plan.assets,
-    relationships: plan.relationships
-  });
+  const changeSet = options.mode === "dry-run"
+    ? await call<unknown>(client, "apply_feature_change_set", changeSetInput(options, plan, idempotencyKey, true))
+    : await call<unknown>(client, "apply_feature_change_set", changeSetInput(options, plan, idempotencyKey, false));
 
   return {
     architectureScope: options.architectureScope,
@@ -143,6 +138,51 @@ export async function runFeatureCatalogBackfill(
     ...(artifactPath ? { artifactPath } : {}),
     changeSet
   };
+}
+
+function changeSetInput(options: FeatureCatalogBackfillOptions, plan: FeatureCatalogBackfillPlan, idempotencyKey: string, dryRun: boolean): JsonRecord {
+  return {
+    architectureScope: options.architectureScope,
+    designChangeSessionId: options.sessionId,
+    correlationId: `feature-catalog-backfill:${plan.digest}`,
+    idempotencyKey,
+    dryRun,
+    assets: plan.assets,
+    relationships: plan.relationships
+  };
+}
+
+async function validateProjectedEndpoints(client: FeatureCatalogMcpClient, options: FeatureCatalogBackfillOptions, initialPlan: FeatureCatalogBackfillPlan): Promise<{ plan: FeatureCatalogBackfillPlan }> {
+  let plan = initialPlan;
+  for (let attempt = 0; attempt <= initialPlan.relationships.length; attempt += 1) {
+    try {
+      await call<unknown>(client, "apply_feature_change_set", changeSetInput(options, plan, `feature-catalog-validation:${options.sessionId}:${plan.digest}`, true));
+      return { plan };
+    } catch (error) {
+      const index = endpointFailureIndex(error);
+      if (index === undefined) throw error;
+      plan = recordUnprojectedEndpoint(plan, index);
+    }
+  }
+  throw new Error("FEATURE_CATALOG_ENDPOINT_VALIDATION_EXHAUSTED");
+}
+
+function endpointFailureIndex(error: unknown): number | undefined {
+  const match = /FEATURE_ENDPOINT_NOT_FOUND[\s\S]*?"index"\s*:\s*(\d+)/u.exec(error instanceof Error ? error.message : String(error));
+  return match ? Number(match[1]) : undefined;
+}
+
+function recordUnprojectedEndpoint(plan: FeatureCatalogBackfillPlan, index: number): FeatureCatalogBackfillPlan {
+  const relationship = plan.relationships[index];
+  if (!relationship) throw new Error("FEATURE_CATALOG_ENDPOINT_VALIDATION_INDEX_INVALID");
+  const endpoint = relationship.source.nodeType === "serviceFeature" || relationship.source.nodeType === "functionalFeature" ? relationship.target : relationship.source;
+  if (endpoint.nodeType === "serviceFeature" || endpoint.nodeType === "functionalFeature") throw new Error("FEATURE_CATALOG_FEATURE_ENDPOINT_MISSING");
+  const exception = { assetId: endpoint.logicalId, assetType: endpoint.nodeType, reason: "GRAPH_ENDPOINT_NOT_PROJECTED" as const };
+  const exceptions = [...plan.exceptions.filter((item) => item.assetId !== exception.assetId), exception].sort((left, right) => left.assetId.localeCompare(right.assetId));
+  const directMappings = plan.directMappings.filter((item) => item.assetId !== exception.assetId);
+  const relationships = plan.relationships.filter((_item, relationshipIndex) => relationshipIndex !== index);
+  const next = { ...plan, relationships, directMappings, exceptions };
+  return { ...next, digest: contentDigest({ assets: next.assets, relationships, directMappings, indirectMappings: next.indirectMappings, exceptions }) };
 }
 
 export function parseFeatureCatalogBackfillArgs(argv: readonly string[]): FeatureCatalogBackfillOptions {
@@ -225,5 +265,8 @@ async function main(): Promise<void> {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  void main().catch((error) => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; });
+  const keepAlive = setInterval(() => undefined, 1_000);
+  main()
+    .catch((error) => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; })
+    .finally(() => clearInterval(keepAlive));
 }

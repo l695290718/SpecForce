@@ -1,5 +1,5 @@
 import { seedData, scopeById, validateAssetLocalization } from "@specforge/core";
-import type { ArchitectureScopeRef, ContextPack, DomainModel, Proposal } from "@specforge/core";
+import type { ArchitectureScopeRef, ContextPack, DomainModel, FunctionalFeature, Proposal, ServiceFeature } from "@specforge/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const persistence = vi.hoisted(() => ({
@@ -108,6 +108,64 @@ function localizedContextPack(applicationServiceId: string, englishName: string,
   };
 }
 
+function localizedServiceFeature(applicationServiceId: string): ServiceFeature {
+  return {
+    id: "sf-governed-authoring",
+    name: "Governed design authoring",
+    description: "Authors governed design facts in the exact application-service Scope.",
+    lifecycleStatus: "ACTIVE",
+    tags: ["governance"],
+    actors: ["Architect"],
+    scenario: "An architect records a design decision.",
+    valueOutcome: "Design facts remain queryable and scope-safe.",
+    benefitHypothesis: "Governance reduces design drift.",
+    serviceBoundary: ["Does not write another application-service Scope."],
+    acceptanceCriteria: ["Writes retain exact Scope."],
+    createdAt: "2026-09-07T00:00:00.000Z",
+    updatedAt: "2026-09-07T00:00:00.000Z",
+    architectureScope: scope(applicationServiceId),
+    localizedContent: { zh: {
+      name: "受治理的设计编写",
+      description: "在精确应用服务范围内编写受治理设计事实。",
+      actors: ["架构师"],
+      scenario: "架构师记录设计决策。",
+      valueOutcome: "设计事实保持可查询且范围安全。",
+      benefitHypothesis: "治理减少设计漂移。",
+      serviceBoundary: ["不会写入其他应用服务范围。"],
+      acceptanceCriteria: ["写入保持精确范围。"]
+    } }
+  };
+}
+
+function localizedFunctionalFeature(applicationServiceId: string): FunctionalFeature {
+  return {
+    id: "ff-governed-authoring",
+    name: "Record a scoped design fact",
+    description: "Persists one authorized design fact in its owner Scope.",
+    lifecycleStatus: "ACTIVE",
+    tags: ["governance"],
+    trigger: "An authorized author submits a design fact.",
+    observableBehavior: "The fact is recorded with its exact Scope.",
+    preconditions: ["The caller has write permission."],
+    postconditions: ["The fact can be read from its owner Scope."],
+    exceptionBehaviors: ["Unauthorized writes are rejected."],
+    acceptanceCriteria: ["No write crosses Scope."],
+    createdAt: "2026-09-07T00:00:00.000Z",
+    updatedAt: "2026-09-07T00:00:00.000Z",
+    architectureScope: scope(applicationServiceId),
+    localizedContent: { zh: {
+      name: "记录范围内设计事实",
+      description: "在归属范围内持久化一项已授权设计事实。",
+      trigger: "授权编写者提交设计事实。",
+      observableBehavior: "事实带精确范围被记录。",
+      preconditions: ["调用方拥有写权限。"],
+      postconditions: ["可以从归属范围读取事实。"],
+      exceptionBehaviors: ["未授权写入被拒绝。"],
+      acceptanceCriteria: ["没有写入跨越范围。"]
+    } }
+  };
+}
+
 const fixtures = {
   [designerId]: {
     domain: localizedDomain(designerId, "Designer Domain", "设计器领域"),
@@ -172,6 +230,18 @@ describe("scoped MCP derived views", () => {
     expect(designer.domains.map((item) => item.name)).toEqual(["Designer Domain"]);
     expect(policy.domains.map((item) => item.name)).toEqual(["Policy Domain"]);
     expect(designer.proposals.map((item) => item.title)).toEqual(["Designer Proposal"]);
+  });
+
+  it("loads persisted Feature collections without breaking the scoped catalog", async () => {
+    persistence.listPersistedAssets.mockResolvedValueOnce([
+      { type: "serviceFeature", asset: localizedServiceFeature(designerId) },
+      { type: "functionalFeature", asset: localizedFunctionalFeature(designerId) }
+    ]);
+
+    const catalog = await loadScopedAssetCatalog(designerId);
+
+    expect(catalog.serviceFeatures?.map((item) => item.id)).toEqual(["sf-governed-authoring"]);
+    expect(catalog.functionalFeatures?.map((item) => item.id)).toEqual(["ff-governed-authoring"]);
   });
 
   it("isolates and localizes graph nodes with identical logical IDs", async () => {

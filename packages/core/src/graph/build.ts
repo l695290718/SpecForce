@@ -25,7 +25,7 @@ function referenceArray(value: unknown): AssetRef[] {
 
 function graphAssets(store: SpecForgeDataStore): Array<{ type: AssetType; asset: GraphAsset }> {
   return graphAssetTypes.flatMap((type) => (
-    store[assetCollections[type]] as GraphAsset[]
+    (store[assetCollections[type]] ?? []) as GraphAsset[]
   ).map((asset) => ({ type, asset })));
 }
 

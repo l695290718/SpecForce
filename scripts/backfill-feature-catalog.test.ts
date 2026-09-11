@@ -30,6 +30,9 @@ function fakeClient(responses: Record<string, unknown[]>): { client: FeatureCata
         calls.push(call);
         const response = responses[call.name]?.shift();
         if (!response) throw new Error(`Unexpected tool: ${call.name}`);
+        if (typeof response === "object" && response !== null && "error" in response) {
+          return { isError: true, content: [{ type: "text", text: JSON.stringify((response as { error: unknown }).error) }] };
+        }
         return text(response);
       }
     }
@@ -44,7 +47,7 @@ describe("runFeatureCatalogBackfill", () => {
         { accessDecision: "ALLOW", assets: [asset("api-catalog", "api")], relationships: [], nextCursor: "next" },
         { accessDecision: "ALLOW", assets: [asset("model-catalog", "dataModel")], relationships: [] }
       ],
-      apply_feature_change_set: [{ dryRun: true, changedAssetIds: [] }]
+      apply_feature_change_set: [{ dryRun: true, changedAssetIds: [] }, { dryRun: true, changedAssetIds: [] }]
     });
 
     const report = await runFeatureCatalogBackfill(fake.client, options, { writePlan: async (plan) => `memory:${plan.digest}` });
@@ -53,11 +56,13 @@ describe("runFeatureCatalogBackfill", () => {
       "evaluate_system_knowledge_readiness",
       "read_system_knowledge",
       "read_system_knowledge",
+      "apply_feature_change_set",
       "apply_feature_change_set"
     ]);
     expect(fake.calls[0]?.arguments).toMatchObject({ knowledgeProfile: "DESIGN_CATALOG_CURATION" });
     expect(fake.calls[1]?.arguments).toMatchObject({ receiptId: "readiness-receipt", pageSize: 200 });
     expect(fake.calls[2]?.arguments).toMatchObject({ receiptId: "readiness-receipt", cursor: "next" });
+    expect(fake.calls[3]?.arguments).toMatchObject({ dryRun: true, designChangeSessionId: options.sessionId });
     expect(fake.calls.at(-1)?.arguments).toMatchObject({ dryRun: true, designChangeSessionId: options.sessionId });
     expect(report).toMatchObject({ assetsRead: 2, featureAssets: 10, featureRelationships: 4 });
   });
@@ -73,7 +78,7 @@ describe("runFeatureCatalogBackfill", () => {
     const responseSet = () => ({
       evaluate_system_knowledge_readiness: [{ accessDecision: "ALLOW", receiptId: "readiness-receipt" }],
       read_system_knowledge: [{ accessDecision: "ALLOW", assets: [asset("api-catalog", "api")], relationships: [] }],
-      apply_feature_change_set: [{ dryRun: false, changedAssetIds: [] }]
+      apply_feature_change_set: [{ dryRun: true, changedAssetIds: [] }, { dryRun: false, changedAssetIds: [] }]
     });
     const first = fakeClient(responseSet());
     const second = fakeClient(responseSet());
@@ -90,5 +95,23 @@ describe("runFeatureCatalogBackfill", () => {
       "--dry-run", "--session", "session-a", "--application-service", scope.applicationServiceId, "--scope-path", scope.scopePath
     ])).toMatchObject({ architectureScope: scope, mode: "dry-run", sessionId: "session-a" });
     expect(() => parseFeatureCatalogBackfillArgs(["--apply", "--dry-run", "--session", "session-a", "--application-service", scope.applicationServiceId, "--scope-path", scope.scopePath])).toThrow("Choose only one");
+  });
+
+  it("turns a missing graph endpoint into an explicit curation exception before a dry run succeeds", async () => {
+    const fake = fakeClient({
+      evaluate_system_knowledge_readiness: [{ accessDecision: "ALLOW", receiptId: "readiness-receipt" }],
+      read_system_knowledge: [{ accessDecision: "ALLOW", assets: [asset("proposal-feature", "proposal")], relationships: [] }],
+      apply_feature_change_set: [
+        { error: { code: "FEATURE_ENDPOINT_NOT_FOUND", details: [{ index: 1 }] } },
+        { dryRun: true, changedAssetIds: [] },
+        { dryRun: true, changedAssetIds: [] }
+      ]
+    });
+
+    const report = await runFeatureCatalogBackfill(fake.client, options);
+
+    expect(report.exceptions).toContainEqual({ assetId: "proposal-feature", assetType: "proposal", reason: "GRAPH_ENDPOINT_NOT_PROJECTED" });
+    expect(report.directMappings).toBe(0);
+    expect(report.featureRelationships).toBe(1);
   });
 });

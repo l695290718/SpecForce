@@ -51,6 +51,8 @@ function emptyCatalog(): SpecForgeDataStore {
     integrations: [],
     qualityRequirements: [],
     observabilityDesigns: [],
+    serviceFeatures: [],
+    functionalFeatures: [],
     adrs: [],
     proposals: [],
     contextPacks: [],

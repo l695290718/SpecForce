@@ -20,12 +20,13 @@
                               "proposal-specforge-self-design",
                               "adr-design-fact-dual-record-governance",
                               "api-specforge-mcp-tools",
-                              "data-specforge-asset-graph"
+                              "data-specforge-asset-graph",
+                              "api-specforge-scoped-read"
                           ],
                           "owner": "SpecForge Product Architecture and Design Governance",
-                          "status": "Accepted; P0 core governance, P1 Web/search/coverage, P2 knowledge/downstream reconciliation, and the readiness-gated Feature catalog backfill command are implemented and locally verified. The live catalog backfill is blocked until this Scope has current SOURCE_CODE knowledge and a reconciliation snapshot; cross-Scope reuse and production-scale graph certification remain deferred.",
+                          "status": "Accepted; P0 core governance, P1 Web/search/coverage, P2 knowledge/downstream reconciliation, readiness-gated Feature catalog backfill, and Scope governance Feature coverage repair are implemented and locally verified. Live catalog curation uses DESIGN_CATALOG_CURATION; its persisted Feature collections are readable through the scoped catalog and legacy graph views. Source-code inventory remains a separate stricter capability. Cross-Scope reuse and production-scale graph certification remain deferred.",
                           "reason": "SpecForge needs first-class, independently versioned Service and Functional Feature assets to trace stakeholder value through functional behavior to contracts, data, implementation, and current-version evidence without weakening exact-Scope isolation. Catalog-wide backfill must consume only receipt-bound knowledge and preserve ontology limits rather than inventing node identities.",
-                          "retryTrigger": "Configure a current SOURCE_CODE knowledge source and create a full-scan reconciliation snapshot for the exact Scope, then rerun the Feature catalog dry-run and apply command. Cross-Scope reuse, enterprise templates, automated implementation discovery, and production-scale graph certification require separate approved designs.",
+                          "retryTrigger": "Run the exact-Scope DESIGN_CATALOG_CURATION dry-run and, only with no unmapped exceptions, apply its MCP Change Set. For the current relationship gaps, first author typed Proposal impact targets or separately approve and synchronize Integration/Context Pack ontology semantics; then retry with a relation-only Change Set. Configure SOURCE_CODE and a full-scan reconciliation separately before source-derived inventory. Cross-Scope reuse, enterprise templates, automated implementation discovery, and production-scale graph certification require separate approved designs.",
                           "evidence": [
                               {
                                   "command": "Industry review: OMG ISO/IEC/IEEE 29148 summary; SEBoK Function glossary; ITU-T Q.1290; OASIS SOA service functionality",
@@ -87,9 +88,45 @@
                                   "command": "pnpm exec vitest run apps/mcp-server/src/features/catalog-backfill.test.ts scripts/backfill-feature-catalog.test.ts && pnpm --filter @specforge/mcp-server typecheck",
                                   "result": "Passed 2 test files and 7 tests; verified bilingual deterministic planning, ontology-valid endpoints, receipt-bound pagination, dry-run atomic Change Set, readiness denial without writes, and stable idempotency keys."
                               },
+                                {
+                                    "command": "pnpm feature-catalog:backfill -- --dry-run --session design-change-session:9e65bd4d-89cb-4720-8b39-568885f55b80 --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner",
+                                    "result": "The ARCHITECTURE_OVERVIEW gate correctly stopped before reads or writes because SOURCE_CODE was missing. The attempt exposed that authored Feature curation needs the separate catalog-only Profile, not a weaker source-dependent Profile."
+                                },
                               {
-                                  "command": "pnpm feature-catalog:backfill -- --dry-run --session design-change-session:9e65bd4d-89cb-4720-8b39-568885f55b80 --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner",
-                                  "result": "Stopped before read/write apply with FEATURE_CATALOG_READINESS_DENIED: KNOWLEDGE_COVERAGE_INCOMPLETE and KNOWLEDGE_SOURCE_NOT_CONFIGURED. Retry after SOURCE_CODE ingestion and exact-Scope reconciliation."
+                                  "command": "pnpm exec vitest run packages/core/src/knowledge-readiness/evaluate.test.ts apps/mcp-server/src/federation/tools.test.ts scripts/backfill-feature-catalog.test.ts",
+                                  "result": "Catalog-only readiness, exact-Scope MCP propagation, and receipt-bound Feature backfill tests passed before live curation."
+                              },
+                              {
+                                  "command": "pnpm db:push",
+                                  "result": "Synchronized the local specforge_canonical schema at localhost:15433; no authored design-asset payloads were changed."
+                              },
+                              {
+                                  "command": "pnpm exec vitest run --root . --exclude **/.worktrees/** --exclude **/.pnpm-store/** packages/core/src/__tests__/core.test.ts apps/mcp-server/src/scoped-derived.test.ts",
+                                  "result": "Passed the scoped Feature catalog initialization and legacy optional-collection graph regressions."
+                              },
+                              {
+                                  "command": "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent Verify-persisted-Feature-catalog-and-repair-scoped-read-service --affected adr-system-knowledge-readiness-gate,adr-first-class-feature-assets,data-specforge-system-knowledge-readiness-receipt,api-specforge-system-knowledge-readiness",
+                                  "result": "Opened design-change-session:abc0062b-50a2-4d6f-8370-4bc4b22c61d8 after reading 520 exact-Scope assets; reconciliation was UNVERIFIED, not blocked."
+                              },
+                              {
+                                  "command": "pnpm design-context:preflight -- --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --intent \"Complete evidenced Feature relationship coverage\" --affected \"adr-first-class-feature-assets,adr-system-knowledge-readiness-gate,data-specforge-asset-graph\" --evidence \"feature-relationship-readback=knowledge-readiness:cbb90cd3b86bda35d179aaa0d9defb08,feature-gaps=identified,scope=com.huawei.celon.desiner\"",
+                                  "result": "Opened design-change-session:28454fd1-cfa8-4dec-85ce-8f8193c7dcbb; exact-Scope knowledge read reported 523 assets and 755 relationships with reconciliation UNVERIFIED rather than blocked."
+                              },
+                              {
+                                  "command": "MCP evaluate_system_knowledge_readiness(DESIGN_CATALOG_CURATION) + paginated read_system_knowledge(exact Scope)",
+                                  "result": "Reported 8 Service Features, 23 Functional Features, 461 Feature-linked relationships, and 149 non-evidence Feature relationships. Domain and ADR coverage was complete; 16 Proposals had no evidenced typed target, and the single Integration had only an API connection while direct Integration-to-Feature mapping is ontology-unsupported."
+                              },
+                              {
+                                  "command": "pnpm feature-catalog:backfill -- --dry-run --application-service com.huawei.celon.desiner --scope-path pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner --session design-change-session:28454fd1-cfa8-4dec-85ce-8f8193c7dcbb --page-size 200",
+                                  "result": "Full replay correctly returned FEATURE_VERSION_CONFLICT for an existing Feature asset and wrote no asset or relationship; the remaining coverage was retained as explicit owner/trigger/rationale backlog facts rather than inferred links."
+                              },
+                              {
+                                  "command": "MCP apply_feature_change_set(dryRun=true,false; session=design-change-session:a57589bc-a668-4a86-82a3-278fd143f412)",
+                                  "result": "Dry-run passed and one atomic MCP transaction persisted ff-scope-governance-identity plus ff-scope-governance-identity CONTRIBUTES_TO sf-scope-governance and api-specforge-scoped-read EXPOSES ff-scope-governance-identity; catalogVersion=2075 and graphVersion=9813."
+                              },
+                              {
+                                  "command": "MCP validate_feature_coverage for every Feature after paginated read_system_knowledge(DESIGN_CATALOG_CURATION)",
+                                  "result": "Returned 32 Features and 757 relationships: COMPLETE=32, PARTIAL=0, UNMAPPED=0; ff-scope-governance-identity and sf-scope-governance both returned COMPLETE."
                               }
                           ]
                       },

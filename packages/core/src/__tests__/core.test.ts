@@ -19,8 +19,8 @@ describe("SpecForge core services", () => {
     const pack = await generateContextPack("proposal-partial-refund");
 
     expect(pack.generatedMarkdown).toContain("# Agent Context Pack");
-    expect(pack.generatedMarkdown).toContain("## 5. Impacted Assets");
-    expect(pack.generatedMarkdown).toContain("## 17. Constraints and Do-not Rules");
+    expect(pack.generatedMarkdown).toContain("## 7. Impacted Assets");
+    expect(pack.generatedMarkdown).toContain("## 19. Constraints and Do-not Rules");
     expect(pack.includedAssets.length).toBeGreaterThan(5);
   });
 
@@ -82,6 +82,17 @@ describe("SpecForge core services", () => {
 
     expect(graph.nodes.length).toBeGreaterThan(0);
     expect(graph.edges.every((edge) => graph.nodes.some((node) => node.id === edge.source) && graph.nodes.some((node) => node.id === edge.target))).toBe(true);
+  });
+
+  it("keeps the graph readable when a legacy catalog predates Feature collections", async () => {
+    const catalog = structuredClone(seedData);
+    delete catalog.serviceFeatures;
+    delete catalog.functionalFeatures;
+
+    const graph = await buildAssetGraph(undefined, undefined, { catalog });
+
+    expect(graph.nodes.length).toBeGreaterThan(0);
+    expect(graph.nodes.some((node) => node.type === "serviceFeature" || node.type === "functionalFeature")).toBe(false);
   });
 
   it("analyzes proposal impact across assets and risks", async () => {

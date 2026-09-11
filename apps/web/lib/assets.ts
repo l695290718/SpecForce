@@ -364,7 +364,7 @@ export async function renderScopedAssetMarkdown(assetType: AssetType, assetId: s
 function emptyCatalog(): SpecForgeDataStore {
   return {
     domains: [], dataModels: [], apis: [], events: [], businessRules: [], stateMachines: [], integrations: [],
-    qualityRequirements: [], observabilityDesigns: [], adrs: [], proposals: [], contextPacks: [], evidence: []
+    qualityRequirements: [], observabilityDesigns: [], serviceFeatures: [], functionalFeatures: [], adrs: [], proposals: [], contextPacks: [], evidence: []
   };
 }
 
