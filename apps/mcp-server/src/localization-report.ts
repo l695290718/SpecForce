@@ -8,8 +8,8 @@ import {
 } from "@specforge/core";
 
 export const defaultArchitectureScope = {
-  applicationServiceId: "com.huawei.celon.desiner",
-  scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+  applicationServiceId: "com.specforge.designcenter",
+  scopePath: "pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter"
 } satisfies ArchitectureScopeRef;
 
 export interface SeedDesignSource {

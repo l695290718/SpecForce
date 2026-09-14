@@ -1,18 +1,18 @@
 version: 1
 repository:
   id: codehub://enterprise/l695290718/SpecForce
-  defaultApplicationServiceId: com.huawei.celon.desiner
+  defaultApplicationServiceId: com.specforge.designcenter
 governance:
   endpoint: http://127.0.0.1:3001/mcp
 scopeMappings:
   # This repository is governed as one application-service Scope.
   # Split this mapping only when a repository path is owned by another Scope.
   - paths: ["**"]
-    applicationServiceIds: ["com.huawei.celon.desiner"]
+    applicationServiceIds: ["com.specforge.designcenter"]
 # Scope paths are canonical server-registered values; a wrong value fails closed.
 scopePaths:
-  com.huawei.celon.desiner: pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner
+  com.specforge.designcenter: pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter
 # Session IDs are returned by the governed design-context preflight.
 # They are intentionally not generated or silently inferred by the hook.
 sessionIds:
-  com.huawei.celon.desiner: design-change-session:replace-with-an-open-session
+  com.specforge.designcenter: design-change-session:replace-with-an-open-session

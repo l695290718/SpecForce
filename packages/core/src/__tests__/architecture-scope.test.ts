@@ -10,6 +10,20 @@ import {
 } from "../index";
 
 describe("Huawei architecture scope authorization", () => {
+  it("registers the product-neutral SpecForge baseline application service", () => {
+    const baseline = scopeById("com.specforge.designcenter");
+
+    expect(baseline).toMatchObject({
+      id: "com.specforge.designcenter",
+      level: "applicationService",
+      purpose: "product",
+      scopePath: "pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter"
+    });
+    expect(hasScopeAccess(defaultHuaweiActor, baseline!, "read")).toBe(true);
+    expect(hasScopeAccess(defaultHuaweiActor, baseline!, "write")).toBe(true);
+    expect(hasScopeAccess(seedHuaweiActor, baseline!, "write")).toBe(true);
+  });
+
   const designerService = scopeById("com.huawei.celon.desiner");
   const runtimeService = scopeById("com.huawei.celon.runtime");
   const designerModule = scopeById("module-celon-designer");

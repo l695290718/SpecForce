@@ -4,8 +4,8 @@ import path from "node:path";
 
 const root = process.cwd();
 const architectureScope = {
-  applicationServiceId: "com.huawei.celon.desiner",
-  scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+  applicationServiceId: "com.specforge.designcenter",
+  scopePath: "pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter"
 };
 
 const projectionPollIntervalMs = Number(process.env.SPECFORGE_3A_BOOTSTRAP_POLL_INTERVAL_MS ?? "1000");
@@ -82,11 +82,11 @@ async function main(): Promise<void> {
       arguments: {
         intent: "Bootstrap the exact-Scope 3A Knowledge Baseline and PostgreSQL projection from the existing authored design assets so the 3A browser has an official bilingual source.",
         affectedFactIds: [
-          "adr-3a-architecture-navigation-workspace",
-          "adr-unified-3a-knowledge-initialization",
-          "data-specforge-3a-projection-read-model",
-          "rule-specforge-3a-projection-publication",
-          "data-specforge-assets"
+          "adr-mcp-first-architecture",
+          "adr-canonical-english-localized-overlay",
+          "api-specforge-mcp-tools",
+          "data-specforge-assets",
+          "data-specforge-asset-graph"
         ],
         expectedEvidenceRefs: ["canonical-design-assets-present", "3a-baseline-empty", "3a-browser-empty-state"],
         architectureScope

@@ -5,8 +5,19 @@ const celonProductPath = `${huaweiProductFamilyPath}/product-celon`;
 const platformSubProductPath = `${celonProductPath}/subproduct-platform`;
 const designerModulePath = `${platformSubProductPath}/module-celon-designer`;
 const runtimeModulePath = `${platformSubProductPath}/module-celon-runtime`;
+const specforgeBaselineScopePath = "pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter";
 
 export const huaweiArchitectureScopes: ArchitectureScope[] = [
+  {
+    id: "com.specforge.designcenter",
+    code: "com.specforge.designcenter",
+    name: "SpecForge Design Center",
+    description: "Product-neutral application service for SpecForge's own governed design facts.",
+    owner: "SpecForge Architecture",
+    level: "applicationService",
+    scopePath: specforgeBaselineScopePath,
+    purpose: "product"
+  },
   {
     id: "pf-huawei",
     code: "HUAWEI",
@@ -128,6 +139,8 @@ export const defaultHuaweiActor: ScopedActor = {
   actorType: "agent",
   actorId: "specforge-default-agent",
   grants: [
+    { scopeId: "com.specforge.designcenter", action: "read" },
+    { scopeId: "com.specforge.designcenter", action: "write" },
     { scopeId: "com.huawei.celon.desiner", action: "read" },
     { scopeId: "com.huawei.celon.desiner", action: "write" },
     // ADR-0039: cross-scope integration facts are read-aggregated across the four real
@@ -143,6 +156,8 @@ export const seedHuaweiActor: ScopedActor = {
   actorType: "system",
   actorId: "specforge-seed",
   grants: [
+    { scopeId: "com.specforge.designcenter", action: "read" },
+    { scopeId: "com.specforge.designcenter", action: "write" },
     { scopeId: "com.huawei.celon.desiner.graph-verification", action: "read" },
     { scopeId: "com.huawei.celon.desiner.graph-verification", action: "write" },
     { scopeId: "module-celon-designer", action: "read" },

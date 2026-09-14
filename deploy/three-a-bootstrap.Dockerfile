@@ -29,6 +29,6 @@ RUN pnpm install --frozen-lockfile \
 
 ENV CI=true
 ENV SPECFORGE_MCP_SEED=1
-ENV SPECFORGE_MCP_SEED_SCOPE=com.huawei.celon.desiner
+ENV SPECFORGE_MCP_SEED_SCOPE=com.specforge.designcenter
 
 CMD ["node_modules/.bin/tsx", "apps/mcp-server/src/bootstrap-3a.ts"]

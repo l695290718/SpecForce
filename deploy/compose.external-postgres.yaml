@@ -25,8 +25,8 @@ services:
   knowledge-projector:
     environment:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in deploy/.env for external PostgreSQL mode}
-      SPECFORGE_PROJECTOR_HEALTH_APPLICATION_SERVICE_ID: ${SPECFORGE_PROJECTOR_HEALTH_APPLICATION_SERVICE_ID:-com.huawei.celon.desiner}
-      SPECFORGE_PROJECTOR_HEALTH_SCOPE_PATH: ${SPECFORGE_PROJECTOR_HEALTH_SCOPE_PATH:-pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner}
+      SPECFORGE_PROJECTOR_HEALTH_APPLICATION_SERVICE_ID: ${SPECFORGE_PROJECTOR_HEALTH_APPLICATION_SERVICE_ID:-com.specforge.designcenter}
+      SPECFORGE_PROJECTOR_HEALTH_SCOPE_PATH: ${SPECFORGE_PROJECTOR_HEALTH_SCOPE_PATH:-pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter}
     depends_on:
       bootstrap:
         condition: service_completed_successfully

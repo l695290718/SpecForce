@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ResolvedApplicationServiceScope } from "../lib/scope";
 
-const defaultScopeId = "com.huawei.celon.desiner";
+const defaultScopeId = "com.specforge.designcenter";
 
 function labelFor(scopeId: string, scopes: ArchitectureScope[]) {
   const scope = huaweiArchitectureScopes.find((item) => item.id === scopeId) ?? huaweiArchitectureScopes.find((item) => item.id === defaultScopeId)!;

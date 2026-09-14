@@ -5,8 +5,8 @@ import { pathToFileURL } from "node:url";
 
 type Arguments = Record<string, string>;
 
-const defaultApplicationServiceId = "com.huawei.celon.desiner";
-const defaultScopePath = "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner";
+const defaultApplicationServiceId = "com.specforge.designcenter";
+const defaultScopePath = "pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter";
 
 function parseArguments(values: string[]): Arguments {
   const result: Arguments = {};

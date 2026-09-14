@@ -1,9 +1,9 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
-const applicationServiceId = "com.huawei.celon.desiner";
-const scopePath = "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner";
-const modelIds = [
+const applicationServiceId = process.env.SPECFORGE_APPLICATION_SERVICE_ID ?? "com.huawei.celon.desiner";
+const scopePath = process.env.SPECFORGE_SCOPE_PATH ?? "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner";
+const defaultModelIds = [
   "data-specforge-3a-projection-read-model",
   "data-specforge-ai-generation",
   "data-specforge-asset-graph",
@@ -17,6 +17,7 @@ const modelIds = [
   "data-specforge-source-observation-v2",
   "data-specforge-web-workspace"
 ] as const;
+const modelIds: readonly string[] = process.env.SPECFORGE_MODEL_IDS?.split(",").map((value) => value.trim()).filter(Boolean) ?? defaultModelIds;
 
 type AnyRecord = Record<string, any>;
 
@@ -106,8 +107,13 @@ async function main(): Promise<void> {
   try {
     const assets = [] as AnyRecord[];
     for (const assetId of modelIds) {
-      const result = await callTool(client, "get_asset_detail", { assetType: "dataModel", assetId, applicationServiceId, format: "json" });
-      assets.push(upgradeAsset(result.asset ?? result.canonicalSource));
+      try {
+        const result = await callTool(client, "get_asset_detail", { assetType: "dataModel", assetId, applicationServiceId, format: "json" });
+        assets.push(upgradeAsset(result.asset ?? result.canonicalSource));
+      } catch (error) {
+        if (String(error).includes("Asset not found")) continue;
+        throw error;
+      }
     }
     const receipts: AnyRecord[] = [];
     for (let index = 0; index < assets.length; index += 2) {

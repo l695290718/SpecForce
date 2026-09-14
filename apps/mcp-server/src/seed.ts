@@ -24,6 +24,7 @@ import {
   defaultArchitectureScope,
   validateSeedLocalizationInventory
 } from "./localization-report";
+import { upgradeLegacyDataModel, type DataModel } from "@specforge/core";
 import { normalizeLegacyAssetLink } from "./relationships/legacy-migration";
 
 const seedConfiguration = createSeedConfiguration({
@@ -57,6 +58,30 @@ const legacyDemoAssetIds = [
   "adr-no-sync-inventory"
 ];
 
+const dataModelFieldOwners: Record<string, Record<string, string>> = {
+  "data-specforge-ai-generation": { provider_id: "AIProviderConfig", capability: "AIProviderRequest", prompt: "AIProviderRequest", draft_payload: "GeneratedDraft" },
+  "data-specforge-asset-graph": { node_id: "AssetGraphNode", node_type: "AssetGraphNode", edge_label: "AssetGraphEdge", domain_filter: "GraphFilter" },
+  "data-specforge-assets": { asset_id: "DesignAsset", asset_type: "DesignAsset", payload: "DesignAsset" },
+  "data-specforge-mcp-registry": { name: "McpTool", kind: "McpTool", permissions: "McpTool", read_only: "McpTool" },
+  "data-specforge-web-workspace": { draft_key: "AssetDraft", locale: "LocalePreference", filter_payload: "WorkspaceFilter", export_format: "MarkdownExport" },
+  "data-specforge-i18n": { message_key: "I18nMessage", locale: "LocalePreference", text: "I18nMessage", fallback_key: "I18nMessage" },
+  "data-specstudio-document": { document_id: "SpecificationDocument", current_version: "SpecificationVersion", content_markdown: "SpecificationVersion", review_status: "ReviewThread" }
+};
+
+function normalizeSeedDataModel(asset: DataModel): DataModel {
+  const owners = dataModelFieldOwners[asset.id];
+  if (!owners) return upgradeLegacyDataModel(asset);
+  const entityIds = new Map(asset.entities.map((name) => [name, `entity:${asset.id}:${name}`]));
+  const fields = asset.fields.map((field) => {
+    if (field.entityId) return field;
+    const owner = owners[field.fieldName];
+    const entityId = owner ? entityIds.get(owner) : undefined;
+    if (!entityId) throw new Error(`FIELD_OWNERSHIP_AMBIGUOUS:${asset.id}:${field.fieldName}`);
+    return { ...field, entityId };
+  });
+  return upgradeLegacyDataModel({ ...asset, fields });
+}
+
 async function main() {
   const localizationReport = validateSeedLocalizationInventory(buildSeedAssetInventory(seedConfiguration));
   console.info(`Validated ${localizationReport.totalAssets} bilingual seed assets.`);
@@ -87,14 +112,21 @@ async function main() {
 
   for (const [assetType, assets] of seedConfiguration.designerAssetGroups) {
     for (const asset of assets) {
-      await callToolOrThrow(client, "upsert_design_asset", { assetType, asset, architectureScope: defaultArchitectureScope });
+      const normalizedAsset = assetType === "dataModel" ? normalizeSeedDataModel(asset as DataModel) : asset;
+      try {
+        await callToolOrThrow(client, "upsert_design_asset", { assetType, asset: normalizedAsset, architectureScope: defaultArchitectureScope });
+      } catch (error) {
+        console.error(`[specforge-seed] failed asset ${assetType}/${String(asset.id)}: ${error instanceof Error ? error.message : String(error)}`);
+        throw error;
+      }
     }
   }
 
   for (const service of seedConfiguration.mockServiceSeeds) {
     await callToolOrThrow(client, "upsert_design_asset", { assetType: "domain", asset: service.domain, architectureScope: service.scope });
     for (const [assetType, asset] of service.assets) {
-      await callToolOrThrow(client, "upsert_design_asset", { assetType, asset, architectureScope: service.scope });
+      const normalizedAsset = assetType === "dataModel" ? normalizeSeedDataModel(asset as DataModel) : asset;
+      await callToolOrThrow(client, "upsert_design_asset", { assetType, asset: normalizedAsset, architectureScope: service.scope });
     }
   }
 

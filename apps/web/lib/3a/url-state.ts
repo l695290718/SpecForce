@@ -25,7 +25,7 @@ export interface ThreeAUrlState {
 const defaultState = { tab: "architecture", mode: "lanes", direction: "both", graphRepresentation: "map", graphView: "overview", graphLayout: "force", layers: [], relationTypes: [], mapLayers: [], mapKinds: [], mappingFamilies: [] } as const;
 
 export function parseThreeAUrlState(params: URLSearchParams): ThreeAUrlState {
-  const scope = nonEmpty(params.get("scope")) ?? "com.huawei.celon.desiner";
+  const scope = nonEmpty(params.get("scope")) ?? "com.specforge.designcenter";
   const tab = enumValue(params.get("tab"), ["architecture", "alignment", "drift", "coverage"] as const) ?? defaultState.tab;
   const mode = enumValue(params.get("mode"), ["lanes", "graph", "list"] as const) ?? defaultState.mode;
   const direction = enumValue(params.get("direction"), ["upstream", "downstream", "both"] as const) ?? defaultState.direction;

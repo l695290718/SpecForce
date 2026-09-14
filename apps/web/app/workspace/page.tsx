@@ -11,7 +11,7 @@ import { getRequestLocale } from "../../lib/locale";
 import { buildDashboardScopeView, type DashboardSpecificShortcut } from "../../lib/dashboard";
 import { getRequestPrincipal } from "../../lib/request-principal";
 
-const defaultScopeId = "com.huawei.celon.desiner";
+const defaultScopeId = "com.specforge.designcenter";
 
 export default async function WorkspaceDashboardPage({ searchParams }: { searchParams: Promise<{ scope?: string }> }) {
   const { scope } = await searchParams;
