@@ -22,7 +22,7 @@ import { verifyPersistedChangeAttestation } from "./attestation-verification";
 import { principalFromAuthInfo, withRequestPrincipal, type McpAuthInfo } from "../auth";
 import { upsertPolicyOverlay } from "../knowledge-readiness/repository";
 import { evaluateScopedKnowledgeReadiness, type KnowledgeReadRequest } from "../knowledge-readiness/service";
-import { readSystemKnowledge } from "../knowledge-readiness/read";
+import { readSystemKnowledge, readSystemKnowledgeSnapshot } from "../knowledge-readiness/read";
 import { recordBudgetFailure, recordCursorInvalidation, recordReadinessEvaluation, recordReceiptReuse } from "../knowledge-readiness/metrics";
 
 const architectureScopeSchema = z.object({
@@ -659,6 +659,21 @@ export function registerFederationTools(server: McpServer): void {
     const startedAt = Date.now();
     const result = await readSystemKnowledge(prisma, { ...input, architectureScope } as KnowledgeReadRequest, caller);
     recordKnowledgeOutcome(architectureScope, result, startedAt, input);
+    return result;
+  });
+
+  registerFederationJsonTool(server, "read_system_knowledge_snapshot", {
+    title: "Read canonical system knowledge snapshot",
+    description: "Returns receipt-bound canonical payloads for an exact authorized Scope. This migration-only read remains bounded and never aggregates scopes.",
+    inputSchema: knowledgeReadInputSchema,
+    permissions: ["knowledge:consume"],
+    readOnly: true
+  }, async (input, caller) => {
+    const architectureScope = readableKnowledgeScope(input.architectureScope, caller);
+    if (!architectureScope) return deniedKnowledgeRead();
+    const startedAt = Date.now();
+    const result = await readSystemKnowledgeSnapshot(prisma, { ...input, architectureScope } as KnowledgeReadRequest, caller);
+    recordKnowledgeOutcome(architectureScope, result as Parameters<typeof recordKnowledgeOutcome>[1], startedAt, input);
     return result;
   });
 

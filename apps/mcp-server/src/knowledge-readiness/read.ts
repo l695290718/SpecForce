@@ -76,6 +76,17 @@ export interface SystemKnowledgeReadResult {
   asOf?: string;
 }
 
+export interface SystemKnowledgeSnapshotResult {
+  accessDecision: "ALLOW" | "DENY";
+  receiptId?: string;
+  assets: Array<{ id: string; type: string; payload: Record<string, unknown>; contentDigest: string; architectureScope: ArchitectureScopeRef }>;
+  proposals: Array<{ id: string; payload: Record<string, unknown>; contentDigest: string; architectureScope: ArchitectureScopeRef }>;
+  contextPacks: Array<{ id: string; payload: Record<string, unknown>; contentDigest: string; architectureScope: ArchitectureScopeRef }>;
+  assetLinks: Array<{ id: string; sourceType: string; sourceId: string; targetType: string; targetId: string; relationType: string; description?: string; architectureScope: ArchitectureScopeRef }>;
+  manifestDigest?: string;
+  reasonCodes: readonly KnowledgeReasonCode[];
+}
+
 type ReadCursorState = {
   assetType: string;
   assetId: string;
@@ -329,4 +340,40 @@ export async function readSystemKnowledge(
       asOf: readiness.asOf
     };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+}
+
+export async function readSystemKnowledgeSnapshot(
+  client: PrismaClient = prisma,
+  request: KnowledgeReadRequest,
+  caller: ScopedPrincipal,
+  now = new Date()
+): Promise<SystemKnowledgeSnapshotResult> {
+  if (!request.receiptId) {
+    return { accessDecision: "DENY", assets: [], proposals: [], contextPacks: [], assetLinks: [], reasonCodes: ["KNOWLEDGE_RECEIPT_STALE"] };
+  }
+
+  const summary = await readSystemKnowledge(client, request, caller, now);
+  if (summary.accessDecision !== "ALLOW" || !summary.receiptId) {
+    return { accessDecision: "DENY", assets: [], proposals: [], contextPacks: [], assetLinks: [], reasonCodes: summary.reasonCodes };
+  }
+
+  const pageSize = Math.max(1, Math.min(request.pageSize ?? 100, 200));
+  const scope = scopeWhere(request.architectureScope);
+  const [assetRows, proposalRows, contextPackRows, linkRows] = await Promise.all([
+    client.designAsset.findMany({ where: scope, orderBy: [{ type: "asc" }, { id: "asc" }], take: pageSize + 1 }),
+    client.proposal.findMany({ where: scope, orderBy: { id: "asc" }, take: pageSize + 1 }),
+    client.contextPack.findMany({ where: scope, orderBy: { id: "asc" }, take: pageSize + 1 }),
+    client.assetLink.findMany({ where: scope, orderBy: { id: "asc" }, take: pageSize + 1 })
+  ]);
+  if ([assetRows, proposalRows, contextPackRows, linkRows].some((rows) => rows.length > pageSize)) {
+    return { accessDecision: "DENY", receiptId: summary.receiptId, assets: [], proposals: [], contextPacks: [], assetLinks: [], reasonCodes: ["KNOWLEDGE_RESPONSE_BUDGET_EXCEEDED"] };
+  }
+
+  const parsePayload = (payload: string | null) => payload ? JSON.parse(payload) as Record<string, unknown> : {};
+  const assets = assetRows.map((row) => ({ id: row.id, type: row.type, payload: parsePayload(row.payload), contentDigest: contentDigest(parsePayload(row.payload)), architectureScope: request.architectureScope }));
+  const proposals = proposalRows.map((row) => ({ id: row.id, payload: parsePayload(row.payload), contentDigest: contentDigest(parsePayload(row.payload)), architectureScope: request.architectureScope }));
+  const contextPacks = contextPackRows.map((row) => ({ id: row.id, payload: parsePayload(row.payload), contentDigest: contentDigest(parsePayload(row.payload)), architectureScope: request.architectureScope }));
+  const assetLinks = linkRows.map((row) => ({ id: row.id, sourceType: row.sourceType, sourceId: row.sourceId, targetType: row.targetType, targetId: row.targetId, relationType: row.relationType, ...(row.description ? { description: row.description } : {}), architectureScope: request.architectureScope }));
+  const manifestDigest = contentDigest({ assets, proposals, contextPacks, assetLinks });
+  return { accessDecision: "ALLOW", receiptId: summary.receiptId, assets, proposals, contextPacks, assetLinks, manifestDigest, reasonCodes: summary.reasonCodes };
 }

@@ -229,7 +229,8 @@ describe("federation MCP tools", () => {
       "get_federated_sync_status",
       "upsert_knowledge_readiness_policy",
       "evaluate_system_knowledge_readiness",
-      "read_system_knowledge"
+      "read_system_knowledge",
+      "read_system_knowledge_snapshot"
     ]));
     expect((tools.get("reconcile_federated_scope")!.config.annotations as { readOnlyHint: boolean }).readOnlyHint).toBe(true);
     expect((tools.get("get_federated_sync_status")!.config.annotations as { readOnlyHint: boolean }).readOnlyHint).toBe(true);

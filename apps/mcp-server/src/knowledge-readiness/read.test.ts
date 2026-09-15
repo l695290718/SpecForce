@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ScopedPrincipal } from "@specforge/core";
 import { prisma } from "../persistence";
-import { readSystemKnowledge } from "./read";
+import { readSystemKnowledge, readSystemKnowledgeSnapshot } from "./read";
 
 const scope = {
   applicationServiceId: "com.huawei.celon.desiner",
@@ -28,6 +28,13 @@ const request = {
 };
 
 describe("gated system knowledge read", () => {
+  it("denies canonical snapshots without a readiness receipt", async () => {
+    const result = await readSystemKnowledgeSnapshot(prisma, request, caller);
+
+    expect(result).toMatchObject({ accessDecision: "DENY", assets: [], proposals: [], contextPacks: [], assetLinks: [] });
+    expect(result.reasonCodes).toContain("KNOWLEDGE_RECEIPT_STALE");
+  });
+
   it.skipIf(!process.env.SPECFORGE_CONTINUOUS_INTEGRATION)("does not expose assets when readiness is incomplete", async () => {
     const result = await readSystemKnowledge(prisma, request, caller, new Date("2026-08-30T10:00:00.000Z"));
 
