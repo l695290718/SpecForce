@@ -5,7 +5,7 @@ import { z } from "zod";
 import { auditToolCall } from "./audit";
 import { validateIntegrationContractV1 as validateIntegrationContractEnvelope } from "./integration-contract";
 import { allowAllPolicy, getDefaultActor, principalFromAuthInfo, withRequestPrincipal, type McpAuthInfo } from "./auth";
-import { archiveSeedGraphOutbox, deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, prepareDataModelUpgrade, queryPersistedAssetLinks, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
+import { archiveSeedGraphOutbox, deletePersistedAssetLinks, deletePersistedDesignData, isSeedMode, listPersistedAssetLinks, prepareDataModelUpgrade, queryPersistedAssetLinks, searchPersistedDesignAssets, upsertAssetLink, upsertContextPack, upsertDesignAsset, upsertProposal } from "./persistence";
 import { applyDataModelChangeSet } from "./data-models/change-set";
 import { applyFeatureChangeSet, getFeature, listFeatures, queryFeatureGraph, validateFeatureCoverage } from "./features";
 import { applyFeatureChangeSetShape, featureDetailShape, featureGraphShape, featureListShape } from "./features/schemas";
@@ -207,6 +207,21 @@ export function registerTools(server: McpServer): void {
       seedOnly: true
     },
     deletePersistedDesignData
+  );
+
+  if (isSeedMode()) registerJsonTool(
+    server,
+    "delete_seed_asset_links",
+    {
+      title: "Delete scoped seed asset links",
+      description: "Removes only persisted typed links and their current relationship projection in one authorized Scope so a governed baseline migration can replay its source links.",
+      inputSchema: { architectureScope: architectureScopeSchema },
+      permissions: ["asset:write"],
+      readOnly: false,
+      destructive: true,
+      seedOnly: true
+    },
+    deletePersistedAssetLinks
   );
 
   if (isSeedMode()) registerJsonTool(

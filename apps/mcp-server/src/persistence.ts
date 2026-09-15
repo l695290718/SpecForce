@@ -1359,6 +1359,35 @@ export async function deletePersistedDesignData(input: DeletePersistedDesignData
   };
 }
 
+export async function deletePersistedAssetLinks(input: { architectureScope: ArchitectureScopeRef }) {
+  if (!isSeedMode()) throw new Error("Seed cleanup is not enabled.");
+  const scope = resolveWritableScope(writableActor(), input.architectureScope);
+  await ensureMcpPersistenceSchema();
+  const relationshipScope = configuredRelationshipScope(scope);
+  const deleted = await prisma.$transaction(async (transaction) => {
+    await lockRelationshipScope(transaction, relationshipScope);
+    const links = await transaction.assetLink.deleteMany({ where: scope });
+    const current = await transaction.relationshipCurrent.deleteMany({ where: relationshipScope });
+    await transaction.auditLog.create({
+      data: {
+        actorType: writableActor().actorType,
+        actorId: writableActor().actorId,
+        channel: "mcp",
+        action: "delete_seed_asset_links",
+        targetType: "asset-link",
+        targetId: scope.applicationServiceId,
+        inputSummary: "Scoped baseline migration relationship cleanup",
+        outputSummary: `deleted assetLinks=${links.count}, relationshipCurrent=${current.count}`,
+        status: "success",
+        applicationServiceId: scope.applicationServiceId,
+        scopePath: scope.scopePath
+      }
+    });
+    return { assetLinks: links.count, relationshipCurrent: current.count };
+  });
+  return { status: "deleted", architectureScope: scope, ...deleted };
+}
+
 export async function archiveSeedGraphOutbox(input: ArchiveSeedGraphOutboxInput) {
   if (!isSeedMode()) throw new Error("Seed cleanup is not enabled.");
   const scope = resolveWritableScope(writableActor(), input.architectureScope);

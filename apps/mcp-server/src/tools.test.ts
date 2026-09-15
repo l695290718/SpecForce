@@ -66,6 +66,7 @@ const persistence = vi.hoisted(() => ({
     }
   },
   archiveSeedGraphOutbox: vi.fn().mockResolvedValue({ status: "archived", archivedCount: 0 }),
+  deletePersistedAssetLinks: vi.fn().mockResolvedValue({ status: "deleted", deletedAssetLinks: 0, deletedRelationshipCurrent: 0 }),
   deletePersistedDesignData: vi.fn().mockResolvedValue({ status: "deleted" }),
   getPersistedAsset: vi.fn(),
   listPersistedAssetLinks: vi.fn().mockResolvedValue([]),
