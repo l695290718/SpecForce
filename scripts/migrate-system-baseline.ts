@@ -100,7 +100,7 @@ async function migrate() {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        if (!message.includes("FIELD_OWNERSHIP_AMBIGUOUS")) throw new Error(`DATA_MODEL_UPGRADE_FAILED:${sourceModel.id}:${message}`);
+        if (!legacyDataModelOwnership[sourceModel.id]) throw new Error(`DATA_MODEL_UPGRADE_FAILED:${sourceModel.id}:${message}`);
         prepared = { dataModel: upgradeWithExplicitOwnership(sourceModel.payload) };
       }
       await call(targetConnection.client, "apply_data_model_change_set", {
