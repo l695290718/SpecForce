@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { upgradeLegacyDataModel } from "@specforge/core";
+import { normalizeLegacyAssetLink } from "../apps/mcp-server/src/relationships/legacy-migration";
 
 type Scope = { applicationServiceId: string; scopePath: string };
 type ToolResult = { content?: Array<{ text?: string }>; isError?: boolean };
@@ -100,6 +101,7 @@ async function migrate() {
   const targetConnection = await connect(target);
   try {
     const [sourceSnapshot, targetSnapshot] = await Promise.all([snapshot(sourceConnection.client, source), snapshot(targetConnection.client, target)]);
+    const canonicalSourceLinks = sourceSnapshot.assetLinks.flatMap((link: any) => normalizeLegacyAssetLink(link));
     const featureAssets = sourceSnapshot.assets.filter((asset: any) => asset.type === "serviceFeature" || asset.type === "functionalFeature");
     const dataModels = sourceSnapshot.assets.filter((asset: any) => asset.type === "dataModel");
     const unresolvedOwnership = dataModels
@@ -111,14 +113,14 @@ async function migrate() {
     const sourceProposalIds = new Set(sourceSnapshot.proposals.map((proposal: any) => proposal.id));
     const sourceContextPackIds = new Set(sourceSnapshot.contextPacks.map((pack: any) => pack.id));
     const linkKey = (link: any) => [link.sourceType, link.sourceId, link.relationType, link.targetType, link.targetId].join("|");
-    const sourceLinkKeys = new Set(sourceSnapshot.assetLinks.map(linkKey));
+    const sourceLinkKeys = new Set(canonicalSourceLinks.map(linkKey));
     const stale = {
       assetIds: targetSnapshot.assets.filter((asset: any) => !sourceAssetIds.has(asset.id)).map((asset: any) => asset.id),
       proposalIds: targetSnapshot.proposals.filter((proposal: any) => !sourceProposalIds.has(proposal.id)).map((proposal: any) => proposal.id),
       contextPackIds: targetSnapshot.contextPacks.filter((pack: any) => !sourceContextPackIds.has(pack.id)).map((pack: any) => pack.id),
       links: targetSnapshot.assetLinks.filter((link: any) => !sourceLinkKeys.has(linkKey(link)))
     };
-    console.log(JSON.stringify({ phase: "dry-run", batchKey, sourceDigest: sourceSnapshot.manifestDigest, source: { assets: sourceSnapshot.assets.length, proposals: sourceSnapshot.proposals.length, contextPacks: sourceSnapshot.contextPacks.length, links: sourceSnapshot.assetLinks.length }, target: { assets: targetSnapshot.assets.length, proposals: targetSnapshot.proposals.length, contextPacks: targetSnapshot.contextPacks.length, links: targetSnapshot.assetLinks.length }, stale: { assets: stale.assetIds.length, proposals: stale.proposalIds.length, contextPacks: stale.contextPackIds.length, links: stale.links.length } }, null, 2));
+    console.log(JSON.stringify({ phase: "dry-run", batchKey, sourceDigest: sourceSnapshot.manifestDigest, source: { assets: sourceSnapshot.assets.length, proposals: sourceSnapshot.proposals.length, contextPacks: sourceSnapshot.contextPacks.length, links: canonicalSourceLinks.length }, target: { assets: targetSnapshot.assets.length, proposals: targetSnapshot.proposals.length, contextPacks: targetSnapshot.contextPacks.length, links: targetSnapshot.assetLinks.length }, stale: { assets: stale.assetIds.length, proposals: stale.proposalIds.length, contextPacks: stale.contextPackIds.length, links: stale.links.length } }, null, 2));
     if (stale.links.length) await call(targetConnection.client, "delete_seed_asset_links", { architectureScope: target });
     if (stale.assetIds.length || stale.proposalIds.length || stale.contextPackIds.length) await call(targetConnection.client, "delete_seed_design_data", { architectureScope: target, assetIds: stale.assetIds, proposalIds: stale.proposalIds, contextPackIds: stale.contextPackIds });
     for (const asset of standardAssets) await call(targetConnection.client, "upsert_design_asset", { assetType: asset.type, asset: asset.payload, architectureScope: target });
@@ -146,9 +148,9 @@ async function migrate() {
     if (featureAssets.length) await call(targetConnection.client, "apply_feature_change_set", { architectureScope: target, designChangeSessionId: targetSession, correlationId: `${batchKey}:features`, idempotencyKey: `${batchKey}:features`, assets: featureAssets.map((asset: any) => ({ assetType: asset.type, asset: { ...asset.payload, architectureScope: target } })), relationships: [] });
     for (const proposal of sourceSnapshot.proposals) await call(targetConnection.client, "upsert_proposal", { proposal: proposal.payload, architectureScope: target });
     for (const contextPack of sourceSnapshot.contextPacks) await call(targetConnection.client, "upsert_context_pack", { contextPack: contextPack.payload, architectureScope: target });
-    for (const link of sourceSnapshot.assetLinks) await call(targetConnection.client, "link_assets", { sourceType: link.sourceType, sourceId: link.sourceId, targetType: link.targetType, targetId: link.targetId, relationType: link.relationType, ...(link.description ? { description: link.description } : {}), architectureScope: target });
+    for (const link of canonicalSourceLinks) await call(targetConnection.client, "link_assets", { sourceType: link.sourceType, sourceId: link.sourceId, targetType: link.targetType, targetId: link.targetId, relationType: link.relationType, ...(link.description ? { description: link.description } : {}), architectureScope: target });
     const reconciled = await snapshot(targetConnection.client, target);
-    const expected = JSON.stringify({ assets: sourceSnapshot.assets.map((item: any) => [item.type, item.id]).sort(), proposals: sourceSnapshot.proposals.map((item: any) => item.id).sort(), contextPacks: sourceSnapshot.contextPacks.map((item: any) => item.id).sort(), links: sourceSnapshot.assetLinks.map((item: any) => [item.sourceType, item.sourceId, item.relationType, item.targetType, item.targetId]).sort() });
+    const expected = JSON.stringify({ assets: sourceSnapshot.assets.map((item: any) => [item.type, item.id]).sort(), proposals: sourceSnapshot.proposals.map((item: any) => item.id).sort(), contextPacks: sourceSnapshot.contextPacks.map((item: any) => item.id).sort(), links: canonicalSourceLinks.map((item: any) => [item.sourceType, item.sourceId, item.relationType, item.targetType, item.targetId]).sort() });
     const actual = JSON.stringify({ assets: reconciled.assets.map((item: any) => [item.type, item.id]).sort(), proposals: reconciled.proposals.map((item: any) => item.id).sort(), contextPacks: reconciled.contextPacks.map((item: any) => item.id).sort(), links: reconciled.assetLinks.map((item: any) => [item.sourceType, item.sourceId, item.relationType, item.targetType, item.targetId]).sort() });
     if (expected !== actual) throw new Error("MIGRATION_RECONCILIATION_FAILED");
     console.log(JSON.stringify({ phase: "converged", batchKey, sourceDigest: sourceSnapshot.manifestDigest, targetDigest: reconciled.manifestDigest }, null, 2));
