@@ -67,7 +67,20 @@ async function migrate() {
     if (stale.links.length) await call(targetConnection.client, "delete_seed_asset_links", { architectureScope: target });
     if (stale.assetIds.length || stale.proposalIds.length || stale.contextPackIds.length) await call(targetConnection.client, "delete_seed_design_data", { architectureScope: target, assetIds: stale.assetIds, proposalIds: stale.proposalIds, contextPackIds: stale.contextPackIds });
     for (const asset of standardAssets) await call(targetConnection.client, "upsert_design_asset", { assetType: asset.type, asset: asset.payload, architectureScope: target });
-    for (let index = 0; index < dataModels.length; index += 1) await call(targetConnection.client, "apply_data_model_change_set", { architectureScope: target, models: [dataModels[index].payload], idempotencyKey: `${batchKey}:data-model:${dataModels[index].id}`, correlationId: `${batchKey}:data-model:${index}` });
+    for (let index = 0; index < dataModels.length; index += 1) {
+      const sourceModel = dataModels[index];
+      const prepared = await call(sourceConnection.client, "upgrade_data_model", {
+        applicationServiceId: source.applicationServiceId,
+        architectureScope: source,
+        assetId: sourceModel.id
+      });
+      await call(targetConnection.client, "apply_data_model_change_set", {
+        architectureScope: target,
+        models: [prepared.dataModel],
+        idempotencyKey: `${batchKey}:data-model:${sourceModel.id}`,
+        correlationId: `${batchKey}:data-model:${index}`
+      });
+    }
     if (featureAssets.length) await call(targetConnection.client, "apply_feature_change_set", { architectureScope: target, designChangeSessionId: targetSession, correlationId: `${batchKey}:features`, idempotencyKey: `${batchKey}:features`, assets: featureAssets.map((asset: any) => ({ assetType: asset.type, asset: { ...asset.payload, architectureScope: target } })), relationships: [] });
     for (const proposal of sourceSnapshot.proposals) await call(targetConnection.client, "upsert_proposal", { proposal: proposal.payload, architectureScope: target });
     for (const contextPack of sourceSnapshot.contextPacks) await call(targetConnection.client, "upsert_context_pack", { contextPack: contextPack.payload, architectureScope: target });
