@@ -1367,6 +1367,11 @@ export async function deletePersistedAssetLinks(input: { architectureScope: Arch
   const deleted = await prisma.$transaction(async (transaction) => {
     await lockRelationshipScope(transaction, relationshipScope);
     const links = await transaction.assetLink.deleteMany({ where: scope });
+    // Clear the target-only derived relationship chain in reverse FK order.
+    const checkpoints = await transaction.projectionCheckpoint.deleteMany({ where: relationshipScope });
+    const outbox = await transaction.relationshipOutbox.deleteMany({ where: relationshipScope });
+    const events = await transaction.relationshipEvent.deleteMany({ where: relationshipScope });
+    const receipts = await transaction.relationshipCommandReceipt.deleteMany({ where: relationshipScope });
     const current = await transaction.relationshipCurrent.deleteMany({ where: relationshipScope });
     await transaction.auditLog.create({
       data: {
@@ -1377,13 +1382,20 @@ export async function deletePersistedAssetLinks(input: { architectureScope: Arch
         targetType: "asset-link",
         targetId: scope.applicationServiceId,
         inputSummary: "Scoped baseline migration relationship cleanup",
-        outputSummary: `deleted assetLinks=${links.count}, relationshipCurrent=${current.count}`,
+        outputSummary: `deleted assetLinks=${links.count}, relationshipCurrent=${current.count}, relationshipEvents=${events.count}, relationshipOutbox=${outbox.count}, projectionCheckpoints=${checkpoints.count}, relationshipReceipts=${receipts.count}`,
         status: "success",
         applicationServiceId: scope.applicationServiceId,
         scopePath: scope.scopePath
       }
     });
-    return { assetLinks: links.count, relationshipCurrent: current.count };
+    return {
+      assetLinks: links.count,
+      relationshipCurrent: current.count,
+      relationshipEvents: events.count,
+      relationshipOutbox: outbox.count,
+      projectionCheckpoints: checkpoints.count,
+      relationshipReceipts: receipts.count
+    };
   });
   return { status: "deleted", architectureScope: scope, ...deleted };
 }
