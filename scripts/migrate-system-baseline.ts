@@ -11,6 +11,7 @@ const source: Scope = { applicationServiceId: "com.huawei.celon.desiner", scopeP
 const target: Scope = { applicationServiceId: "com.specforge.designcenter", scopePath: "pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter" };
 const targetSession = process.env.SPECFORGE_TARGET_MIGRATION_SESSION;
 const batchKey = process.env.SPECFORGE_BASELINE_MIGRATION_BATCH ?? "system-baseline-2026-09-15";
+const reconcileOnly = process.env.SPECFORGE_MIGRATION_RECONCILE_ONLY === "1";
 
 const legacyDataModelOwnership: Record<string, Record<string, string>> = {
   "data-specforge-ai-generation": {
@@ -125,6 +126,13 @@ async function migrate() {
       links: targetSnapshot.assetLinks.filter((link: any) => !sourceLinkKeys.has(linkKey(link)))
     };
     console.log(JSON.stringify({ phase: "dry-run", batchKey, sourceDigest: sourceSnapshot.manifestDigest, source: { assets: sourceSnapshot.assets.length, proposals: sourceSnapshot.proposals.length, contextPacks: sourceSnapshot.contextPacks.length, links: canonicalSourceLinks.length }, target: { assets: targetSnapshot.assets.length, proposals: targetSnapshot.proposals.length, contextPacks: targetSnapshot.contextPacks.length, links: targetSnapshot.assetLinks.length }, stale: { assets: stale.assetIds.length, proposals: stale.proposalIds.length, contextPacks: stale.contextPackIds.length, links: stale.links.length } }, null, 2));
+    const expected = JSON.stringify({ assets: sourceSnapshot.assets.map((item: any) => [item.type, item.id]).sort(), proposals: sourceSnapshot.proposals.map((item: any) => item.id).sort(), contextPacks: sourceSnapshot.contextPacks.map((item: any) => item.id).sort(), links: canonicalSourceLinks.map((item: any) => [item.sourceType, item.sourceId, item.relationType, item.targetType, item.targetId]).sort() });
+    const targetComparable = JSON.stringify({ assets: targetSnapshot.assets.map((item: any) => [item.type, item.id]).sort(), proposals: targetSnapshot.proposals.map((item: any) => item.id).sort(), contextPacks: targetSnapshot.contextPacks.map((item: any) => item.id).sort(), links: targetSnapshot.assetLinks.map((item: any) => [item.sourceType, item.sourceId, item.relationType, item.targetType, item.targetId]).sort() });
+    if (reconcileOnly) {
+      if (expected !== targetComparable) throw new Error("MIGRATION_RECONCILIATION_FAILED");
+      console.log(JSON.stringify({ phase: "converged", batchKey, sourceDigest: sourceSnapshot.manifestDigest, targetDigest: targetSnapshot.manifestDigest }, null, 2));
+      return;
+    }
     if (stale.links.length) await call(targetConnection.client, "delete_seed_asset_links", { architectureScope: target });
     if (stale.assetIds.length || stale.proposalIds.length || stale.contextPackIds.length) await call(targetConnection.client, "delete_seed_design_data", { architectureScope: target, assetIds: stale.assetIds, proposalIds: stale.proposalIds, contextPackIds: stale.contextPackIds });
     for (const asset of standardAssets) await call(targetConnection.client, "upsert_design_asset", { assetType: asset.type, asset: asset.payload, architectureScope: target });
@@ -154,7 +162,6 @@ async function migrate() {
     for (const contextPack of sourceSnapshot.contextPacks) await call(targetConnection.client, "upsert_context_pack", { contextPack: contextPack.payload, architectureScope: target });
     for (const link of canonicalSourceLinks) await call(targetConnection.client, "link_assets", { sourceType: link.sourceType, sourceId: link.sourceId, targetType: link.targetType, targetId: link.targetId, relationType: link.relationType, ...(link.description ? { description: link.description } : {}), architectureScope: target });
     const reconciled = await snapshot(targetConnection.client, target);
-    const expected = JSON.stringify({ assets: sourceSnapshot.assets.map((item: any) => [item.type, item.id]).sort(), proposals: sourceSnapshot.proposals.map((item: any) => item.id).sort(), contextPacks: sourceSnapshot.contextPacks.map((item: any) => item.id).sort(), links: canonicalSourceLinks.map((item: any) => [item.sourceType, item.sourceId, item.relationType, item.targetType, item.targetId]).sort() });
     const actual = JSON.stringify({ assets: reconciled.assets.map((item: any) => [item.type, item.id]).sort(), proposals: reconciled.proposals.map((item: any) => item.id).sort(), contextPacks: reconciled.contextPacks.map((item: any) => item.id).sort(), links: reconciled.assetLinks.map((item: any) => [item.sourceType, item.sourceId, item.relationType, item.targetType, item.targetId]).sort() });
     if (expected !== actual) throw new Error("MIGRATION_RECONCILIATION_FAILED");
     console.log(JSON.stringify({ phase: "converged", batchKey, sourceDigest: sourceSnapshot.manifestDigest, targetDigest: reconciled.manifestDigest }, null, 2));
