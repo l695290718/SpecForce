@@ -17,6 +17,35 @@ const legacyDataModelOwnership: Record<string, Record<string, string>> = {
     capability: "AIProviderRequest",
     prompt: "AIProviderRequest",
     draft_payload: "GeneratedDraft"
+  },
+  "data-specforge-asset-graph": {
+    node_id: "AssetGraphNode",
+    node_type: "AssetGraphNode",
+    edge_label: "AssetGraphEdge",
+    domain_filter: "GraphFilter"
+  },
+  "data-specforge-assets": {
+    asset_id: "DesignAsset",
+    asset_type: "DesignAsset",
+    payload: "DesignAsset"
+  },
+  "data-specforge-i18n": {
+    message_key: "I18nMessage",
+    locale: "I18nMessage",
+    text: "I18nMessage",
+    fallback_key: "I18nMessage"
+  },
+  "data-specforge-mcp-registry": {
+    name: "McpTool",
+    kind: "McpTool",
+    permissions: "McpTool",
+    read_only: "McpTool"
+  },
+  "data-specforge-web-workspace": {
+    draft_key: "AssetDraft",
+    locale: "LocalePreference",
+    filter_payload: "WorkspaceFilter",
+    export_format: "MarkdownExport"
   }
 };
 
@@ -73,6 +102,10 @@ async function migrate() {
     const [sourceSnapshot, targetSnapshot] = await Promise.all([snapshot(sourceConnection.client, source), snapshot(targetConnection.client, target)]);
     const featureAssets = sourceSnapshot.assets.filter((asset: any) => asset.type === "serviceFeature" || asset.type === "functionalFeature");
     const dataModels = sourceSnapshot.assets.filter((asset: any) => asset.type === "dataModel");
+    const unresolvedOwnership = dataModels
+      .filter((asset: any) => (asset.payload.entities?.length ?? 0) > 1 && asset.payload.fields?.some((field: any) => !field.entityId) && !legacyDataModelOwnership[asset.id])
+      .map((asset: any) => ({ id: asset.id, entities: asset.payload.entities, fields: asset.payload.fields.map((field: any) => field.fieldName) }));
+    if (unresolvedOwnership.length) throw new Error(`DATA_MODEL_OWNERSHIP_RULES_REQUIRED:${JSON.stringify(unresolvedOwnership)}`);
     const standardAssets = sourceSnapshot.assets.filter((asset: any) => asset.type !== "serviceFeature" && asset.type !== "functionalFeature" && asset.type !== "dataModel");
     const sourceAssetIds = new Set(sourceSnapshot.assets.map((asset: any) => asset.id));
     const sourceProposalIds = new Set(sourceSnapshot.proposals.map((proposal: any) => proposal.id));
