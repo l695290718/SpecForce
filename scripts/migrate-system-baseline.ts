@@ -103,6 +103,10 @@ async function migrate() {
     const [sourceSnapshot, targetSnapshot] = await Promise.all([snapshot(sourceConnection.client, source), snapshot(targetConnection.client, target)]);
     const canonicalSourceLinks = sourceSnapshot.assetLinks.flatMap((link: any) => normalizeLegacyAssetLink(link));
     const featureAssets = sourceSnapshot.assets.filter((asset: any) => asset.type === "serviceFeature" || asset.type === "functionalFeature");
+    const targetFeatureIds = new Set(targetSnapshot.assets
+      .filter((asset: any) => asset.type === "serviceFeature" || asset.type === "functionalFeature")
+      .map((asset: any) => asset.id));
+    const missingFeatureAssets = featureAssets.filter((asset: any) => !targetFeatureIds.has(asset.id));
     const dataModels = sourceSnapshot.assets.filter((asset: any) => asset.type === "dataModel");
     const unresolvedOwnership = dataModels
       .filter((asset: any) => (asset.payload.entities?.length ?? 0) > 1 && asset.payload.fields?.some((field: any) => !field.entityId) && !legacyDataModelOwnership[asset.id])
@@ -145,7 +149,7 @@ async function migrate() {
         correlationId: `${batchKey}:data-model:${index}`
       });
     }
-    if (featureAssets.length) await call(targetConnection.client, "apply_feature_change_set", { architectureScope: target, designChangeSessionId: targetSession, correlationId: `${batchKey}:features`, idempotencyKey: `${batchKey}:features`, assets: featureAssets.map((asset: any) => ({ assetType: asset.type, asset: { ...asset.payload, architectureScope: target } })), relationships: [] });
+    if (missingFeatureAssets.length) await call(targetConnection.client, "apply_feature_change_set", { architectureScope: target, designChangeSessionId: targetSession, correlationId: `${batchKey}:features`, idempotencyKey: `${batchKey}:features`, assets: missingFeatureAssets.map((asset: any) => ({ assetType: asset.type, asset: { ...asset.payload, architectureScope: target } })), relationships: [] });
     for (const proposal of sourceSnapshot.proposals) await call(targetConnection.client, "upsert_proposal", { proposal: proposal.payload, architectureScope: target });
     for (const contextPack of sourceSnapshot.contextPacks) await call(targetConnection.client, "upsert_context_pack", { contextPack: contextPack.payload, architectureScope: target });
     for (const link of canonicalSourceLinks) await call(targetConnection.client, "link_assets", { sourceType: link.sourceType, sourceId: link.sourceId, targetType: link.targetType, targetId: link.targetId, relationType: link.relationType, ...(link.description ? { description: link.description } : {}), architectureScope: target });
