@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
+import { upgradeLegacyDataModel } from "@specforge/core";
 
 type Scope = { applicationServiceId: string; scopePath: string };
 type ToolResult = { content?: Array<{ text?: string }>; isError?: boolean };
@@ -9,6 +10,27 @@ const source: Scope = { applicationServiceId: "com.huawei.celon.desiner", scopeP
 const target: Scope = { applicationServiceId: "com.specforge.designcenter", scopePath: "pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter" };
 const targetSession = process.env.SPECFORGE_TARGET_MIGRATION_SESSION;
 const batchKey = process.env.SPECFORGE_BASELINE_MIGRATION_BATCH ?? "system-baseline-2026-09-15";
+
+const legacyDataModelOwnership: Record<string, Record<string, string>> = {
+  "data-specforge-ai-generation": {
+    provider_id: "AIProviderConfig",
+    capability: "AIProviderRequest",
+    prompt: "AIProviderRequest",
+    draft_payload: "GeneratedDraft"
+  }
+};
+
+function upgradeWithExplicitOwnership(model: any) {
+  const ownership = legacyDataModelOwnership[model.id];
+  if (!ownership) throw new Error(`DATA_MODEL_OWNERSHIP_RULE_MISSING:${model.id}`);
+  const entityIds = new Set(model.entities ?? []);
+  const fields = model.fields.map((field: any) => {
+    const entityName = ownership[field.fieldName];
+    if (!entityName || !entityIds.has(entityName)) throw new Error(`DATA_MODEL_OWNERSHIP_INVALID:${model.id}:${field.fieldName}`);
+    return { ...field, entityId: `entity:${model.id}:${entityName}` };
+  });
+  return upgradeLegacyDataModel({ ...model, fields });
+}
 
 function parse(result: ToolResult, name: string): any {
   const text = result.content?.map((item) => item.text ?? "").join("") ?? "";
@@ -69,11 +91,18 @@ async function migrate() {
     for (const asset of standardAssets) await call(targetConnection.client, "upsert_design_asset", { assetType: asset.type, asset: asset.payload, architectureScope: target });
     for (let index = 0; index < dataModels.length; index += 1) {
       const sourceModel = dataModels[index];
-      const prepared = await call(sourceConnection.client, "upgrade_data_model", {
-        applicationServiceId: source.applicationServiceId,
-        architectureScope: source,
-        assetId: sourceModel.id
-      });
+      let prepared: any;
+      try {
+        prepared = await call(sourceConnection.client, "upgrade_data_model", {
+          applicationServiceId: source.applicationServiceId,
+          architectureScope: source,
+          assetId: sourceModel.id
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.includes("FIELD_OWNERSHIP_AMBIGUOUS")) throw new Error(`DATA_MODEL_UPGRADE_FAILED:${sourceModel.id}:${message}`);
+        prepared = { dataModel: upgradeWithExplicitOwnership(sourceModel.payload) };
+      }
       await call(targetConnection.client, "apply_data_model_change_set", {
         architectureScope: target,
         models: [prepared.dataModel],
