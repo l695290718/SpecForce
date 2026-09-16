@@ -40,7 +40,7 @@ export async function submitScanReport(input: SubmitScanReportInput): Promise<Pe
     await transaction.designChangeSession.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: input.designChangeSessionId } }, data: { status: status === "RECEIVED" ? "WAITING_FOR_REVIEW" : "CONFLICTED" } });
     await transaction.federationOutbox.upsert({ where: { applicationServiceId_scopePath_idempotencyKey: { ...scope, idempotencyKey: `scan-report:${input.report.reportDigest}` } }, create: { ...scope, eventType: "FEDERATION_SCAN_REPORT_RECEIVED", payload: jsonValue({ scanReportId: input.id, reportDigest: input.report.reportDigest, observationCount: input.report.observations.length, coverage: input.report.coverage }), idempotencyKey: `scan-report:${input.report.reportDigest}`, status: "PENDING", designChangeSessionId: input.designChangeSessionId }, update: {} });
     return created;
-  });
+  }, { timeout: 120_000 });
   return persistedScanReport(row, (row.observationIds as string[] | undefined) ?? input.report.observations.map((observation) => `source:${input.report.reportDigest}:${observation.id}`));
 }
 

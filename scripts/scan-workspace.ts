@@ -2,7 +2,7 @@ import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { buildScanReport, type ArchitectureScopeRef, type LocalFileSnapshot } from "@specforge/core";
 
-const ignoredDirectoryNames = new Set([".git", "node_modules", "vendor", "dist", "build", "coverage", ".next", "target"]);
+const ignoredDirectoryNames = new Set([".git", ".pnpm-store", ".specforge", ".worktrees", "node_modules", "vendor", "dist", "build", "coverage", ".next", "target"]);
 const ignoredFilePattern = /(^|\/)(\.env(?:\.|$)|.*\.(pem|key|p12|pfx|jks)|id_rsa(?:\.|$))/i;
 const maxFileBytes = 2 * 1024 * 1024;
 

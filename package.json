@@ -20,6 +20,7 @@
     "design-facts:check": "tsx scripts/reconcile-design-facts.ts",
     "design-context:preflight": "tsx scripts/design-context.ts preflight",
     "scan:workspace": "tsx scripts/scan-workspace.ts",
+    "scan:workspace:mcp": "tsx scripts/rescan-workspace-through-mcp.ts",
     "scanner-contract:generate": "tsx scripts/generate-scan-contract.ts",
     "scanner-contract:check": "tsx scripts/generate-scan-contract.ts --check",
     "legacy-baseline:verify": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-legacy-baseline.ps1",
