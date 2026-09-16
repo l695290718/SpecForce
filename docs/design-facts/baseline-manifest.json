@@ -3337,6 +3337,39 @@
                       { "command": "pnpm exec vitest run --root . --exclude .worktrees/** --exclude .pnpm-store/** apps/web/lib/__tests__/scoped-catalog.test.ts apps/web/lib/__tests__/legacy-read.test.ts apps/web/lib/data-model-graph.test.ts apps/web/lib/__tests__/derived-routes.test.ts", "result": "Passed: 4 files and 22 tests." },
                       { "command": "Invoke-WebRequest http://127.0.0.1:3010/healthz; GET /api/data-model-graph; GET /api/assets/{data-models,apis}", "result": "Docker Web restarted after latest-revision selection; health 200; graph 200 with 15,494 bytes and repeated timings 216/164/119/137/168 ms; data-model assets 20-45 ms; API assets 13-25 ms." }
                     ]
+                  },
+                  {
+                    "id": "adr-governed-scan-coverage-policy",
+                    "repositoryAdr": "docs/adr/0048-governed-scan-coverage-policy.md",
+                    "mcpAdrId": "adr-governed-scan-coverage-policy",
+                    "scope": {
+                      "applicationServiceId": "com.specforge.designcenter",
+                      "scopePath": "pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter"
+                    },
+                    "proposalId": "proposal-governed-scan-coverage-policy",
+                    "proposalStatus": "implemented",
+                    "contextPackId": "context-pack-governed-scan-coverage-policy",
+                    "relatedAssetIds": ["api-specforge-mcp-tools", "data-specforge-assets"],
+                    "owner": "SpecForge Architecture and Design Governance",
+                    "status": "Implemented and locally verified; semantic parsers and promotion remain deferred.",
+                    "reason": "Candidate-only scans must report governed coverage rather than raw repository noise.",
+                    "retryTrigger": "Add a parser or policy rule when a required declaration type is observed unsupported.",
+                    "localizedContent": {
+                      "en": {
+                        "decision": "Use a versioned policy that blocks only required unsupported declarations and persist candidate-only scan evidence through MCP.",
+                        "constraints": ["Exact Scope ownership is mandatory.", "PostgreSQL is authoritative.", "Scans do not overwrite authored facts."]
+                      },
+                      "zh": {
+                        "decision": "使用版本化策略，仅由必需未支持声明阻断，并通过 MCP 持久化仅候选扫描证据。",
+                        "constraints": ["必须精确归属 Scope。", "PostgreSQL 保持权威。", "扫描不得覆盖已编写事实。"]
+                      }
+                    },
+                    "evidence": [
+                      { "command": "pnpm exec vitest run packages/core/src/__tests__/scanner.test.ts", "result": "Passed: 4 tests." },
+                      { "command": "pnpm --filter @specforge/core typecheck", "result": "Passed." },
+                      { "command": "pnpm --filter @specforge/mcp-server typecheck", "result": "Passed." },
+                      { "command": "pnpm exec tsx scripts/rescan-workspace-through-mcp.ts", "result": "Passed: MCP persisted 1009 candidate observations, zero required unsupported files, status RECEIVED." }
+                    ]
                   }
                   ]
 }

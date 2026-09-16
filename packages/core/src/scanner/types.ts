@@ -26,6 +26,14 @@ export interface ScanCoverage {
   unsupportedFiles: number;
   observationCount: number;
   sourceKinds: Record<ScannerSourceKind, number>;
+  policyId: string;
+  policyVersion: string;
+  policyDigest: string;
+  excludedFiles: number;
+  outOfPolicyFiles: number;
+  requiredUnsupportedFiles: number;
+  blockingRuleIds: string[];
+  representativeEntries: Array<{ path: string; classification: "EXCLUDED" | "REQUIRED_UNSUPPORTED" | "OUT_OF_POLICY"; ruleId: string }>;
   complete: boolean;
 }
 

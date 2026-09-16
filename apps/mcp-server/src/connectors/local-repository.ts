@@ -13,7 +13,7 @@ import { join, relative, sep } from "node:path";
 
 const DEFAULT_MAX_SOURCE_FILE_BYTES = 10 * 1024 * 1024;
 const DEFAULT_SOURCE_NAMESPACE = "local-repository-v1";
-const IGNORED_DIRECTORIES = new Set([".git", ".specforge", "node_modules", "vendor", "dist", "build", "coverage", ".next", "target"]);
+const IGNORED_DIRECTORIES = new Set([".git", ".pnpm-store", ".specforge", ".worktrees", "node_modules", "vendor", "dist", "build", "coverage", ".next", "target"]);
 
 export interface LocalRepositorySourceAdapterOptions {
   root: string;

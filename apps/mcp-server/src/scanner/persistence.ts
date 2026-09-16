@@ -30,7 +30,7 @@ export async function submitScanReport(input: SubmitScanReportInput): Promise<Pe
       const idempotencyKey = `scan-observation:${input.report.reportDigest}:${observation.id}`;
       await transaction.sourceObservation.upsert({
         where: { applicationServiceId_scopePath_idempotencyKey: { ...scope, idempotencyKey } },
-        create: { ...scope, id: `source:${input.report.reportDigest}:${observation.id}`, connectorId: input.connectorId, sourceNamespace: "local-scanner", externalAssetType: observation.observationType, externalId: observation.sourcePath, payload: jsonValue({ ...observation.payload, scanReportId: input.id, reportDigest: input.report.reportDigest }), normalizedDigest: observation.normalizedDigest, sourceVersion: input.report.scannerVersion, observedAt: new Date(input.report.generatedAt), status: "CANDIDATE", provenance: jsonValue({ sourceSystem: "local-scanner", connectorInstanceId: input.connectorId, observedAt: input.report.generatedAt }), idempotencyKey },
+        create: { ...scope, id: `source:${input.report.reportDigest}:${observation.id}`, connectorId: input.connectorId, sourceNamespace: "local-scanner", externalAssetType: observation.observationType, externalId: observation.sourcePath, payload: jsonValue({ ...observation.payload, scanReportId: input.id, reportDigest: input.report.reportDigest }), normalizedDigest: observation.normalizedDigest, sourceVersion: observation.normalizedDigest, observedAt: new Date(input.report.generatedAt), status: "CANDIDATE", provenance: jsonValue({ sourceSystem: "local-scanner", connectorInstanceId: input.connectorId, observedAt: input.report.generatedAt }), idempotencyKey },
         update: {}
       });
     }
