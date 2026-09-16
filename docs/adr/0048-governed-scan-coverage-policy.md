@@ -16,7 +16,7 @@ A repository scan previously treated every unindexed file as unsupported, so gen
 
 ## Decision
 
-Adopt a versioned governed coverage policy. Every discovered file is classified as `SUPPORTED`, `EXCLUDED`, `OUT_OF_POLICY`, or `REQUIRED_UNSUPPORTED`. Only `REQUIRED_UNSUPPORTED` blocks scan completeness. The deterministic local scanner indexes recognized source, contract, data, documentation, workflow, Docker, deployment-script, and graph-bootstrap declarations as structural candidate observations. PostgreSQL persists policy metadata, bounded representative entries, and the report digest through the MCP boundary; observation source versions use each normalized observation digest so repeated reports do not collide. Scans remain candidate-only and never overwrite authored design facts or a published baseline.
+Adopt a versioned governed coverage policy. Every discovered file is classified as `SUPPORTED`, `EXCLUDED`, `OUT_OF_POLICY`, or `REQUIRED_UNSUPPORTED`. Only `REQUIRED_UNSUPPORTED` blocks scan completeness. The deterministic local scanner indexes recognized source, contract, data, documentation, workflow, Docker, deployment-script, and graph-bootstrap declarations as structural candidate observations. PostgreSQL persists policy metadata, bounded representative entries, and the report digest through the MCP boundary; observation source versions use the immutable report digest while normalized observation digests retain content identity. Scans remain candidate-only and never overwrite authored design facts or a published baseline.
 
 ## Alternatives
 
@@ -53,7 +53,7 @@ Adopt a versioned governed coverage policy. Every discovered file is classified 
 
 ### 决策
 
-采用版本化的受治理覆盖策略。每个发现的文件被分类为 `SUPPORTED`、`EXCLUDED`、`OUT_OF_POLICY` 或 `REQUIRED_UNSUPPORTED`；只有 `REQUIRED_UNSUPPORTED` 会阻断扫描完整性。确定性本地扫描器对已识别的源码、契约、数据、文档、工作流、Docker、部署脚本和图初始化声明生成结构化候选观察。PostgreSQL 通过 MCP 边界持久化策略元数据、有界代表性条目和报告摘要；观察的源版本使用各自规范化摘要，避免重复报告冲突。扫描始终只生成候选，不覆盖已编写设计事实或已发布基线。
+采用版本化的受治理覆盖策略。每个发现的文件被分类为 `SUPPORTED`、`EXCLUDED`、`OUT_OF_POLICY` 或 `REQUIRED_UNSUPPORTED`；只有 `REQUIRED_UNSUPPORTED` 会阻断扫描完整性。确定性本地扫描器对已识别的源码、契约、数据、文档、工作流、Docker、部署脚本和图初始化声明生成结构化候选观察。PostgreSQL 通过 MCP 边界持久化策略元数据、有界代表性条目和报告摘要；观察源版本使用不可变报告摘要，而规范化观察摘要保持内容身份。扫描始终只生成候选，不覆盖已编写设计事实或已发布基线。
 
 ### 备选方案
 
