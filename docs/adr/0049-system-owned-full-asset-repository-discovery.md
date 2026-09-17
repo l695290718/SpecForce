@@ -2,13 +2,13 @@
 
 ## Status
 
-Accepted for phased implementation.
+Implemented for the governed repository-scan increment; production connector delivery remains deferred.
 
 - Stable ADR ID: `adr-system-owned-full-asset-repository-discovery`.
 - Proposal: `proposal-system-owned-full-asset-repository-discovery`.
 - Context Pack: `context-pack-system-owned-full-asset-repository-discovery`.
 - Scope: `com.specforge.designcenter`.
-- Design session: `design-change-session:c346c2e0-64ad-4f87-b8c1-3f4a744a736f`.
+- Design session: `design-change-session:197ab290-ff5b-40d0-950f-55b213a58c9b`.
 - Specification: `docs/superpowers/specs/2026-09-17-governed-repository-scan-skill-design.md`.
 
 ## Context
@@ -53,6 +53,22 @@ A file-extension scanner cannot correctly discover the complete SpecForge asset 
 - `docs/superpowers/specs/2026-08-03-agent-driven-legacy-baseline-production-design.md` already establishes signed static extractors, evidence/observation/candidate/fact separation, T0-T3 review and provider-neutral Agent integration.
 - The approved design review selected system-owned governance, framework-aware extraction, per-asset capability coverage and Agent semantic candidates.
 
+## Implementation Boundary
+
+The implemented increment includes system-owned governance records, technology-aware extractor catalogs, deterministic multi-language and contract-neutral extraction, bounded bilingual semantic-candidate validation, resumable governed sessions, coverage and blocker reports, provider-neutral Skill packaging, and scale/contract proof. Continuous scanning, runtime or CMDB connectors, outbound proposals, external `APPLY`, cross-Scope semantic merging, and full historical-baseline reconciliation remain deferred.
+
+## Implementation Evidence
+
+- `pnpm scanner-contract:check` -> passed.
+- Focused MCP scanner Vitest suite (session, finalization, report, 100,000-observation scale, provider contract equivalence, bilingual candidate persistence) -> 22 tests passed.
+- `Push-Location apps/specforge-cli; go test ./...; Pop-Location` -> passed.
+- `node --test skills/specforge-repository-scan/scripts/verify-input.test.mjs` -> 3 tests passed.
+- `pnpm typecheck` -> passed.
+- `SPECFORGE_NEXT_STANDALONE=0 pnpm build` -> passed. The default standalone build remains blocked only by Windows OneDrive symlink permissions during Next trace copying; the production Docker/Linux path is unchanged.
+- `$env:SPECFORGE_DESIGN_FACT_IDS='adr-system-owned-full-asset-repository-discovery'; pnpm design-facts:sync` -> complete for this ADR.
+- `$env:SPECFORGE_DESIGN_FACT_IDS='adr-system-owned-full-asset-repository-discovery'; pnpm design-facts:check` -> `missing=[]`, `mismatched=[]`, `outOfScope=[]`, `blocked=[]`.
+- Unscoped `pnpm design-facts:sync` remains blocked by the unrelated historical `adr-3a-architecture-navigation-workspace` record returning `DATA_MODEL_UPGRADE_REQUIRED`. Retry after that historical data-model migration, then rerun full sync and reconciliation.
+
 ## 中文本地化覆盖
 
 ### 背景
@@ -96,3 +112,19 @@ A file-extension scanner cannot correctly discover the complete SpecForge asset 
 - `packages/core/src/scanner/service.ts` 当前主要按路径和扩展名分类，证明需要框架感知提取器。
 - 既有生产扫描设计已建立签名静态提取器、四层事实模型、T0-T3 审核和 Agent 中立集成。
 - 本次设计评审确认采用系统内置治理、框架提取、逐资产能力覆盖与 Agent 语义候选。
+
+### 实施边界
+
+本次已实现增量包括系统级治理记录、技术栈感知提取器目录、多语言与契约中立的确定性提取、双语语义候选校验、可恢复的受治理扫描会话、覆盖与阻断报告、中立 Agent Skill 打包，以及规模和契约证明。持续扫描、运行时或 CMDB 连接器、出站 Proposal、外部 `APPLY`、跨 Scope 语义合并和历史全量基线对账仍然延期。
+
+### 实施证据
+
+- `pnpm scanner-contract:check` -> 通过。
+- MCP 扫描器聚焦 Vitest 套件（会话、终结、报告、十万观察规模、Agent 契约等价性、双语候选持久化）-> 22 个测试通过。
+- `Push-Location apps/specforge-cli; go test ./...; Pop-Location` -> 通过。
+- `node --test skills/specforge-repository-scan/scripts/verify-input.test.mjs` -> 3 个测试通过。
+- `pnpm typecheck` -> 通过。
+- `SPECFORGE_NEXT_STANDALONE=0 pnpm build` -> 通过。默认 standalone 构建仅因 Windows OneDrive 在 Next trace 阶段创建符号链接受限；生产 Docker/Linux 路径未改变。
+- `$env:SPECFORGE_DESIGN_FACT_IDS='adr-system-owned-full-asset-repository-discovery'; pnpm design-facts:sync` -> 本 ADR 同步完成。
+- `$env:SPECFORGE_DESIGN_FACT_IDS='adr-system-owned-full-asset-repository-discovery'; pnpm design-facts:check` -> `missing=[]`、`mismatched=[]`、`outOfScope=[]`、`blocked=[]`。
+- 不带筛选的 `pnpm design-facts:sync` 仍被无关的历史 `adr-3a-architecture-navigation-workspace` 记录阻断，返回 `DATA_MODEL_UPGRADE_REQUIRED`。完成该历史数据模型迁移后，重新执行全量同步和对账。
