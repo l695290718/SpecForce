@@ -3370,6 +3370,39 @@
                       { "command": "pnpm --filter @specforge/mcp-server typecheck", "result": "Passed." },
                       { "command": "pnpm exec tsx scripts/rescan-workspace-through-mcp.ts", "result": "Passed: MCP persisted 1009 candidate observations, zero required unsupported files, status RECEIVED." }
                     ]
+                  },
+                  {
+                    "id": "adr-system-owned-full-asset-repository-discovery",
+                    "repositoryAdr": "docs/adr/0049-system-owned-full-asset-repository-discovery.md",
+                    "mcpAdrId": "adr-system-owned-full-asset-repository-discovery",
+                    "scope": {
+                      "applicationServiceId": "com.specforge.designcenter",
+                      "scopePath": "pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter"
+                    },
+                    "proposalId": "proposal-system-owned-full-asset-repository-discovery",
+                    "proposalStatus": "approved",
+                    "contextPackId": "context-pack-system-owned-full-asset-repository-discovery",
+                    "relatedAssetIds": ["api-specforge-mcp-tools", "data-specforge-assets", "adr-governed-scan-coverage-policy"],
+                    "owner": "SpecForge Architecture and Design Governance",
+                    "status": "Approved design; implementation is split into six governed delivery slices.",
+                    "reason": "Complete repository discovery requires system-owned governance, framework-specific deterministic extraction, and evidence-bounded Agent semantics.",
+                    "retryTrigger": "Begin implementation after the phased plan is reviewed and approved.",
+                    "localizedContent": {
+                      "en": {
+                        "decision": "Use system-owned versioned governance, a signed framework extractor registry, per-asset capability coverage, bounded Agent semantics, and a provider-neutral orchestration Skill.",
+                        "constraints": ["Scope configuration cannot weaken system governance.", "Every scan targets one exact authorized application service.", "The Skill cannot directly write accepted facts or Baselines."]
+                      },
+                      "zh": {
+                        "decision": "采用系统级版本治理、签名框架提取器目录、逐资产能力覆盖、有界 Agent 语义和供应商中立的编排 Skill。",
+                        "constraints": ["Scope 配置不得削弱系统治理。", "每次扫描只绑定一个精确授权的应用服务。", "Skill 不得直接写正式事实或 Baseline。"]
+                      }
+                    },
+                    "evidence": [
+                      { "command": "rg AssetType packages/core/src/types.ts", "result": "Confirmed sixteen top-level SpecForge asset types." },
+                      { "command": "rg ScannerObservationType packages/core/src/scanner/types.ts", "result": "Confirmed the current scanner exposes six coarse observation types." },
+                      { "command": "design review 2026-09-17", "result": "Approved system-owned governance, framework capability matrix, full-asset candidates, and governed promotion boundaries." },
+                      { "command": "git diff --check", "result": "Passed for the rewritten specification, ADR, and manifest." }
+                    ]
                   }
                   ]
 }

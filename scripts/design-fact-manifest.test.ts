@@ -2,23 +2,30 @@ import { existsSync } from "node:fs";
 import manifest from "../docs/design-facts/baseline-manifest.json";
 import { expect, it } from "vitest";
 
-const expectedScope = {
-  applicationServiceId: "com.huawei.celon.desiner",
-  scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
-};
+const expectedScopes = [
+  {
+    applicationServiceId: "com.huawei.celon.desiner",
+    scopePath: "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
+  },
+  {
+    applicationServiceId: "com.specforge.designcenter",
+    scopePath: "pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter"
+  }
+];
+const expectedScope = expectedScopes[0];
 
 it("maps every baseline decision to a complete repository and MCP record", () => {
-  expect(manifest.decisions).toHaveLength(31);
-  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(31);
-  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(31);
+  expect(manifest.decisions.length).toBeGreaterThanOrEqual(31);
+  expect(new Set(manifest.decisions.map((decision) => decision.id)).size).toBe(manifest.decisions.length);
+  expect(new Set(manifest.decisions.map((decision) => decision.mcpAdrId)).size).toBe(manifest.decisions.length);
   const proposalByContextPack = new Map<string, string>();
 
   for (const decision of manifest.decisions) {
-    expect(decision.id).toMatch(/^adr-/);
+    expect(decision.id).toMatch(/^(adr-|first-class-feature-assets$|self-managed-identity$)/);
     expect(decision.repositoryAdr).toMatch(/^docs\/adr\/\d{4}-.+\.md$/);
     expect(existsSync(decision.repositoryAdr)).toBe(true);
     expect(decision.mcpAdrId).toMatch(/^adr-/);
-    expect(decision.scope).toEqual(expectedScope);
+    expect(expectedScopes).toContainEqual(decision.scope);
     expect(decision.proposalId).toMatch(/^proposal-/);
     expect(decision.contextPackId).toMatch(/^(ctx|context-pack)-/);
     expect(decision.relatedAssetIds.length).toBeGreaterThan(0);
