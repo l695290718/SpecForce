@@ -1794,6 +1794,39 @@ model ScannerRelease {
   @@index([status, publishedAt], map: "ScannerRelease_status_published_idx")
 }
 
+model SystemScanGovernanceRecord {
+  dbId          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id            String
+  kind          String
+  version       String
+  payload       Json     @db.JsonB
+  contentDigest String
+  signature     String
+  keyId         String
+  status        String
+  publishedAt   DateTime
+  createdAt     DateTime @default(now())
+
+  @@unique([kind, version], map: "SystemScanGovernanceRecord_kind_version_key")
+  @@unique([kind, contentDigest], map: "SystemScanGovernanceRecord_kind_digest_key")
+  @@index([kind, status, publishedAt], map: "SystemScanGovernanceRecord_active_idx")
+}
+
+model ScopeScanRuntimeProfile {
+  dbId                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String
+  applicationServiceId String
+  scopePath            String
+  payload              Json     @db.JsonB
+  contentDigest        String
+  status               String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([applicationServiceId, scopePath, id], map: "ScopeScanRuntimeProfile_scope_id_key")
+  @@index([applicationServiceId, scopePath, status], map: "ScopeScanRuntimeProfile_scope_status_idx")
+}
+
 model KnowledgeScanSession {
   dbId                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   id                    String

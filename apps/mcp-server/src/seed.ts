@@ -26,6 +26,7 @@ import {
 } from "./localization-report";
 import { upgradeLegacyDataModel, type DataModel } from "@specforge/core";
 import { normalizeLegacyAssetLink } from "./relationships/legacy-migration";
+import { bootstrapSystemScanGovernance } from "./scanner/governance-bootstrap";
 
 const seedConfiguration = createSeedConfiguration({
   architectureChangeProposals,
@@ -85,6 +86,7 @@ function normalizeSeedDataModel(asset: DataModel): DataModel {
 async function main() {
   const localizationReport = validateSeedLocalizationInventory(buildSeedAssetInventory(seedConfiguration));
   console.info(`Validated ${localizationReport.totalAssets} bilingual seed assets.`);
+  await bootstrapSystemScanGovernance();
 
   process.env.SPECFORGE_MCP_SEED = "1";
   const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
