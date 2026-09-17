@@ -1,9 +1,10 @@
-import type { ScanFinalization, ScanLimits, ScanSessionDescriptor } from "@specforge/scan-contract";
-import type { ArchitectureScopeRef } from "@specforge/core";
+import type { AssetCapability, AssetCoveragePlan, ScanFinalization, ScanLimits, ScanSessionDescriptor, TechnologyProfile } from "@specforge/scan-contract";
+import { contentDigest, type ArchitectureScopeRef } from "@specforge/core";
 import { Prisma } from "@prisma/client";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { ensureMcpPersistenceSchema, prisma, resolveWritableScope, writableActor } from "../persistence";
 import { assertScannerReleaseAvailable } from "./release";
+import { resolvePersistedEffectiveScanGovernance } from "./governance-persistence";
 
 const MAX_SESSION_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_SESSION_LIFETIME_MS = 30 * 60 * 1000;
@@ -13,6 +14,7 @@ export interface StartKnowledgeScanInput {
   connectorId: string;
   designChangeSessionId: string;
   scannerReleaseId?: string;
+  runtimeProfileId?: string;
   snapshotIdentity: Record<string, unknown>;
   repositoryPolicy?: { allowDirtyWorktree: boolean; ignorePatterns: string[] };
   evidencePolicy?: Record<string, unknown>;
@@ -57,8 +59,21 @@ export async function startKnowledgeScan(input: StartKnowledgeScanInput): Promis
   const now = new Date();
   const expiresAt = normalizeExpiry(input.expiresAt, now);
   const contract = await loadScanContract();
-  const limits = normalizeScanLimits(input.budgets, contract.SCAN_LIMITS);
-  const repositoryPolicy = input.repositoryPolicy ?? { allowDirtyWorktree: false, ignorePatterns: [] };
+  const governance = await resolvePersistedEffectiveScanGovernance(scope, input.runtimeProfileId ?? "default-repository-scan");
+  const limits = normalizeScanLimits(input.budgets, governance.budgets);
+  const repositoryPolicy = {
+    allowDirtyWorktree: input.repositoryPolicy?.allowDirtyWorktree ?? false,
+    ignorePatterns: [...new Set([...(input.repositoryPolicy?.ignorePatterns ?? []), ...governance.overlay.excludePaths])].sort()
+  };
+  const technologyProfile: TechnologyProfile = { detections: [], conflicts: [], digest: contentDigest({ detections: [], conflicts: [] }) };
+  const coveragePlan = initialCoveragePlan(governance.records.ASSET_INFERENCE_POLICY.payload.assetFamilies);
+  const policyReceipt = {
+    systemGovernanceDigest: governance.systemDigest,
+    extractorCatalogDigest: governance.records.EXTRACTOR_CATALOG.contentDigest,
+    semanticPromptPackDigest: governance.records.SEMANTIC_PROMPT_PACK.contentDigest,
+    scopeRuntimeProfileDigest: governance.overlayDigest,
+    effectivePolicyDigest: governance.effectiveDigest
+  };
   const nonce = createScanSessionNonce();
   const actorId = writableActor().actorId;
   await ensureMcpPersistenceSchema();
@@ -80,6 +95,9 @@ export async function startKnowledgeScan(input: StartKnowledgeScanInput): Promis
     expiresAt: expiresAt.toISOString(),
     repositoryPolicy,
     limits,
+    policyReceipt,
+    technologyProfile,
+    coveragePlan,
     expectedPreviousBatchDigest: null
   });
 
@@ -107,8 +125,8 @@ export async function startKnowledgeScan(input: StartKnowledgeScanInput): Promis
         nonceDigest: nonce.digest,
         snapshotIdentity: jsonValue(input.snapshotIdentity),
         repositoryPolicy: jsonValue(repositoryPolicy),
-        evidencePolicy: jsonValue(input.evidencePolicy ?? {}),
-        parserPolicy: jsonValue(input.parserPolicy ?? {}),
+        evidencePolicy: jsonValue({ ...(input.evidencePolicy ?? {}), policyReceipt }),
+        parserPolicy: jsonValue({ ...(input.parserPolicy ?? {}), technologyProfile, coveragePlan }),
         budgets: jsonValue(limits),
         status: "OPEN",
         expiresAt
@@ -116,6 +134,22 @@ export async function startKnowledgeScan(input: StartKnowledgeScanInput): Promis
     });
   });
   return descriptor;
+}
+
+function initialCoveragePlan(assetFamiliesValue: unknown): AssetCoveragePlan {
+  const assetFamilies = Array.isArray(assetFamiliesValue) && assetFamiliesValue.every((item) => typeof item === "string")
+    ? [...new Set(assetFamiliesValue)] as string[]
+    : ["domain", "dataModel", "api", "event", "businessRule", "stateMachine", "integration", "quality", "observability", "serviceFeature", "functionalFeature", "adr", "proposal", "contextPack", "evidence", "typedRelationship"];
+  const capabilities: AssetCapability[] = assetFamilies.map((assetFamily) => ({
+    assetFamily,
+    framework: "repository",
+    state: "DISCOVERY_ONLY",
+    required: true,
+    reasonCodes: ["TECHNOLOGY_PROFILE_PENDING"],
+    extractorIds: []
+  }));
+  const plan = { assetFamilies, capabilities, complete: false, digest: "" } satisfies AssetCoveragePlan;
+  return { ...plan, digest: contentDigest({ assetFamilies, capabilities, complete: false }) };
 }
 
 export async function getScanCheckpoint(input: ScopedScanSessionInput) {

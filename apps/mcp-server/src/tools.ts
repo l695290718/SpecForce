@@ -712,6 +712,7 @@ export function registerTools(server: McpServer): void {
       connectorId: z.string().min(1),
       designChangeSessionId: z.string().min(1),
       scannerReleaseId: z.string().min(1).optional(),
+      runtimeProfileId: z.string().min(1).optional(),
       snapshotIdentity: z.record(z.unknown()),
       repositoryPolicy: z.object({ allowDirtyWorktree: z.boolean(), ignorePatterns: z.array(z.string()) }).optional(),
       evidencePolicy: z.record(z.unknown()).optional(),
