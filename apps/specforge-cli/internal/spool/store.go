@@ -19,6 +19,7 @@ var (
 	ErrSequenceGap         = errors.New("SPOOL_SEQUENCE_GAP")
 	ErrSequenceConflict    = errors.New("SPOOL_SEQUENCE_CONFLICT")
 	ErrDigestChainMismatch = errors.New("SPOOL_DIGEST_CHAIN_MISMATCH")
+	ErrContextMismatch     = errors.New("SCAN_RESUME_CONTEXT_MISMATCH")
 )
 
 var safeSessionID = regexp.MustCompile(`^[A-Za-z0-9._:-]+$`)
@@ -33,6 +34,14 @@ type Batch struct {
 type Checkpoint struct {
 	AcceptedSequence    int    `json:"acceptedSequence"`
 	AcceptedBatchDigest string `json:"acceptedBatchDigest"`
+}
+
+type ScanContext struct {
+	SessionID             string `json:"sessionId"`
+	SnapshotDigest        string `json:"snapshotDigest"`
+	EffectivePolicyDigest string `json:"effectivePolicyDigest"`
+	CatalogDigest         string `json:"catalogDigest"`
+	TechnologyDigest      string `json:"technologyDigest"`
 }
 
 type Store struct {
@@ -76,6 +85,29 @@ func (store *Store) Checkpoint() (Checkpoint, error) {
 		return Checkpoint{}, fmt.Errorf("SPOOL_CHECKPOINT_INVALID: %w", err)
 	}
 	return checkpoint, nil
+}
+
+func (store *Store) WriteContext(context ScanContext) error {
+	if context.SessionID == "" || !isDigest(context.SnapshotDigest) || !isDigest(context.EffectivePolicyDigest) || !isDigest(context.CatalogDigest) || !isDigest(context.TechnologyDigest) {
+		return errors.New("SPOOL_CONTEXT_INVALID")
+	}
+	path := filepath.Join(store.root, "context.json")
+	contents, err := os.ReadFile(path)
+	if err == nil {
+		var existing ScanContext
+		if json.Unmarshal(contents, &existing) != nil || existing != context {
+			return ErrContextMismatch
+		}
+		return nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("SPOOL_CONTEXT_READ_FAILED: %w", err)
+	}
+	encoded, err := json.Marshal(context)
+	if err != nil {
+		return err
+	}
+	return atomicWrite(path, append(encoded, '\n'), 0o600)
 }
 
 func (store *Store) Append(batch Batch) error {

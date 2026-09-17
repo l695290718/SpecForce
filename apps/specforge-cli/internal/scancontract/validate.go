@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"time"
 )
 
 const (
@@ -32,6 +33,40 @@ func (session ScanSessionDescriptor) Validate() error {
 		limits.MaxObservationsPerSession < 1 || limits.MaxObservationsPerSession > MaxObservationsPerSession {
 		return errors.New("SCAN_LIMITS_EXCEEDED")
 	}
+	if err := validatePolicyReceipt(session.PolicyReceipt); err != nil {
+		return err
+	}
+	if err := validateTechnologyProfile(session.TechnologyProfile); err != nil {
+		return err
+	}
+	if err := validateCoveragePlan(session.CoveragePlan); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (finalization ScanFinalization) Validate(expectedScope ArchitectureScope) error {
+	if finalization.ContractVersion != "2.0" || finalization.SessionId == "" || finalization.BatchCount < 0 || finalization.ObservationCount < 0 {
+		return errors.New("SCAN_FINALIZATION_INVALID")
+	}
+	if finalization.ArchitectureScope != expectedScope {
+		return errors.New("SCOPE_MISMATCH")
+	}
+	if !isSHA256(string(finalization.RepositorySnapshotDigest)) || !isSHA256(string(finalization.ManifestDigest)) || !isSHA256(string(finalization.FinalBatchDigest)) {
+		return errors.New("SCAN_FINALIZATION_DIGEST_INVALID")
+	}
+	if err := validateCoverage(finalization.Coverage); err != nil {
+		return err
+	}
+	if err := validateCoveragePlan(finalization.CoveragePlan); err != nil {
+		return err
+	}
+	if err := validatePolicyReceipt(finalization.PolicyReceipt); err != nil {
+		return err
+	}
+	if _, err := time.Parse(time.RFC3339Nano, finalization.GeneratedAt); err != nil {
+		return errors.New("SCAN_FINALIZATION_INVALID")
+	}
 	return nil
 }
 
@@ -51,6 +86,9 @@ func (batch KnowledgeScanBatch) Validate(expectedScope ArchitectureScope) error 
 	if len(batch.Observations) > MaxObservationsPerBatch {
 		return errors.New("SCAN_BATCH_OBSERVATION_LIMIT_EXCEEDED")
 	}
+	if err := validateCoverage(batch.CoverageDelta); err != nil {
+		return err
+	}
 	if batch.CoverageDelta.ObservationCount != len(batch.Observations) {
 		return errors.New("SCAN_BATCH_COVERAGE_MISMATCH")
 	}
@@ -67,6 +105,55 @@ func (batch KnowledgeScanBatch) Validate(expectedScope ArchitectureScope) error 
 		return errors.New("SCAN_BATCH_BYTE_LIMIT_EXCEEDED")
 	}
 	return nil
+}
+
+func validateCoverage(coverage ScanCoverageDelta) error {
+	if coverage.IndexedFiles < 0 || coverage.SkippedFiles < 0 || coverage.ObservationCount < 0 {
+		return errors.New("SCAN_COVERAGE_INVALID")
+	}
+	return nil
+}
+
+func validatePolicyReceipt(receipt ScanPolicyReceipt) error {
+	for _, digest := range []Sha256{receipt.SystemGovernanceDigest, receipt.ExtractorCatalogDigest, receipt.SemanticPromptPackDigest, receipt.ScopeRuntimeProfileDigest, receipt.EffectivePolicyDigest} {
+		if !isSHA256(string(digest)) {
+			return errors.New("SCAN_POLICY_RECEIPT_INVALID")
+		}
+	}
+	return nil
+}
+
+func validateTechnologyProfile(profile TechnologyProfile) error {
+	if !isSHA256(string(profile.Digest)) {
+		return errors.New("SCAN_TECHNOLOGY_PROFILE_INVALID")
+	}
+	for _, detection := range profile.Detections {
+		if detection.Ecosystem == "" || detection.Framework == "" || detection.VersionRange == "" || detection.Confidence < 0 || detection.Confidence > 1 {
+			return errors.New("SCAN_TECHNOLOGY_DETECTION_INVALID")
+		}
+	}
+	return nil
+}
+
+func validateCoveragePlan(plan AssetCoveragePlan) error {
+	if !isSHA256(string(plan.Digest)) {
+		return errors.New("SCAN_COVERAGE_PLAN_INVALID")
+	}
+	for _, capability := range plan.Capabilities {
+		if capability.AssetFamily == "" || capability.Framework == "" || !validCoverageState(capability.State) {
+			return errors.New("SCAN_CAPABILITY_INVALID")
+		}
+	}
+	return nil
+}
+
+func validCoverageState(state CapabilityCoverageState) bool {
+	switch state {
+	case CapabilityCoverageStateFull, CapabilityCoverageStatePartial, CapabilityCoverageStateDiscoveryOnly, CapabilityCoverageStateSemanticReviewRequired, CapabilityCoverageStateUnsupported, CapabilityCoverageStateNotApplicable:
+		return true
+	default:
+		return false
+	}
 }
 
 func (scope ArchitectureScope) Validate() error {

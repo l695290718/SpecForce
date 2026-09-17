@@ -74,6 +74,25 @@ func TestOpenRejectsUnsafeSessionID(t *testing.T) {
 	}
 }
 
+func TestStorePinsAndRejectsResumeContextChanges(t *testing.T) {
+	store, err := Open(t.TempDir(), "scan-session:test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	context := ScanContext{SessionID: "scan-session:test", SnapshotDigest: digestOf("snapshot"), EffectivePolicyDigest: digestOf("policy"), CatalogDigest: digestOf("catalog"), TechnologyDigest: digestOf("technology")}
+	if err := store.WriteContext(context); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.WriteContext(context); err != nil {
+		t.Fatalf("identical context must be idempotent: %v", err)
+	}
+	changed := context
+	changed.SnapshotDigest = digestOf("different-snapshot")
+	if err := store.WriteContext(changed); !errors.Is(err, ErrContextMismatch) {
+		t.Fatalf("expected context mismatch, got %v", err)
+	}
+}
+
 func TestAppendKnowledgeBatchPersistsCanonicalEnvelope(t *testing.T) {
 	store, err := Open(t.TempDir(), "scan-session:test")
 	if err != nil {

@@ -2,6 +2,7 @@ import type {
   ArchitectureScope,
   AssetCoveragePlan,
   KnowledgeScanBatch,
+  ScanFinalization,
   ScanPolicyReceipt,
   ScanSessionDescriptor,
   ScannerReleaseManifest,
@@ -80,6 +81,34 @@ export function validateScanBatch(
 
   if (canonicalJsonBytes(batch).byteLength > SCAN_LIMITS.maxBatchBytes) throw new Error("SCAN_BATCH_BYTE_LIMIT_EXCEEDED");
   return batch as unknown as KnowledgeScanBatch;
+}
+
+export function validateScanFinalization(value: unknown): ScanFinalization {
+  const finalization = strictRecord(value, "SCAN_FINALIZATION_INVALID", [
+    "contractVersion", "sessionId", "architectureScope", "repositorySnapshotDigest", "manifestDigest", "finalBatchDigest", "batchCount", "observationCount", "coverage", "coveragePlan", "policyReceipt", "generatedAt"
+  ]);
+  contractVersion(finalization.contractVersion);
+  nonEmptyString(finalization.sessionId, "SCAN_FINALIZATION_INVALID");
+  validateScope(finalization.architectureScope);
+  sha256(finalization.repositorySnapshotDigest, "SCAN_FINALIZATION_DIGEST_INVALID");
+  sha256(finalization.manifestDigest, "SCAN_FINALIZATION_DIGEST_INVALID");
+  sha256(finalization.finalBatchDigest, "SCAN_FINALIZATION_DIGEST_INVALID");
+  nonNegativeInteger(finalization.batchCount, "SCAN_FINALIZATION_INVALID");
+  nonNegativeInteger(finalization.observationCount, "SCAN_FINALIZATION_INVALID");
+  validateCoverageDelta(finalization.coverage);
+  validateCoveragePlan(finalization.coveragePlan);
+  validatePolicyReceipt(finalization.policyReceipt);
+  dateTime(finalization.generatedAt, "SCAN_FINALIZATION_INVALID");
+  return finalization as unknown as ScanFinalization;
+}
+
+function validateCoverageDelta(value: unknown): { indexedFiles: number; skippedFiles: number; observationCount: number; coverageGaps: string[] } {
+  const coverage = strictRecord(value, "SCAN_COVERAGE_INVALID", ["indexedFiles", "skippedFiles", "observationCount", "coverageGaps"]);
+  const indexedFiles = nonNegativeInteger(coverage.indexedFiles, "SCAN_COVERAGE_INVALID");
+  const skippedFiles = nonNegativeInteger(coverage.skippedFiles, "SCAN_COVERAGE_INVALID");
+  const observationCount = nonNegativeInteger(coverage.observationCount, "SCAN_COVERAGE_INVALID");
+  const coverageGaps = stringArray(coverage.coverageGaps, "SCAN_COVERAGE_INVALID");
+  return { indexedFiles, skippedFiles, observationCount, coverageGaps };
 }
 
 export function validateScannerRelease(value: unknown): ScannerReleaseManifest {

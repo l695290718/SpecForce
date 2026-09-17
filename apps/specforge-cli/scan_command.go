@@ -20,6 +20,7 @@ import (
 	"github.com/l695290718/specforge/apps/specforge-cli/internal/scanner"
 	"github.com/l695290718/specforge/apps/specforge-cli/internal/session"
 	"github.com/l695290718/specforge/apps/specforge-cli/internal/spool"
+	"github.com/l695290718/specforge/apps/specforge-cli/internal/technology"
 )
 
 type localScanOptions struct {
@@ -70,6 +71,29 @@ func runLocalScan(ctx context.Context, root string, config FileConfig, args []st
 			return err
 		}
 	}
+	catalog := extractors.DefaultCatalog()
+	registry := extractors.DefaultRegistry()
+	if err := catalog.Verify(registry); err != nil {
+		return err
+	}
+	technologyProfile, err := technology.Detect(inventory.Files, repositoryFileReader(root), nil)
+	if err != nil {
+		return err
+	}
+	coveragePlan := catalog.Plan(technologyProfile)
+	store, err := spool.Open(options.spoolBase, descriptor.SessionId)
+	if err != nil {
+		return err
+	}
+	if err := store.WriteContext(spool.ScanContext{
+		SessionID:             descriptor.SessionId,
+		SnapshotDigest:        string(identity.SnapshotDigest),
+		EffectivePolicyDigest: string(descriptor.PolicyReceipt.EffectivePolicyDigest),
+		CatalogDigest:         string(descriptor.PolicyReceipt.ExtractorCatalogDigest),
+		TechnologyDigest:      string(technologyProfile.Digest),
+	}); err != nil {
+		return err
+	}
 	observations, coverage, err := extractors.DefaultRegistry().ExtractAll(ctx, root, identity, inventory.Files, descriptor.Limits.MaxExcerptBytes)
 	if err != nil {
 		return err
@@ -82,10 +106,6 @@ func runLocalScan(ctx context.Context, root string, config FileConfig, args []st
 		return errors.New("SCAN_COVERAGE_OBSERVATION_MISMATCH")
 	}
 	batches, err := buildScanBatches(descriptor, observations, coverage)
-	if err != nil {
-		return err
-	}
-	store, err := spool.Open(options.spoolBase, descriptor.SessionId)
 	if err != nil {
 		return err
 	}
@@ -104,13 +124,26 @@ func runLocalScan(ctx context.Context, root string, config FileConfig, args []st
 	finalization := scancontract.ScanFinalization{
 		ContractVersion: descriptor.ContractVersion, SessionId: descriptor.SessionId, ArchitectureScope: descriptor.ArchitectureScope,
 		RepositorySnapshotDigest: identity.SnapshotDigest, ManifestDigest: manifestDigest, FinalBatchDigest: batches[len(batches)-1].BatchDigest,
-		BatchCount: len(batches), ObservationCount: len(observations), Coverage: coverage, GeneratedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		BatchCount: len(batches), ObservationCount: len(observations), Coverage: coverage, CoveragePlan: coveragePlan, PolicyReceipt: descriptor.PolicyReceipt, GeneratedAt: time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	if err := finalization.Validate(descriptor.ArchitectureScope); err != nil {
+		return err
 	}
 	if err := store.WriteFinalization(finalization); err != nil {
 		return err
 	}
 	summary := map[string]any{"sessionId": descriptor.SessionId, "snapshotDigest": identity.SnapshotDigest, "batchCount": len(batches), "observationCount": len(observations), "coverageGapCount": len(coverage.CoverageGaps), "spoolPath": store.Root()}
 	return writeJSON(stdout, summary)
+}
+
+func repositoryFileReader(root string) technology.ReadFile {
+	return func(path string) ([]byte, error) {
+		relative := filepath.Clean(filepath.FromSlash(path))
+		if filepath.IsAbs(relative) || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			return nil, fmt.Errorf("TECHNOLOGY_SOURCE_OUTSIDE_ROOT:%s", path)
+		}
+		return os.ReadFile(filepath.Join(root, relative))
+	}
 }
 
 func mergeInventoryCoverage(coverage scancontract.ScanCoverageDelta, inventory scanner.InventoryResult) scancontract.ScanCoverageDelta {

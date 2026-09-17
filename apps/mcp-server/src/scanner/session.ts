@@ -1,10 +1,11 @@
-import type { AssetCapability, AssetCoveragePlan, ScanFinalization, ScanLimits, ScanSessionDescriptor, TechnologyProfile } from "@specforge/scan-contract";
+import { validateScanFinalization, type AssetCapability, type AssetCoveragePlan, type ScanFinalization, type ScanLimits, type ScanPolicyReceipt, type ScanSessionDescriptor, type TechnologyProfile } from "@specforge/scan-contract";
 import { contentDigest, type ArchitectureScopeRef } from "@specforge/core";
 import { Prisma } from "@prisma/client";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { ensureMcpPersistenceSchema, prisma, resolveWritableScope, writableActor } from "../persistence";
 import { assertScannerReleaseAvailable } from "./release";
 import { resolvePersistedEffectiveScanGovernance } from "./governance-persistence";
+import { assessScanFinalization } from "./finalization";
 
 const MAX_SESSION_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_SESSION_LIFETIME_MS = 30 * 60 * 1000;
@@ -188,8 +189,9 @@ export async function finalizeKnowledgeScan(input: FinalizeKnowledgeScanInput) {
     if (!release) throw new Error("SCANNER_RELEASE_NOT_FOUND");
     assertScannerReleaseAvailable(release);
     assertFinalizationMatches(session, finalization);
-    const blockingIssues = finalization.coverage.coverageGaps;
-    const status = blockingIssues.length === 0 ? "READY_FOR_ANALYSIS" : "BLOCKED";
+    const assessment = assessScanFinalization({ finalization, expectedPolicyReceipt: readPolicyReceipt(session.evidencePolicy) });
+    const blockingIssues = assessment.blockingIssues;
+    const status = assessment.status === "READY" ? "READY_FOR_ANALYSIS" : "BLOCKED";
     const updated = await tx.knowledgeScanSession.update({
       where: { dbId: session.dbId },
       data: {
@@ -265,14 +267,14 @@ async function findAndLockSession(tx: Prisma.TransactionClient, sessionId: strin
 }
 
 function requireFinalization(value: ScanFinalization | Record<string, unknown>): ScanFinalization {
-  const finalization = value as Partial<ScanFinalization>;
-  if (finalization.contractVersion !== "2.0" || !finalization.sessionId || !finalization.architectureScope) throw new Error("SCAN_FINALIZATION_INVALID");
-  if (!Number.isInteger(finalization.batchCount) || !Number.isInteger(finalization.observationCount)) throw new Error("SCAN_FINALIZATION_INVALID");
-  if (!finalization.coverage || !Array.isArray(finalization.coverage.coverageGaps)) throw new Error("SCAN_FINALIZATION_INVALID");
-  for (const digest of [finalization.repositorySnapshotDigest, finalization.manifestDigest, finalization.finalBatchDigest]) {
-    if (typeof digest !== "string" || !/^[0-9a-f]{64}$/.test(digest)) throw new Error("SCAN_FINALIZATION_DIGEST_INVALID");
-  }
-  return finalization as ScanFinalization;
+  return validateScanFinalization(value);
+}
+
+function readPolicyReceipt(value: Prisma.JsonValue): ScanPolicyReceipt {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("SCAN_POLICY_RECEIPT_MISSING");
+  const policyReceipt = (value as Record<string, unknown>).policyReceipt;
+  if (!policyReceipt || typeof policyReceipt !== "object" || Array.isArray(policyReceipt)) throw new Error("SCAN_POLICY_RECEIPT_MISSING");
+  return policyReceipt as ScanPolicyReceipt;
 }
 
 function assertFinalizationMatches(session: Awaited<ReturnType<typeof findAndLockSession>>, finalization: ScanFinalization): void {
