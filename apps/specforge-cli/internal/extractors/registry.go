@@ -55,10 +55,12 @@ func DefaultRegistry() Registry {
 		SchemaExtractor{},
 		GoExtractor{},
 		JavaExtractor{},
+		PythonExtractor{},
 		TypeScriptExtractor{},
 		TestExtractor{},
 		ConfigExtractor{},
 		DeploymentExtractor{},
+		ObservabilityExtractor{},
 		DocumentationExtractor{},
 	}}
 }

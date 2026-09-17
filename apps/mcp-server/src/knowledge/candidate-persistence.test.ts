@@ -104,6 +104,10 @@ describe("semantic candidate batch persistence", () => {
     expect(() => validateSemanticCandidateBatch(batch({ candidates: Array.from({ length: 101 }, () => batch().candidates[0]!) }))).toThrow("SEMANTIC_CANDIDATE_BATCH_LIMIT_EXCEEDED");
   });
 
+  it("requires bilingual human-facing candidate content", () => {
+    expect(() => validateSemanticCandidateBatch(batch({ candidates: [{ ...batch().candidates[0]!, value: { canonicalContent: { summary: "English only" } } }] }))).toThrow("SEMANTIC_CANDIDATE_BILINGUAL_CONTENT_REQUIRED");
+  });
+
   it("persists candidate risk and returns an identical retry idempotently", async () => {
     const first = await submitSemanticCandidateBatch({ architectureScope: scope, batch: batch() });
     const second = await submitSemanticCandidateBatch({ architectureScope: scope, batch: batch() });

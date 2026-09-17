@@ -16,8 +16,8 @@ import (
 func TestRegistryIsStaticAndDeterministic(t *testing.T) {
 	want := []string{
 		"repository-build-metadata", "openapi-asyncapi-contracts", "prisma-sql-schema", "go-ast",
-		"java-spring-conservative", "typescript-node-conservative", "test-evidence",
-		"configuration-structured", "deployment-metadata", "documentation-sections",
+		"java-spring-conservative", "python-conservative", "typescript-node-conservative", "test-evidence",
+		"configuration-structured", "deployment-metadata", "observability-operational", "documentation-sections",
 	}
 	first := DefaultRegistry().IDs()
 	second := DefaultRegistry().IDs()

@@ -39,6 +39,18 @@ func TestGoldenFixturesProduceStableEvidence(t *testing.T) {
 			{"HTTP_HANDLER", "CreateCustomerHandler", "service.go", 13},
 			{"EVENT_PUBLICATION", "Publish", "service.go", 14},
 		}},
+		{"python-fastapi", []goldenLocation{
+			{"API_OPERATION", "POST /orders", "service.py", 15},
+			{"DATA_ENTITY", "Order", "service.py", 8},
+			{"BUSINESS_VALIDATION", "\"id\"", "service.py", 11},
+			{"ASYNC_TASK", "task", "service.py", 21},
+		}},
+		{"go-gin", []goldenLocation{
+			{"API_OPERATION", "POST /orders", "service.go", 10},
+			{"DATA_ENTITY", "Order", "service.go", 5},
+			{"SQL_QUERY", "Query", "service.go", 14},
+			{"SERVICE_DEPENDENCY", "http-client", "service.go", 15},
+		}},
 		{"contracts", []goldenLocation{
 			{"EVENT_CHANNEL_OPERATION", "publishOrderCreated", "asyncapi.yaml", 8},
 			{"API_OPERATION", "getOrder", "openapi.yaml", 8},

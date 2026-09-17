@@ -2,6 +2,7 @@ import {
   classifyCandidateRisk,
   contentDigest,
   evaluateReviewBundle,
+  hasBilingualCandidateContent,
   type ArchitectureScopeRef,
   type KnowledgeAssertion,
   type ReviewBundle,
@@ -269,6 +270,7 @@ function validateCandidateShape(candidate: SemanticCandidateSubmission): void {
   if (!Number.isFinite(candidate.confidence) || candidate.confidence < 0 || candidate.confidence > 1) throw new Error("SEMANTIC_CANDIDATE_CONFIDENCE_INVALID");
   if (!Array.isArray(candidate.sourceObservationIds) || candidate.sourceObservationIds.length === 0) throw new Error("SEMANTIC_CANDIDATE_SOURCE_REQUIRED");
   if (!candidate.value || typeof candidate.value !== "object" || Array.isArray(candidate.value)) throw new Error("SEMANTIC_CANDIDATE_VALUE_REQUIRED");
+  if (!hasBilingualCandidateContent(candidate.value)) throw new Error("SEMANTIC_CANDIDATE_BILINGUAL_CONTENT_REQUIRED");
 }
 
 async function findSession(sessionId: string): Promise<ScanSessionRow> {

@@ -7,12 +7,19 @@ import (
 	"go/parser"
 	"go/token"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/l695290718/specforge/apps/specforge-cli/internal/scancontract"
 )
 
 type GoExtractor struct{}
+
+var (
+	goRoutePattern      = regexp.MustCompile(`(?m)\b(?:router|r|e|engine|app)\.(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)\(\s*["']([^"']+)["']`)
+	goSQLPattern        = regexp.MustCompile(`(?m)\b(?:db|tx|q|queries|conn|database)\.(Query|QueryRow|Exec|Get|Select|Raw)\s*\(`)
+	goDependencyPattern = regexp.MustCompile(`(?m)\b(?:http\.NewRequest|http\.Client\s*\{|client\.Do)\s*\(`)
+)
 
 func (GoExtractor) ID() string      { return "go-ast" }
 func (GoExtractor) Version() string { return "1.0.0" }
@@ -30,6 +37,16 @@ func (extractor GoExtractor) Extract(ctx context.Context, file File) ([]scancont
 		return nil, parserGap(file.Meta.Path, "GO_AST_PARSE_FAILED"), nil
 	}
 	var observations []scancontract.SourceObservationV2
+	for _, match := range goRoutePattern.FindAllSubmatchIndex(file.Contents, -1) {
+		method, path := submatch(file.Contents, match, 2), submatch(file.Contents, match, 4)
+		start, end := lineForOffset(file.Contents, match[0]), lineForOffset(file.Contents, match[1])
+		observations = append(observations, makeObservation(file, observationSpec{
+			ObservationType: "API_OPERATION", Layer: scancontract.ArchitectureLayerSys, Aspect: "application-service",
+			Symbol: strings.ToUpper(method) + " " + path, LineStart: start, LineEnd: end,
+			ParserID: "go/parser", ParserVersion: extractor.Version(),
+			Payload: map[string]any{"framework": "go-router", "method": strings.ToUpper(method), "path": path},
+		}))
+	}
 	for _, declaration := range parsed.Decls {
 		switch node := declaration.(type) {
 		case *ast.GenDecl:
@@ -43,13 +60,19 @@ func (extractor GoExtractor) Extract(ctx context.Context, file File) ([]scancont
 				}
 				kind := "type"
 				fieldCount := 0
+				observationType := "CODE_TYPE"
+				aspect := "implementation-structure"
 				if structure, ok := typeSpec.Type.(*ast.StructType); ok {
 					kind = "struct"
 					fieldCount = structure.Fields.NumFields()
+					if hasDataModelTags(structure) {
+						observationType = "DATA_ENTITY"
+						aspect = "data-model"
+					}
 				}
 				start, end := goNodeRange(fset, node)
 				observations = append(observations, makeObservation(file, observationSpec{
-					ObservationType: "CODE_TYPE", Layer: scancontract.ArchitectureLayerTech, Aspect: "implementation-structure",
+					ObservationType: observationType, Layer: scancontract.ArchitectureLayerTech, Aspect: aspect,
 					Symbol: typeSpec.Name.Name, LineStart: start, LineEnd: end,
 					ParserID: "go/parser", ParserVersion: extractor.Version(),
 					Payload: map[string]any{"package": parsed.Name.Name, "name": typeSpec.Name.Name, "kind": kind, "fieldCount": fieldCount},
@@ -86,6 +109,25 @@ func (extractor GoExtractor) Extract(ctx context.Context, file File) ([]scancont
 		}))
 		return true
 	})
+	for _, match := range goSQLPattern.FindAllSubmatchIndex(file.Contents, -1) {
+		method := submatch(file.Contents, match, 2)
+		start, end := lineForOffset(file.Contents, match[0]), lineForOffset(file.Contents, match[1])
+		observations = append(observations, makeObservation(file, observationSpec{
+			ObservationType: "SQL_QUERY", Layer: scancontract.ArchitectureLayerTech, Aspect: "data-access",
+			Symbol: method, LineStart: start, LineEnd: end,
+			ParserID: "go/parser", ParserVersion: extractor.Version(),
+			Payload: map[string]any{"method": method},
+		}))
+	}
+	for _, match := range goDependencyPattern.FindAllIndex(file.Contents, -1) {
+		start, end := lineForOffset(file.Contents, match[0]), lineForOffset(file.Contents, match[1])
+		observations = append(observations, makeObservation(file, observationSpec{
+			ObservationType: "SERVICE_DEPENDENCY", Layer: scancontract.ArchitectureLayerTech, Aspect: "outbound-integration",
+			Symbol: "http-client", LineStart: start, LineEnd: end,
+			ParserID: "go/parser", ParserVersion: extractor.Version(),
+			Payload: map[string]any{"client": "net/http"},
+		}))
+	}
 	if len(observations) == 0 {
 		return nil, successfulDelta(file.Meta.Path, 0, "GO_AST_NO_SUPPORTED_CONSTRUCTS"), nil
 	}
@@ -114,6 +156,15 @@ func goFunctionName(function *ast.FuncDecl) string {
 		return function.Name.Name
 	}
 	return "method." + function.Name.Name
+}
+
+func hasDataModelTags(structure *ast.StructType) bool {
+	for _, field := range structure.Fields.List {
+		if field.Tag != nil && (strings.Contains(field.Tag.Value, "json:") || strings.Contains(field.Tag.Value, "gorm:") || strings.Contains(field.Tag.Value, "db:")) {
+			return true
+		}
+	}
+	return false
 }
 
 func goNodeRange(fset *token.FileSet, node ast.Node) (int, int) {

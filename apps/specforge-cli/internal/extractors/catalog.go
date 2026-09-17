@@ -30,11 +30,13 @@ func DefaultCatalog() Catalog {
 		{ExtractorID: "openapi-asyncapi-contracts", Version: "1.0.0", Framework: "openapi-asyncapi", AssetFamily: []string{"api", "event", "dataModel", "typedRelationship"}},
 		{ExtractorID: "prisma-sql-schema", Version: "1.0.0", Framework: "sql", AssetFamily: []string{"dataModel", "typedRelationship"}},
 		{ExtractorID: "java-spring-conservative", Version: "1.0.0", Framework: "java", AssetFamily: []string{"api", "dataModel", "event", "integration", "typedRelationship"}},
+		{ExtractorID: "python-conservative", Version: "1.0.0", Framework: "python", AssetFamily: []string{"api", "dataModel", "businessRule", "event", "integration", "typedRelationship"}},
 		{ExtractorID: "typescript-node-conservative", Version: "1.0.0", Framework: "typescript", AssetFamily: []string{"api", "dataModel", "event", "integration", "typedRelationship"}},
 		{ExtractorID: "go-ast", Version: "1.0.0", Framework: "go", AssetFamily: []string{"api", "dataModel", "integration", "typedRelationship"}},
 		{ExtractorID: "test-evidence", Version: "1.0.0", Framework: "operations", AssetFamily: []string{"quality", "evidence"}},
 		{ExtractorID: "configuration-structured", Version: "1.0.0", Framework: "deployment", AssetFamily: []string{"integration", "quality", "observability", "typedRelationship"}},
 		{ExtractorID: "deployment-metadata", Version: "1.0.0", Framework: "deployment", AssetFamily: []string{"integration", "quality", "observability", "typedRelationship"}},
+		{ExtractorID: "observability-operational", Version: "1.0.0", Framework: "operations", AssetFamily: []string{"quality", "observability", "evidence", "typedRelationship"}},
 		{ExtractorID: "documentation-sections", Version: "1.0.0", Framework: "documents", AssetFamily: []string{"adr", "proposal", "contextPack", "evidence"}},
 	}
 	sort.Slice(descriptors, func(i, j int) bool { return descriptors[i].ExtractorID < descriptors[j].ExtractorID })

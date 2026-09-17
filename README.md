@@ -288,6 +288,12 @@ pnpm legacy-baseline:verify
 
 See [Legacy Baseline Discovery Operations](docs/operations/legacy-baseline-discovery.md) for trust installation, Session and Agent flow, resume, T0-T3 review, promotion, reconciliation, publication, revocation, rotation, cleanup, audit, and deferred production capabilities.
 
+## Provider-Neutral Repository Scan Skill
+
+Use [the repository scan Skill](skills/specforge-repository-scan/SKILL.md) to import an existing codebase through the same governed MCP boundary from Codex, Claude Code, or OpenCode. Every run must provide `repositoryPath`, `applicationServiceId`, and `scopePath`; the Skill never infers the target Scope. It creates deterministic local observations, resumable policy-pinned batches, bilingual semantic candidates, and review-ready evidence. It never writes accepted assets or Baselines directly.
+
+See [Agent integration](docs/agent-integration/repository-scan-skill.md) for client setup and [the blocker reference](skills/specforge-repository-scan/references/blockers.md) for remediation.
+
 ## Single-Host Docker Deployment
 
 Deploy the Web console, PostgreSQL, direct first-startup Bootstrap, Knowledge Projector, and governed 3A Bootstrap on one host with Docker. On a fresh empty database, direct Bootstrap applies the versioned initial catalog and canonical relationship events once; the governed 3A Bootstrap then invokes MCP to create and publish the exact-Scope baseline projection before Web starts. After that, business design changes still use MCP. PostgreSQL remains private to the Compose network; MCP stays a client-side stdio process and is not deployed as a network container.

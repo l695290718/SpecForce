@@ -15,6 +15,7 @@ import { analyze3aArchitectureCandidates, get3aArchitectureCandidateSet } from "
 import { submitScanReport } from "./scanner/persistence";
 import { getScannerRelease } from "./scanner/release";
 import { finalizeKnowledgeScan, getScanCheckpoint, startKnowledgeScan } from "./scanner/session";
+import { getKnowledgeScanReport } from "./scanner/report";
 import { submitScanBatch } from "./scanner/batch-persistence";
 import { generateKnowledgeCandidates } from "./knowledge/semantic-persistence";
 import { matchKnowledgeIdentities } from "./knowledge/identity-persistence";
@@ -745,6 +746,14 @@ export function registerTools(server: McpServer): void {
     permissions: ["knowledge:read"],
     readOnly: true
   }, getScanCheckpoint);
+
+  registerJsonTool(server, "get_knowledge_scan_report", {
+    title: "Get governed knowledge scan report",
+    description: "Reads a bounded exact-Scope scan report, coverage plan, policy receipt, observations, blockers, and remediation actions without mutating candidates or accepted assets.",
+    inputSchema: { architectureScope: architectureScopeSchema, sessionId: z.string().min(1), limit: z.number().int().positive().max(500).optional() },
+    permissions: ["knowledge:read"],
+    readOnly: true
+  }, async (input) => getKnowledgeScanReport(input));
 
   registerJsonTool(server, "submit_scan_batch", {
     title: "Submit resumable scan batch",
