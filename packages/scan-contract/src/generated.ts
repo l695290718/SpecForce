@@ -13,6 +13,47 @@ export interface ScanLimits {
   maxObservationsPerSession: number;
 }
 
+export type CapabilityCoverageState = "FULL" | "PARTIAL" | "DISCOVERY_ONLY" | "SEMANTIC_REVIEW_REQUIRED" | "UNSUPPORTED" | "NOT_APPLICABLE";
+
+export interface TechnologyDetection {
+  ecosystem: string;
+  framework: string;
+  versionRange: string;
+  confidence: number;
+  evidenceRefs: Array<string>;
+  conflicts: Array<string>;
+}
+
+export interface TechnologyProfile {
+  detections: Array<TechnologyDetection>;
+  conflicts: Array<string>;
+  digest: Sha256;
+}
+
+export interface AssetCapability {
+  assetFamily: string;
+  framework: string;
+  state: CapabilityCoverageState;
+  required: boolean;
+  reasonCodes: Array<string>;
+  extractorIds: Array<string>;
+}
+
+export interface AssetCoveragePlan {
+  assetFamilies: Array<string>;
+  capabilities: Array<AssetCapability>;
+  complete: boolean;
+  digest: Sha256;
+}
+
+export interface ScanPolicyReceipt {
+  systemGovernanceDigest: Sha256;
+  extractorCatalogDigest: Sha256;
+  semanticPromptPackDigest: Sha256;
+  scopeRuntimeProfileDigest: Sha256;
+  effectivePolicyDigest: Sha256;
+}
+
 export interface RepositoryPolicy {
   allowDirtyWorktree: boolean;
   ignorePatterns: Array<string>;
@@ -58,6 +99,9 @@ export interface ScanSessionDescriptor {
   expiresAt: string;
   repositoryPolicy: RepositoryPolicy;
   limits: ScanLimits;
+  policyReceipt: ScanPolicyReceipt;
+  technologyProfile: TechnologyProfile;
+  coveragePlan: AssetCoveragePlan;
   expectedPreviousBatchDigest: Sha256 | null;
 }
 
@@ -160,6 +204,8 @@ export interface ScanFinalization {
   batchCount: number;
   observationCount: number;
   coverage: ScanCoverageDelta;
+  coveragePlan: AssetCoveragePlan;
+  policyReceipt: ScanPolicyReceipt;
   generatedAt: string;
 }
 

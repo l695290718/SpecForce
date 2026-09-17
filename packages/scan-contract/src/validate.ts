@@ -1,9 +1,12 @@
 import type {
   ArchitectureScope,
+  AssetCoveragePlan,
   KnowledgeScanBatch,
+  ScanPolicyReceipt,
   ScanSessionDescriptor,
   ScannerReleaseManifest,
-  SourceObservationV2
+  SourceObservationV2,
+  TechnologyProfile
 } from "./generated";
 
 export const SCAN_LIMITS = Object.freeze({
@@ -20,7 +23,7 @@ const base64Pattern = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]
 
 export function validateScanSession(value: unknown): ScanSessionDescriptor {
   const session = strictRecord(value, "SCAN_SESSION_INVALID", [
-    "contractVersion", "sessionId", "architectureScope", "actorId", "connectorId", "scannerReleaseId", "sessionNonce", "expiresAt", "repositoryPolicy", "limits", "expectedPreviousBatchDigest"
+    "contractVersion", "sessionId", "architectureScope", "actorId", "connectorId", "scannerReleaseId", "sessionNonce", "expiresAt", "repositoryPolicy", "limits", "policyReceipt", "technologyProfile", "coveragePlan", "expectedPreviousBatchDigest"
   ]);
   contractVersion(session.contractVersion);
   nonEmptyString(session.sessionId, "SCAN_SESSION_ID_REQUIRED");
@@ -41,6 +44,9 @@ export function validateScanSession(value: unknown): ScanSessionDescriptor {
     const minimum = key === "maxExcerptBytes" ? 0 : 1;
     if (limit < minimum || limit > ceiling) throw new Error("SCAN_LIMITS_EXCEEDED");
   }
+  validatePolicyReceipt(session.policyReceipt);
+  validateTechnologyProfile(session.technologyProfile);
+  validateCoveragePlan(session.coveragePlan);
   nullableSha256(session.expectedPreviousBatchDigest, "SCAN_PREVIOUS_DIGEST_INVALID");
   return session as unknown as ScanSessionDescriptor;
 }
@@ -121,6 +127,44 @@ export async function verifyScannerRelease(value: unknown, trustedRawPublicKeyBa
   if (rawKey.byteLength !== 32) throw new Error("SCANNER_TRUST_KEY_INVALID");
   const publicKey = await globalThis.crypto.subtle.importKey("raw", arrayBuffer(rawKey), "Ed25519", false, ["verify"]);
   return globalThis.crypto.subtle.verify("Ed25519", publicKey, arrayBuffer(decodeBase64(release.signature)), arrayBuffer(canonicalUnsignedRelease(release)));
+}
+
+function validatePolicyReceipt(value: unknown): asserts value is ScanPolicyReceipt {
+  const receipt = strictRecord(value, "SCAN_POLICY_RECEIPT_INVALID", ["systemGovernanceDigest", "extractorCatalogDigest", "semanticPromptPackDigest", "scopeRuntimeProfileDigest", "effectivePolicyDigest"]);
+  for (const key of Object.keys(receipt)) sha256(receipt[key], "SCAN_POLICY_RECEIPT_INVALID");
+}
+
+function validateTechnologyProfile(value: unknown): asserts value is TechnologyProfile {
+  const profile = strictRecord(value, "SCAN_TECHNOLOGY_PROFILE_INVALID", ["detections", "conflicts", "digest"]);
+  if (!Array.isArray(profile.detections)) throw new Error("SCAN_TECHNOLOGY_PROFILE_INVALID");
+  for (const value of profile.detections) {
+    const detection = strictRecord(value, "SCAN_TECHNOLOGY_DETECTION_INVALID", ["ecosystem", "framework", "versionRange", "confidence", "evidenceRefs", "conflicts"]);
+    nonEmptyString(detection.ecosystem, "SCAN_TECHNOLOGY_DETECTION_INVALID");
+    nonEmptyString(detection.framework, "SCAN_TECHNOLOGY_DETECTION_INVALID");
+    nonEmptyString(detection.versionRange, "SCAN_TECHNOLOGY_DETECTION_INVALID");
+    if (typeof detection.confidence !== "number" || detection.confidence < 0 || detection.confidence > 1) throw new Error("SCAN_TECHNOLOGY_DETECTION_INVALID");
+    stringArray(detection.evidenceRefs, "SCAN_TECHNOLOGY_DETECTION_INVALID");
+    stringArray(detection.conflicts, "SCAN_TECHNOLOGY_DETECTION_INVALID");
+  }
+  stringArray(profile.conflicts, "SCAN_TECHNOLOGY_PROFILE_INVALID");
+  sha256(profile.digest, "SCAN_TECHNOLOGY_PROFILE_INVALID");
+}
+
+function validateCoveragePlan(value: unknown): asserts value is AssetCoveragePlan {
+  const plan = strictRecord(value, "SCAN_COVERAGE_PLAN_INVALID", ["assetFamilies", "capabilities", "complete", "digest"]);
+  stringArray(plan.assetFamilies, "SCAN_COVERAGE_PLAN_INVALID");
+  if (!Array.isArray(plan.capabilities)) throw new Error("SCAN_COVERAGE_PLAN_INVALID");
+  for (const value of plan.capabilities) {
+    const capability = strictRecord(value, "SCAN_CAPABILITY_INVALID", ["assetFamily", "framework", "state", "required", "reasonCodes", "extractorIds"]);
+    nonEmptyString(capability.assetFamily, "SCAN_CAPABILITY_INVALID");
+    nonEmptyString(capability.framework, "SCAN_CAPABILITY_INVALID");
+    enumValue(capability.state, ["FULL", "PARTIAL", "DISCOVERY_ONLY", "SEMANTIC_REVIEW_REQUIRED", "UNSUPPORTED", "NOT_APPLICABLE"], "SCAN_CAPABILITY_INVALID");
+    booleanValue(capability.required, "SCAN_CAPABILITY_INVALID");
+    stringArray(capability.reasonCodes, "SCAN_CAPABILITY_INVALID");
+    stringArray(capability.extractorIds, "SCAN_CAPABILITY_INVALID");
+  }
+  booleanValue(plan.complete, "SCAN_COVERAGE_PLAN_INVALID");
+  sha256(plan.digest, "SCAN_COVERAGE_PLAN_INVALID");
 }
 
 export function canonicalJsonBytes(value: unknown): Uint8Array {

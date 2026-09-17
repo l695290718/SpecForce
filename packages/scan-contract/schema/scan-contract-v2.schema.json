@@ -32,6 +32,69 @@
         "maxObservationsPerSession": { "type": "integer", "minimum": 1, "maximum": 100000 }
       }
     },
+    "CapabilityCoverageState": {
+      "type": "string",
+      "enum": ["FULL", "PARTIAL", "DISCOVERY_ONLY", "SEMANTIC_REVIEW_REQUIRED", "UNSUPPORTED", "NOT_APPLICABLE"]
+    },
+    "TechnologyDetection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ecosystem", "framework", "versionRange", "confidence", "evidenceRefs", "conflicts"],
+      "properties": {
+        "ecosystem": { "type": "string", "minLength": 1 },
+        "framework": { "type": "string", "minLength": 1 },
+        "versionRange": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidenceRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "conflicts": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+      }
+    },
+    "TechnologyProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["detections", "conflicts", "digest"],
+      "properties": {
+        "detections": { "type": "array", "items": { "$ref": "#/$defs/TechnologyDetection" } },
+        "conflicts": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "digest": { "$ref": "#/$defs/Sha256" }
+      }
+    },
+    "AssetCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assetFamily", "framework", "state", "required", "reasonCodes", "extractorIds"],
+      "properties": {
+        "assetFamily": { "type": "string", "minLength": 1 },
+        "framework": { "type": "string", "minLength": 1 },
+        "state": { "$ref": "#/$defs/CapabilityCoverageState" },
+        "required": { "type": "boolean" },
+        "reasonCodes": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "extractorIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+      }
+    },
+    "AssetCoveragePlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assetFamilies", "capabilities", "complete", "digest"],
+      "properties": {
+        "assetFamilies": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "capabilities": { "type": "array", "items": { "$ref": "#/$defs/AssetCapability" } },
+        "complete": { "type": "boolean" },
+        "digest": { "$ref": "#/$defs/Sha256" }
+      }
+    },
+    "ScanPolicyReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["systemGovernanceDigest", "extractorCatalogDigest", "semanticPromptPackDigest", "scopeRuntimeProfileDigest", "effectivePolicyDigest"],
+      "properties": {
+        "systemGovernanceDigest": { "$ref": "#/$defs/Sha256" },
+        "extractorCatalogDigest": { "$ref": "#/$defs/Sha256" },
+        "semanticPromptPackDigest": { "$ref": "#/$defs/Sha256" },
+        "scopeRuntimeProfileDigest": { "$ref": "#/$defs/Sha256" },
+        "effectivePolicyDigest": { "$ref": "#/$defs/Sha256" }
+      }
+    },
     "RepositoryPolicy": {
       "type": "object",
       "additionalProperties": false,
@@ -87,7 +150,7 @@
     "ScanSessionDescriptor": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["contractVersion", "sessionId", "architectureScope", "actorId", "connectorId", "scannerReleaseId", "sessionNonce", "expiresAt", "repositoryPolicy", "limits", "expectedPreviousBatchDigest"],
+      "required": ["contractVersion", "sessionId", "architectureScope", "actorId", "connectorId", "scannerReleaseId", "sessionNonce", "expiresAt", "repositoryPolicy", "limits", "policyReceipt", "technologyProfile", "coveragePlan", "expectedPreviousBatchDigest"],
       "properties": {
         "contractVersion": { "const": "2.0" },
         "sessionId": { "type": "string", "minLength": 1 },
@@ -99,6 +162,9 @@
         "expiresAt": { "type": "string", "format": "date-time" },
         "repositoryPolicy": { "$ref": "#/$defs/RepositoryPolicy" },
         "limits": { "$ref": "#/$defs/ScanLimits" },
+        "policyReceipt": { "$ref": "#/$defs/ScanPolicyReceipt" },
+        "technologyProfile": { "$ref": "#/$defs/TechnologyProfile" },
+        "coveragePlan": { "$ref": "#/$defs/AssetCoveragePlan" },
         "expectedPreviousBatchDigest": {
           "anyOf": [{ "$ref": "#/$defs/Sha256" }, { "type": "null" }]
         }
@@ -245,7 +311,7 @@
     "ScanFinalization": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["contractVersion", "sessionId", "architectureScope", "repositorySnapshotDigest", "manifestDigest", "finalBatchDigest", "batchCount", "observationCount", "coverage", "generatedAt"],
+      "required": ["contractVersion", "sessionId", "architectureScope", "repositorySnapshotDigest", "manifestDigest", "finalBatchDigest", "batchCount", "observationCount", "coverage", "coveragePlan", "policyReceipt", "generatedAt"],
       "properties": {
         "contractVersion": { "const": "2.0" },
         "sessionId": { "type": "string", "minLength": 1 },
@@ -256,6 +322,8 @@
         "batchCount": { "type": "integer", "minimum": 0 },
         "observationCount": { "type": "integer", "minimum": 0, "maximum": 100000 },
         "coverage": { "$ref": "#/$defs/ScanCoverageDelta" },
+        "coveragePlan": { "$ref": "#/$defs/AssetCoveragePlan" },
+        "policyReceipt": { "$ref": "#/$defs/ScanPolicyReceipt" },
         "generatedAt": { "type": "string", "format": "date-time" }
       }
     },

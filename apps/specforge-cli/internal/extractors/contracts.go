@@ -3,6 +3,7 @@ package extractors
 import (
 	"context"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/l695290718/specforge/apps/specforge-cli/internal/scancontract"
@@ -19,12 +20,21 @@ func (ContractExtractor) Supports(meta FileMeta) bool {
 	ext := filepath.Ext(base)
 	return (ext == ".yaml" || ext == ".yml" || ext == ".json") &&
 		(strings.Contains(base, "openapi") || strings.Contains(base, "swagger") || strings.Contains(base, "asyncapi") ||
-			strings.Contains(path, "/openapi/") || strings.Contains(path, "/asyncapi/"))
+			strings.Contains(path, "/openapi/") || strings.Contains(path, "/asyncapi/")) || ext == ".graphql" || ext == ".gql" || ext == ".proto"
 }
 
 func (extractor ContractExtractor) Extract(ctx context.Context, file File) ([]scancontract.SourceObservationV2, scancontract.ScanCoverageDelta, error) {
 	if err := checkContext(ctx); err != nil {
 		return nil, scancontract.ScanCoverageDelta{}, err
+	}
+	ext := strings.ToLower(filepath.Ext(file.Meta.Path))
+	if ext == ".graphql" || ext == ".gql" {
+		observations := extractor.extractGraphQL(file)
+		return observations, successfulDelta(file.Meta.Path, len(observations)), nil
+	}
+	if ext == ".proto" {
+		observations := extractor.extractProtobuf(file)
+		return observations, successfulDelta(file.Meta.Path, len(observations)), nil
 	}
 	var document yaml.Node
 	if err := yaml.Unmarshal(file.Contents, &document); err != nil {
@@ -49,6 +59,41 @@ func (extractor ContractExtractor) Extract(ctx context.Context, file File) ([]sc
 		return observations, successfulDelta(file.Meta.Path, len(observations)), nil
 	}
 	return nil, parserGap(file.Meta.Path, "API_CONTRACT_KIND_UNRECOGNIZED"), nil
+}
+
+func (extractor ContractExtractor) extractGraphQL(file File) []scancontract.SourceObservationV2 {
+	declaration := regexp.MustCompile(`(?m)^\s*(type|interface|input|enum)\s+([A-Za-z_][A-Za-z0-9_]*)`)
+	operation := regexp.MustCompile(`(?m)^\s*(query|mutation|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)`)
+	observations := make([]scancontract.SourceObservationV2, 0)
+	for _, match := range declaration.FindAllStringSubmatchIndex(string(file.Contents), -1) {
+		kind, name := string(file.Contents[match[2]:match[3]]), string(file.Contents[match[4]:match[5]])
+		line := lineForOffset(file.Contents, match[0])
+		observations = append(observations, makeObservation(file, observationSpec{ObservationType: "DATA_ENTITY", Layer: scancontract.ArchitectureLayerSys, Aspect: "api-contract", Symbol: name, LineStart: line, LineEnd: line, ParserID: "graphql-lexical", ParserVersion: extractor.Version(), Payload: map[string]any{"kind": kind, "name": name}}))
+	}
+	for _, match := range operation.FindAllStringSubmatchIndex(string(file.Contents), -1) {
+		kind, name := string(file.Contents[match[2]:match[3]]), string(file.Contents[match[4]:match[5]])
+		line := lineForOffset(file.Contents, match[0])
+		observations = append(observations, makeObservation(file, observationSpec{ObservationType: "API_OPERATION", Layer: scancontract.ArchitectureLayerSys, Aspect: "api-contract", Symbol: name, LineStart: line, LineEnd: line, ParserID: "graphql-lexical", ParserVersion: extractor.Version(), Payload: map[string]any{"kind": kind, "operation": name}}))
+	}
+	return observations
+}
+
+func (extractor ContractExtractor) extractProtobuf(file File) []scancontract.SourceObservationV2 {
+	patterns := []struct{ expression, observationType string }{
+		{`(?m)^\s*service\s+([A-Za-z_][A-Za-z0-9_]*)`, "RPC_SERVICE"},
+		{`(?m)\brpc\s+([A-Za-z_][A-Za-z0-9_]*)`, "RPC_METHOD"},
+		{`(?m)^\s*message\s+([A-Za-z_][A-Za-z0-9_]*)`, "DATA_ENTITY"},
+	}
+	observations := make([]scancontract.SourceObservationV2, 0)
+	for _, pattern := range patterns {
+		compiled := regexp.MustCompile(pattern.expression)
+		for _, match := range compiled.FindAllStringSubmatchIndex(string(file.Contents), -1) {
+			name := string(file.Contents[match[2]:match[3]])
+			line := lineForOffset(file.Contents, match[0])
+			observations = append(observations, makeObservation(file, observationSpec{ObservationType: pattern.observationType, Layer: scancontract.ArchitectureLayerSys, Aspect: "api-contract", Symbol: name, LineStart: line, LineEnd: line, ParserID: "protobuf-lexical", ParserVersion: extractor.Version(), Payload: map[string]any{"name": name}}))
+		}
+	}
+	return observations
 }
 
 func (extractor ContractExtractor) extractOpenAPI(file File, root *yaml.Node) []scancontract.SourceObservationV2 {

@@ -15,6 +15,56 @@ type ScanLimits struct {
 	MaxObservationsPerSession int `json:"maxObservationsPerSession"`
 }
 
+type CapabilityCoverageState string
+
+const (
+	CapabilityCoverageStateFull                   CapabilityCoverageState = "FULL"
+	CapabilityCoverageStatePartial                CapabilityCoverageState = "PARTIAL"
+	CapabilityCoverageStateDiscoveryOnly          CapabilityCoverageState = "DISCOVERY_ONLY"
+	CapabilityCoverageStateSemanticReviewRequired CapabilityCoverageState = "SEMANTIC_REVIEW_REQUIRED"
+	CapabilityCoverageStateUnsupported            CapabilityCoverageState = "UNSUPPORTED"
+	CapabilityCoverageStateNotApplicable          CapabilityCoverageState = "NOT_APPLICABLE"
+)
+
+type TechnologyDetection struct {
+	Ecosystem    string   `json:"ecosystem"`
+	Framework    string   `json:"framework"`
+	VersionRange string   `json:"versionRange"`
+	Confidence   float64  `json:"confidence"`
+	EvidenceRefs []string `json:"evidenceRefs"`
+	Conflicts    []string `json:"conflicts"`
+}
+
+type TechnologyProfile struct {
+	Detections []TechnologyDetection `json:"detections"`
+	Conflicts  []string              `json:"conflicts"`
+	Digest     Sha256                `json:"digest"`
+}
+
+type AssetCapability struct {
+	AssetFamily  string                  `json:"assetFamily"`
+	Framework    string                  `json:"framework"`
+	State        CapabilityCoverageState `json:"state"`
+	Required     bool                    `json:"required"`
+	ReasonCodes  []string                `json:"reasonCodes"`
+	ExtractorIds []string                `json:"extractorIds"`
+}
+
+type AssetCoveragePlan struct {
+	AssetFamilies []string          `json:"assetFamilies"`
+	Capabilities  []AssetCapability `json:"capabilities"`
+	Complete      bool              `json:"complete"`
+	Digest        Sha256            `json:"digest"`
+}
+
+type ScanPolicyReceipt struct {
+	SystemGovernanceDigest    Sha256 `json:"systemGovernanceDigest"`
+	ExtractorCatalogDigest    Sha256 `json:"extractorCatalogDigest"`
+	SemanticPromptPackDigest  Sha256 `json:"semanticPromptPackDigest"`
+	ScopeRuntimeProfileDigest Sha256 `json:"scopeRuntimeProfileDigest"`
+	EffectivePolicyDigest     Sha256 `json:"effectivePolicyDigest"`
+}
+
 type RepositoryPolicy struct {
 	AllowDirtyWorktree bool     `json:"allowDirtyWorktree"`
 	IgnorePatterns     []string `json:"ignorePatterns"`
@@ -66,6 +116,9 @@ type ScanSessionDescriptor struct {
 	ExpiresAt                   string            `json:"expiresAt"`
 	RepositoryPolicy            RepositoryPolicy  `json:"repositoryPolicy"`
 	Limits                      ScanLimits        `json:"limits"`
+	PolicyReceipt               ScanPolicyReceipt `json:"policyReceipt"`
+	TechnologyProfile           TechnologyProfile `json:"technologyProfile"`
+	CoveragePlan                AssetCoveragePlan `json:"coveragePlan"`
 	ExpectedPreviousBatchDigest *Sha256           `json:"expectedPreviousBatchDigest"`
 }
 
@@ -209,6 +262,8 @@ type ScanFinalization struct {
 	BatchCount               int               `json:"batchCount"`
 	ObservationCount         int               `json:"observationCount"`
 	Coverage                 ScanCoverageDelta `json:"coverage"`
+	CoveragePlan             AssetCoveragePlan `json:"coveragePlan"`
+	PolicyReceipt            ScanPolicyReceipt `json:"policyReceipt"`
 	GeneratedAt              string            `json:"generatedAt"`
 }
 

@@ -21,5 +21,37 @@
     "maxSourceFileBytes": 10485760,
     "maxObservationsPerSession": 100000
   },
+  "policyReceipt": {
+    "systemGovernanceDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+    "extractorCatalogDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+    "semanticPromptPackDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+    "scopeRuntimeProfileDigest": "4444444444444444444444444444444444444444444444444444444444444444",
+    "effectivePolicyDigest": "5555555555555555555555555555555555555555555555555555555555555555"
+  },
+  "technologyProfile": {
+    "detections": [{
+      "ecosystem": "typescript",
+      "framework": "nestjs",
+      "versionRange": "10.x",
+      "confidence": 0.99,
+      "evidenceRefs": ["manifest:package.json"],
+      "conflicts": []
+    }],
+    "conflicts": [],
+    "digest": "6666666666666666666666666666666666666666666666666666666666666666"
+  },
+  "coveragePlan": {
+    "assetFamilies": ["api", "dataModel", "event"],
+    "capabilities": [{
+      "assetFamily": "api",
+      "framework": "nestjs",
+      "state": "FULL",
+      "required": true,
+      "reasonCodes": [],
+      "extractorIds": ["typescript-frameworks"]
+    }],
+    "complete": true,
+    "digest": "7777777777777777777777777777777777777777777777777777777777777777"
+  },
   "expectedPreviousBatchDigest": null
 }
