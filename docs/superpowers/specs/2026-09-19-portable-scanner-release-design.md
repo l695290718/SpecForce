@@ -28,7 +28,7 @@ The signed release boundary remains mandatory. Cross-platform delivery changes t
 - `artifactKind`: `PORTABLE_SCRIPT` or `NATIVE_BINARY`.
 - `platform`: `any` for portable scripts, otherwise a normalized operating-system identifier.
 - `architecture`: `any` for portable scripts, otherwise a normalized CPU architecture.
-- `runtime`: required for portable scripts and absent for native binaries. The first supported runtime is `{ "name": "node", "versionRange": ">=20 <23" }`.
+- `runtime`: required for portable scripts and absent for native binaries. The first supported runtime is `{ "name": "node", "versionRange": ">=20 <25" }`.
 - `entrypoint`: the artifact-relative executable module, initially `scanner.mjs`.
 
 The artifact remains a content-addressed archive containing the entrypoint, extractor modules, schemas and a machine-readable inventory. Repository-authored code and plugins are never loaded. The portable artifact must run without installing repository dependencies and without invoking package managers, build scripts or hooks.
@@ -133,4 +133,3 @@ SpecForge 默认发布经过签名的 Node.js 跨平台扫描器，原生扫描�
 ### 安全与验证
 
 签名覆盖运行兼容性、发布物摘要、提取器目录和契约版本。运行前必须校验签名、摘要、有效期和撤销状态；解压必须防止路径穿越和符号链接逃逸。源码默认保留在本地，仅上传有界且脱敏的 Observation 与证据引用。验证覆盖契约一致性、Release 选择、跨平台执行、原生与脚本 Golden Repository 等价、首次扫描门禁、空库初始化、治理唯一性和测试隔离。
-

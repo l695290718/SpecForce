@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Owning Scope is `com.specforge.designcenter` at `pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter`.
-- `PORTABLE_SCRIPT` uses Node `>=20 <23`; its manifest platform and architecture are `any`.
+- `PORTABLE_SCRIPT` uses Node `>=20 <25`; its manifest platform and architecture are `any`.
 - PostgreSQL is authoritative; graph stores remain derived projections.
 - MCP is the only persistence and promotion boundary for ADRs, Proposals, Context Packs, assets and typed links.
 - Every human-facing canonical field is English and has a complete Chinese overlay.
