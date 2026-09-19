@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
+import { randomUUID } from "node:crypto";
 import { contentDigest, type ArchitectureScopeRef } from "@specforge/core";
 import { prisma } from "../persistence";
 import { loadActiveSystemScanGovernance, publishSystemScanGovernanceRecord, upsertScopeScanRuntimeProfile } from "./governance-persistence";
@@ -7,10 +8,20 @@ const enabled = process.env.SPECFORGE_CONTINUOUS_INTEGRATION === "1";
 const scope: ArchitectureScopeRef = { applicationServiceId: "com.specforge.designcenter", scopePath: "pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter" };
 
 describe.skipIf(!enabled)("system scan governance persistence", () => {
+  const createdVersions: Array<{ kind: string; version: string }> = [];
+
+  afterAll(async () => {
+    for (const key of createdVersions) {
+      await prisma.systemScanGovernanceRecord.delete({ where: { kind_version: key } });
+    }
+  });
+
   it("publishes an immutable version and returns an identical retry", async () => {
     const kind = "EXTRACTOR_CATALOG" as const;
     const payload = { budgets: { maxObservationsPerBatch: 500, maxBatchBytes: 1_000_000, maxExcerptBytes: 8192, maxSourceFileBytes: 10_000_000, maxObservationsPerSession: 100_000 } };
-    const input = { id: "system:extractor-catalog:test", kind, version: "test-1", payload, signature: "test-signature", keyId: "test-key" };
+    const version = `test-${randomUUID()}`;
+    const input = { id: `system:extractor-catalog:test:${randomUUID()}`, kind, version, payload, signature: "test-signature", keyId: "test-key" };
+    createdVersions.push({ kind, version });
     const first = await publishSystemScanGovernanceRecord(input);
     const retry = await publishSystemScanGovernanceRecord(input);
     expect(retry.contentDigest).toBe(first.contentDigest);

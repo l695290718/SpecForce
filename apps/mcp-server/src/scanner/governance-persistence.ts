@@ -52,6 +52,10 @@ export async function publishSystemScanGovernanceRecord(input: PublishSystemScan
       }
       return toGovernanceRecord(existing);
     }
+    await tx.systemScanGovernanceRecord.updateMany({
+      where: { kind: input.kind, status: "ACTIVE" },
+      data: { status: "SUPERSEDED" }
+    });
     const row = await tx.systemScanGovernanceRecord.create({
       data: {
         id: input.id,
@@ -71,6 +75,9 @@ export async function publishSystemScanGovernanceRecord(input: PublishSystemScan
 
 export async function loadActiveSystemScanGovernance(): Promise<SystemScanGovernanceRecord[]> {
   const rows = await prisma.systemScanGovernanceRecord.findMany({ where: { kind: { in: [...activeKinds] }, status: "ACTIVE" }, orderBy: [{ kind: "asc" }, { publishedAt: "desc" }] });
+  const counts = new Map<string, number>();
+  for (const row of rows) counts.set(row.kind, (counts.get(row.kind) ?? 0) + 1);
+  if ([...counts.values()].some((count) => count > 1)) throw new Error("SYSTEM_SCAN_GOVERNANCE_ACTIVE_DUPLICATE");
   return rows.map(toGovernanceRecord);
 }
 
