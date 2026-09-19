@@ -399,3 +399,31 @@ Only incomplete work is listed here. Completed and superseded records are preser
 - **生产容量认证：** 有代表性的遥测能够认证收据保留、来源规模、分页和延迟目标后启动。
 
 **完成证据：** 每项能力都必须拥有精确 Scope 设计会话、双语 MCP 资产、有类型关系、不可变 Evidence、对账回读和更新后的 Context Pack。在此之前，`SOURCE_CHECK_REQUIRED` 或 `BLOCKED` 都是合法结果，系统不得声明完整系统事实。
+
+## 15. Canonical PostgreSQL Migration Baseline For Portable Scanner Governance
+
+**Backlog ID:** `backlog-portable-scanner-postgres-baseline`
+
+**Status:** Blocked by the current deployment environment. The governance migration is prepared, but it has not been applied to the existing canonical database.
+
+**Owner:** SpecForge deployment and data-platform operator.
+
+**Rationale:** The `specforge_canonical` PostgreSQL database at `localhost:15433` is non-empty and does not contain the Prisma migration history required by the repository. Running `pnpm exec prisma migrate deploy` returned `P3005`; applying `db push` or resetting the database would risk destroying authored design facts and is not an acceptable substitute.
+
+**Trigger:** During an approved maintenance window, take a backup, compare the existing schema with the repository migration history, create and review the Prisma baseline or mark the historical migrations as applied, then rerun `pnpm exec prisma migrate deploy` and verify the partial unique index for one ACTIVE scanner-governance record per kind with `pnpm exec prisma migrate status`.
+
+**Evidence:** `pnpm exec prisma migrate status` reported 26 pending migrations; `pnpm exec prisma migrate deploy` returned `P3005: The database schema is not empty`. MCP design-fact synchronization and scoped reconciliation completed successfully; only database deployment remains blocked.
+
+### Portable Scanner Governance 的 PostgreSQL 规范迁移基线
+
+**待办标识：** `backlog-portable-scanner-postgres-baseline`
+
+**状态：** 被当前部署环境阻断。治理迁移已经准备好，但尚未应用到现有权威数据库。
+
+**负责人：** SpecForge 部署与数据平台负责人。
+
+**理由：** `localhost:15433` 的 `specforge_canonical` PostgreSQL 数据库已有非空 Schema，但没有仓库要求的 Prisma 迁移历史。执行 `pnpm exec prisma migrate deploy` 返回 `P3005`；执行 `db push` 或重置数据库可能破坏已维护的设计事实，不能作为替代方案。
+
+**启动条件：** 在获批准的维护窗口备份数据库，核对现有 Schema 与仓库迁移历史，创建并审核 Prisma 基线或将历史迁移标记为已应用；随后重新执行 `pnpm exec prisma migrate deploy`，并用 `pnpm exec prisma migrate status` 验证每个治理 kind 至多一个 ACTIVE 记录的部分唯一索引。
+
+**证据：** `pnpm exec prisma migrate status` 报告 26 个待执行迁移；`pnpm exec prisma migrate deploy` 返回 `P3005: The database schema is not empty`。MCP 设计事实同步和精确 Scope 对账已经成功，当前仅数据库部署仍被阻断。

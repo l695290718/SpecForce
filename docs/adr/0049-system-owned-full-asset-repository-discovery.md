@@ -55,11 +55,19 @@ A file-extension scanner cannot correctly discover the complete SpecForge asset 
 
 ## Implementation Boundary
 
-The implemented increment includes system-owned governance records, technology-aware extractor catalogs, deterministic multi-language and contract-neutral extraction, bounded bilingual semantic-candidate validation, resumable governed sessions, coverage and blocker reports, provider-neutral Skill packaging, and scale/contract proof. Continuous scanning, runtime or CMDB connectors, outbound proposals, external `APPLY`, cross-Scope semantic merging, and full historical-baseline reconciliation remain deferred.
+The implemented increment includes system-owned governance records, technology-aware extractor catalogs, deterministic multi-language and contract-neutral extraction, bounded bilingual semantic-candidate validation, resumable governed sessions, coverage and blocker reports, provider-neutral Skill packaging, a signed portable Node scanner release path, compatible release selection, safe first-scan bootstrap readiness, and governance-version uniqueness protection. Continuous scanning, runtime or CMDB connectors, outbound proposals, external `APPLY`, cross-Scope semantic merging, automatic native acceleration, and full historical-baseline reconciliation remain deferred.
 
 ## Implementation Evidence
 
 - `pnpm scanner-contract:check` -> passed.
+- `pnpm exec vitest run packages/scan-contract/src/contract.test.ts` -> 8 tests passed, including portable/legacy manifest compatibility.
+- `Push-Location apps/specforge-cli; go test ./internal/scancontract; Pop-Location` -> passed.
+- `pnpm exec vitest run apps/mcp-server/src/scanner/release.test.ts apps/mcp-server/src/scanner/session.test.ts` -> 8 tests passed, including portable preference and incompatible-release denial.
+- `node --test apps/specforge-cli/portable/scanner.test.mjs` -> 2 tests passed.
+- `node scripts/build-portable-scanner-release.mjs --check` -> passed on Node 24.17.0.
+- `node --test skills/specforge-repository-scan/scripts/readiness-gate.test.mjs skills/specforge-repository-scan/scripts/verify-input.test.mjs` -> 5 tests passed.
+- `pnpm exec vitest run packages/core/src/knowledge-readiness/policy.test.ts apps/mcp-server/src/scanner/governance-bootstrap.test.ts` -> 6 tests passed.
+- `pnpm exec vitest run apps/mcp-server/src/scanner/governance-persistence.integration.test.ts` -> 3 tests skipped because PostgreSQL integration was not enabled; the test now uses unique records and cleanup.
 - Focused MCP scanner Vitest suite (session, finalization, report, 100,000-observation scale, provider contract equivalence, bilingual candidate persistence) -> 22 tests passed.
 - `Push-Location apps/specforge-cli; go test ./...; Pop-Location` -> passed.
 - `node --test skills/specforge-repository-scan/scripts/verify-input.test.mjs` -> 3 tests passed.
@@ -68,6 +76,14 @@ The implemented increment includes system-owned governance records, technology-a
 - `$env:SPECFORGE_DESIGN_FACT_IDS='adr-system-owned-full-asset-repository-discovery'; pnpm design-facts:sync` -> complete for this ADR.
 - `$env:SPECFORGE_DESIGN_FACT_IDS='adr-system-owned-full-asset-repository-discovery'; pnpm design-facts:check` -> `missing=[]`, `mismatched=[]`, `outOfScope=[]`, `blocked=[]`.
 - Unscoped `pnpm design-facts:sync` remains blocked by the unrelated historical `adr-3a-architecture-navigation-workspace` record returning `DATA_MODEL_UPGRADE_REQUIRED`. Retry after that historical data-model migration, then rerun full sync and reconciliation.
+
+## Portable Release Increment (2026-09-19)
+
+The default scanner distribution is now a signed Node.js portable script release for Node `>=20 <25`, with `platform=any`, `architecture=any`, and an explicit runtime/entrypoint in the manifest. Native Go releases remain compatible only when the caller explicitly supports the target platform. `start_knowledge_scan` receives bounded runtime capabilities and pins the deterministic compatible release to the session.
+
+The deployment bootstrap can publish the official portable manifest from `SPECFORGE_SCANNER_RELEASE_MANIFEST` and fails closed when a required production release is absent. A readiness denial containing only source-coverage reasons plus `START_FULL_SCAN` may start a governed bootstrap scan after exact-Scope authorization; denied knowledge is never read in that mode. PostgreSQL prevents more than one ACTIVE governance version per kind.
+
+The repository migration for the ACTIVE-governance uniqueness constraint is prepared but not deployed in the current environment. `pnpm exec prisma migrate status` reports 26 pending migrations, and `pnpm exec prisma migrate deploy` returns `P3005` because the existing `specforge_canonical` schema is non-empty without a Prisma migration baseline. This is an environment-owned blocked follow-up, not an MCP synchronization failure; the migration must be baselined and reviewed before deployment.
 
 ## 中文本地化覆盖
 
@@ -115,11 +131,19 @@ The implemented increment includes system-owned governance records, technology-a
 
 ### 实施边界
 
-本次已实现增量包括系统级治理记录、技术栈感知提取器目录、多语言与契约中立的确定性提取、双语语义候选校验、可恢复的受治理扫描会话、覆盖与阻断报告、中立 Agent Skill 打包，以及规模和契约证明。持续扫描、运行时或 CMDB 连接器、出站 Proposal、外部 `APPLY`、跨 Scope 语义合并和历史全量基线对账仍然延期。
+本次已实现增量包括系统级治理记录、技术栈感知提取器目录、多语言与契约中立的确定性提取、双语语义候选校验、可恢复的受治理扫描会话、覆盖与阻断报告、中立 Agent Skill 打包、签名跨平台 Node 扫描器发布路径、兼容 Release 选择、安全首次扫描门禁和治理版本唯一性保护。持续扫描、运行时或 CMDB 连接器、出站 Proposal、外部 `APPLY`、跨 Scope 语义合并、自动原生加速和历史全量基线对账仍然延期。
 
 ### 实施证据
 
 - `pnpm scanner-contract:check` -> 通过。
+- `pnpm exec vitest run packages/scan-contract/src/contract.test.ts` -> 8 个测试通过，覆盖跨平台与旧版清单兼容。
+- `Push-Location apps/specforge-cli; go test ./internal/scancontract; Pop-Location` -> 通过。
+- `pnpm exec vitest run apps/mcp-server/src/scanner/release.test.ts apps/mcp-server/src/scanner/session.test.ts` -> 8 个测试通过，覆盖脚本优先和不兼容拒绝。
+- `node --test apps/specforge-cli/portable/scanner.test.mjs` -> 2 个测试通过。
+- `node scripts/build-portable-scanner-release.mjs --check` -> Node 24.17.0 下通过。
+- `node --test skills/specforge-repository-scan/scripts/readiness-gate.test.mjs skills/specforge-repository-scan/scripts/verify-input.test.mjs` -> 5 个测试通过。
+- `pnpm exec vitest run packages/core/src/knowledge-readiness/policy.test.ts apps/mcp-server/src/scanner/governance-bootstrap.test.ts` -> 6 个测试通过。
+- `pnpm exec vitest run apps/mcp-server/src/scanner/governance-persistence.integration.test.ts` -> 因未启用 PostgreSQL 集成而跳过 3 个测试；测试已改为随机记录并清理。
 - MCP 扫描器聚焦 Vitest 套件（会话、终结、报告、十万观察规模、Agent 契约等价性、双语候选持久化）-> 22 个测试通过。
 - `Push-Location apps/specforge-cli; go test ./...; Pop-Location` -> 通过。
 - `node --test skills/specforge-repository-scan/scripts/verify-input.test.mjs` -> 3 个测试通过。
@@ -128,3 +152,11 @@ The implemented increment includes system-owned governance records, technology-a
 - `$env:SPECFORGE_DESIGN_FACT_IDS='adr-system-owned-full-asset-repository-discovery'; pnpm design-facts:sync` -> 本 ADR 同步完成。
 - `$env:SPECFORGE_DESIGN_FACT_IDS='adr-system-owned-full-asset-repository-discovery'; pnpm design-facts:check` -> `missing=[]`、`mismatched=[]`、`outOfScope=[]`、`blocked=[]`。
 - 不带筛选的 `pnpm design-facts:sync` 仍被无关的历史 `adr-3a-architecture-navigation-workspace` 记录阻断，返回 `DATA_MODEL_UPGRADE_REQUIRED`。完成该历史数据模型迁移后，重新执行全量同步和对账。
+
+## 跨平台 Release 增量（2026-09-19）
+
+默认扫描器发行物改为 Node `>=20 <25` 的签名跨平台脚本，清单明确记录 `platform=any`、`architecture=any`、运行时和入口文件。原生 Go Release 仍可使用，但只有调用方明确声明目标平台能力时才参与选择。`start_knowledge_scan` 接收有界运行能力，并将确定选择的 Release 固定到扫描会话。
+
+部署引导可从 `SPECFORGE_SCANNER_RELEASE_MANIFEST` 发布官方 portable 清单；生产环境缺少必需 Release 时快速失败。就绪评估只有在原因全部属于来源覆盖问题、同时包含 `START_FULL_SCAN` 且精确 Scope 已授权时，才允许开始受治理的首次扫描；该模式绝不读取被拒绝的知识正文。PostgreSQL 防止同一治理 kind 存在多个 ACTIVE 版本。
+
+用于保证 ACTIVE 治理版本唯一性的仓库迁移已经准备好，但尚未在当前环境部署。`pnpm exec prisma migrate status` 报告 26 个待执行迁移，`pnpm exec prisma migrate deploy` 因现有 `specforge_canonical` Schema 非空且没有 Prisma 迁移基线而返回 `P3005`。这是由部署环境负责的阻断待办，不是 MCP 同步失败；部署前必须完成基线核对和审核。

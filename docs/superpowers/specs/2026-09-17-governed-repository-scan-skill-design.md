@@ -164,6 +164,8 @@ Observations and candidates use bounded, ordered, idempotent batches with checkp
 5. Reusable Skill: provider-neutral lifecycle, report explanation, checkpoint resume and remediation.
 6. Production proof: cross-Agent, security, scale, failure, promotion, Baseline and reconciliation evidence.
 
+The portable-release increment delivered on 2026-09-19 makes the Node script artifact the default runtime, retains native Go as an optional explicitly compatible runtime, permits only the source-coverage `START_FULL_SCAN` bootstrap path, and protects one ACTIVE system-governance version per kind in PostgreSQL.
+
 ## Deferred Work
 
 Continuous scanning, live database/runtime/CMDB/API-gateway connectors, external repository providers, outbound `APPLY`, and cross-Scope semantic merging remain separate governed increments.
@@ -182,7 +184,7 @@ Scope 只能配置仓库、扫描路径、框架提示、敏感路径和资源�
 
 ### 框架与全资产覆盖
 
-系统按“框架 × 资产族”声明能力，首批覆盖 Java/Spring/JPA/MyBatis、TypeScript/NestJS/Express/Prisma/TypeORM、Python/FastAPI/Django/SQLAlchemy、Go/net/http/Gin/GORM，以及 OpenAPI、AsyncAPI、GraphQL、gRPC、SQL、Docker、Kubernetes、Helm、CI、Prometheus 和 OpenTelemetry。每项能力返回完整、部分、仅发现、需要语义审核、不支持或不适用状态。
+系统按“框架 × 资产族”声明能力，首批覆盖 Java/Spring/JPA/MyBatis、TypeScript/NestJS/Express/Prisma/TypeORM、Python/FastAPI/Django/SQLAlchemy、Go/net/http/Gin/GORM，以及 OpenAPI、AsyncAPI、GraphQL、gRPC、SQL、Docker、Kubernetes、Helm、CI、Prometheus 和 OpenTelemetry。每项能力返回完整、部分、仅发现、需要语义审核、不支持或不适用状态。2026-09-19 的跨平台增量默认使用签名 Node 脚本 Release，调用方提供运行能力，服务端按契约、平台、架构和运行时确定选择并固定到扫描会话；原生 Go 仅作为显式兼容的可选 Release。
 
 数据模型依据 ORM、Schema 和迁移提取；API 依据框架路由与契约提取；事件、状态机、集成、质量和可观测性使用对应框架证据。领域、业务规则、服务特性和功能特性由 Agent 基于代码、测试、约束、契约与文档交叉提出。ADR、Proposal 和 Context Pack 只能导入已有记录或形成待确认候选，不得伪造历史决策。
 
