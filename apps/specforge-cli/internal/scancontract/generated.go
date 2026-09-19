@@ -89,12 +89,28 @@ const (
 	ScannerReleaseStatusRetired ScannerReleaseStatus = "RETIRED"
 )
 
+type ScannerArtifactKind string
+
+const (
+	ScannerArtifactKindPortableScript ScannerArtifactKind = "PORTABLE_SCRIPT"
+	ScannerArtifactKindNativeBinary   ScannerArtifactKind = "NATIVE_BINARY"
+)
+
+type ScannerRuntime struct {
+	Name         string `json:"name"`
+	VersionRange string `json:"versionRange"`
+}
+
 type ScannerReleaseManifest struct {
 	ContractVersion string                `json:"contractVersion"`
 	ReleaseId       string                `json:"releaseId"`
 	ScannerVersion  string                `json:"scannerVersion"`
 	Platform        string                `json:"platform"`
+	ArtifactKind    *ScannerArtifactKind  `json:"artifactKind,omitempty"`
+	Architecture    *string               `json:"architecture,omitempty"`
 	Artifact        ScannerArtifact       `json:"artifact"`
+	Runtime         *ScannerRuntime       `json:"runtime,omitempty"`
+	Entrypoint      *string               `json:"entrypoint,omitempty"`
 	SchemaVersions  []string              `json:"schemaVersions"`
 	Extractors      []ExtractorDescriptor `json:"extractors"`
 	SigningKeyId    string                `json:"signingKeyId"`

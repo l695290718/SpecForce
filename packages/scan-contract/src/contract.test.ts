@@ -6,6 +6,7 @@ import {
   canonicalUnsignedRelease,
   validateScanBatch,
   validateScanSession,
+  validateScannerRelease,
   verifyScannerRelease
 } from "./index";
 import type { ArchitectureScope, ScanSessionDescriptor } from "./index";
@@ -72,6 +73,25 @@ describe("scan contract v2", () => {
 
     expect(canonical).toBe(expected);
     await expect(verifyScannerRelease(release, "A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=")).resolves.toBe(true);
+  });
+
+  it("validates portable release runtime compatibility while preserving legacy native manifests", () => {
+    const legacy = fixture("signed-release.json");
+    expect(validateScannerRelease(legacy).platform).toBe("windows-amd64");
+
+    const portable = {
+      ...legacy,
+      releaseId: "scanner-release:2.1.0-portable",
+      scannerVersion: "2.1.0",
+      platform: "any",
+      artifactKind: "PORTABLE_SCRIPT",
+      architecture: "any",
+      runtime: { name: "node", versionRange: ">=20 <23" },
+      entrypoint: "scanner.mjs"
+    };
+    expect(validateScannerRelease(portable)).toMatchObject({ artifactKind: "PORTABLE_SCRIPT", runtime: { name: "node" } });
+    expect(() => validateScannerRelease({ ...portable, runtime: undefined })).toThrow("SCANNER_PORTABLE_RUNTIME_REQUIRED");
+    expect(() => validateScannerRelease({ ...portable, platform: "windows-amd64" })).toThrow("SCANNER_PORTABLE_PLATFORM_INVALID");
   });
 
   it("declares JSON Schema 2020-12 as the canonical schema", () => {

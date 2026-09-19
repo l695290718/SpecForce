@@ -72,12 +72,23 @@ export interface ExtractorDescriptor {
 
 export type ScannerReleaseStatus = "ACTIVE" | "REVOKED" | "RETIRED";
 
+export type ScannerArtifactKind = "PORTABLE_SCRIPT" | "NATIVE_BINARY";
+
+export interface ScannerRuntime {
+  name: "node";
+  versionRange: string;
+}
+
 export interface ScannerReleaseManifest {
   contractVersion: "2.0";
   releaseId: string;
   scannerVersion: string;
   platform: string;
+  artifactKind?: ScannerArtifactKind;
+  architecture?: string;
   artifact: ScannerArtifact;
+  runtime?: ScannerRuntime;
+  entrypoint?: string;
   schemaVersions: Array<string>;
   extractors: Array<ExtractorDescriptor>;
   signingKeyId: string;

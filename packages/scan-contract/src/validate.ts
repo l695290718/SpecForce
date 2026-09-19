@@ -113,12 +113,26 @@ function validateCoverageDelta(value: unknown): { indexedFiles: number; skippedF
 
 export function validateScannerRelease(value: unknown): ScannerReleaseManifest {
   const release = strictRecord(value, "SCANNER_RELEASE_INVALID", [
-    "contractVersion", "releaseId", "scannerVersion", "platform", "artifact", "schemaVersions", "extractors", "signingKeyId", "algorithm", "issuedAt", "expiresAt", "status", "signature"
-  ]);
+    "contractVersion", "releaseId", "scannerVersion", "platform", "artifactKind", "architecture", "artifact", "runtime", "entrypoint", "schemaVersions", "extractors", "signingKeyId", "algorithm", "issuedAt", "expiresAt", "status", "signature"
+  ], ["artifactKind", "architecture", "runtime", "entrypoint"]);
   contractVersion(release.contractVersion);
   nonEmptyString(release.releaseId, "SCANNER_RELEASE_ID_REQUIRED");
   nonEmptyString(release.scannerVersion, "SCANNER_VERSION_REQUIRED");
   nonEmptyString(release.platform, "SCANNER_PLATFORM_REQUIRED");
+
+  const artifactKind = release.artifactKind ?? "NATIVE_BINARY";
+  enumValue(artifactKind, ["PORTABLE_SCRIPT", "NATIVE_BINARY"], "SCANNER_ARTIFACT_KIND_INVALID");
+  if (release.architecture !== undefined) nonEmptyString(release.architecture, "SCANNER_ARCHITECTURE_INVALID");
+  if (release.entrypoint !== undefined) nonEmptyString(release.entrypoint, "SCANNER_ENTRYPOINT_INVALID");
+  if (release.runtime !== undefined) {
+    const runtime = strictRecord(release.runtime, "SCANNER_RUNTIME_INVALID", ["name", "versionRange"]);
+    if (runtime.name !== "node") throw new Error("SCANNER_RUNTIME_INVALID");
+    nonEmptyString(runtime.versionRange, "SCANNER_RUNTIME_INVALID");
+  }
+  if (artifactKind === "PORTABLE_SCRIPT") {
+    if (release.platform !== "any" || release.architecture !== "any") throw new Error("SCANNER_PORTABLE_PLATFORM_INVALID");
+    if (!release.runtime || !release.entrypoint) throw new Error("SCANNER_PORTABLE_RUNTIME_REQUIRED");
+  }
 
   const artifact = strictRecord(release.artifact, "SCANNER_ARTIFACT_INVALID", ["uri", "sha256", "sizeBytes"]);
   nonEmptyString(artifact.uri, "SCANNER_ARTIFACT_INVALID");

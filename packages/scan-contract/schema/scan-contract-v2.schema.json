@@ -127,6 +127,19 @@
       "type": "string",
       "enum": ["ACTIVE", "REVOKED", "RETIRED"]
     },
+    "ScannerArtifactKind": {
+      "type": "string",
+      "enum": ["PORTABLE_SCRIPT", "NATIVE_BINARY"]
+    },
+    "ScannerRuntime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "versionRange"],
+      "properties": {
+        "name": { "const": "node" },
+        "versionRange": { "type": "string", "minLength": 1 }
+      }
+    },
     "ScannerReleaseManifest": {
       "type": "object",
       "additionalProperties": false,
@@ -136,7 +149,11 @@
         "releaseId": { "type": "string", "minLength": 1 },
         "scannerVersion": { "type": "string", "minLength": 1 },
         "platform": { "type": "string", "minLength": 1 },
+        "artifactKind": { "$ref": "#/$defs/ScannerArtifactKind" },
+        "architecture": { "type": "string", "minLength": 1 },
         "artifact": { "$ref": "#/$defs/ScannerArtifact" },
+        "runtime": { "$ref": "#/$defs/ScannerRuntime" },
+        "entrypoint": { "type": "string", "minLength": 1 },
         "schemaVersions": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "extractors": { "type": "array", "items": { "$ref": "#/$defs/ExtractorDescriptor" } },
         "signingKeyId": { "type": "string", "minLength": 1 },
