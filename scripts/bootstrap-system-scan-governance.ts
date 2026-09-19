@@ -2,7 +2,7 @@ import { bootstrapSystemScanGovernance } from "../apps/mcp-server/src/scanner/go
 import { upsertScopeScanRuntimeProfile } from "../apps/mcp-server/src/scanner/governance-persistence";
 
 async function main(): Promise<void> {
-  await bootstrapSystemScanGovernance();
+  await bootstrapSystemScanGovernance({ requireScannerRelease: true });
   const architectureScope = {
     applicationServiceId: "com.specforge.designcenter",
     scopePath: "pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter"

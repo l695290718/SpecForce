@@ -273,9 +273,9 @@ Open [http://localhost:3000](http://localhost:3000) for local development. For t
 
 ## Legacy Baseline Discovery
 
-Phase 1 provides a signed, native Go scanner and an Agent-mediated MCP flow for turning an existing repository into an exact-Scope, reviewed Baseline v1. Scanner releases use an explicit Ed25519 trust root with no trust-on-first-use; local batches are resumable and hash-chained, while PostgreSQL remains authoritative for Sessions, observations, review decisions, ChangeSets, and Baselines.
+Phase 1 provides a signed, portable Node scanner by default, with the native Go scanner retained as an optional accelerator, and an Agent-mediated MCP flow for turning an existing repository into an exact-Scope, reviewed Baseline v1. Scanner releases use an explicit Ed25519 trust root with no trust-on-first-use; local batches are resumable and hash-chained, while PostgreSQL remains authoritative for Sessions, observations, review decisions, ChangeSets, and Baselines.
 
-第一阶段提供签名的原生 Go 扫描器及 Agent 中介的 MCP 流程，将存量仓库转换为精确 Scope、经评审的 Baseline v1。扫描器使用显式 Ed25519 信任根，禁止首次使用自动信任；本地批次支持哈希链断点续传，PostgreSQL 对 Session、观察、评审决策、ChangeSet 和 Baseline 保持权威。
+第一阶段默认提供签名的跨平台 Node 扫描器，原生 Go 扫描器保留为可选加速器，并通过 Agent 中介的 MCP 流程将存量仓库转换为精确 Scope、经评审的 Baseline v1。扫描器使用显式 Ed25519 信任根，禁止首次使用自动信任；本地批次支持哈希链断点续传，PostgreSQL 对 Session、观察、评审决策、ChangeSet 和 Baseline 保持权威。
 
 ```powershell
 # Stage-level verification; DATABASE_URL is required for PostgreSQL integration.

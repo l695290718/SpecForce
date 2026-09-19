@@ -1,4 +1,6 @@
 import { contentDigest, type SystemScanGovernanceKind } from "@specforge/core";
+import type { ScannerReleaseManifest } from "@specforge/scan-contract";
+import { persistScannerRelease, type PersistScannerReleaseInput } from "./release";
 import { publishSystemScanGovernanceRecord, type PublishSystemScanGovernanceInput } from "./governance-persistence";
 
 const governanceVersion = "1.0.0";
@@ -63,6 +65,24 @@ export function defaultSystemScanGovernanceInputs(): PublishSystemScanGovernance
   }));
 }
 
-export async function bootstrapSystemScanGovernance(): Promise<void> {
+export interface SystemScanBootstrapOptions {
+  requireScannerRelease?: boolean;
+}
+
+export function portableReleaseBootstrapInput(raw = process.env.SPECFORGE_SCANNER_RELEASE_MANIFEST): PersistScannerReleaseInput | null {
+  if (!raw) return null;
+  let manifest: ScannerReleaseManifest;
+  try {
+    manifest = JSON.parse(raw) as ScannerReleaseManifest;
+  } catch {
+    throw new Error("SCANNER_RELEASE_MANIFEST_INVALID");
+  }
+  return { manifest, status: "ACTIVE" };
+}
+
+export async function bootstrapSystemScanGovernance(options: SystemScanBootstrapOptions = {}): Promise<void> {
   for (const input of defaultSystemScanGovernanceInputs()) await publishSystemScanGovernanceRecord(input);
+  const release = portableReleaseBootstrapInput();
+  if (!release && options.requireScannerRelease) throw new Error("SCANNER_RELEASE_BOOTSTRAP_REQUIRED");
+  if (release) await persistScannerRelease(release);
 }
