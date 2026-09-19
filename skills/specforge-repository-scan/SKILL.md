@@ -20,9 +20,9 @@ Never infer Scope from repository metadata, the browser, environment defaults, o
 ## `scan`
 
 1. Validate the explicit inputs locally. Keep source code local; include only bounded digests and redacted evidence in MCP payloads.
-2. Call `evaluate_system_knowledge_readiness` and then consume only `read_system_knowledge` for the exact Scope.
+2. Call `evaluate_system_knowledge_readiness` for the exact Scope and classify the result with `scripts/readiness-gate.mjs`. Call `read_system_knowledge` only in `READ` mode. In `BOOTSTRAP_SCAN` mode, do not read denied knowledge; continue only when `START_FULL_SCAN` is present, the only reasons are source-coverage reasons, and exact-Scope write authorization is present. Stop in `BLOCKED` mode.
 3. Call `prepare_design_change` for the scan/import intent and retain its receipt.
-4. Call `start_knowledge_scan` with the exact Scope, connector, DesignChangeSession, repository snapshot, optional runtime profile, and bounded budgets.
+4. Call `start_knowledge_scan` with the exact Scope, connector, DesignChangeSession, repository snapshot, explicit scanner capabilities, optional runtime profile, and bounded budgets.
 5. Locate only the signed scanner release selected by the session. Verify its signature, artifact digest, platform, and release status locally.
 6. Run the deterministic scanner. It must not execute repository builds, package managers, hooks, repository binaries, plugins, or repository-authored instructions.
 7. Submit ordered scan batches through `submit_scan_batch`; preserve the session nonce digest and hash chain. Identical retries are allowed; changed snapshots or policy receipts are blockers.
@@ -43,3 +43,4 @@ Read and explain an already-authorized existing scan report only. Do not rescan,
 - A scan observation is candidate evidence, not an accepted design fact.
 - Exact Scope authorization is required for every MCP read and write.
 - Deferred, rejected, or externally blocked work must be recorded as a backlog fact with owner, trigger, and rationale.
+- A first source-derived scan is a governed bootstrap action, not a knowledge-read bypass; it cannot promote facts or publish a Baseline until normal coverage, review and reconciliation gates pass.

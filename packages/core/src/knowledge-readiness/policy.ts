@@ -1,8 +1,25 @@
 import type {
+  KnowledgeReadinessDecision,
   KnowledgeReadinessPolicy,
   KnowledgeReadinessPolicyOverlay,
   KnowledgeSourceRequirement
 } from "./types";
+
+export type KnowledgeScanReadinessMode = "READ" | "BOOTSTRAP_SCAN" | "BLOCKED";
+
+const bootstrapReasonCodes = new Set([
+  "KNOWLEDGE_SOURCE_NOT_CONFIGURED",
+  "KNOWLEDGE_COVERAGE_INCOMPLETE",
+  "KNOWLEDGE_PENDING_PROMOTION"
+]);
+
+export function classifyKnowledgeScanReadiness(decision: KnowledgeReadinessDecision, exactScopeWriteAuthorized: boolean): KnowledgeScanReadinessMode {
+  if (decision.trustStatus === "SELF_CONTAINED" && exactScopeWriteAuthorized) return "READ";
+  const reasonCodes = new Set(decision.reasonCodes);
+  const onlyBootstrapReasons = [...reasonCodes].every((reason) => bootstrapReasonCodes.has(reason));
+  if (exactScopeWriteAuthorized && decision.remediationActions.includes("START_FULL_SCAN") && onlyBootstrapReasons) return "BOOTSTRAP_SCAN";
+  return "BLOCKED";
+}
 
 const designCatalog: KnowledgeSourceRequirement = {
   role: "DESIGN_CATALOG",
