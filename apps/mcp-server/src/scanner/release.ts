@@ -1,4 +1,4 @@
-import type { ScannerReleaseManifest } from "@specforge/scan-contract";
+import { validateScannerRelease, type ScannerReleaseManifest } from "@specforge/scan-contract";
 import { createPublicKey, verify as verifySignature } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import type { ArchitectureScopeRef } from "@specforge/core";
@@ -59,6 +59,7 @@ export function canonicalUnsignedReleaseBytes(value: unknown): Uint8Array {
 export function verifyScannerReleaseManifest(value: unknown, trustedKeys: TrustedReleaseKeys): boolean {
   try {
     const manifest = requireRecord(value, "SCANNER_RELEASE_MANIFEST_INVALID");
+    validateScannerRelease(manifest);
     if (manifest.algorithm !== "Ed25519") return false;
     const keyId = requireString(manifest.signingKeyId, "SCANNER_RELEASE_KEY_ID_REQUIRED");
     const signature = Buffer.from(requireString(manifest.signature, "SCANNER_RELEASE_SIGNATURE_REQUIRED"), "base64");
