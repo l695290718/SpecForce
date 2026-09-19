@@ -3,7 +3,7 @@ import { contentDigest, type ArchitectureScopeRef } from "@specforge/core";
 import { Prisma } from "@prisma/client";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { ensureMcpPersistenceSchema, prisma, resolveWritableScope, writableActor } from "../persistence";
-import { assertScannerReleaseAvailable } from "./release";
+import { assertScannerReleaseAvailable, selectScannerRelease, type ScannerCapabilities } from "./release";
 import { resolvePersistedEffectiveScanGovernance } from "./governance-persistence";
 import { assessScanFinalization } from "./finalization";
 
@@ -15,6 +15,7 @@ export interface StartKnowledgeScanInput {
   connectorId: string;
   designChangeSessionId: string;
   scannerReleaseId?: string;
+  scannerCapabilities?: ScannerCapabilities;
   runtimeProfileId?: string;
   snapshotIdentity: Record<string, unknown>;
   repositoryPolicy?: { allowDirtyWorktree: boolean; ignorePatterns: string[] };
@@ -79,9 +80,16 @@ export async function startKnowledgeScan(input: StartKnowledgeScanInput): Promis
   const actorId = writableActor().actorId;
   await ensureMcpPersistenceSchema();
 
-  const release = input.scannerReleaseId
-    ? await prisma.scannerRelease.findUnique({ where: { id: input.scannerReleaseId } })
-    : await prisma.scannerRelease.findFirst({ where: { status: "ACTIVE" }, orderBy: { publishedAt: "desc" } });
+  const release = input.scannerCapabilities
+    ? await selectScannerRelease({
+      requestedReleaseId: input.scannerReleaseId,
+      capabilities: input.scannerCapabilities,
+      contractVersion: "2.0",
+      now
+    })
+    : input.scannerReleaseId
+      ? await prisma.scannerRelease.findUnique({ where: { id: input.scannerReleaseId } })
+      : await prisma.scannerRelease.findFirst({ where: { status: "ACTIVE" }, orderBy: { publishedAt: "desc" } });
   if (!release) throw new Error("SCANNER_RELEASE_NOT_FOUND");
   assertScannerReleaseAvailable(release, now);
 

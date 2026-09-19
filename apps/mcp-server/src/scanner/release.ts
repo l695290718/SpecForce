@@ -7,11 +7,36 @@ import { ensureMcpPersistenceSchema, prisma, writableActor } from "../persistenc
 type ManifestRecord = ScannerReleaseManifest & Record<string, unknown>;
 type TrustedReleaseKeys = Readonly<Record<string, string>>;
 
+export type ScannerArtifactKind = "PORTABLE_SCRIPT" | "NATIVE_BINARY";
+
+export interface ScannerRuntimeCapability {
+  name: string;
+  version: string;
+}
+
+export interface ScannerCapabilities {
+  artifactKinds: ScannerArtifactKind[];
+  platform: string;
+  architecture: string;
+  runtimes?: ScannerRuntimeCapability[];
+}
+
 export interface ScannerReleasePolicyRow {
+  id?: string;
+  version?: string;
+  contractVersion?: string;
+  publishedAt?: Date;
   status: string;
   revokedAt: Date | null;
   revocationReason: string | null;
   manifest: unknown;
+}
+
+export interface ScannerReleaseCandidate extends ScannerReleasePolicyRow {
+  id: string;
+  version: string;
+  contractVersion: string;
+  publishedAt: Date;
 }
 
 export interface GetScannerReleaseInput {
@@ -54,6 +79,62 @@ export function assertScannerReleaseAvailable(row: ScannerReleasePolicyRow, now 
   if (typeof manifest.expiresAt === "string" && new Date(manifest.expiresAt).getTime() <= now.getTime()) {
     throw new Error("SCANNER_RELEASE_EXPIRED");
   }
+}
+
+export function isScannerReleaseCompatible(
+  row: ScannerReleaseCandidate,
+  capabilities: ScannerCapabilities,
+  contractVersion: string
+): boolean {
+  if (row.contractVersion !== contractVersion) return false;
+  const manifest = requireRecord(row.manifest, "SCANNER_RELEASE_MANIFEST_INVALID") as ManifestRecord;
+  const kind = (manifest.artifactKind ?? "NATIVE_BINARY") as ScannerArtifactKind;
+  if (!capabilities.artifactKinds.includes(kind)) return false;
+  if (kind === "PORTABLE_SCRIPT") {
+    if (manifest.platform !== "any" || manifest.architecture !== "any" || !manifest.runtime) return false;
+    const runtime = manifest.runtime as unknown as Record<string, unknown>;
+    if (runtime.name !== "node") return false;
+    return (capabilities.runtimes ?? []).some((candidate) => candidate.name === "node" && satisfiesVersionRange(candidate.version, String(runtime.versionRange)));
+  }
+  if (manifest.platform !== capabilities.platform) return false;
+  return manifest.architecture === undefined || manifest.architecture === capabilities.architecture;
+}
+
+export async function selectScannerRelease(input: {
+  requestedReleaseId?: string;
+  capabilities: ScannerCapabilities;
+  contractVersion: string;
+  now?: Date;
+}, rows?: readonly ScannerReleaseCandidate[]): Promise<ScannerReleaseCandidate> {
+  const now = input.now ?? new Date();
+  const candidates = rows
+    ? [...rows]
+    : await prisma.scannerRelease.findMany({ where: { status: "ACTIVE", contractVersion: input.contractVersion }, orderBy: { publishedAt: "desc" } }) as ScannerReleaseCandidate[];
+  if (input.requestedReleaseId) {
+    const requested = candidates.find((candidate) => candidate.id === input.requestedReleaseId)
+      ?? await prisma.scannerRelease.findUnique({ where: { id: input.requestedReleaseId } }) as ScannerReleaseCandidate | null;
+    if (!requested) throw new Error("SCANNER_RELEASE_NOT_FOUND");
+    if (!isScannerReleaseCompatible(requested, input.capabilities, input.contractVersion)) throw new Error("SCANNER_RELEASE_INCOMPATIBLE");
+    assertScannerReleaseAvailable(requested, now);
+    return requested;
+  }
+  const compatible = candidates
+    .filter((candidate) => candidate.status === "ACTIVE" && isScannerReleaseCompatible(candidate, input.capabilities, input.contractVersion))
+    .filter((candidate) => {
+      try {
+        assertScannerReleaseAvailable(candidate, now);
+        return true;
+      } catch {
+        return false;
+      }
+    })
+    .sort((left, right) => {
+      const leftKind = (requireRecord(left.manifest, "SCANNER_RELEASE_MANIFEST_INVALID").artifactKind ?? "NATIVE_BINARY") === "PORTABLE_SCRIPT" ? 0 : 1;
+      const rightKind = (requireRecord(right.manifest, "SCANNER_RELEASE_MANIFEST_INVALID").artifactKind ?? "NATIVE_BINARY") === "PORTABLE_SCRIPT" ? 0 : 1;
+      return leftKind - rightKind || compareVersions(right.version, left.version) || right.publishedAt.getTime() - left.publishedAt.getTime() || left.id.localeCompare(right.id);
+    });
+  if (!compatible[0]) throw new Error("SCANNER_RELEASE_NOT_FOUND");
+  return compatible[0];
 }
 
 export async function persistScannerRelease(input: PersistScannerReleaseInput, trustedKeys = configuredTrustBundle()) {
@@ -195,4 +276,44 @@ function canonicalJson(value: unknown): string {
 
 function jsonValue(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
+}
+
+function compareVersions(left: string, right: string): number {
+  const leftParts = left.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const rightParts = right.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  for (let index = 0; index < Math.max(leftParts.length, rightParts.length); index += 1) {
+    const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+function satisfiesVersionRange(version: string, range: string): boolean {
+  const actual = parseVersion(version);
+  if (!actual) return false;
+  return range.split(/\s+/u).filter(Boolean).every((constraint) => {
+    const match = /^(>=|<=|>|<|=)?\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?$/u.exec(constraint);
+    if (!match) return false;
+    const expected = [Number(match[2]), Number(match[3] ?? 0), Number(match[4] ?? 0)];
+    const difference = compareVersionParts(actual, expected);
+    switch (match[1] ?? "=") {
+      case ">=": return difference >= 0;
+      case "<=": return difference <= 0;
+      case ">": return difference > 0;
+      case "<": return difference < 0;
+      default: return difference === 0;
+    }
+  });
+}
+
+function parseVersion(value: string): number[] | null {
+  const match = /^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:[-+].*)?$/u.exec(value);
+  return match ? [Number(match[1]), Number(match[2] ?? 0), Number(match[3] ?? 0)] : null;
+}
+
+function compareVersionParts(left: number[], right: number[]): number {
+  for (let index = 0; index < 3; index += 1) {
+    if (left[index] !== right[index]) return (left[index] ?? 0) - (right[index] ?? 0);
+  }
+  return 0;
 }
