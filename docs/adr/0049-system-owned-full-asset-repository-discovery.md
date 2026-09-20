@@ -85,6 +85,8 @@ The deployment bootstrap can publish the official portable manifest from `SPECFO
 
 The repository migration for the ACTIVE-governance uniqueness constraint is prepared but not deployed in the current environment. `pnpm exec prisma migrate status` reports 26 pending migrations, and `pnpm exec prisma migrate deploy` returns `P3005` because the existing `specforge_canonical` schema is non-empty without a Prisma migration baseline. This is an environment-owned blocked follow-up, not an MCP synchronization failure; the migration must be baselined and reviewed before deployment.
 
+The verified connection at `localhost:15433` forwards to Docker service `deploy-postgres-1/specforge_canonical`; the separate `specforge-postgres` container is not the application's configured database. A custom-format backup was created at `.specforge/backups/specforge_canonical-20260920.dump` and validated with `pg_restore -l` (608 archive entries). Because historical migrations include data backfills and graph seeding, the backup is a prerequisite for review; it is not evidence that the historical migrations can be marked applied automatically.
+
 ## 中文本地化覆盖
 
 ### 背景
@@ -160,3 +162,5 @@ The repository migration for the ACTIVE-governance uniqueness constraint is prep
 部署引导可从 `SPECFORGE_SCANNER_RELEASE_MANIFEST` 发布官方 portable 清单；生产环境缺少必需 Release 时快速失败。就绪评估只有在原因全部属于来源覆盖问题、同时包含 `START_FULL_SCAN` 且精确 Scope 已授权时，才允许开始受治理的首次扫描；该模式绝不读取被拒绝的知识正文。PostgreSQL 防止同一治理 kind 存在多个 ACTIVE 版本。
 
 用于保证 ACTIVE 治理版本唯一性的仓库迁移已经准备好，但尚未在当前环境部署。`pnpm exec prisma migrate status` 报告 26 个待执行迁移，`pnpm exec prisma migrate deploy` 因现有 `specforge_canonical` Schema 非空且没有 Prisma 迁移基线而返回 `P3005`。这是由部署环境负责的阻断待办，不是 MCP 同步失败；部署前必须完成基线核对和审核。
+
+已核实 `localhost:15433` 转发到 Docker 服务 `deploy-postgres-1/specforge_canonical`；旁边的 `specforge-postgres` 容器不是应用配置使用的数据库。已创建 `.specforge/backups/specforge_canonical-20260920.dump` 格式备份，并用 `pg_restore -l` 校验到 608 个归档目录项。由于历史迁移包含数据回填和图关系种子数据，备份只是审核前提，不能证明可以自动将历史迁移标记为已应用。

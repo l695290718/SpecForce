@@ -412,7 +412,7 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **Trigger:** During an approved maintenance window, take a backup, compare the existing schema with the repository migration history, create and review the Prisma baseline or mark the historical migrations as applied, then rerun `pnpm exec prisma migrate deploy` and verify the partial unique index for one ACTIVE scanner-governance record per kind with `pnpm exec prisma migrate status`.
 
-**Evidence:** `pnpm exec prisma migrate status` reported 26 pending migrations; `pnpm exec prisma migrate deploy` returned `P3005: The database schema is not empty`. MCP design-fact synchronization and scoped reconciliation completed successfully; only database deployment remains blocked.
+**Evidence:** `pnpm exec prisma migrate status` reported 26 pending migrations; `pnpm exec prisma migrate deploy` returned `P3005: The database schema is not empty`. The application connection at `localhost:15433` forwards to Docker service `deploy-postgres-1/specforge_canonical`; the separate `specforge-postgres` container is not the application database. A custom-format backup at `.specforge/backups/specforge_canonical-20260920.dump` was created and its 608-entry archive directory was validated with `pg_restore -l`. MCP design-fact synchronization and scoped reconciliation completed successfully; only database deployment remains blocked.
 
 ### Portable Scanner Governance 的 PostgreSQL 规范迁移基线
 
@@ -426,4 +426,4 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **启动条件：** 在获批准的维护窗口备份数据库，核对现有 Schema 与仓库迁移历史，创建并审核 Prisma 基线或将历史迁移标记为已应用；随后重新执行 `pnpm exec prisma migrate deploy`，并用 `pnpm exec prisma migrate status` 验证每个治理 kind 至多一个 ACTIVE 记录的部分唯一索引。
 
-**证据：** `pnpm exec prisma migrate status` 报告 26 个待执行迁移；`pnpm exec prisma migrate deploy` 返回 `P3005: The database schema is not empty`。MCP 设计事实同步和精确 Scope 对账已经成功，当前仅数据库部署仍被阻断。
+**证据：** `pnpm exec prisma migrate status` 报告 26 个待执行迁移；`pnpm exec prisma migrate deploy` 返回 `P3005: The database schema is not empty`。应用连接 `localhost:15433` 转发到 Docker 服务 `deploy-postgres-1/specforge_canonical`；旁边的 `specforge-postgres` 容器不是应用数据库。已创建 `.specforge/backups/specforge_canonical-20260920.dump` 格式备份，并用 `pg_restore -l` 校验到 608 个目录项。MCP 设计事实同步和精确 Scope 对账已经成功，当前仅数据库部署仍被阻断。

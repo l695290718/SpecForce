@@ -30,8 +30,12 @@ The 2026-09-19 portable-release increment also verifies a signed Node runtime pa
 
 Database deployment boundary: `pnpm exec prisma migrate status` reported 26 pending migrations, and `pnpm exec prisma migrate deploy` returned `P3005` because the existing `specforge_canonical` schema is non-empty without a Prisma migration baseline. The partial unique-index migration is prepared but not applied. This is tracked as `backlog-portable-scanner-postgres-baseline`; do not use `db push` or reset the database. MCP synchronization for the exact Scope completed successfully.
 
+The configured `localhost:15433` endpoint was verified to forward to Docker service `deploy-postgres-1/specforge_canonical`; the separate `specforge-postgres` container is not the configured application database. A custom-format backup was written to `.specforge/backups/specforge_canonical-20260920.dump` and `pg_restore -l` recognized 608 archive entries. Historical migrations include data backfills and graph seed writes, so automatic `migrate resolve --applied` remains prohibited until the baseline review is complete.
+
 ## Deliberate environment boundary
 
 The default Next standalone build is environment-blocked on Windows OneDrive because Next cannot create trace symlinks (`EPERM`); the equivalent non-standalone build passed, and the production Docker/Linux path is unchanged. An unscoped full-baseline design-fact sync is also blocked by an unrelated historical ADR that requires a governed data-model upgrade; the current repository-scan increment is synchronized and reconciled independently under its exact Scope.
 
 数据库部署阻断：`pnpm exec prisma migrate status` 报告 26 个待执行迁移，`pnpm exec prisma migrate deploy` 因现有 `specforge_canonical` Schema 非空且没有 Prisma 迁移基线而返回 `P3005`。部分唯一索引迁移已准备但未应用。该问题已登记为 `backlog-portable-scanner-postgres-baseline`，禁止使用 `db push` 或重置数据库。精确 Scope 的 MCP 同步已经成功。
+
+已核实配置的 `localhost:15433` 端点转发到 Docker 服务 `deploy-postgres-1/specforge_canonical`；旁边的 `specforge-postgres` 容器不是应用配置使用的数据库。已将格式备份写入 `.specforge/backups/specforge_canonical-20260920.dump`，`pg_restore -l` 识别到 608 个归档目录项。历史迁移包含数据回填和图关系种子写入，因此在基线审核完成前禁止自动执行 `migrate resolve --applied`。
