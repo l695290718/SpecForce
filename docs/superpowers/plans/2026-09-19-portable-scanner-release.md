@@ -19,6 +19,13 @@
 - A failed or partial scan cannot change accepted facts, Baselines or formal dashboard counts.
 - `.specforge/scans/` remains private runtime output and is never staged.
 
+## Execution Status (2026-09-20)
+
+- Tasks 1-6: implemented and committed. Contract compatibility, deterministic release selection, portable Node scanner, bootstrap readiness, governance uniqueness, and isolated integration fixtures are in the repository.
+- Task 7: ADR, evidence, bilingual overlays, exact-Scope MCP synchronization, and reconciliation are complete. The design session was closed as `BLOCKED` because the canonical PostgreSQL database has no Prisma migration history and historical migrations include data backfills and graph seed writes.
+- Task 8: repository verification and local build checks passed. Database deployment and the final bounded end-to-end scan remain blocked until the reviewed PostgreSQL baseline is completed.
+- Verified database prerequisite: `localhost:15433` forwards to Docker `deploy-postgres-1/specforge_canonical`; backup `.specforge/backups/specforge_canonical-20260920.dump` is private and was validated with `pg_restore -l`.
+
 ---
 
 ### Task 1: Extend the signed Scanner Release contract
