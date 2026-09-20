@@ -3403,6 +3403,40 @@
                       { "command": "design review 2026-09-17", "result": "Approved system-owned governance, framework capability matrix, full-asset candidates, and governed promotion boundaries." },
                       { "command": "git diff --check", "result": "Passed for the rewritten specification, ADR, and manifest." }
                     ]
+                  },
+                  {
+                    "id": "adr-canonical-postgresql-brownfield-baseline",
+                    "repositoryAdr": "docs/adr/0050-canonical-postgresql-brownfield-baseline.md",
+                    "mcpAdrId": "adr-canonical-postgresql-brownfield-baseline",
+                    "scope": {
+                      "applicationServiceId": "com.specforge.designcenter",
+                      "scopePath": "pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter"
+                    },
+                    "proposalId": "proposal-canonical-postgresql-brownfield-baseline",
+                    "proposalStatus": "implemented",
+                    "contextPackId": "context-pack-canonical-postgresql-brownfield-baseline",
+                    "relatedAssetIds": ["adr-system-owned-full-asset-repository-discovery", "api-specforge-mcp-tools", "data-specforge-asset-graph"],
+                    "owner": "SpecForge Deployment and Data Platform Governance",
+                    "status": "Implemented and verified against the canonical Docker PostgreSQL database.",
+                    "reason": "The existing authored database required a guarded Prisma baseline and a missing-only relationship repair without replaying historical data migrations.",
+                    "retryTrigger": "For a future brownfield database, run the audit mode, create a reviewed backup, confirm the unchanged relationship-gap digest, and apply only with exact database confirmation.",
+                    "localizedContent": {
+                      "en": {
+                        "decision": "Establish Prisma ownership with a guarded brownfield baseline and repair only missing AssetLink relationship ledger entries.",
+                        "constraints": ["PostgreSQL remains authoritative.", "Historical data migrations are never replayed.", "Private backups and audit reports are never committed."]
+                      },
+                      "zh": {
+                        "decision": "通过受保护的存量基线建立 Prisma 所有权，并且只修复 AssetLink 关系账本中真正缺失的记录。",
+                        "constraints": ["PostgreSQL 保持权威。", "绝不重放历史数据迁移。", "私有备份和审计报告不得提交到仓库。"]
+                      }
+                    },
+                    "evidence": [
+                      { "command": "docker exec deploy-postgres-1 pg_restore -l /tmp/specforge_canonical-20260920-final.dump", "result": "Passed: final custom-format rollback backup is readable; local copy is 2,540,597 bytes." },
+                      { "command": "pnpm baseline:canonical -- --mode apply --confirm-canonical --backup .specforge/backups/specforge_canonical-20260920-final.dump --expected-gap-digest ae0c5607ef65ef97db66c559464dee853a87092567447743517db5049a0e3025", "result": "Passed: canonical database applied the 25 historical baseline resolutions, the governance uniqueness migration, and the missing-only relationship repair migration." },
+                      { "command": "pnpm exec prisma migrate status", "result": "Passed: 27 migrations found; Database schema is up to date!" },
+                      { "command": "pnpm exec vitest run scripts/baseline-canonical-postgres.test.ts scripts/brownfield-baseline.integration.test.ts", "result": "Passed: pure baseline tests and 3 canonical integration tests; the same 3 integration tests also passed on the isolated probe database." },
+                      { "command": "canonical PostgreSQL invariant queries", "result": "Passed: missing semantic relationships 0, repair relationships 373, repair events 373, repair Outbox rows 373, active governance duplicate groups 0." }
+                    ]
                   }
                   ]
 }

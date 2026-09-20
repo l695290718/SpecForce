@@ -50,6 +50,7 @@
     ,"identity:apply-migration": "tsx scripts/identity-apply-migration.ts"
     ,"identity:verify-config": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/verify-identity-config.ts"
     ,"identity:cutover-check": "node --env-file=deploy/.env node_modules/tsx/dist/cli.mjs scripts/identity-cutover-check.ts"
+    ,"baseline:canonical": "tsx scripts/baseline-canonical-postgres.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved direction, pending written-spec review. Owning application-service Scope: `com.specforge.designcenter` at `pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter`.
+Approved and implemented on 2026-09-20. Owning application-service Scope: `com.specforge.designcenter` at `pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter`.
 
 Design change session: `design-change-session:d7f00607-dc6b-4df5-8729-12e2e101d9b0`.
 
@@ -68,7 +68,7 @@ Add a repository script that defaults to audit-only mode. It must:
 - leave `20260919000000_unique_active_scan_governance` and the new repair migration pending for normal `migrate deploy`;
 - write a machine-readable audit report under `.specforge/baselines/`, which remains private and untracked.
 
-The script never runs `db push`, resets a schema, drops data, or edits checksums. It stops before each write if the observed migration directory does not match the reviewed allowlist.
+The script never runs `db push`, resets a schema, drops data, or edits checksums. It stops before each write if the observed migration directory does not match the reviewed allowlist. `--confirm-probe` is accepted only for a uniquely named `specforge_baseline_probe_*` database; `--confirm-canonical` is accepted only for `specforge_canonical`. Historical migrations already present in the ledger are skipped, and each newly resolved migration is read back before continuing.
 
 ## Verification And Rollback
 
@@ -82,7 +82,7 @@ First restore the verified backup into a uniquely named probe database. Run audi
 - `prisma migrate status` is current;
 - focused graph, scanner-governance, and Scope-isolation tests pass.
 
-Production execution uses the same commands and digests after a fresh backup. Failure before commit rolls back the repair transaction. Failure after migration metadata changes uses the verified backup for full database restore; migration metadata is never manually edited in place.
+Production execution used the same commands and digest after a fresh backup. Failure before commit rolls back the repair transaction. Failure after migration metadata changes uses the verified backup for full database restore; migration metadata is never manually edited in place. Final evidence: 27 migrations are current, the semantic gap is 0, 373 repair relationship/event/Outbox rows exist, and the focused probe and canonical integration suites each pass 3 tests.
 
 ## Operational Boundaries
 

@@ -404,26 +404,26 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **Backlog ID:** `backlog-portable-scanner-postgres-baseline`
 
-**Status:** Blocked by the current deployment environment. The governance migration is prepared, but it has not been applied to the existing canonical database.
+**Status:** Completed on 2026-09-20. The canonical database has a Prisma migration baseline and the missing relationship ledger entries have been repaired.
 
 **Owner:** SpecForge deployment and data-platform operator.
 
-**Rationale:** The `specforge_canonical` PostgreSQL database at `localhost:15433` is non-empty and does not contain the Prisma migration history required by the repository. Running `pnpm exec prisma migrate deploy` returned `P3005`; applying `db push` or resetting the database would risk destroying authored design facts and is not an acceptable substitute.
+**Rationale:** The non-empty database required a guarded brownfield baseline rather than a reset or `db push`. Historical migrations were resolved without replaying their data backfills, and a missing-only migration repaired the relationship ledger.
 
-**Trigger:** During an approved maintenance window, take a backup, compare the existing schema with the repository migration history, create and review the Prisma baseline or mark the historical migrations as applied, then rerun `pnpm exec prisma migrate deploy` and verify the partial unique index for one ACTIVE scanner-governance record per kind with `pnpm exec prisma migrate status`.
+**Trigger:** Future brownfield environments must use `pnpm baseline:canonical -- --mode audit` first, then provide a reviewed backup, unchanged gap digest, and explicit database confirmation before apply.
 
-**Evidence:** `pnpm exec prisma migrate status` reported 26 pending migrations; `pnpm exec prisma migrate deploy` returned `P3005: The database schema is not empty`. The application connection at `localhost:15433` forwards to Docker service `deploy-postgres-1/specforge_canonical`; the separate `specforge-postgres` container is not the application database. A custom-format backup at `.specforge/backups/specforge_canonical-20260920.dump` was created and its 608-entry archive directory was validated with `pg_restore -l`. MCP design-fact synchronization and scoped reconciliation completed successfully; only database deployment remains blocked.
+**Evidence:** Final backup `.specforge/backups/specforge_canonical-20260920-final.dump` is 2,540,597 bytes and passed `pg_restore -l`. `pnpm exec prisma migrate status` reports 27 migrations and `Database schema is up to date!`. The canonical audit reports `pendingHistoricalMigrations=[]`, `missingLinkCount=0`, `unexpectedIndexes=[]`, all Scope-null counts `0`, and no duplicate ACTIVE governance groups. The canonical invariant query reports 373 repaired relationships, 373 repaired events, 373 repaired Outbox rows, and 0 duplicate groups. The application connection at `localhost:15433` forwards to Docker service `deploy-postgres-1/specforge_canonical`; `specforge-postgres` is not the application database. See ADR-0050 and `docs/evidence/governed-full-asset-repository-scan.md` for exact command evidence.
 
 ### Portable Scanner Governance 的 PostgreSQL 规范迁移基线
 
 **待办标识：** `backlog-portable-scanner-postgres-baseline`
 
-**状态：** 被当前部署环境阻断。治理迁移已经准备好，但尚未应用到现有权威数据库。
+**状态：** 已于 2026-09-20 完成。权威数据库已建立 Prisma 迁移基线，关系账本缺口已修复。
 
 **负责人：** SpecForge 部署与数据平台负责人。
 
-**理由：** `localhost:15433` 的 `specforge_canonical` PostgreSQL 数据库已有非空 Schema，但没有仓库要求的 Prisma 迁移历史。执行 `pnpm exec prisma migrate deploy` 返回 `P3005`；执行 `db push` 或重置数据库可能破坏已维护的设计事实，不能作为替代方案。
+**理由：** 非空数据库必须采用受保护的存量基线，而不能重置或执行 `db push`。历史迁移只登记不重放数据回填，另用只补缺失的迁移修复关系账本。
 
-**启动条件：** 在获批准的维护窗口备份数据库，核对现有 Schema 与仓库迁移历史，创建并审核 Prisma 基线或将历史迁移标记为已应用；随后重新执行 `pnpm exec prisma migrate deploy`，并用 `pnpm exec prisma migrate status` 验证每个治理 kind 至多一个 ACTIVE 记录的部分唯一索引。
+**启动条件：** 后续存量环境先执行 `pnpm baseline:canonical -- --mode audit`，只有在备份、缺口摘要未变化且精确数据库确认完成后才允许应用。
 
-**证据：** `pnpm exec prisma migrate status` 报告 26 个待执行迁移；`pnpm exec prisma migrate deploy` 返回 `P3005: The database schema is not empty`。应用连接 `localhost:15433` 转发到 Docker 服务 `deploy-postgres-1/specforge_canonical`；旁边的 `specforge-postgres` 容器不是应用数据库。已创建 `.specforge/backups/specforge_canonical-20260920.dump` 格式备份，并用 `pg_restore -l` 校验到 608 个目录项。MCP 设计事实同步和精确 Scope 对账已经成功，当前仅数据库部署仍被阻断。
+**证据：** 最终备份 `.specforge/backups/specforge_canonical-20260920-final.dump` 为 2,540,597 字节并通过 `pg_restore -l` 校验。`pnpm exec prisma migrate status` 报告 27 个迁移且 Schema 已是最新；审计报告历史待迁移为空、关系缺口为 0、意外漂移为空、所有 Scope 空值为 0、治理重复组为 0；正式库查询得到 373 条关系、373 条事件、373 条 Outbox，聚焦集成测试通过。详见 ADR-0050 与 `docs/evidence/governed-full-asset-repository-scan.md`。
