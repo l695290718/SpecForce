@@ -42,7 +42,9 @@
     "designer-3a:v7:publish": "tsx scripts/publish-designer-3a-v7.ts",
     "designer-3a:v7:verify": "tsx scripts/verify-designer-3a-v7.ts",
     "feature-catalog:backfill": "tsx scripts/backfill-feature-catalog.ts",
-    "scan-governance:bootstrap": "tsx scripts/bootstrap-system-scan-governance.ts"
+    "scan-governance:bootstrap": "tsx scripts/bootstrap-system-scan-governance.ts",
+    "scanner:provision-local": "node scripts/provision-local-scanner-release.mjs",
+    "scan:governed-local": "tsx scripts/run-governed-repository-scan.ts"
     ,"system-baseline:migrate": "tsx scripts/migrate-system-baseline.ts"
     ,"identity:bootstrap": "tsx scripts/identity-bootstrap.ts"
     ,"identity:recover": "tsx scripts/identity-recover.ts"

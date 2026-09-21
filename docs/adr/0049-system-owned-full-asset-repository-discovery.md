@@ -77,6 +77,22 @@ The implemented increment includes system-owned governance records, technology-a
 - `$env:SPECFORGE_DESIGN_FACT_IDS='adr-system-owned-full-asset-repository-discovery'; pnpm design-facts:check` -> `missing=[]`, `mismatched=[]`, `outOfScope=[]`, `blocked=[]`.
 - Unscoped `pnpm design-facts:sync` remains blocked by the unrelated historical `adr-3a-architecture-navigation-workspace` record returning `DATA_MODEL_UPGRADE_REQUIRED`. Retry after that historical data-model migration, then rerun full sync and reconciliation.
 
+## Large-Repository Candidate Persistence (2026-09-21)
+
+The current SpecForge repository was scanned into the exact `com.specforge.designcenter` Scope with report digest `d9a86018f8691d4da1764e4a75e57e85c4b69056a7032a628925e1d66a2c856c`. The scan indexed 1,060 observations across repository sources, OpenAPI, AsyncAPI, database metadata, and documents. The first MockAI candidate-generation attempt returned `MCP synchronization blocked` because the compatibility path placed all 1,060 candidate upserts in one database transaction and the transaction expired. The transaction rolled back; retry trigger: persist candidates in bounded idempotent chunks before assembling the ReviewBundle.
+
+The compatibility path now validates candidates before persistence, writes chunks of at most 100 candidates through separate idempotent transactions, and creates the ReviewBundle only after all chunks succeed. `pnpm typecheck` and `pnpm exec vitest run apps/mcp-server/src/knowledge/candidate-persistence.test.ts` passed (8 tests). Retrying the same report produced 1,060 bilingual candidate assertions with complete coverage, zero blocking issues, and ReviewBundle digest `9979fabf241dba8d1a3964d547b81c0022f7e58746dde06ed5a82eca752068a9`. Candidates remain pending review; no accepted asset, relationship, or Baseline was published. The full production path remains the signed `KnowledgeScanSession` plus `submit_semantic_candidate_batch` protocol.
+
+The first complete ReviewBundle was correctly blocked because `totalFiles` included 2,215 explicitly `OUT_OF_POLICY` paths. Candidate coverage now uses indexed, applicable sources (`1,060/1,060`) while preserving the report's policy coverage and out-of-policy counts. Reassembly changed the bundle to `READY` with risk `T1` and no blocking issues. The user-approved MCP decision `knowledge-promotion-decision:d9a86018f8691d4da1764e4a75e57e85c4b69056a7032a628925e1d66a2c856c:user-confirmed` marked the candidate assertions approved for later delivery; formal asset promotion and Baseline publication remain separate governed steps.
+
+Formal promotion was intentionally not attempted from this compatibility report. `promote_knowledge_candidates` requires a finalized `KnowledgeScanSession` in `READY_FOR_ANALYSIS`, while this run produced only a compatibility `ScanReport`; the local `dist/scanner` directory has no signed release and `SPECFORGE_SCANNER_RELEASE_PRIVATE_KEY` is not configured. Retry trigger: configure the trusted signed portable scanner release, rerun `start_knowledge_scan` through `finalize_knowledge_scan`, resubmit provider-neutral candidate batches, then promote and reconcile through the exact Scope.
+
+## Governed Retry and Local Trust Root (2026-09-21)
+
+The local close-out now includes an idempotent `pnpm scanner:provision-local` command. It generates one Ed25519 development key outside the repository at `~/.specforge/scanner/keys/`, derives a fingerprinted Key ID, writes a local scanner trust store, builds a unique signed Portable Scanner Release, and registers the public Trust Bundle plus manifest in PostgreSQL. The private key, trust store, scanner artifact, and scan spool are excluded from the commit boundary.
+
+`pnpm scan:governed-local` then binds the signed release to an exact `KnowledgeScanSession`, runs the portable scanner, submits hash-chained batches through MCP, and submits provider-neutral bilingual semantic candidates only after finalization. The first governed retry created release `scanner-release:2.1.0-local.2026092101-portable` and session `knowledge-scan:32151ac2-aa21-41a6-841a-4e9b8f20a0db`; it accepted 3,469 observations across 31,522 indexed files but finalized `BLOCKED` with `COVERAGE_PLAN_INCOMPLETE`. The portable observer is intentionally not allowed to claim framework-aware full-asset coverage, so no candidates, accepted assets, relationships, ChangeSet, or Baseline were promoted. The remaining backlog is framework-aware extractor coverage and server-derived technology/coverage planning, followed by independent T1 review.
+
 ## Portable Release Increment (2026-09-19)
 
 The default scanner distribution is now a signed Node.js portable script release for Node `>=20 <25`, with `platform=any`, `architecture=any`, and an explicit runtime/entrypoint in the manifest. Native Go releases remain compatible only when the caller explicitly supports the target platform. `start_knowledge_scan` receives bounded runtime capabilities and pins the deterministic compatible release to the session.
@@ -154,6 +170,22 @@ The verified connection at `localhost:15433` forwards to Docker service `deploy-
 - `$env:SPECFORGE_DESIGN_FACT_IDS='adr-system-owned-full-asset-repository-discovery'; pnpm design-facts:sync` -> 本 ADR 同步完成。
 - `$env:SPECFORGE_DESIGN_FACT_IDS='adr-system-owned-full-asset-repository-discovery'; pnpm design-facts:check` -> `missing=[]`、`mismatched=[]`、`outOfScope=[]`、`blocked=[]`。
 - 不带筛选的 `pnpm design-facts:sync` 仍被无关的历史 `adr-3a-architecture-navigation-workspace` 记录阻断，返回 `DATA_MODEL_UPGRADE_REQUIRED`。完成该历史数据模型迁移后，重新执行全量同步和对账。
+
+## 大仓库候选持久化（2026-09-21）
+
+当前 SpecForge 仓库已在精确 `com.specforge.designcenter` Scope 下完成扫描，报告摘要为 `d9a86018f8691d4da1764e4a75e57e85c4b69056a7032a628925e1d66a2c856c`。本次从仓库源码、OpenAPI、AsyncAPI、数据库元数据和文档中索引了 1,060 条观察。第一次 MockAI 候选生成尝试返回 `MCP synchronization blocked`，原因是兼容路径把 1,060 条候选全部放入单个数据库事务，事务超时；事务已回滚。重试触发条件为：在组装 ReviewBundle 前，使用有界且幂等的小批次持久化候选。
+
+兼容路径现已在持久化前校验候选，按不超过 100 条的批次分别执行幂等事务，全部批次成功后才创建 ReviewBundle。`pnpm typecheck` 和 `pnpm exec vitest run apps/mcp-server/src/knowledge/candidate-persistence.test.ts` 已通过（8 个测试）。使用同一报告重试后生成 1,060 条双语候选断言，覆盖完整、阻断项为 0，ReviewBundle 摘要为 `9979fabf241dba8d1a3964d547b81c0022f7e58746dde06ed5a82eca752068a9`。候选仍待审核；没有发布正式资产、关系或 Baseline。完整生产路径仍是签名 `KnowledgeScanSession` 加 `submit_semantic_candidate_batch` 协议。
+
+第一版完整 ReviewBundle 被正确阻断，原因是 `totalFiles` 把 2,215 个明确标记为 `OUT_OF_POLICY` 的路径也计算在内。现在候选覆盖改用扫描策略实际索引的适用来源（`1,060/1,060`），同时保留扫描报告中的策略覆盖和越界路径统计。重新组装后审核包状态为 `READY`、风险为 `T1`、阻断项为 0。用户已通过 MCP 决策 `knowledge-promotion-decision:d9a86018f8691d4da1764e4a75e57e85c4b69056a7032a628925e1d66a2c856c:user-confirmed` 批准候选进入后续交付；正式资产提升和 Baseline 发布仍是独立的受治理步骤。
+
+本次没有直接从兼容性报告执行正式提升。`promote_knowledge_candidates` 要求已完成且状态为 `READY_FOR_ANALYSIS` 的 `KnowledgeScanSession`，而本次只有兼容性 `ScanReport`；本地 `dist/scanner` 没有签名发行物，`SPECFORGE_SCANNER_RELEASE_PRIVATE_KEY` 也未配置。重试条件为：配置受信任的签名跨平台扫描器发行物，重新通过 `start_knowledge_scan` 到 `finalize_knowledge_scan` 完成受治理扫描，再提交中立候选批次，最后在精确 Scope 下执行提升和对账。
+
+## 受治理重试与本地信任根（2026-09-21）
+
+本次收尾新增幂等命令 `pnpm scanner:provision-local`：在仓库外的 `~/.specforge/scanner/keys/` 生成一把 Ed25519 开发密钥，根据公钥指纹生成 Key ID，写入本地扫描器信任库，构建唯一的签名 Portable Scanner Release，并将公钥 Trust Bundle 和清单注册到 PostgreSQL。私钥、信任库、扫描器制品和扫描 Spool 均不进入提交边界。
+
+随后 `pnpm scan:governed-local` 将签名发行物绑定到精确 `KnowledgeScanSession`，运行便携扫描器，通过 MCP 提交哈希链批次，并且仅在最终化后提交中立的双语语义候选。第一次受治理重试创建了发行物 `scanner-release:2.1.0-local.2026092101-portable` 和会话 `knowledge-scan:32151ac2-aa21-41a6-841a-4e9b8f20a0db`，接收 3,469 条观察、覆盖 31,522 个索引文件，但以 `COVERAGE_PLAN_INCOMPLETE` 阻塞。便携观察器不能冒充框架感知的完整资产覆盖，因此没有提升候选、正式资产、关系、ChangeSet 或 Baseline。剩余待办是框架感知提取器覆盖、服务端生成的技术栈与覆盖计划，以及后续 T1 独立评审。
 
 ## 跨平台 Release 增量（2026-09-19）
 

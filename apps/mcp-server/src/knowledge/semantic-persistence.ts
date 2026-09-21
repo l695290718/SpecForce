@@ -41,7 +41,7 @@ export async function generateKnowledgeCandidates(input: GenerateKnowledgeCandid
   if (!report) throw new Error("SCAN_REPORT_NOT_FOUND");
   const reviewBundleId = `knowledge-review:${report.reportDigest}`;
   const existingBundle = await prisma.knowledgeReviewBundle.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: reviewBundleId } } });
-  if (existingBundle) {
+  if (existingBundle && existingBundle.status !== "BLOCKED") {
     return {
       scanReportId: report.id,
       reportDigest: report.reportDigest,
@@ -54,7 +54,7 @@ export async function generateKnowledgeCandidates(input: GenerateKnowledgeCandid
   }
 
   const observationIds = (report.observationIds as string[] | undefined) ?? [];
-  const coverageReport = report.coverage as { totalFiles: number; indexedFiles: number; complete: boolean };
+  const coverageReport = report.coverage as { totalFiles: number; indexedFiles: number; outOfPolicyFiles?: number; excludedFiles?: number; complete: boolean };
   const rows = await prisma.sourceObservation.findMany({ where: { ...scope, id: { in: observationIds } }, orderBy: [{ externalId: "asc" }, { id: "asc" }] });
   if (rows.length !== observationIds.length) throw new Error("SCAN_OBSERVATIONS_NOT_PERSISTED");
   const observations: ScanObservation[] = rows.map((row) => ({
@@ -82,7 +82,9 @@ export async function generateKnowledgeCandidates(input: GenerateKnowledgeCandid
   const assertions = validDrafts.map((draft, index) => assertionFromDraft(draft, observations.find((observation) => observation.id === draft.sourceObservationId)!, report, scope, evidenceRefs, now, assertionIds[index]!));
   const riskTier = maximumReviewRisk(assertions.map((assertion) => assertion.riskTier ?? "T1"));
   const coverage = {
-    totalSources: coverageReport.totalFiles,
+    // The report's totalFiles includes explicitly out-of-policy and excluded
+    // paths. Only indexed files are applicable candidate sources.
+    totalSources: coverageReport.indexedFiles,
     processedSources: validDrafts.length,
     supportedSources: coverageReport.indexedFiles,
     candidateCount: validDrafts.length,
@@ -91,21 +93,37 @@ export async function generateKnowledgeCandidates(input: GenerateKnowledgeCandid
   const status = evaluateReviewBundle(coverage, issues);
   const digest = reviewBundleDigest({ architectureScope: scope, designChangeSessionId: report.designChangeSessionId, riskTier, assertionIds, identityCandidateIds: [], architectureFactRevisionIds: [], evidenceRefs, coverage, blockingIssues: issues });
 
+  const session = await prisma.designChangeSession.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: report.designChangeSessionId } } });
+  if (!session) throw new Error("DESIGN_CHANGE_SESSION_NOT_FOUND");
+  if (["BLOCKED", "CLOSED"].includes(session.status)) throw new Error("DESIGN_CHANGE_SESSION_NOT_OPEN");
+  for (const assertion of assertions) validateKnowledgeAssertion(assertion, genericSystemAnalysisProfile);
+
+  // Keep candidate persistence resumable. A large repository can produce thousands
+  // of candidates, so one long transaction would exceed the database transaction
+  // lifetime before the review bundle is assembled.
+  for (const chunk of chunks(assertions, 100)) {
+    await prisma.$transaction(async (transaction) => {
+      for (const assertion of chunk) {
+        const existing = await transaction.knowledgeAssertion.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: assertion.id } } });
+        if (existing?.status === "ACCEPTED") throw new Error("SEMANTIC_CANDIDATE_REWRITE_ACCEPTED");
+        await transaction.knowledgeAssertion.upsert({
+          where: { applicationServiceId_scopePath_id: { ...scope, id: assertion.id } },
+          create: assertionRow(assertion),
+          update: assertionRowUpdate(assertion)
+        });
+      }
+    });
+  }
+
   const bundle = await prisma.$transaction(async (transaction) => {
-    const session = await transaction.designChangeSession.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: report.designChangeSessionId } } });
-    if (!session) throw new Error("DESIGN_CHANGE_SESSION_NOT_FOUND");
-    if (["BLOCKED", "CLOSED"].includes(session.status)) throw new Error("DESIGN_CHANGE_SESSION_NOT_OPEN");
-    for (const assertion of assertions) {
-      validateKnowledgeAssertion(assertion, genericSystemAnalysisProfile);
-      const existing = await transaction.knowledgeAssertion.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: assertion.id } } });
-      if (existing?.status === "ACCEPTED") throw new Error("SEMANTIC_CANDIDATE_REWRITE_ACCEPTED");
-      await transaction.knowledgeAssertion.upsert({
-        where: { applicationServiceId_scopePath_id: { ...scope, id: assertion.id } },
-        create: assertionRow(assertion),
-        update: assertionRowUpdate(assertion)
-      });
-    }
-    const created = await transaction.knowledgeReviewBundle.create({ data: { ...scope, id: reviewBundleId, designChangeSessionId: report.designChangeSessionId, status, riskTier, assertionIds, identityCandidateIds: [], evidenceRefs, coverage: jsonValue(coverage), blockingIssues: issues, digest, createdBy: writableActor().actorId } });
+    const currentSession = await transaction.designChangeSession.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: report.designChangeSessionId } } });
+    if (!currentSession) throw new Error("DESIGN_CHANGE_SESSION_NOT_FOUND");
+    if (["BLOCKED", "CLOSED"].includes(currentSession.status)) throw new Error("DESIGN_CHANGE_SESSION_NOT_OPEN");
+    const created = await transaction.knowledgeReviewBundle.upsert({
+      where: { applicationServiceId_scopePath_id: { ...scope, id: reviewBundleId } },
+      create: { ...scope, id: reviewBundleId, designChangeSessionId: report.designChangeSessionId, status, riskTier, assertionIds, identityCandidateIds: [], evidenceRefs, coverage: jsonValue(coverage), blockingIssues: issues, digest, createdBy: writableActor().actorId },
+      update: { designChangeSessionId: report.designChangeSessionId, status, riskTier, assertionIds, identityCandidateIds: [], evidenceRefs, coverage: jsonValue(coverage), blockingIssues: issues, digest }
+    });
     await transaction.designChangeSession.update({ where: { applicationServiceId_scopePath_id: { ...scope, id: report.designChangeSessionId } }, data: { status: status === "READY" ? "WAITING_FOR_REVIEW" : "CONFLICTED" } });
     await transaction.federationOutbox.upsert({ where: { applicationServiceId_scopePath_idempotencyKey: { ...scope, idempotencyKey: `semantic-candidates:${report.reportDigest}` } }, create: { ...scope, eventType: "KNOWLEDGE_SEMANTIC_CANDIDATES_GENERATED", payload: jsonValue({ scanReportId: report.id, reportDigest: report.reportDigest, provider: response.provider, assertionIds, blockingIssues: issues }), idempotencyKey: `semantic-candidates:${report.reportDigest}`, status: "PENDING", designChangeSessionId: report.designChangeSessionId }, update: {} });
     return created;
@@ -218,6 +236,12 @@ function normalizeCompatibilityValue(value: Record<string, unknown>, source: Rec
 
 function domainClusterFor(draft: SemanticCandidateDraft): string {
   return draft.semanticIdentity.split(/[.:/]/u).find(Boolean) ?? draft.factType;
+}
+
+function chunks<T>(items: T[], size: number): T[][] {
+  const result: T[][] = [];
+  for (let index = 0; index < items.length; index += size) result.push(items.slice(index, index + size));
+  return result;
 }
 
 function jsonValue(value: unknown): Prisma.InputJsonValue {

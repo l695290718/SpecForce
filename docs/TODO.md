@@ -427,3 +427,31 @@ Only incomplete work is listed here. Completed and superseded records are preser
 **启动条件：** 后续存量环境先执行 `pnpm baseline:canonical -- --mode audit`，只有在备份、缺口摘要未变化且精确数据库确认完成后才允许应用。
 
 **证据：** 最终备份 `.specforge/backups/specforge_canonical-20260920-final.dump` 为 2,540,597 字节并通过 `pg_restore -l` 校验。`pnpm exec prisma migrate status` 报告 27 个迁移且 Schema 已是最新；审计报告历史待迁移为空、关系缺口为 0、意外漂移为空、所有 Scope 空值为 0、治理重复组为 0；正式库查询得到 373 条关系、373 条事件、373 条 Outbox，聚焦集成测试通过。详见 ADR-0050 与 `docs/evidence/governed-full-asset-repository-scan.md`。
+
+## 16. Promote Approved Brownfield Scan Through Governed Session
+
+**Backlog ID:** `backlog-approved-brownfield-scan-governed-promotion`
+
+**Status:** Blocked after governed retry. A local Ed25519 key, trusted signed Portable Scanner Release, and exact-Scope `KnowledgeScanSession` were created successfully, but finalization correctly stopped at `COVERAGE_PLAN_INCOMPLETE` because the portable observer does not yet provide framework-aware full-asset extractor coverage.
+
+**Owner:** SpecForge Architecture and Agent Integration.
+
+**Rationale:** The compatibility path remains candidate-only. The governed run now proves release pinning, source-session binding, and the production observation chain, but must not mark all asset families complete when the signed portable observer only reports repository observations.
+
+**Trigger:** Add trusted framework-aware extractor coverage and a server-derived technology/coverage plan for the repository, then rerun `start_knowledge_scan` -> `submit_scan_batch` -> `finalize_knowledge_scan`. Re-submit candidates through `submit_semantic_candidate_batch`, obtain the required independent T1 review, then promote, reconcile, and publish only after the governed session is `READY_FOR_ANALYSIS`.
+
+**Evidence:** Local release `scanner-release:2.1.0-local.2026092101-portable`, Key ID `local-dev-fbdd35fb26796f2e`, and governed session `knowledge-scan:32151ac2-aa21-41a6-841a-4e9b8f20a0db` were persisted in the exact Scope. The session accepted 3,469 observations across 31,522 indexed files, then finalized `BLOCKED` with `COVERAGE_PLAN_INCOMPLETE`; no candidate, accepted asset, relationship, ChangeSet, or Baseline was promoted from this blocked session.
+
+### 通过受治理会话提升已批准的存量扫描
+
+**待办标识：** `backlog-approved-brownfield-scan-governed-promotion`
+
+**状态：** 受治理重试后仍阻塞。本机 Ed25519 密钥、受信任的签名 Portable Scanner Release 和精确 Scope 的 `KnowledgeScanSession` 已成功建立，但最终化正确阻断于 `COVERAGE_PLAN_INCOMPLETE`：便携观察器尚未提供面向框架的完整资产提取覆盖。
+
+**负责人：** SpecForge 架构与 Agent 集成团队。
+
+**理由：** 兼容路径仍然只允许候选态。本次受治理重试已经证明发行物固定、来源会话绑定和生产观察链路有效，但在签名便携观察器只提供仓库观察时，不能伪造所有资产族已完成。
+
+**启动条件：** 增加受信任的框架感知提取器覆盖，以及由服务端生成的技术栈与覆盖计划，再重新执行 `start_knowledge_scan` -> `submit_scan_batch` -> `finalize_knowledge_scan`。通过 `submit_semantic_candidate_batch` 重新提交候选，完成 T1 独立评审，只有受治理会话进入 `READY_FOR_ANALYSIS` 后才能执行提升、对账和发布。
+
+**证据：** 本地发行物 `scanner-release:2.1.0-local.2026092101-portable`、Key ID `local-dev-fbdd35fb26796f2e` 和受治理会话 `knowledge-scan:32151ac2-aa21-41a6-841a-4e9b8f20a0db` 已写入精确 Scope。该会话接收了 3,469 条观察、覆盖 31,522 个索引文件，最终以 `COVERAGE_PLAN_INCOMPLETE` 阻塞；本次阻塞会话没有提升候选、正式资产、关系、ChangeSet 或 Baseline。

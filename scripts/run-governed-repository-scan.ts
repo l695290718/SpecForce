@@ -1,0 +1,142 @@
+import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { generateSemanticCandidates } from "@specforge/core";
+
+type ToolResult = { content?: Array<{ text?: string }>; isError?: boolean };
+type Client = { callTool(input: { name: string; arguments: Record<string, unknown> }): Promise<ToolResult>; connect(transport: unknown): Promise<void>; close(): Promise<void> };
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const scope = {
+  applicationServiceId: process.env.SPECFORGE_APPLICATION_SERVICE_ID ?? "com.specforge.designcenter",
+  scopePath: process.env.SPECFORGE_SCOPE_PATH ?? "pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter"
+};
+const designChangeSessionId = required("SPECFORGE_DESIGN_CHANGE_SESSION");
+const scannerReleaseId = required("SPECFORGE_SCANNER_RELEASE_ID");
+const connectorId = "specforge-local-repository-connector";
+const runId = `governed-repository-scan-${new Date().toISOString().replace(/[-:TZ.]/gu, "").slice(0, 14)}`;
+const runDirectory = resolve(root, ".specforge", "scans", runId);
+const sessionPath = join(runDirectory, "session.json");
+const spoolDirectory = join(runDirectory, "spool");
+let activeClient: Client | undefined;
+
+async function main(): Promise<void> {
+await mkdir(runDirectory, { recursive: true });
+const requireFromMcp = createRequire(resolve(root, "apps/mcp-server/package.json"));
+const { Client: McpClient } = requireFromMcp("@modelcontextprotocol/sdk/client/index.js");
+const { StdioClientTransport } = requireFromMcp("@modelcontextprotocol/sdk/client/stdio.js");
+const transport = new StdioClientTransport({
+  command: process.execPath,
+  args: [resolve(root, "apps/mcp-server/node_modules/tsx/dist/cli.mjs"), resolve(root, "apps/mcp-server/src/index.ts")],
+  cwd: root,
+  env: { ...process.env, CI: process.env.CI ?? "true", SPECFORGE_MCP_SEED: "1", SPECFORGE_MCP_SEED_SCOPE: scope.applicationServiceId }
+});
+activeClient = new McpClient({ name: "specforge-governed-repository-scan", version: "0.1.0" }, { capabilities: {} }) as Client;
+const client = activeClient;
+await client.connect(transport);
+
+try {
+  await call("register_connector", { id: connectorId, kind: "local-repository", capabilities: ["OBSERVE"], status: "ACTIVE", architectureScope: scope });
+  const snapshot = snapshotIdentity();
+  const descriptor = await call("start_knowledge_scan", {
+    architectureScope: scope,
+    connectorId,
+    designChangeSessionId,
+    scannerReleaseId,
+    runtimeProfileId: "default-repository-scan",
+    snapshotIdentity: snapshot,
+    repositoryPolicy: { allowDirtyWorktree: true, ignorePatterns: [".git/**", ".specforge/**", "node_modules/**", "dist/**", ".next/**"] },
+    evidencePolicy: { sourceMinimization: "metadata-and-digest", repositoryContentIsEvidence: true },
+    parserPolicy: { extractorMode: "portable-repository-observer" },
+    expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+  });
+  await writeFile(sessionPath, `${JSON.stringify({ ...descriptor, snapshotIdentity: snapshot }, null, 2)}\n`, "utf8");
+
+  const manifest = await call("get_scanner_release", { architectureScope: scope, sessionId: descriptor.sessionId });
+  const artifactDirectory = fileURLToPath(new URL(`${manifest.manifest.artifact.uri.endsWith("/") ? manifest.manifest.artifact.uri : `${manifest.manifest.artifact.uri}/`}`));
+  const scannerPath = resolve(artifactDirectory, manifest.manifest.entrypoint);
+  const scan = spawnSync(process.execPath, [scannerPath, "--repository", root, "--session", sessionPath, "--output", spoolDirectory], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  if (scan.status !== 0) throw new Error(`SCANNER_FAILED:${scan.stderr || scan.stdout}`);
+
+  const batchFiles = (await import("node:fs/promises")).readdir(spoolDirectory).then((names) => names.filter((name) => /^batch-\d+\.json$/u.test(name)).sort());
+  for (const name of await batchFiles) await call("submit_scan_batch", { architectureScope: scope, batch: JSON.parse(await readFile(join(spoolDirectory, name), "utf8")) });
+  const finalization = JSON.parse(await readFile(join(spoolDirectory, "finalization.json"), "utf8"));
+  const finalized = await call("finalize_knowledge_scan", { architectureScope: scope, sessionId: descriptor.sessionId, finalization });
+  if (finalized.status !== "READY_FOR_ANALYSIS") throw new Error(`SCAN_FINALIZATION_BLOCKED:${finalized.status}`);
+
+  const observations = [] as Array<Record<string, unknown>>;
+  for (const name of await batchFiles) {
+    const batch = JSON.parse(await readFile(join(spoolDirectory, name), "utf8")) as { observations: Array<Record<string, unknown>> };
+    for (const observation of batch.observations) {
+      const sourceObservationId = `source:${descriptor.sessionId}:${String(observation.id)}`;
+      const source = observation.source as Record<string, unknown>;
+      observations.push({
+        id: sourceObservationId,
+        sourceObservationId,
+        observationType: observation.observationType,
+        sourcePath: String(source.path ?? "unknown"),
+        payload: observation.payload,
+        normalizedDigest: observation.normalizedDigest
+      });
+    }
+  }
+  const generated = await generateSemanticCandidates({ observations: observations as never[], provider: "mock" });
+  const normalizedDigests = new Map(observations.map((observation) => [String(observation.sourceObservationId), String(observation.normalizedDigest)]));
+  const candidates = generated.content.map((candidate) => ({
+    ...candidate,
+    normalizedDigest: normalizedDigests.get(candidate.sourceObservationId) ?? "",
+    evidenceRefs: [`source-observation:${candidate.sourceObservationId}`, `scanner-release:${scannerReleaseId}`],
+    sourceObservationIds: [candidate.sourceObservationId],
+    domainCluster: candidate.semanticIdentity.split(".")[1] ?? "repository",
+    identityDecision: "UNMATCHED" as const
+  }));
+  let previousBatchDigest: string | undefined;
+  for (let offset = 0, sequence = 0; offset < candidates.length; offset += 100, sequence += 1) {
+    const page = candidates.slice(offset, offset + 100);
+    const batch = {
+      sessionId: descriptor.sessionId,
+      sequence,
+      ...(previousBatchDigest ? { previousBatchDigest } : {}),
+      complete: offset + page.length === candidates.length,
+      provenance: { agent: "specforge-local-governed-scan", model: "MockAIProvider", tool: "run-governed-repository-scan", runId },
+      candidates: page
+    };
+    const receipt = await call("submit_semantic_candidate_batch", { architectureScope: scope, batch });
+    previousBatchDigest = receipt.acceptedBatchDigest;
+  }
+  const reviewBundle = await call("assemble_knowledge_review_bundle", { architectureScope: scope, sessionId: descriptor.sessionId });
+  process.stdout.write(`${JSON.stringify({ status: "GOVERNED_SCAN_READY_FOR_REVIEW", sessionId: descriptor.sessionId, runDirectory, scannerReleaseId, scan: JSON.parse(scan.stdout || "{}"), finalized, candidateCount: candidates.length, reviewBundle }, null, 2)}\n`);
+} finally {
+  await client.close();
+  await transport.close();
+}
+}
+
+async function call(name: string, arguments_: Record<string, unknown>): Promise<any> {
+  if (!activeClient) throw new Error("MCP_CLIENT_NOT_READY");
+  const result = await activeClient.callTool({ name, arguments: arguments_ });
+  const text = result.content?.map((item) => item.text ?? "").join("") ?? "";
+  if (result.isError) throw new Error(`${name}:${text}`);
+  return text ? JSON.parse(text) : {};
+}
+
+function required(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name}_REQUIRED`);
+  return value;
+}
+
+function snapshotIdentity() {
+  let commit = "WORKTREE";
+  try { commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim() || commit; } catch { /* dirty or non-git workspaces are still explicitly allowed */ }
+  const snapshot = { repositoryId: "specforge", snapshotKind: "DIRTY_MANIFEST", commit };
+  return { ...snapshot, snapshotDigest: createHash("sha256").update(JSON.stringify(snapshot)).digest("hex") };
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+});
