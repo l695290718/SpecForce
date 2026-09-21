@@ -1,4 +1,46 @@
-import type { ScanFinalization, ScanPolicyReceipt } from "@specforge/scan-contract";
+import { contentDigest } from "@specforge/core";
+import type { AssetCapability, AssetCoveragePlan, ScanFinalization, ScanPolicyReceipt } from "@specforge/scan-contract";
+
+const OBSERVATION_FAMILY_MAP: Readonly<Record<string, string>> = {
+  "api-contract": "api",
+  "event-contract": "event",
+  "data-model": "dataModel",
+  documentation: "evidence",
+  "system-component": "serviceFeature"
+};
+
+export function deriveCoveragePlan(input: {
+  assetFamilies: readonly string[];
+  observationTypes: readonly string[];
+  extractorId: string;
+}): AssetCoveragePlan {
+  const assetFamilies = [...new Set(input.assetFamilies)].sort();
+  const observedFamilies = new Set(
+    input.observationTypes
+      .map((observationType) => OBSERVATION_FAMILY_MAP[observationType])
+      .filter((assetFamily): assetFamily is string => Boolean(assetFamily))
+  );
+  const capabilities: AssetCapability[] = assetFamilies.map((assetFamily) => {
+    const directlyObserved = observedFamilies.has(assetFamily);
+    return {
+      assetFamily,
+      framework: "repository-observer",
+      state: "SEMANTIC_REVIEW_REQUIRED",
+      required: true,
+      reasonCodes: directlyObserved
+        ? ["OBSERVATION_COVERED", "SEMANTIC_REVIEW_REQUIRED"]
+        : ["SEMANTIC_REVIEW_REQUIRED"],
+      extractorIds: directlyObserved ? [input.extractorId] : []
+    };
+  });
+  const complete = true;
+  return {
+    assetFamilies,
+    capabilities,
+    complete,
+    digest: contentDigest({ assetFamilies, capabilities, complete })
+  };
+}
 
 export interface ScanFinalizationAssessment {
   status: "READY" | "BLOCKED" | "STALE";

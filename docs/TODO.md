@@ -432,26 +432,26 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **Backlog ID:** `backlog-approved-brownfield-scan-governed-promotion`
 
-**Status:** Blocked after governed retry. A local Ed25519 key, trusted signed Portable Scanner Release, and exact-Scope `KnowledgeScanSession` were created successfully, but finalization correctly stopped at `COVERAGE_PLAN_INCOMPLETE` because the portable observer does not yet provide framework-aware full-asset extractor coverage.
+**Status:** Blocked after governed retry. The server-derived coverage gate now reaches `READY_FOR_ANALYSIS`, but the ReviewBundle remains blocked because MockAI candidates have unresolved identity decisions and unresolved questions; framework-aware extraction and authorized semantic review are still required before promotion.
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
-**Rationale:** The compatibility path remains candidate-only. The governed run now proves release pinning, source-session binding, and the production observation chain, but must not mark all asset families complete when the signed portable observer only reports repository observations.
+**Rationale:** The compatibility path remains candidate-only. The governed run proves release pinning, source-session binding, server-derived coverage, and the production observation chain, but must not promote MockAI candidates while identity and semantic questions remain unresolved.
 
-**Trigger:** Add trusted framework-aware extractor coverage and a server-derived technology/coverage plan for the repository, then rerun `start_knowledge_scan` -> `submit_scan_batch` -> `finalize_knowledge_scan`. Re-submit candidates through `submit_semantic_candidate_batch`, obtain the required independent T1 review, then promote, reconcile, and publish only after the governed session is `READY_FOR_ANALYSIS`.
+**Trigger:** Add trusted framework-aware extractor coverage and run an authorized semantic Agent/reviewer that resolves candidate identity and questions. Then rerun `start_knowledge_scan` -> `submit_scan_batch` -> `finalize_knowledge_scan`, submit candidates through `submit_semantic_candidate_batch`, obtain the required independent T1 review, and promote, reconcile, and publish only after all gates pass.
 
-**Evidence:** Local release `scanner-release:2.1.0-local.2026092101-portable`, Key ID `local-dev-fbdd35fb26796f2e`, and governed session `knowledge-scan:32151ac2-aa21-41a6-841a-4e9b8f20a0db` were persisted in the exact Scope. The session accepted 3,469 observations across 31,522 indexed files, then finalized `BLOCKED` with `COVERAGE_PLAN_INCOMPLETE`; no candidate, accepted asset, relationship, ChangeSet, or Baseline was promoted from this blocked session.
+**Evidence:** Local release `scanner-release:2.1.0-local.2026092101-portable`, Key ID `local-dev-fbdd35fb26796f2e`, and both governed sessions were persisted in the exact Scope. The second session `knowledge-scan:1ba4e7db-54f2-4e56-8746-8c0535c62c3c` accepted 3,469 observations across 31,522 indexed files and finalized `READY_FOR_ANALYSIS`; ReviewBundle `knowledge-review:knowledge-scan:1ba4e7db-54f2-4e56-8746-8c0535c62c3c` is `BLOCKED` by candidate identity and unresolved-question gates. No accepted asset, relationship, ChangeSet, or Baseline was promoted.
 
 ### 通过受治理会话提升已批准的存量扫描
 
 **待办标识：** `backlog-approved-brownfield-scan-governed-promotion`
 
-**状态：** 受治理重试后仍阻塞。本机 Ed25519 密钥、受信任的签名 Portable Scanner Release 和精确 Scope 的 `KnowledgeScanSession` 已成功建立，但最终化正确阻断于 `COVERAGE_PLAN_INCOMPLETE`：便携观察器尚未提供面向框架的完整资产提取覆盖。
+**状态：** 受治理重试后仍阻塞。服务端生成的覆盖门禁已进入 `READY_FOR_ANALYSIS`，但 ReviewBundle 因 MockAI 候选仍有未解决身份判定和未决问题而阻断；正式提升仍需框架感知提取和获授权的语义审核。
 
 **负责人：** SpecForge 架构与 Agent 集成团队。
 
-**理由：** 兼容路径仍然只允许候选态。本次受治理重试已经证明发行物固定、来源会话绑定和生产观察链路有效，但在签名便携观察器只提供仓库观察时，不能伪造所有资产族已完成。
+**理由：** 兼容路径仍然只允许候选态。本次受治理重试已经证明发行物固定、来源会话绑定、服务端覆盖推导和生产观察链路有效，但在身份和语义问题未解决时，不能提升 MockAI 候选。
 
-**启动条件：** 增加受信任的框架感知提取器覆盖，以及由服务端生成的技术栈与覆盖计划，再重新执行 `start_knowledge_scan` -> `submit_scan_batch` -> `finalize_knowledge_scan`。通过 `submit_semantic_candidate_batch` 重新提交候选，完成 T1 独立评审，只有受治理会话进入 `READY_FOR_ANALYSIS` 后才能执行提升、对账和发布。
+**启动条件：** 增加受信任的框架感知提取器，并由获授权的语义 Agent/审核人解决候选身份和问题。重新执行 `start_knowledge_scan` -> `submit_scan_batch` -> `finalize_knowledge_scan`，通过 `submit_semantic_candidate_batch` 提交候选，完成 T1 独立评审，所有门禁通过后才能执行提升、对账和发布。
 
-**证据：** 本地发行物 `scanner-release:2.1.0-local.2026092101-portable`、Key ID `local-dev-fbdd35fb26796f2e` 和受治理会话 `knowledge-scan:32151ac2-aa21-41a6-841a-4e9b8f20a0db` 已写入精确 Scope。该会话接收了 3,469 条观察、覆盖 31,522 个索引文件，最终以 `COVERAGE_PLAN_INCOMPLETE` 阻塞；本次阻塞会话没有提升候选、正式资产、关系、ChangeSet 或 Baseline。
+**证据：** 本地发行物 `scanner-release:2.1.0-local.2026092101-portable`、Key ID `local-dev-fbdd35fb26796f2e` 和两个受治理会话已写入精确 Scope。第二个会话 `knowledge-scan:1ba4e7db-54f2-4e56-8746-8c0535c62c3c` 接收 3,469 条观察、覆盖 31,522 个索引文件并最终化为 `READY_FOR_ANALYSIS`；ReviewBundle `knowledge-review:knowledge-scan:1ba4e7db-54f2-4e56-8746-8c0535c62c3c` 因候选身份和未决问题门禁为 `BLOCKED`。没有提升正式资产、关系、ChangeSet 或 Baseline。

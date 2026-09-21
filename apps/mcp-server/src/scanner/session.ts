@@ -5,7 +5,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypt
 import { ensureMcpPersistenceSchema, prisma, resolveWritableScope, writableActor } from "../persistence";
 import { assertScannerReleaseAvailable, selectScannerRelease, type ScannerCapabilities } from "./release";
 import { resolvePersistedEffectiveScanGovernance } from "./governance-persistence";
-import { assessScanFinalization } from "./finalization";
+import { assessScanFinalization, deriveCoveragePlan } from "./finalization";
 
 const MAX_SESSION_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_SESSION_LIFETIME_MS = 30 * 60 * 1000;
@@ -187,17 +187,31 @@ export async function finalizeKnowledgeScan(input: FinalizeKnowledgeScanInput) {
     const finalization = requireFinalization(input.finalization);
     assertScanSessionScope(scope, finalization.architectureScope);
     if (finalization.sessionId !== session.id) throw new Error("SCAN_SESSION_MISMATCH");
-    const finalizationDigest = sha256(canonicalJson(finalization));
+    const release = await tx.scannerRelease.findUnique({ where: { id: session.scannerReleaseId } });
+    if (!release) throw new Error("SCANNER_RELEASE_NOT_FOUND");
+    assertScannerReleaseAvailable(release);
+    const sessionAssetFamilies = readSessionAssetFamilies(session.parserPolicy);
+    if (!sameStringSet(sessionAssetFamilies, finalization.coveragePlan.assetFamilies)) {
+      throw new Error("SCAN_COVERAGE_PLAN_SCOPE_MISMATCH");
+    }
+    const observationRows = await tx.sourceObservation.findMany({
+      where: { ...scope, payload: { path: ["scanSessionId"], equals: session.id } },
+      select: { payload: true }
+    });
+    const verifiedCoveragePlan = deriveCoveragePlan({
+      assetFamilies: sessionAssetFamilies,
+      observationTypes: observationRows.map((row) => readObservationType(row.payload)),
+      extractorId: "portable-repository-observer"
+    });
+    const verifiedFinalization = { ...finalization, coveragePlan: verifiedCoveragePlan };
+    const finalizationDigest = sha256(canonicalJson(verifiedFinalization));
     if (session.finalizationDigest) {
       if (session.finalizationDigest !== finalizationDigest) throw new Error("SCAN_FINALIZATION_CONFLICT");
       return { session, finalizationDigest, idempotent: true };
     }
     assertScanSessionWritable(session, writableActor().actorId);
-    const release = await tx.scannerRelease.findUnique({ where: { id: session.scannerReleaseId } });
-    if (!release) throw new Error("SCANNER_RELEASE_NOT_FOUND");
-    assertScannerReleaseAvailable(release);
-    assertFinalizationMatches(session, finalization);
-    const assessment = assessScanFinalization({ finalization, expectedPolicyReceipt: readPolicyReceipt(session.evidencePolicy) });
+    assertFinalizationMatches(session, verifiedFinalization);
+    const assessment = assessScanFinalization({ finalization: verifiedFinalization, expectedPolicyReceipt: readPolicyReceipt(session.evidencePolicy) });
     const blockingIssues = assessment.blockingIssues;
     const status = assessment.status === "READY" ? "READY_FOR_ANALYSIS" : "BLOCKED";
     const updated = await tx.knowledgeScanSession.update({
@@ -205,7 +219,7 @@ export async function finalizeKnowledgeScan(input: FinalizeKnowledgeScanInput) {
       data: {
         status,
         blockedReason: blockingIssues.length > 0 ? blockingIssues.join("; ") : null,
-        finalizationManifest: jsonValue(finalization),
+        finalizationManifest: jsonValue(verifiedFinalization),
         finalizationDigest,
         finalizedAt: new Date()
       }
@@ -283,6 +297,29 @@ function readPolicyReceipt(value: Prisma.JsonValue): ScanPolicyReceipt {
   const policyReceipt = (value as Record<string, unknown>).policyReceipt;
   if (!policyReceipt || typeof policyReceipt !== "object" || Array.isArray(policyReceipt)) throw new Error("SCAN_POLICY_RECEIPT_MISSING");
   return policyReceipt as ScanPolicyReceipt;
+}
+
+function readSessionAssetFamilies(value: Prisma.JsonValue): string[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("SCAN_COVERAGE_PLAN_MISSING");
+  const coveragePlan = (value as Record<string, unknown>).coveragePlan;
+  if (!coveragePlan || typeof coveragePlan !== "object" || Array.isArray(coveragePlan)) throw new Error("SCAN_COVERAGE_PLAN_MISSING");
+  const assetFamilies = (coveragePlan as Record<string, unknown>).assetFamilies;
+  if (!Array.isArray(assetFamilies) || !assetFamilies.every((item) => typeof item === "string" && item.length > 0)) {
+    throw new Error("SCAN_COVERAGE_PLAN_MISSING");
+  }
+  return [...new Set(assetFamilies)].sort();
+}
+
+function readObservationType(value: Prisma.JsonValue): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "source-file";
+  const observationType = (value as Record<string, unknown>).observationType;
+  return typeof observationType === "string" && observationType.length > 0 ? observationType : "source-file";
+}
+
+function sameStringSet(left: readonly string[], right: readonly string[]): boolean {
+  const sortedLeft = [...new Set(left)].sort();
+  const sortedRight = [...new Set(right)].sort();
+  return sortedLeft.length === sortedRight.length && sortedLeft.every((value, index) => value === sortedRight[index]);
 }
 
 function assertFinalizationMatches(session: Awaited<ReturnType<typeof findAndLockSession>>, finalization: ScanFinalization): void {

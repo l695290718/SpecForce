@@ -1,6 +1,6 @@
 import type { ScanFinalization, ScanPolicyReceipt } from "@specforge/scan-contract";
 import { describe, expect, it } from "vitest";
-import { assessScanFinalization } from "./finalization";
+import { assessScanFinalization, deriveCoveragePlan } from "./finalization";
 
 const receipt: ScanPolicyReceipt = {
   systemGovernanceDigest: "1".repeat(64),
@@ -29,6 +29,39 @@ function finalization(overrides: Partial<ScanFinalization> = {}): ScanFinalizati
 }
 
 describe("governed scan finalization", () => {
+  it("derives a deterministic semantic-review plan from persisted observations", () => {
+    const first = deriveCoveragePlan({
+      assetFamilies: ["api", "dataModel", "event"],
+      observationTypes: ["data-model", "api-contract"],
+      extractorId: "portable-repository-observer"
+    });
+    const second = deriveCoveragePlan({
+      assetFamilies: ["event", "dataModel", "api"],
+      observationTypes: ["api-contract", "data-model"],
+      extractorId: "portable-repository-observer"
+    });
+
+    expect(first).toEqual(second);
+    expect(first.complete).toBe(true);
+    expect(first.capabilities).toEqual(expect.arrayContaining([
+      expect.objectContaining({ assetFamily: "api", state: "SEMANTIC_REVIEW_REQUIRED", reasonCodes: ["OBSERVATION_COVERED", "SEMANTIC_REVIEW_REQUIRED"] }),
+      expect.objectContaining({ assetFamily: "dataModel", state: "SEMANTIC_REVIEW_REQUIRED", reasonCodes: ["OBSERVATION_COVERED", "SEMANTIC_REVIEW_REQUIRED"] }),
+      expect.objectContaining({ assetFamily: "event", state: "SEMANTIC_REVIEW_REQUIRED", reasonCodes: ["SEMANTIC_REVIEW_REQUIRED"] })
+    ]));
+  });
+
+  it("keeps unobserved asset families reviewable instead of declaring them unsupported", () => {
+    const plan = deriveCoveragePlan({
+      assetFamilies: ["businessRule", "stateMachine"],
+      observationTypes: ["source-file"],
+      extractorId: "portable-repository-observer"
+    });
+
+    expect(plan.complete).toBe(true);
+    expect(plan.capabilities.every((capability) => capability.state === "SEMANTIC_REVIEW_REQUIRED")).toBe(true);
+    expect(plan.capabilities.flatMap((capability) => capability.reasonCodes)).not.toContain("UNSUPPORTED");
+  });
+
   it("blocks a required capability without a trusted extractor", () => {
     const result = assessScanFinalization({
       finalization: finalization({ coveragePlan: { assetFamilies: ["api"], capabilities: [{ assetFamily: "api", framework: "nestjs", state: "UNSUPPORTED", required: true, reasonCodes: ["REQUIRED_EXTRACTOR_MISSING"], extractorIds: [] }], complete: false, digest: "d".repeat(64) } }),
