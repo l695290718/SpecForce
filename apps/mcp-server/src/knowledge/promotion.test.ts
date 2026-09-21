@@ -67,6 +67,19 @@ describe("knowledge promotion mapping", () => {
     expect(() => mapKnowledgeAssertionForPromotion(assertion({ value: { canonicalContent: { summary: "English only" } } }), scope)).toThrow("PROMOTION_BILINGUAL_CONTENT_REQUIRED");
   });
 
+  it.each([
+    ["integration", "integration"],
+    ["quality", "quality"],
+    ["observability", "observability"],
+    ["service-feature", "serviceFeature"],
+    ["functional-feature", "functionalFeature"],
+    ["proposal", "proposal"],
+    ["context-pack", "contextPack"],
+    ["evidence", "evidence"]
+  ] as const)("maps %s full-asset facts to %s assets", (factType, assetType) => {
+    expect(mapKnowledgeAssertionForPromotion(assertion({ factType }), scope)).toMatchObject({ assetType });
+  });
+
   it("maps only explicit directional typed relationships", () => {
     const mapped = mapKnowledgeAssertionForPromotion(assertion({
       id: "candidate-relationship-1",

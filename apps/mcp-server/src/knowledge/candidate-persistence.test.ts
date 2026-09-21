@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SemanticCandidateBatch } from "@specforge/core";
+import { contentDigest, semanticEvidenceClusterDigest, type SemanticCandidateBatch } from "@specforge/core";
 
 const scope = { applicationServiceId: "com.huawei.celon.desiner", scopePath: "designer" };
 const state = vi.hoisted(() => ({
@@ -41,7 +41,8 @@ const database = vi.hoisted(() => ({
       connectorId: "connector-1",
       designChangeSessionId: "design-session-1",
       status: "READY_FOR_ANALYSIS",
-      observationCount: 1
+      observationCount: 1,
+      evidencePolicy: { policyReceipt: { semanticPromptPackDigest: "b".repeat(64), effectivePolicyDigest: "c".repeat(64) } }
     }])
   },
   $transaction: vi.fn(async (callback: (tx: typeof transaction) => unknown) => callback(transaction))
@@ -63,21 +64,37 @@ function batch(overrides: Partial<SemanticCandidateBatch> = {}): SemanticCandida
     sequence: 0,
     complete: true,
     provenance: { agent: "claude-code", model: "enterprise-model", runId: "run-1" },
+    clusters: [{
+      id: "cluster:orders",
+      architectureScope: scope,
+      domainHint: "orders",
+      observationIds: ["source:scan-session-1:orders"],
+      evidenceTypes: ["api-contract", "executable-test"],
+      tokenEstimate: 100,
+      clusterDigest: semanticEvidenceClusterDigest({ id: "cluster:orders", architectureScope: scope, domainHint: "orders", observationIds: ["source:scan-session-1:orders"], evidenceTypes: ["api-contract", "executable-test"], tokenEstimate: 100 })
+    }],
     candidates: [{
       semanticIdentity: "orders.api",
-      normalizedDigest: "candidate-digest",
+      normalizedDigest: contentDigest({ candidate: "orders.api" }),
       factType: "api-contract",
       layer: "SYS",
       aspect: "contract",
       value: { canonicalContent: { summary: "Orders API" }, localizedContent: { zh: { summary: "订单 API" } } },
       confidence: 0.92,
-      matchingEvidence: ["source:orders"],
+      matchingEvidence: ["api-contract:orders", "executable-test:orders"],
       counterEvidence: [],
       unresolvedQuestions: [],
-      evidenceRefs: ["evidence:orders"],
+      evidenceRefs: ["api-contract:orders", "executable-test:orders"],
       sourceObservationIds: ["source:scan-session-1:orders"],
       domainCluster: "orders",
-      identityDecision: "UNAMBIGUOUS"
+      identityDecision: "UNAMBIGUOUS",
+      assetFamily: "api",
+      promptPackDigest: "b".repeat(64),
+      policyDigest: "c".repeat(64),
+      clusterId: "cluster:orders",
+      evidenceTypes: ["api-contract", "executable-test"],
+      canonicalContent: { summary: "Orders API" },
+      localizedContent: { zh: { summary: "订单 API" } }
     }],
     ...overrides
   };
@@ -115,7 +132,7 @@ describe("semantic candidate batch persistence", () => {
     expect(first).toMatchObject({ acceptedSequence: 0, idempotent: false, complete: true });
     expect(second).toMatchObject({ acceptedSequence: 0, idempotent: true, acceptedBatchDigest: first.acceptedBatchDigest });
     expect(transaction.knowledgeAssertion.upsert).toHaveBeenCalledOnce();
-    expect([...state.assertions.values()][0]).toMatchObject({ riskTier: "T1", domainCluster: "orders", generatedByActorId: "semantic-agent" });
+    expect([...state.assertions.values()][0]).toMatchObject({ riskTier: "T2", domainCluster: "orders", generatedByActorId: "semantic-agent" });
   });
 
   it("rejects conflicting reuse of an accepted sequence", async () => {

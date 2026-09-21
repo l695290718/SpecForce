@@ -127,7 +127,8 @@ const scanner = vi.hoisted(() => ({
 
 const semanticCandidates = vi.hoisted(() => ({
   submitSemanticCandidateBatch: vi.fn().mockResolvedValue({ sessionId: "scan-session-1", acceptedSequence: 0, acceptedBatchDigest: "digest", assertionIds: ["assertion-1"], idempotent: false, complete: true }),
-  assembleKnowledgeReviewBundle: vi.fn().mockResolvedValue({ id: "review-1", status: "READY", riskTier: "T1" })
+  assembleKnowledgeReviewBundle: vi.fn().mockResolvedValue({ id: "review-1", status: "READY", riskTier: "T1" }),
+  assembleKnowledgeReviewBundles: vi.fn().mockResolvedValue({ sessionId: "scan-session-1", status: "READY", bundles: [] })
 }));
 
 const promotion = vi.hoisted(() => ({
@@ -622,6 +623,7 @@ describe("3A knowledge foundation tools", () => {
       "generate_knowledge_candidates",
       "submit_semantic_candidate_batch",
       "assemble_knowledge_review_bundle",
+      "assemble_knowledge_review_bundles",
       "match_knowledge_identities",
       "create_identity_candidate",
       "create_knowledge_review_bundle",
@@ -675,6 +677,7 @@ describe("3A knowledge foundation tools", () => {
     await tools.get("generate_knowledge_candidates")!.handler({ architectureScope, scanReportId: "scan-1", provider: "mock" });
     await tools.get("submit_semantic_candidate_batch")!.handler({ architectureScope, batch: { sessionId: "scan-session-1", sequence: 0, complete: true, provenance: { agent: "claude-code" }, candidates: [{ semanticIdentity: "orders.api", normalizedDigest: "digest", factType: "api-contract", layer: "SYS", aspect: "contract", value: {}, confidence: 0.9, matchingEvidence: [], counterEvidence: [], unresolvedQuestions: [], evidenceRefs: ["evidence-1"], sourceObservationIds: ["source-1"], domainCluster: "orders", identityDecision: "UNAMBIGUOUS" }] } });
     await tools.get("assemble_knowledge_review_bundle")!.handler({ architectureScope, sessionId: "scan-session-1" });
+    await tools.get("assemble_knowledge_review_bundles")!.handler({ architectureScope, sessionId: "scan-session-1" });
     await tools.get("match_knowledge_identities")!.handler({ architectureScope, scanReportId: "scan-1" });
     await tools.get("create_identity_candidate")!.handler({ architectureScope, candidate: { id: "identity-1" } });
     await tools.get("create_knowledge_review_bundle")!.handler({ architectureScope, id: "review-1", designChangeSessionId: "session-1", riskTier: "T1", assertionIds: ["assertion-1"], identityCandidateIds: [], evidenceRefs: ["evidence-1"], coverage: { totalSources: 1, processedSources: 1, supportedSources: 1, candidateCount: 1, complete: true }, blockingIssues: [] });
@@ -692,6 +695,7 @@ describe("3A knowledge foundation tools", () => {
     expect(scanner.generateKnowledgeCandidates).toHaveBeenCalledWith({ architectureScope, scanReportId: "scan-1", provider: "mock" });
     expect(semanticCandidates.submitSemanticCandidateBatch).toHaveBeenCalledWith(expect.objectContaining({ architectureScope, batch: expect.objectContaining({ sessionId: "scan-session-1" }) }));
     expect(semanticCandidates.assembleKnowledgeReviewBundle).toHaveBeenCalledWith({ architectureScope, sessionId: "scan-session-1" });
+    expect(semanticCandidates.assembleKnowledgeReviewBundles).toHaveBeenCalledWith({ architectureScope, sessionId: "scan-session-1" });
     expect(scanner.matchKnowledgeIdentities).toHaveBeenCalledWith({ architectureScope, scanReportId: "scan-1" });
     expect(knowledge.createIdentityCandidate).toHaveBeenCalledOnce();
     expect(knowledge.createKnowledgeReviewBundle).toHaveBeenCalledOnce();

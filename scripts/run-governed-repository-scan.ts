@@ -4,7 +4,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 type ToolResult = { content?: Array<{ text?: string }>; isError?: boolean };
 type Client = { callTool(input: { name: string; arguments: Record<string, unknown> }): Promise<ToolResult>; connect(transport: unknown): Promise<void>; close(): Promise<void> };
@@ -14,7 +14,6 @@ const scope = {
   applicationServiceId: process.env.SPECFORGE_APPLICATION_SERVICE_ID ?? "com.specforge.designcenter",
   scopePath: process.env.SPECFORGE_SCOPE_PATH ?? "pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter"
 };
-const designChangeSessionId = required("SPECFORGE_DESIGN_CHANGE_SESSION");
 const repositoryId = process.env.SPECFORGE_REPOSITORY_ID?.trim() || "specforge";
 const repositoryIgnorePatterns = [".git/**", ".specforge/**", ".pnpm-store/**", ".tmp-go-build/**", ".worktrees/**", "node_modules/**", "dist/**", ".next/**", "coverage/**", "fixtures/**"];
 const connectorId = "specforge-local-repository-connector";
@@ -24,6 +23,7 @@ const sessionPath = join(runDirectory, "session.json");
 let activeClient: Client | undefined;
 
 async function main(): Promise<void> {
+  const designChangeSessionId = required("SPECFORGE_DESIGN_CHANGE_SESSION");
   await mkdir(runDirectory, { recursive: true });
   const releaseSelection = await resolveReleaseSelection();
   const scannerReleaseId = releaseSelection.releaseId;
@@ -73,7 +73,7 @@ async function main(): Promise<void> {
     if (finalized.status !== "READY_FOR_ANALYSIS") throw new Error(`SCAN_FINALIZATION_BLOCKED:${finalized.status}`);
 
     if (process.env.SPECFORGE_SEMANTIC_PROVIDER?.trim().toLowerCase() === "mock") {
-      const reviewResult = await submitMockSemanticCandidates(descriptor.sessionId, scannerReleaseId, spoolDirectory, await batchFilesPromise);
+      const reviewResult = await submitMockSemanticCandidates(descriptor.sessionId, scannerReleaseId, descriptor.policyReceipt, spoolDirectory, await batchFilesPromise);
       process.stdout.write(`${JSON.stringify({ status: "GOVERNED_SCAN_READY_FOR_REVIEW", sessionId: descriptor.sessionId, runDirectory, scannerReleaseId, scan: scanSummary, finalized, ...reviewResult }, null, 2)}\n`);
       return;
     }
@@ -84,8 +84,8 @@ async function main(): Promise<void> {
   }
 }
 
-async function submitMockSemanticCandidates(sessionId: string, scannerReleaseId: string, spoolDirectory: string, batchFiles: string[]) {
-  const { generateSemanticCandidates } = await import("@specforge/core");
+async function submitMockSemanticCandidates(sessionId: string, scannerReleaseId: string, policyReceipt: { semanticPromptPackDigest: string; effectivePolicyDigest: string }, spoolDirectory: string, batchFiles: string[]) {
+  const { contentDigest, factTypeForAssetFamily, generateSemanticCandidates, semanticEvidenceClusterDigest } = await import("@specforge/core");
   const observations = [] as Array<Record<string, unknown>>;
   for (const name of batchFiles) {
     const batch = JSON.parse(await readFile(join(spoolDirectory, name), "utf8")) as { observations: Array<Record<string, unknown>> };
@@ -97,30 +97,66 @@ async function submitMockSemanticCandidates(sessionId: string, scannerReleaseId:
   }
   const generated = await generateSemanticCandidates({ observations: observations as never[], provider: "mock" });
   const normalizedDigests = new Map(observations.map((observation) => [String(observation.sourceObservationId), String(observation.normalizedDigest)]));
-  const candidates = generated.content.map((candidate) => ({
-    ...candidate,
-    normalizedDigest: normalizedDigests.get(candidate.sourceObservationId) ?? "",
-    evidenceRefs: [`source-observation:${candidate.sourceObservationId}`, `scanner-release:${scannerReleaseId}`],
-    sourceObservationIds: [candidate.sourceObservationId],
-    domainCluster: candidate.semanticIdentity.split(".")[1] ?? "repository",
-    identityDecision: "UNMATCHED" as const
-  }));
+  const drafts = generated.content.map((candidate) => ({ candidate, assetFamily: mockAssetFamily(candidate.factType) }));
   let previousBatchDigest: string | undefined;
-  for (let offset = 0, sequence = 0; offset < candidates.length; offset += 100, sequence += 1) {
-    const page = candidates.slice(offset, offset + 100);
+  for (let offset = 0, sequence = 0; offset < drafts.length; offset += 100, sequence += 1) {
+    const pageDrafts = drafts.slice(offset, offset + 100);
+    const clusterBase = {
+      id: `cluster:${sessionId}:${sequence}`,
+      architectureScope: scope,
+      domainHint: "repository",
+      observationIds: pageDrafts.map(({ candidate }) => candidate.sourceObservationId),
+      evidenceTypes: ["source-code", "documentation"] as const,
+      tokenEstimate: Math.max(1, pageDrafts.length * 100)
+    };
+    const cluster = { ...clusterBase, evidenceTypes: [...clusterBase.evidenceTypes], clusterDigest: semanticEvidenceClusterDigest({ ...clusterBase, evidenceTypes: [...clusterBase.evidenceTypes] }) };
+    const page = pageDrafts.map(({ candidate, assetFamily }) => {
+      const value = candidate.value as Record<string, unknown>;
+      const canonicalContent = value.canonicalContent as Record<string, unknown>;
+      const localizedContent = value.localizedContent as { zh: Record<string, unknown> };
+      const evidenceRefs = [`source-observation:${candidate.sourceObservationId}`, `scanner-release:${scannerReleaseId}`];
+      return {
+        ...candidate,
+        normalizedDigest: contentDigest({ semanticIdentity: candidate.semanticIdentity, source: normalizedDigests.get(candidate.sourceObservationId) ?? "" }),
+        factType: factTypeForAssetFamily[assetFamily],
+        matchingEvidence: evidenceRefs,
+        evidenceRefs,
+        sourceObservationIds: [candidate.sourceObservationId],
+        domainCluster: candidate.semanticIdentity.split(".")[1] ?? "repository",
+        identityDecision: "UNMATCHED" as const,
+        assetFamily,
+        promptPackDigest: policyReceipt.semanticPromptPackDigest,
+        policyDigest: policyReceipt.effectivePolicyDigest,
+        clusterId: cluster.id,
+        evidenceTypes: [...cluster.evidenceTypes],
+        canonicalContent,
+        localizedContent
+      };
+    });
     const batch = {
       sessionId,
       sequence,
       ...(previousBatchDigest ? { previousBatchDigest } : {}),
-      complete: offset + page.length === candidates.length,
+      complete: offset + page.length === drafts.length,
       provenance: { agent: "specforge-local-governed-scan", model: "MockAIProvider", tool: "run-governed-repository-scan", runId },
+      clusters: [cluster],
       candidates: page
     };
     const receipt = await call("submit_semantic_candidate_batch", { architectureScope: scope, batch });
     previousBatchDigest = receipt.acceptedBatchDigest;
   }
-  const reviewBundle = await call("assemble_knowledge_review_bundle", { architectureScope: scope, sessionId });
-  return { candidateCount: candidates.length, reviewBundle };
+  const reviewBundles = await call("assemble_knowledge_review_bundles", { architectureScope: scope, sessionId });
+  return { candidateCount: drafts.length, reviewBundles };
+}
+
+function mockAssetFamily(factType: string) {
+  if (factType === "api-contract") return "api" as const;
+  if (factType === "event-contract") return "event" as const;
+  if (factType === "data-model") return "dataModel" as const;
+  if (factType === "business-rule") return "businessRule" as const;
+  if (factType === "state-machine") return "stateMachine" as const;
+  if (factType === "architecture-decision") return "adr" as const;
+  return "domain" as const;
 }
 
 function runScanner(manifest: Record<string, any>, selection: ReleaseSelection, manifestPath: string) {
@@ -201,7 +237,9 @@ function snapshotIdentity() {
   return { ...snapshot, snapshotDigest: createHash("sha256").update(JSON.stringify(snapshot)).digest("hex") };
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  });
+}

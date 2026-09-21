@@ -31,7 +31,15 @@ const factAssetTypes = Object.freeze({
   "event-contract": "event",
   "data-model": "dataModel",
   "state-machine": "stateMachine",
-  "architecture-decision": "adr"
+  "architecture-decision": "adr",
+  integration: "integration",
+  quality: "quality",
+  observability: "observability",
+  "service-feature": "serviceFeature",
+  "functional-feature": "functionalFeature",
+  proposal: "proposal",
+  "context-pack": "contextPack",
+  evidence: "evidence"
 } satisfies Record<string, AssetType>);
 
 const typedRelationshipFactType = "typed-relationship";

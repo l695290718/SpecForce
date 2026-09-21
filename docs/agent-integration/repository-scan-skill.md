@@ -12,7 +12,7 @@ All three clients must provide `repositoryPath`, `applicationServiceId`, and `sc
 
 ## Operational contract
 
-The local scanner performs deterministic extraction only. Semantic interpretation is performed by the available Agent and submitted as bounded bilingual candidate batches. Candidates remain isolated from accepted design assets until the normal T0-T3 review, promotion, relationship, reconciliation, and Baseline gates complete.
+The local scanner performs deterministic extraction only. Semantic interpretation is performed by the available Agent and submitted as bounded bilingual candidate batches. Each batch carries digest-pinned evidence clusters, the system prompt-pack and policy digests, full-asset-family identity, evidence types, stable identity decisions, counter-evidence, and unresolved questions. High-impact candidates require multiple evidence types. Candidates remain isolated from accepted design assets until risk-and-domain-partitioned review, promotion, relationship, reconciliation, and Baseline gates complete.
 
 Keep `.specforge/scans/` private. Retain signed manifests, session and actor IDs, snapshot and policy digests, batch receipts, blocker reasons, and MCP reconciliation evidence according to the enterprise retention policy.
 

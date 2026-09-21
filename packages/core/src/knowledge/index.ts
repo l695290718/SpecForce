@@ -4,3 +4,4 @@ export * from "./service";
 export * from "./identity";
 export * from "./projections";
 export * from "./projection-v2";
+export * from "./semantic-candidates";

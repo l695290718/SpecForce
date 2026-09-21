@@ -1,5 +1,5 @@
 import {
-  classifyCandidateRisk,
+  classifyFullAssetCandidateRisk,
   contentDigest,
   evaluateReviewBundle,
   hasBilingualCandidateContent,
@@ -8,12 +8,16 @@ import {
   type ReviewBundle,
   type SemanticCandidateBatch,
   type SemanticCandidateBatchReceipt,
-  type SemanticCandidateSubmission
+  type FullAssetSemanticCandidate,
+  type SemanticEvidenceCluster,
+  validateFullAssetSemanticCandidate,
+  validateSemanticEvidenceCluster
 } from "@specforge/core";
 import { Prisma } from "@prisma/client";
 import { ensureMcpPersistenceSchema, prisma, resolveWritableScope, writableActor } from "../persistence";
 import { createKnowledgeReviewBundle } from "./persistence";
 import { assessReviewCandidates } from "./risk-policy";
+import { partitionReviewCandidates } from "./review-bundle";
 
 export const SEMANTIC_CANDIDATE_BATCH_LIMITS = Object.freeze({ maxCandidates: 100, maxBytes: 1024 * 1024 });
 const semanticBatchEvent = "KNOWLEDGE_SEMANTIC_CANDIDATE_BATCH_ACCEPTED";
@@ -28,11 +32,18 @@ export interface AssembleKnowledgeReviewBundleInput {
   sessionId: string;
 }
 
+export interface AssembleKnowledgeReviewBundlesResult {
+  sessionId: string;
+  status: "READY" | "BLOCKED";
+  coverage: { totalSources: number; processedSources: number; supportedSources: number; candidateCount: number; complete: boolean };
+  bundles: ReviewBundle[];
+}
+
 export function semanticBatchDigest(batch: SemanticCandidateBatch): string {
   return contentDigest(batch);
 }
 
-export function semanticCandidateId(sessionId: string, candidate: Pick<SemanticCandidateSubmission, "semanticIdentity" | "normalizedDigest">): string {
+export function semanticCandidateId(sessionId: string, candidate: Pick<FullAssetSemanticCandidate, "semanticIdentity" | "normalizedDigest">): string {
   return `knowledge:${sessionId}:${contentDigest({ semanticIdentity: candidate.semanticIdentity, normalizedDigest: candidate.normalizedDigest })}`;
 }
 
@@ -40,10 +51,16 @@ export function validateSemanticCandidateBatch(batch: SemanticCandidateBatch): v
   if (!batch.sessionId?.trim()) throw new Error("SEMANTIC_CANDIDATE_BATCH_SESSION_REQUIRED");
   if (!Number.isInteger(batch.sequence) || batch.sequence < 0) throw new Error("SEMANTIC_CANDIDATE_BATCH_SEQUENCE_INVALID");
   if (!Array.isArray(batch.candidates) || batch.candidates.length === 0) throw new Error("SEMANTIC_CANDIDATE_BATCH_EMPTY");
+  if (!Array.isArray(batch.clusters) || batch.clusters.length === 0) throw new Error("SEMANTIC_EVIDENCE_CLUSTER_REQUIRED");
   if (batch.candidates.length > SEMANTIC_CANDIDATE_BATCH_LIMITS.maxCandidates) throw new Error("SEMANTIC_CANDIDATE_BATCH_LIMIT_EXCEEDED");
   if (Buffer.byteLength(JSON.stringify(batch), "utf8") > SEMANTIC_CANDIDATE_BATCH_LIMITS.maxBytes) throw new Error("SEMANTIC_CANDIDATE_BATCH_BYTES_EXCEEDED");
   if (!batch.provenance?.agent?.trim()) throw new Error("SEMANTIC_CANDIDATE_PROVENANCE_REQUIRED");
-  for (const candidate of batch.candidates) validateCandidateShape(candidate);
+  const clusters = new Map(batch.clusters.map((cluster) => {
+    validateSemanticEvidenceCluster(cluster);
+    return [cluster.id, cluster] as const;
+  }));
+  if (clusters.size !== batch.clusters.length) throw new Error("SEMANTIC_CLUSTER_DUPLICATE");
+  for (const candidate of batch.candidates) validateCandidateShape(candidate, clusters);
 }
 
 export async function submitSemanticCandidateBatch(input: SubmitSemanticCandidateBatchInput): Promise<SemanticCandidateBatchReceipt> {
@@ -53,6 +70,7 @@ export async function submitSemanticCandidateBatch(input: SubmitSemanticCandidat
   await ensureMcpPersistenceSchema();
   const session = await findSession(input.batch.sessionId);
   assertSessionAccess(session, assertedScope, actor.actorId);
+  assertBatchGovernance(input.batch, assertedScope, session);
   const batchDigest = semanticBatchDigest(input.batch);
 
   return prisma.$transaction(async (tx) => {
@@ -168,11 +186,79 @@ export async function assembleKnowledgeReviewBundle(input: AssembleKnowledgeRevi
   return reviewBundle;
 }
 
-function candidateAssertion(session: ScanSessionRow, scope: ArchitectureScopeRef, batch: SemanticCandidateBatch, candidate: SemanticCandidateSubmission, actorId: string, now: Date): KnowledgeAssertion {
+export async function assembleKnowledgeReviewBundles(input: AssembleKnowledgeReviewBundleInput): Promise<AssembleKnowledgeReviewBundlesResult> {
+  const actor = writableActor();
+  const assertedScope = resolveWritableScope(actor, input.architectureScope);
+  await ensureMcpPersistenceSchema();
+  const session = await findSession(input.sessionId);
+  assertSessionAccess(session, assertedScope, actor.actorId);
+  const events = await prisma.federationOutbox.findMany({ where: { ...assertedScope, eventType: semanticBatchEvent, designChangeSessionId: session.designChangeSessionId }, orderBy: { createdAt: "asc" } });
+  const payloads = events.map((event) => jsonRecord(event.payload));
+  const assertionIds = [...new Set(payloads.flatMap((payload) => receiptFromPayload(payload)?.assertionIds ?? []))];
+  const rows = await prisma.knowledgeAssertion.findMany({ where: { ...assertedScope, id: { in: assertionIds } }, orderBy: { id: "asc" } });
+  if (rows.length !== assertionIds.length) throw new Error("SEMANTIC_CANDIDATE_ASSERTION_SCOPE_MISMATCH");
+  const assertions = rows.map(assertionFromRow);
+  const partitions = partitionReviewCandidates(assertions);
+  if (partitions.length === 0) throw new Error("SEMANTIC_REVIEW_PARTITIONS_EMPTY");
+  const processedSources = new Set(assertions.flatMap((assertion) => assertion.sourceObservationIds)).size;
+  const completeSignal = payloads.some((payload) => payload.complete === true);
+  const globalCoverage = {
+    totalSources: session.observationCount,
+    processedSources,
+    supportedSources: processedSources,
+    candidateCount: assertions.length,
+    complete: completeSignal && processedSources === session.observationCount
+  };
+  const batchEvidence = payloads.map((payload) => typeof payload.batchDigest === "string" ? `semantic-batch:${payload.batchDigest}` : "").filter(Boolean);
+  const allSourceObservationIds = [...new Set(assertions.flatMap((assertion) => assertion.sourceObservationIds))];
+  const identityRows = await prisma.identityCandidate.findMany({ where: { ...assertedScope, sourceObservationId: { in: allSourceObservationIds } }, select: { id: true, sourceObservationId: true } });
+  const bundles: ReviewBundle[] = [];
+  for (const partition of partitions) {
+    const blockingIssues = [...partition.blockingIssues];
+    if (!completeSignal) blockingIssues.push("SEMANTIC_CANDIDATE_BATCH_NOT_FINALIZED");
+    if (!globalCoverage.complete) blockingIssues.push("SEMANTIC_CANDIDATE_COVERAGE_INCOMPLETE");
+    const partitionSourceIds = new Set(partition.sourceObservationIds);
+    const partitionCoverage = {
+      totalSources: partition.sourceObservationIds.length,
+      processedSources: partition.sourceObservationIds.length,
+      supportedSources: partition.sourceObservationIds.length,
+      candidateCount: partition.assertions.length,
+      complete: completeSignal && globalCoverage.complete
+    };
+    bundles.push(await createKnowledgeReviewBundle({
+      id: `knowledge-review:${session.id}:${contentDigest({ riskTier: partition.riskTier, domainCluster: partition.domainCluster }).slice(0, 16)}`,
+      designChangeSessionId: session.designChangeSessionId,
+      architectureScope: assertedScope,
+      riskTier: partition.riskTier,
+      assertionIds: partition.assertions.map((assertion) => assertion.id),
+      identityCandidateIds: identityRows.filter((row) => partitionSourceIds.has(row.sourceObservationId)).map((row) => row.id),
+      evidenceRefs: [...new Set([...partition.evidenceRefs, ...batchEvidence])],
+      coverage: partitionCoverage,
+      blockingIssues: [...new Set(blockingIssues)]
+    }));
+  }
+  const status = bundles.every((bundle) => bundle.status === "READY") ? "READY" : "BLOCKED";
+  await prisma.designChangeSession.update({
+    where: { applicationServiceId_scopePath_id: { ...assertedScope, id: session.designChangeSessionId } },
+    data: { status: status === "READY" ? "WAITING_FOR_REVIEW" : "CONFLICTED" }
+  });
+  return { sessionId: session.id, status, coverage: globalCoverage, bundles };
+}
+
+function candidateAssertion(session: ScanSessionRow, scope: ArchitectureScopeRef, batch: SemanticCandidateBatch, candidate: FullAssetSemanticCandidate, actorId: string, now: Date): KnowledgeAssertion {
   const candidateDigest = contentDigest(candidate);
   const sourceEvidence = candidate.sourceObservationIds.map((id) => `source-observation:${id}`);
   const value = {
     ...candidate.value,
+    canonicalContent: candidate.canonicalContent,
+    localizedContent: candidate.localizedContent,
+    semanticGovernance: {
+      assetFamily: candidate.assetFamily,
+      promptPackDigest: candidate.promptPackDigest,
+      policyDigest: candidate.policyDigest,
+      clusterId: candidate.clusterId,
+      evidenceTypes: candidate.evidenceTypes
+    },
     review: {
       identityDecision: candidate.identityDecision,
       normalizedDigest: candidate.normalizedDigest,
@@ -197,7 +283,7 @@ function candidateAssertion(session: ScanSessionRow, scope: ArchitectureScopeRef
     evidenceRefs: [...new Set([...candidate.evidenceRefs, ...sourceEvidence])],
     sourceObservationIds: [...new Set(candidate.sourceObservationIds)],
     extractorId: `agent:${batch.provenance.agent}`,
-    riskTier: classifyCandidateRisk(candidate),
+    riskTier: classifyFullAssetCandidateRisk(candidate),
     domainCluster: candidate.domainCluster,
     generatedByActorId: actorId,
     revision: 1,
@@ -265,12 +351,26 @@ function assertionFromRow(row: any): KnowledgeAssertion {
   };
 }
 
-function validateCandidateShape(candidate: SemanticCandidateSubmission): void {
+function validateCandidateShape(candidate: FullAssetSemanticCandidate, clusters: Map<string, SemanticEvidenceCluster>): void {
   if (!candidate.semanticIdentity?.trim() || !candidate.normalizedDigest?.trim() || !candidate.factType?.trim() || !candidate.domainCluster?.trim()) throw new Error("SEMANTIC_CANDIDATE_IDENTITY_REQUIRED");
   if (!Number.isFinite(candidate.confidence) || candidate.confidence < 0 || candidate.confidence > 1) throw new Error("SEMANTIC_CANDIDATE_CONFIDENCE_INVALID");
   if (!Array.isArray(candidate.sourceObservationIds) || candidate.sourceObservationIds.length === 0) throw new Error("SEMANTIC_CANDIDATE_SOURCE_REQUIRED");
   if (!candidate.value || typeof candidate.value !== "object" || Array.isArray(candidate.value)) throw new Error("SEMANTIC_CANDIDATE_VALUE_REQUIRED");
   if (!hasBilingualCandidateContent(candidate.value)) throw new Error("SEMANTIC_CANDIDATE_BILINGUAL_CONTENT_REQUIRED");
+  const cluster = clusters.get(candidate.clusterId);
+  if (!cluster) throw new Error("SEMANTIC_CLUSTER_NOT_FOUND");
+  validateFullAssetSemanticCandidate(candidate, cluster);
+}
+
+function assertBatchGovernance(batch: SemanticCandidateBatch, scope: ArchitectureScopeRef, session: ScanSessionRow): void {
+  for (const cluster of batch.clusters) {
+    if (cluster.architectureScope.applicationServiceId !== scope.applicationServiceId || cluster.architectureScope.scopePath !== scope.scopePath) throw new Error("SEMANTIC_CLUSTER_SCOPE_MISMATCH");
+  }
+  const receipt = jsonRecord(jsonRecord(session.evidencePolicy).policyReceipt);
+  const promptPackDigest = typeof receipt.semanticPromptPackDigest === "string" ? receipt.semanticPromptPackDigest : undefined;
+  const policyDigest = typeof receipt.effectivePolicyDigest === "string" ? receipt.effectivePolicyDigest : undefined;
+  if (!promptPackDigest || !policyDigest) throw new Error("SEMANTIC_SESSION_GOVERNANCE_RECEIPT_MISSING");
+  if (batch.candidates.some((candidate) => candidate.promptPackDigest !== promptPackDigest || candidate.policyDigest !== policyDigest)) throw new Error("SEMANTIC_SESSION_GOVERNANCE_DIGEST_MISMATCH");
 }
 
 async function findSession(sessionId: string): Promise<ScanSessionRow> {
@@ -343,4 +443,5 @@ interface ScanSessionRow {
   designChangeSessionId: string;
   status: string;
   observationCount: number;
+  evidencePolicy: unknown;
 }

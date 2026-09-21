@@ -19,7 +19,7 @@ import { getKnowledgeScanReport } from "./scanner/report";
 import { submitScanBatch } from "./scanner/batch-persistence";
 import { generateKnowledgeCandidates } from "./knowledge/semantic-persistence";
 import { matchKnowledgeIdentities } from "./knowledge/identity-persistence";
-import { assembleKnowledgeReviewBundle, submitSemanticCandidateBatch } from "./knowledge/candidate-persistence";
+import { assembleKnowledgeReviewBundle, assembleKnowledgeReviewBundles, submitSemanticCandidateBatch } from "./knowledge/candidate-persistence";
 import { promoteKnowledgeCandidates, reconcileKnowledgeBaseline } from "./knowledge/promotion";
 import { bootstrapThreeAFromDesignAssets } from "./knowledge/bootstrap";
 import { deriveScopedKnowledgeProjection } from "./knowledge/projection";
@@ -819,6 +819,14 @@ export function registerTools(server: McpServer): void {
     permissions: ["knowledge:write", "governance:run"],
     readOnly: false
   }, assembleKnowledgeReviewBundle);
+
+  registerJsonTool(server, "assemble_knowledge_review_bundles", {
+    title: "Assemble governed knowledge review bundles",
+    description: "Builds risk-homogeneous, domain-bounded review bundles from finalized full-asset semantic candidate batches. It never approves or promotes candidates.",
+    inputSchema: { architectureScope: architectureScopeSchema, sessionId: z.string().min(1) },
+    permissions: ["knowledge:write", "governance:run"],
+    readOnly: false
+  }, assembleKnowledgeReviewBundles);
 
   registerJsonTool(server, "match_knowledge_identities", {
     title: "Match knowledge identities",

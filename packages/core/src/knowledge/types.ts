@@ -1,5 +1,7 @@
 import type { ArchitectureScopeRef } from "../architecture/types";
 
+import type { FullAssetSemanticCandidate, SemanticEvidenceCluster } from "./semantic-candidates";
+
 export type ArchitectureLayer = "BIZ" | "SYS" | "TECH";
 export type ArchitectureAspect = "structure" | "behavior" | "information" | "contract" | "constraint";
 export type KnowledgeAssertionStatus = "DRAFT" | "CANDIDATE" | "ACCEPTED" | "REJECTED" | "CONFLICTED" | "SUPERSEDED";
@@ -94,7 +96,8 @@ export interface SemanticCandidateBatch {
   previousBatchDigest?: string;
   complete: boolean;
   provenance: SemanticCandidateProvenance;
-  candidates: SemanticCandidateSubmission[];
+  clusters: SemanticEvidenceCluster[];
+  candidates: FullAssetSemanticCandidate[];
 }
 
 export interface SemanticCandidateBatchReceipt {

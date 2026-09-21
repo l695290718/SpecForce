@@ -1,4 +1,4 @@
-import { contentDigest, scopeById, type SemanticCandidateBatch, type SemanticCandidateSubmission } from "@specforge/core";
+import { contentDigest, factTypeForAssetFamily, scopeById, semanticEvidenceClusterDigest, type FullAssetFamily, type FullAssetSemanticCandidate, type SemanticCandidateBatch } from "@specforge/core";
 import type { KnowledgeScanBatch, ScanFinalization, ScannerReleaseManifest } from "@specforge/scan-contract";
 import { execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync, randomUUID, sign } from "node:crypto";
@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { principalFromAuthInfo, withRequestPrincipal } from "../auth";
 import { createDesignChangeSession, registerConnector } from "../federation/persistence";
 import { assembleKnowledgeReviewBundle, submitSemanticCandidateBatch } from "../knowledge/candidate-persistence";
 import { createIdentityCandidate, createWorkingStream, decideKnowledgeReviewBundle, publishKnowledgeBaseline } from "../knowledge/persistence";
@@ -137,12 +138,26 @@ async function executeBaselineRun(runNumber: number, interruptAfterSecondBatch: 
 
   const observations = await prisma.sourceObservation.findMany({ where: { ...architectureScope, payload: { path: ["scanSessionId"], equals: descriptor.sessionId } }, orderBy: { externalId: "asc" } });
   expect(observations.length).toBe(finalization.observationCount);
-  const semanticCandidates = candidateFixtures(observations.map((observation) => ({ id: observation.id, normalizedDigest: observation.normalizedDigest })));
+  const semanticCluster = {
+    id: `${semanticPrefix}.cluster`,
+    architectureScope,
+    domainHint: `${semanticPrefix}.domain`,
+    observationIds: observations.map((observation) => observation.id),
+    evidenceTypes: ["source-code", "executable-test"] as const,
+    tokenEstimate: Math.max(1, observations.length * 100)
+  };
+  const semanticCandidates = candidateFixtures(
+    observations.map((observation) => ({ id: observation.id, normalizedDigest: observation.normalizedDigest })),
+    semanticCluster.id,
+    descriptor.policyReceipt.semanticPromptPackDigest,
+    descriptor.policyReceipt.effectivePolicyDigest
+  );
   const semanticBatch: SemanticCandidateBatch = {
     sessionId: descriptor.sessionId,
     sequence: 0,
     complete: true,
     provenance: { agent: "claude-code", model: "enterprise-agent", runId: `${runPrefix}-${runNumber}` },
+    clusters: [{ ...semanticCluster, evidenceTypes: [...semanticCluster.evidenceTypes], clusterDigest: semanticEvidenceClusterDigest({ ...semanticCluster, evidenceTypes: [...semanticCluster.evidenceTypes] }) }],
     candidates: semanticCandidates
   };
   await submitSemanticCandidateBatch({ architectureScope, batch: semanticBatch });
@@ -164,41 +179,59 @@ async function executeBaselineRun(runNumber: number, interruptAfterSecondBatch: 
     }
   });
   const review = await assembleKnowledgeReviewBundle({ architectureScope, sessionId: descriptor.sessionId });
-  expect(review).toMatchObject({ status: "READY", riskTier: "T1", blockingIssues: [] });
+  expect(review).toMatchObject({ status: "READY", riskTier: "T2", blockingIssues: [] });
 
   delete process.env.SPECFORGE_MCP_SEED;
-  const decision = await decideKnowledgeReviewBundle({
-    id: `${runPrefix}-decision-${runNumber}`,
-    reviewBundleId: review.id,
-    architectureScope,
-    decision: "APPROVE",
-    approvedAssertionIds: review.assertionIds,
-    approvedIdentityCandidateIds: review.identityCandidateIds,
-    evidenceRefs: review.evidenceRefs,
-    reason: "Independent actor approved complete bilingual evidence and unambiguous identities."
+  const reviewer = principalFromAuthInfo({
+    clientId: `${runPrefix}-reviewer-${runNumber}`,
+    tenantId: "local-development",
+    scopes: ["knowledge:write", "governance:run"],
+    extra: {
+      actor: {
+        actorType: "user",
+        actorId: `${runPrefix}-reviewer-${runNumber}`,
+        grants: [{ scopeId: architectureScope.applicationServiceId, action: "write" }]
+      }
+    }
   });
-  await createWorkingStream({ id: streamId, name: "Legacy baseline main", architectureScope });
-  const promotion = await promoteKnowledgeCandidates({ architectureScope, promotionDecisionId: decision.id, streamId });
-  const retryPromotion = await promoteKnowledgeCandidates({ architectureScope, promotionDecisionId: decision.id, streamId });
+  const { baseline, reconciliation, promotion, retryPromotion } = await withRequestPrincipal(reviewer, async () => {
+    const decision = await decideKnowledgeReviewBundle({
+      id: `${runPrefix}-decision-${runNumber}`,
+      reviewBundleId: review.id,
+      architectureScope,
+      decision: "APPROVE",
+      approvedAssertionIds: review.assertionIds,
+      approvedIdentityCandidateIds: review.identityCandidateIds,
+      evidenceRefs: review.evidenceRefs,
+      reason: "Independent human reviewer approved complete bilingual evidence and unambiguous identities."
+    });
+    await createWorkingStream({ id: streamId, name: "Legacy baseline main", architectureScope });
+    const promoted = await promoteKnowledgeCandidates({ architectureScope, promotionDecisionId: decision.id, streamId });
+    const retried = await promoteKnowledgeCandidates({ architectureScope, promotionDecisionId: decision.id, streamId });
+    const reconciled = await reconcileKnowledgeBaseline({ architectureScope, promotionReceiptId: promoted.id });
+    const published = await publishKnowledgeBaseline({
+      id: `${runPrefix}-baseline-${runNumber}`,
+      streamId,
+      changeSetId: promoted.changeSetId,
+      architectureScope,
+      sourceRevisionIds: promoted.assetRevisionIds,
+      relationshipVersion: promoted.relationshipVersion,
+      reconciliationReceiptId: reconciled.id
+    });
+    return { baseline: published, reconciliation: reconciled, promotion: promoted, retryPromotion: retried };
+  });
   expect(retryPromotion).toMatchObject({ id: promotion.id, idempotent: true });
-  const reconciliation = await reconcileKnowledgeBaseline({ architectureScope, promotionReceiptId: promotion.id });
-  const baseline = await publishKnowledgeBaseline({
-    id: `${runPrefix}-baseline-${runNumber}`,
-    streamId,
-    changeSetId: promotion.changeSetId,
-    architectureScope,
-    sourceRevisionIds: promotion.assetRevisionIds,
-    relationshipVersion: promotion.relationshipVersion,
-    reconciliationReceiptId: reconciliation.id
-  });
   const canonicalAssetIds = (await prisma.designAsset.findMany({ where: { ...architectureScope, id: { startsWith: "knowledge-asset:" }, payload: { contains: semanticPrefix } }, select: { id: true }, orderBy: { id: "asc" } })).map((asset) => asset.id);
   return { baseline, reconciliation, canonicalAssetIds, relationshipRevisionIds: promotion.relationshipRevisionIds, interruptedCheckpoint, retryWasIdempotent, producedBatchCount: batches.length };
 }
 
-function candidateFixtures(observations: Array<{ id: string; normalizedDigest: string }>): SemanticCandidateSubmission[] {
-  const candidates = observations.map<SemanticCandidateSubmission>((observation, index) => {
-    const factType = index === 0 ? "api-contract" : index === 1 ? "data-model" : "domain-concept";
+function candidateFixtures(observations: Array<{ id: string; normalizedDigest: string }>, clusterId: string, promptPackDigest: string, policyDigest: string): FullAssetSemanticCandidate[] {
+  const candidates = observations.map<FullAssetSemanticCandidate>((observation, index) => {
+    const assetFamily: FullAssetFamily = index === 0 ? "api" : index === 1 ? "dataModel" : "domain";
+    const factType = factTypeForAssetFamily[assetFamily];
     const semanticIdentity = `${semanticPrefix}.fact.${index}`;
+    const canonicalContent = { name: `Legacy fixture fact ${index}`, description: `Verified semantic fact ${index} extracted from the legacy fixture.` };
+    const localizedContent = { zh: { name: `存量夹具事实 ${index}`, description: `从存量夹具提取并验证的语义事实 ${index}。` } };
     return {
       semanticIdentity,
       normalizedDigest: contentDigest({ semanticIdentity, source: observation.normalizedDigest }),
@@ -206,22 +239,28 @@ function candidateFixtures(observations: Array<{ id: string; normalizedDigest: s
       layer: "SYS",
       aspect: factType === "data-model" ? "information" : "contract",
       domainCluster: `${semanticPrefix}.domain`,
-      value: {
-        canonicalContent: { name: `Legacy fixture fact ${index}`, description: `Verified semantic fact ${index} extracted from the legacy fixture.` },
-        localizedContent: { zh: { name: `存量夹具事实 ${index}`, description: `从存量夹具提取并验证的语义事实 ${index}。` } }
-      },
+      value: { canonicalContent, localizedContent },
       confidence: 0.99,
-      matchingEvidence: [`source-observation:${observation.id}`],
+      matchingEvidence: [`source-observation:${observation.id}`, `executable-test:${runPrefix}`],
       counterEvidence: [],
       unresolvedQuestions: [],
-      evidenceRefs: [`source-observation:${observation.id}`],
+      evidenceRefs: [`source-observation:${observation.id}`, `executable-test:${runPrefix}`],
       sourceObservationIds: [observation.id],
-      identityDecision: "UNAMBIGUOUS"
+      identityDecision: "UNAMBIGUOUS",
+      assetFamily,
+      promptPackDigest,
+      policyDigest,
+      clusterId,
+      evidenceTypes: ["source-code", "executable-test"],
+      canonicalContent,
+      localizedContent
     };
   });
   if (candidates.length >= 2) {
     const source = candidates[0]!;
     const target = candidates[1]!;
+    const canonicalContent = { summary: "The discovered API writes the discovered data model.", source: { semanticIdentity: source.semanticIdentity }, target: { semanticIdentity: target.semanticIdentity }, relationType: "WRITES" };
+    const localizedContent = { zh: { summary: "发现的 API 写入发现的数据模型。" } };
     candidates.push({
       semanticIdentity: `${semanticPrefix}.relationship.api-writes-model`,
       normalizedDigest: contentDigest({ source: source.semanticIdentity, target: target.semanticIdentity, relationType: "WRITES" }),
@@ -229,17 +268,21 @@ function candidateFixtures(observations: Array<{ id: string; normalizedDigest: s
       layer: "SYS",
       aspect: "structure",
       domainCluster: `${semanticPrefix}.domain`,
-      value: {
-        canonicalContent: { summary: "The discovered API writes the discovered data model.", source: { semanticIdentity: source.semanticIdentity }, target: { semanticIdentity: target.semanticIdentity }, relationType: "WRITES" },
-        localizedContent: { zh: { summary: "发现的 API 写入发现的数据模型。" } }
-      },
+      value: { canonicalContent, localizedContent },
       confidence: 0.99,
       matchingEvidence: source.matchingEvidence,
       counterEvidence: [],
       unresolvedQuestions: [],
       evidenceRefs: source.evidenceRefs,
       sourceObservationIds: source.sourceObservationIds,
-      identityDecision: "UNAMBIGUOUS"
+      identityDecision: "UNAMBIGUOUS",
+      assetFamily: "typedRelationship",
+      promptPackDigest,
+      policyDigest,
+      clusterId,
+      evidenceTypes: ["source-code", "executable-test"],
+      canonicalContent,
+      localizedContent
     });
   }
   return candidates;

@@ -123,6 +123,14 @@ Reports are summary-first with a maximum page size of 500. An Agent must explici
 
 Focused tests passed with 81 checks across scanner report, MCP routing, and federation regression coverage. MCP-server typecheck passed. A live read against session `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` returned two consecutive, non-overlapping payload pages from the 6,078 observations, preserved `READY_FOR_ANALYSIS`, and reported zero blocking issues. This completes the bounded read prerequisite only; candidate submission, independent T1 review, promotion, reconciliation, and Baseline publication remain pending.
 
+## Full-Asset Semantic Governance Increment (2026-09-21)
+
+Production semantic batches now require one of the sixteen full asset families, an exact family-to-fact mapping, an immutable evidence-cluster digest, the scan session's prompt-pack and effective-policy digests, typed evidence, canonical English content, a complete Chinese overlay, and a stable identity decision. Evidence clusters contain at most 500 exact-session observations; candidate batches contain at most 100 candidates and remain capped at 1 MiB. Public contracts, business rules, state machines, integrations, and typed relationships require at least two evidence types.
+
+Risk is server-owned: ambiguous identity and security, authorization, privacy, or compliance meaning are T3; public contracts, rules, state, integrations, typed relationships, and breaking change are T2; ordinary semantic facts are T1; T0 is available only to explicitly server-authorized deterministic quality, observability, or evidence facts. The additive `assemble_knowledge_review_bundles` tool partitions review by risk tier and domain cluster; the singular tool remains for compatibility. Promotion mapping now covers all fifteen asset families plus typed relationships.
+
+Core and MCP typechecks passed. Twenty-eight core semantic/risk checks and sixty candidate persistence, review partition, promotion mapping, risk-policy, and MCP routing checks passed. A live dry run against the 6,078-observation session validated one real policy-pinned evidence cluster and rejected the legacy unclustered batch shape. It did not persist candidates. Design session `design-change-session:15373558-985e-4d62-8a1e-e92f5e791ff6` closed as `BLOCKED` because the current promotion API accepts one review decision at a time while a complete scan is partitioned by risk and domain. Retry after all approved partitions can be aggregated into one atomic ChangeSet; publishing one partial Baseline per partition is forbidden.
+
 ## 中文本地化覆盖
 
 ### 背景
@@ -218,6 +226,14 @@ Focused tests passed with 81 checks across scanner report, MCP routing, and fede
 报告默认只返回摘要，单页最多 500 条。Agent 必须显式请求 `includePayload=true` 才能读取载荷，此时单页上限降为 50，且仅返回白名单内、已脱敏的观察字段，不暴露内部持久化元数据。报告与扫描最终化复用同一套“告警缺口/阻断缺口”分类。
 
 聚焦验证共通过 81 项扫描报告、MCP 路由与联邦回归测试，MCP Server 类型检查通过。对会话 `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` 的真实数据库读取成功返回两个连续且不重叠的载荷页，总量保持 6,078、状态保持 `READY_FOR_ANALYSIS`、阻断项为 0。本增量仅完成语义分析的有界读取前提；候选提交、独立 T1 审核、提升、对账与 Baseline 发布仍待完成。
+
+## 全资产语义治理增量（2026-09-21）
+
+生产语义批次现在必须声明十六类完整资产族之一、精确的资产族到事实类型映射、不可变证据簇摘要、扫描会话固定的 Prompt Pack 与有效策略摘要、类型化证据、英文规范内容、完整中文覆盖和稳定身份结论。每个证据簇最多 500 条精确会话观察，每个候选批次最多 100 条且保持 1 MiB 上限。公共契约、业务规则、状态机、集成与类型化关系至少需要两种证据类型。
+
+风险由服务端判定：身份歧义以及安全、授权、隐私或合规语义为 T3；公共契约、规则、状态、集成、类型化关系与破坏性变更为 T2；普通语义事实为 T1；只有服务端显式授权的确定性质量、可观测性或证据事实才能进入 T0。新增 `assemble_knowledge_review_bundles` 按风险等级和领域簇拆分审核包，单数工具保留为兼容接口。提升映射现覆盖十五类设计资产及类型化关系。
+
+Core 与 MCP 类型检查通过；核心语义/风险通过 28 项检查，候选持久化、审核拆包、提升映射、风险策略和 MCP 路由通过 60 项检查。针对 6,078 条观察会话的真实只读演练验证了一组策略固定的证据簇，并拒绝旧式无簇批次，未持久化任何候选。设计会话 `design-change-session:15373558-985e-4d62-8a1e-e92f5e791ff6` 已关闭为 `BLOCKED`：当前提升 API 每次只接受一个审核决策，而完整扫描需要按风险和领域拆分。必须先将所有已批准分区原子汇总为一个 ChangeSet 再重试；禁止按分区发布部分 Baseline。
 
 ## 跨平台 Release 增量（2026-09-19）
 

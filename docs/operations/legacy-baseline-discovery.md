@@ -75,14 +75,14 @@ Agent 将本地状态与 MCP `get_scan_checkpoint` 比对，只通过 `submit_sc
 
 1. Read finalized observations and coverage through authorized exact-Scope MCP tools.
 2. Use Claude Code, OpenCode, or another enterprise Agent to infer bounded semantic candidates. Keep English canonical fields mandatory and provide complete Chinese overlays for human-facing content.
-3. Submit at most 100 candidates per hash-chained batch with `submit_semantic_candidate_batch`; mark only the last batch `complete=true`.
-4. Call `assemble_knowledge_review_bundle`. Caller-supplied risk is ignored; the server computes candidate risk and bundle maximum.
+3. Group at most 500 exact-session observations into each digest-pinned evidence cluster. Submit at most 100 full-asset candidates per hash-chained batch with `submit_semantic_candidate_batch`; mark only the last batch `complete=true`.
+4. Call `assemble_knowledge_review_bundles`. Caller-supplied risk is ignored; the server classifies candidates and partitions bundles by risk tier and domain cluster. The singular tool remains compatibility-only.
 5. Resolve all missing evidence, incomplete coverage, bilingual fields, and ambiguous identities before approval.
 
 1. 通过授权的精确 Scope MCP 工具读取已完成的观察与覆盖率。
 2. 使用 Claude Code、OpenCode 或企业 Agent 推导有界语义候选；英文规范字段必填，面向人的内容必须具备完整中文覆盖。
-3. 通过 `submit_semantic_candidate_batch` 提交哈希链批次，每批最多 100 条，仅最后一批标记 `complete=true`。
-4. 调用 `assemble_knowledge_review_bundle`；服务端独立计算候选风险和 Bundle 最大风险，不接受调用方自报风险。
+3. 每个摘要固定的证据簇最多包含 500 条精确会话观察；通过 `submit_semantic_candidate_batch` 提交哈希链批次，每批最多 100 条完整资产候选，仅最后一批标记 `complete=true`。
+4. 调用 `assemble_knowledge_review_bundles`；服务端独立计算候选风险，并按风险等级与领域簇拆分 Bundle，不接受调用方自报风险；单数工具仅用于兼容旧流程。
 5. 审批前处理所有证据、覆盖率、双语和身份匹配阻塞项。
 
 ## 6. T0-T3 Review / T0-T3 评审
