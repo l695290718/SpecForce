@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"io/fs"
 	"os"
+	pathpkg "path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -27,6 +28,10 @@ type InventoryResult struct {
 }
 
 func Inventory(root string, maxSourceFileBytes int64) (InventoryResult, error) {
+	return InventoryWithPolicy(root, maxSourceFileBytes, nil)
+}
+
+func InventoryWithPolicy(root string, maxSourceFileBytes int64, ignorePatterns []string) (InventoryResult, error) {
 	root, err := filepath.Abs(root)
 	if err != nil {
 		return InventoryResult{}, err
@@ -43,12 +48,12 @@ func Inventory(root string, maxSourceFileBytes int64) (InventoryResult, error) {
 			return nil
 		}
 		if entry.IsDir() {
-			if relative == ".git" || relative == ".specforge" {
+			if relative == ".git" || relative == ".specforge" || ignored(relative, ignorePatterns) {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if relative == ".specforge.yaml" {
+		if relative == ".specforge.yaml" || ignored(relative, ignorePatterns) {
 			return nil
 		}
 		if entry.Type()&os.ModeSymlink != 0 {
@@ -86,6 +91,30 @@ func Inventory(root string, maxSourceFileBytes int64) (InventoryResult, error) {
 		return result.Gaps[i].Path < result.Gaps[j].Path
 	})
 	return result, err
+}
+
+func ignored(relative string, patterns []string) bool {
+	relative = filepath.ToSlash(relative)
+	for _, raw := range patterns {
+		pattern := strings.TrimPrefix(filepath.ToSlash(strings.TrimSpace(raw)), "./")
+		if pattern == "" {
+			continue
+		}
+		if strings.HasSuffix(pattern, "/**") {
+			prefix := strings.TrimSuffix(pattern, "/**")
+			if relative == prefix || strings.HasPrefix(relative, prefix+"/") {
+				return true
+			}
+			if !strings.Contains(prefix, "/") && strings.Contains("/"+relative+"/", "/"+prefix+"/") {
+				return true
+			}
+			continue
+		}
+		if matched, err := pathpkg.Match(pattern, relative); err == nil && matched {
+			return true
+		}
+	}
+	return false
 }
 
 func withinRoot(root, candidate string) bool {

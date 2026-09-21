@@ -14,6 +14,7 @@ const keyDirectory = join(localRoot, "keys");
 const privateKeyPath = join(keyDirectory, "local-ed25519-private.pem");
 const trustPath = join(localRoot, "scanner-trust.json");
 const version = valueAfter(process.argv.slice(2), "--version") ?? localVersion();
+const nativeVersion = nextPatch(version);
 
 await mkdir(keyDirectory, { recursive: true, mode: 0o700 });
 const privateKey = await loadOrCreatePrivateKey();
@@ -29,7 +30,7 @@ await writePrivateKey(privateKey);
 await writeFile(trustPath, `${JSON.stringify(trust, null, 2)}\n`, "utf8");
 await protectFile(trustPath);
 
-const build = run(process.execPath, [
+const portableBuild = run(process.execPath, [
   resolve(root, "scripts", "build-portable-scanner-release.mjs"),
   "--version", version
 ], {
@@ -37,24 +38,40 @@ const build = run(process.execPath, [
   SPECFORGE_SCANNER_RELEASE_PRIVATE_KEY: privateKey,
   SPECFORGE_SCANNER_RELEASE_SIGNING_KEY_ID: signingKeyId
 });
-const built = parseLastJson(build.stdout, "SCANNER_RELEASE_BUILD_OUTPUT");
-const manifest = JSON.parse(await readFile(built.manifest, "utf8"));
-const bootstrap = run(pnpmCommand(), ["scan-governance:bootstrap"], {
+const nativeBuild = run(process.execPath, [
+  resolve(root, "scripts", "build-native-scanner-release.mjs"),
+  "--version", nativeVersion
+], {
+  ...process.env,
+  SPECFORGE_SCANNER_RELEASE_PRIVATE_KEY: privateKey,
+  SPECFORGE_SCANNER_RELEASE_SIGNING_KEY_ID: signingKeyId
+});
+const portable = parseLastJson(portableBuild.stdout, "PORTABLE_SCANNER_RELEASE_BUILD_OUTPUT");
+const native = parseLastJson(nativeBuild.stdout, "NATIVE_SCANNER_RELEASE_BUILD_OUTPUT");
+const portableManifest = JSON.parse(await readFile(portable.manifest, "utf8"));
+const nativeManifest = JSON.parse(await readFile(native.manifest, "utf8"));
+const bootstraps = [portableManifest, nativeManifest].map((manifest) => parseLastJson(run(pnpmCommand(), ["scan-governance:bootstrap"], {
   ...process.env,
   SPECFORGE_SCANNER_RELEASE_MANIFEST: JSON.stringify(manifest),
   SPECFORGE_SCANNER_RELEASE_TRUST_BUNDLE: JSON.stringify(trust.keys)
-}, true);
+}, true).stdout, "SCANNER_GOVERNANCE_BOOTSTRAP_OUTPUT"));
+const activeReleasePath = join(localRoot, "active-release.json");
+await writeFile(activeReleasePath, `${JSON.stringify({ preferredReleaseId: nativeManifest.releaseId, nativeManifestPath: native.manifest, portableManifestPath: portable.manifest, trustPath }, null, 2)}\n`, "utf8");
+await protectFile(activeReleasePath);
 
 process.stdout.write(`${JSON.stringify({
   status: "LOCAL_SCANNER_RELEASE_READY",
-  releaseId: manifest.releaseId,
-  scannerVersion: manifest.scannerVersion,
+  releaseId: nativeManifest.releaseId,
+  releaseIds: [nativeManifest.releaseId, portableManifest.releaseId],
+  scannerVersion: nativeManifest.scannerVersion,
   signingKeyId,
   publicKeyFingerprint: fingerprint,
   privateKeyPath,
   trustPath,
-  manifestPath: built.manifest,
-  bootstrap: parseLastJson(bootstrap.stdout, "SCANNER_GOVERNANCE_BOOTSTRAP_OUTPUT")
+  activeReleasePath,
+  manifestPath: native.manifest,
+  manifestPaths: [native.manifest, portable.manifest],
+  bootstraps
 }, null, 2)}\n`);
 
 async function loadOrCreatePrivateKey() {
@@ -121,7 +138,13 @@ function pnpmCommand() {
 
 function localVersion() {
   const stamp = new Date().toISOString().replace(/[-:TZ.]/gu, "").slice(0, 14);
-  return `2.1.0-local.${stamp}`;
+  return `2.1.${stamp}`;
+}
+
+function nextPatch(value) {
+  const parts = value.split(".").map(Number);
+  if (parts.length !== 3 || parts.some((part) => !Number.isSafeInteger(part) || part < 0)) throw new Error("SCANNER_VERSION_INVALID");
+  return `${parts[0]}.${parts[1]}.${parts[2] + 1}`;
 }
 
 function valueAfter(values, flag) {

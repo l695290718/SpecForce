@@ -116,9 +116,21 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		return usageError()
 	}
+	if len(args) == 1 && args[0] == "scanner-metadata" {
+		return writeScannerMetadata(stdout)
+	}
 	root, err := repositoryRoot(context.Background())
 	if err != nil {
 		return err
+	}
+	if args[0] == "scan" {
+		if len(args) > 1 && args[1] == "status" {
+			return runScanStatus(root, args[2:], stdout)
+		}
+		if len(args) > 1 && args[1] == "snapshot" {
+			return runScanSnapshot(context.Background(), root, args[2:], stdout)
+		}
+		return runLocalScan(context.Background(), root, args[1:], stdout)
 	}
 	config, err := loadConfig(filepath.Join(root, configName))
 	if err != nil {
@@ -145,11 +157,6 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		return verifyStaged(context.Background(), root, config, stdout, stderr)
 	case "verify-commit":
 		return verifyCommit(context.Background(), root, config, args[1:], stdout)
-	case "scan":
-		if len(args) > 1 && args[1] == "status" {
-			return runScanStatus(root, args[2:], stdout)
-		}
-		return runLocalScan(context.Background(), root, config, args[1:], stdout)
 	case "observe":
 		return runObserve(context.Background(), root, config, args[1:], stdout)
 	case "status":
@@ -160,7 +167,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 }
 
 func usageError() error {
-	return errors.New("usage: specforge login | hook install|uninstall|doctor | verify-staged | verify-commit --attestation <file> | status | scan --release <file> --session <file> --trust <file> [--spool <dir>] [--artifact <file>] | scan status --session <file> [--spool <dir>] | observe --connector-id <id> --scope-path <path> [--application-service-id <id>] [--source-cursor <cursor>] [--sequence <n>] [--previous-batch-digest <digest>] [--allow-dirty]")
+	return errors.New("usage: specforge scanner-metadata | login | hook install|uninstall|doctor | verify-staged | verify-commit --attestation <file> | status | scan --repository-id <id> --release <file> --session <file> --trust <file> [--spool <dir>] [--artifact <file>] | scan snapshot --repository-id <id> [--allow-dirty true|false] [--max-source-file-bytes <n>] [--ignore-patterns <csv>] | scan status --session <file> [--spool <dir>] | observe --connector-id <id> --scope-path <path> [--application-service-id <id>] [--source-cursor <cursor>] [--sequence <n>] [--previous-batch-digest <digest>] [--allow-dirty]")
 }
 
 func repositoryRoot(ctx context.Context) (string, error) {

@@ -432,26 +432,26 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **Backlog ID:** `backlog-approved-brownfield-scan-governed-promotion`
 
-**Status:** Blocked after governed retry. The server-derived coverage gate now reaches `READY_FOR_ANALYSIS`, but the ReviewBundle remains blocked because MockAI candidates have unresolved identity decisions and unresolved questions; framework-aware extraction and authorized semantic review are still required before promotion.
+**Status:** Deterministic framework-aware extraction completed; authorized semantic review and governed promotion remain blocked. Native governed session `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` reached `READY_FOR_ANALYSIS` without generating MockAI candidates.
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
-**Rationale:** The compatibility path remains candidate-only. The governed run proves release pinning, source-session binding, server-derived coverage, and the production observation chain, but must not promote MockAI candidates while identity and semantic questions remain unresolved.
+**Rationale:** The signed native run now proves release pinning, source-session binding, framework-aware extraction, trusted coverage-plan verification, and the production observation chain. Structural evidence still cannot decide business semantics or stable asset identity, so promotion remains an independent authorized Agent and reviewer action.
 
-**Trigger:** Add trusted framework-aware extractor coverage and run an authorized semantic Agent/reviewer that resolves candidate identity and questions. Then rerun `start_knowledge_scan` -> `submit_scan_batch` -> `finalize_knowledge_scan`, submit candidates through `submit_semantic_candidate_batch`, obtain the required independent T1 review, and promote, reconcile, and publish only after all gates pass.
+**Trigger:** Run an authorized semantic Agent over the bounded observations from the ready native session, produce complete English-canonical and Chinese-localized candidates, resolve stable identity and questions, submit through `submit_semantic_candidate_batch`, obtain the required independent T1 review, and promote, reconcile, and publish only after all gates pass.
 
-**Evidence:** Local release `scanner-release:2.1.0-local.2026092101-portable`, Key ID `local-dev-fbdd35fb26796f2e`, and both governed sessions were persisted in the exact Scope. The second session `knowledge-scan:1ba4e7db-54f2-4e56-8746-8c0535c62c3c` accepted 3,469 observations across 31,522 indexed files and finalized `READY_FOR_ANALYSIS`; ReviewBundle `knowledge-review:knowledge-scan:1ba4e7db-54f2-4e56-8746-8c0535c62c3c` is `BLOCKED` by candidate identity and unresolved-question gates. No accepted asset, relationship, ChangeSet, or Baseline was promoted.
+**Evidence:** Native release `scanner-release:2.1.20260921095754-windows-amd64` and portable fallback `scanner-release:2.1.20260921095753-portable` were signed by Key ID `local-dev-fbdd35fb26796f2e` and registered in the exact Scope. Session `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` accepted 6,078 observations in 13 batches and finalized `READY_FOR_ANALYSIS`; no semantic candidate, accepted asset, relationship, ChangeSet, or Baseline was promoted.
 
 ### 通过受治理会话提升已批准的存量扫描
 
 **待办标识：** `backlog-approved-brownfield-scan-governed-promotion`
 
-**状态：** 受治理重试后仍阻塞。服务端生成的覆盖门禁已进入 `READY_FOR_ANALYSIS`，但 ReviewBundle 因 MockAI 候选仍有未解决身份判定和未决问题而阻断；正式提升仍需框架感知提取和获授权的语义审核。
+**状态：** 确定性框架感知提取已经完成；授权语义审核和受治理提升仍阻塞。原生受治理会话 `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` 已进入 `READY_FOR_ANALYSIS`，且没有生成 MockAI 候选。
 
 **负责人：** SpecForge 架构与 Agent 集成团队。
 
-**理由：** 兼容路径仍然只允许候选态。本次受治理重试已经证明发行物固定、来源会话绑定、服务端覆盖推导和生产观察链路有效，但在身份和语义问题未解决时，不能提升 MockAI 候选。
+**理由：** 签名原生运行已经证明发行物固定、来源会话绑定、框架感知提取、可信覆盖计划校验和生产观察链路有效。结构证据仍不能代替业务语义与稳定身份判定，因此提升必须由授权 Agent 和审核人独立完成。
 
-**启动条件：** 增加受信任的框架感知提取器，并由获授权的语义 Agent/审核人解决候选身份和问题。重新执行 `start_knowledge_scan` -> `submit_scan_batch` -> `finalize_knowledge_scan`，通过 `submit_semantic_candidate_batch` 提交候选，完成 T1 独立评审，所有门禁通过后才能执行提升、对账和发布。
+**启动条件：** 获授权语义 Agent 消费已就绪原生会话的有界观察，生成英文规范字段与完整中文本地化候选，解决稳定身份与未决问题，通过 `submit_semantic_candidate_batch` 提交，完成 T1 独立评审；所有门禁通过后才能提升、对账和发布。
 
-**证据：** 本地发行物 `scanner-release:2.1.0-local.2026092101-portable`、Key ID `local-dev-fbdd35fb26796f2e` 和两个受治理会话已写入精确 Scope。第二个会话 `knowledge-scan:1ba4e7db-54f2-4e56-8746-8c0535c62c3c` 接收 3,469 条观察、覆盖 31,522 个索引文件并最终化为 `READY_FOR_ANALYSIS`；ReviewBundle `knowledge-review:knowledge-scan:1ba4e7db-54f2-4e56-8746-8c0535c62c3c` 因候选身份和未决问题门禁为 `BLOCKED`。没有提升正式资产、关系、ChangeSet 或 Baseline。
+**证据：** 原生发行物 `scanner-release:2.1.20260921095754-windows-amd64` 与便携回退 `scanner-release:2.1.20260921095753-portable` 由 Key ID `local-dev-fbdd35fb26796f2e` 签名并注册到精确 Scope。会话 `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` 接收 6,078 条观察、13 个批次并最终化为 `READY_FOR_ANALYSIS`；没有生成语义候选，也没有提升正式资产、关系、ChangeSet 或 Baseline。

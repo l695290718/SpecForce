@@ -9,6 +9,7 @@ Implemented for the governed repository-scan increment; production connector del
 - Context Pack: `context-pack-system-owned-full-asset-repository-discovery`.
 - Scope: `com.specforge.designcenter`.
 - Design session: `design-change-session:197ab290-ff5b-40d0-950f-55b213a58c9b`.
+- Native scanner increment session: `design-change-session:2e8bf691-87dc-4c77-8c0b-5fdee242e9b9`.
 - Specification: `docs/superpowers/specs/2026-09-17-governed-repository-scan-skill-design.md`.
 
 ## Context
@@ -55,7 +56,7 @@ A file-extension scanner cannot correctly discover the complete SpecForge asset 
 
 ## Implementation Boundary
 
-The implemented increment includes system-owned governance records, technology-aware extractor catalogs, deterministic multi-language and contract-neutral extraction, bounded bilingual semantic-candidate validation, resumable governed sessions, coverage and blocker reports, provider-neutral Skill packaging, a signed portable Node scanner release path, compatible release selection, safe first-scan bootstrap readiness, and governance-version uniqueness protection. Continuous scanning, runtime or CMDB connectors, outbound proposals, external `APPLY`, cross-Scope semantic merging, automatic native acceleration, and full historical-baseline reconciliation remain deferred.
+The implemented increment includes system-owned governance records, technology-aware extractor catalogs, deterministic multi-language and contract-neutral extraction, bounded bilingual semantic-candidate validation, resumable governed sessions, coverage and blocker reports, provider-neutral Skill packaging, signed native Go acceleration with a portable Node fallback, compatible release selection, safe first-scan bootstrap readiness, and governance-version uniqueness protection. Continuous scanning, runtime or CMDB connectors, outbound proposals, external `APPLY`, cross-Scope semantic merging, authorized semantic identity resolution, and formal Baseline promotion remain deferred.
 
 ## Implementation Evidence
 
@@ -105,6 +106,14 @@ The repository migration for the ACTIVE-governance uniqueness constraint is prep
 
 The verified connection at `localhost:15433` forwards to Docker service `deploy-postgres-1/specforge_canonical`; the separate `specforge-postgres` container is not the application's configured database. A custom-format backup was created at `.specforge/backups/specforge_canonical-20260920.dump` and validated with `pg_restore -l` (608 archive entries). Because historical migrations include data backfills and graph seeding, the backup is a prerequisite for review; it is not evidence that the historical migrations can be marked applied automatically.
 
+## Framework-Aware Native Release Increment (2026-09-21)
+
+The local release provisioner now publishes two independently versioned artifacts under one Ed25519 trust root: a Windows/amd64 native Go scanner and a portable Node fallback. The governed runner reads the active-release pointer, computes the repository snapshot with the selected native binary before opening the MCP session, verifies the server-returned signed manifest locally, and submits the native content-addressed Spool format. Repository policy exclusions are applied identically during snapshot, extraction, and dirty-snapshot verification, including nested dependency, build-cache, worktree, generated-output, and test-fixture directories.
+
+The server preserves a native coverage plan only when every capability belongs to the exact governed asset-family set, every claimed extractor belongs to the signed release catalog, capability semantics are valid, and the Go-compatible plan digest matches. Portable releases remain server-derived and `SEMANTIC_REVIEW_REQUIRED`. Advisory parser-depth, unsupported-file, binary, and credential-file findings remain evidence; unreadable or oversized required source remains blocking.
+
+Release `scanner-release:2.1.20260921095754-windows-amd64` completed governed session `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` in the exact Scope. It accepted 6,078 observations in 13 hash-chained batches and finalized `READY_FOR_ANALYSIS` with snapshot digest `36aeddea57688d8b7b68f9cc0d8e99fe130746245bc7d58d0670a33d5f55e672`. The runner deliberately stopped before semantic-candidate generation. An authorized Agent must consume the bounded observations, resolve bilingual semantics and stable identity, submit candidates through MCP, obtain the required review, and only then promote and reconcile. No accepted asset, typed relationship, ChangeSet, or Baseline was created by this increment.
+
 ## 中文本地化覆盖
 
 ### 背景
@@ -151,7 +160,7 @@ The verified connection at `localhost:15433` forwards to Docker service `deploy-
 
 ### 实施边界
 
-本次已实现增量包括系统级治理记录、技术栈感知提取器目录、多语言与契约中立的确定性提取、双语语义候选校验、可恢复的受治理扫描会话、覆盖与阻断报告、中立 Agent Skill 打包、签名跨平台 Node 扫描器发布路径、兼容 Release 选择、安全首次扫描门禁和治理版本唯一性保护。持续扫描、运行时或 CMDB 连接器、出站 Proposal、外部 `APPLY`、跨 Scope 语义合并、自动原生加速和历史全量基线对账仍然延期。
+本次已实现增量包括系统级治理记录、技术栈感知提取器目录、多语言与契约中立的确定性提取、双语语义候选校验、可恢复的受治理扫描会话、覆盖与阻断报告、中立 Agent Skill 打包、签名 Go 原生加速与 Node 便携回退、兼容 Release 选择、安全首次扫描门禁和治理版本唯一性保护。持续扫描、运行时或 CMDB 连接器、出站 Proposal、外部 `APPLY`、跨 Scope 语义合并、授权语义身份解析和正式 Baseline 提升仍然延期。
 
 ### 实施证据
 
@@ -185,9 +194,13 @@ The verified connection at `localhost:15433` forwards to Docker service `deploy-
 
 ## 受治理重试与本地信任根（2026-09-21）
 
-本次收尾新增幂等命令 `pnpm scanner:provision-local`：在仓库外的 `~/.specforge/scanner/keys/` 生成一把 Ed25519 开发密钥，根据公钥指纹生成 Key ID，写入本地扫描器信任库，构建唯一的签名 Portable Scanner Release，并将公钥 Trust Bundle 和清单注册到 PostgreSQL。私钥、信任库、扫描器制品和扫描 Spool 均不进入提交边界。
+本次收尾新增幂等命令 `pnpm scanner:provision-local`：在仓库外的 `~/.specforge/scanner/keys/` 生成一把 Ed25519 开发密钥，根据公钥指纹生成 Key ID，写入本地扫描器信任库，并分别构建和注册独立版本的签名 Go 原生 Release 与 Node 便携回退 Release。私钥、信任库、扫描器制品和扫描 Spool 均不进入提交边界。
 
-随后 `pnpm scan:governed-local` 将签名发行物绑定到精确 `KnowledgeScanSession`，运行便携扫描器，通过 MCP 提交哈希链批次，并且仅在最终化后提交中立的双语语义候选。第一次受治理重试创建了发行物 `scanner-release:2.1.0-local.2026092101-portable` 和会话 `knowledge-scan:32151ac2-aa21-41a6-841a-4e9b8f20a0db`，接收 3,469 条观察、覆盖 31,522 个索引文件，但以 `COVERAGE_PLAN_INCOMPLETE` 阻塞。便携观察器不能冒充框架感知的完整资产覆盖，因此没有提升候选、正式资产、关系、ChangeSet 或 Baseline。剩余待办是框架感知提取器覆盖、服务端生成的技术栈与覆盖计划，以及后续 T1 独立评审。
+随后 `pnpm scan:governed-local` 从本地活动发行指针优先选择原生扫描器，在开启 MCP 会话前用同一二进制计算仓库快照，本地校验服务端返回的签名清单，并提交内容寻址的哈希链批次。快照、提取和脏快照复核统一执行 Scope 仓库忽略策略，排除嵌套依赖、构建缓存、隔离工作区、生成物和测试夹具。
+
+服务端只在资产族集合精确一致、能力语义合法、声明的提取器全部属于签名发行目录且 Go 兼容摘要一致时保留原生覆盖计划；便携发行仍由服务端推导为 `SEMANTIC_REVIEW_REQUIRED`。普通解析深度提示、不支持文件类型、二进制文件和凭据文件保持为证据，不再被误判为致命缺口；不可读或超限的必需源码仍会阻断。
+
+原生发行物 `scanner-release:2.1.20260921095754-windows-amd64` 在精确 Scope 下完成会话 `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751`，接收 6,078 条观察、13 个哈希链批次，并最终化为 `READY_FOR_ANALYSIS`。编排器有意停在 Agent 分析边界，不再默认生成 MockAI 候选。下一步由获授权 Agent 消费有界观察，完成英文规范字段与中文本地化、稳定身份判定和未决问题处理，再通过 MCP 提交候选并完成 T1 审核、提升与对账。本增量没有创建正式资产、类型化关系、ChangeSet 或 Baseline。
 
 ## 跨平台 Release 增量（2026-09-19）
 

@@ -21,6 +21,8 @@ The implementation is owned by `com.specforge.designcenter` at `pf-specforge/pro
 
 These checks cover exact Scope assertions, policy receipt pinning, unsupported-capability blocking, bounded report remediation, bilingual candidate input, Python/Go/TypeScript/neutral extraction, private resume context, cross-Agent contract equivalence, and the 100,000-observation batch invariant.
 
+The 2026-09-21 native release increment additionally passed `go test ./...`, `pnpm exec vitest run apps/mcp-server/src/scanner/finalization.test.ts` (10 tests), and `pnpm --filter @specforge/mcp-server typecheck`. `pnpm scanner:provision-local` registered signed native release `scanner-release:2.1.20260921095754-windows-amd64` plus portable fallback `scanner-release:2.1.20260921095753-portable`. With `SPECFORGE_DESIGN_CHANGE_SESSION=design-change-session:2e8bf691-87dc-4c77-8c0b-5fdee242e9b9`, `pnpm scan:governed-local` accepted 6,078 observations in 13 hash-chained batches and finalized session `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` as `READY_FOR_ANALYSIS`. Snapshot digest: `36aeddea57688d8b7b68f9cc0d8e99fe130746245bc7d58d0670a33d5f55e672`; finalization digest: `2039780dee422d740d6427995d5c25db4e78f6d1aa9add00bf5419e930e3cc77`. Semantic candidate generation and promotion were deliberately not run.
+
 The exact-Scope MCP synchronization and reconciliation were also completed:
 
 - `$env:SPECFORGE_DESIGN_FACT_IDS='adr-system-owned-full-asset-repository-discovery'; pnpm design-facts:sync` -> complete.

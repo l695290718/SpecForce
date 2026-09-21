@@ -1,6 +1,7 @@
-import type { ScanFinalization, ScanPolicyReceipt } from "@specforge/scan-contract";
+import type { AssetCoveragePlan, ScanFinalization, ScanPolicyReceipt } from "@specforge/scan-contract";
 import { describe, expect, it } from "vitest";
-import { assessScanFinalization, deriveCoveragePlan } from "./finalization";
+import { createHash } from "node:crypto";
+import { assessScanFinalization, deriveCoveragePlan, verifyTrustedCoveragePlan } from "./finalization";
 
 const receipt: ScanPolicyReceipt = {
   systemGovernanceDigest: "1".repeat(64),
@@ -29,6 +30,40 @@ function finalization(overrides: Partial<ScanFinalization> = {}): ScanFinalizati
 }
 
 describe("governed scan finalization", () => {
+  it("accepts a native coverage plan backed by signed and observed extractors", () => {
+    const coveragePlan = nativePlan([
+      { assetFamily: "api", framework: "repository", state: "FULL", required: true, reasonCodes: [], extractorIds: ["typescript-node-conservative"] },
+      { assetFamily: "event", framework: "repository", state: "NOT_APPLICABLE", required: false, reasonCodes: ["NO_APPLICABLE_TECHNOLOGY_EVIDENCE"], extractorIds: [] }
+    ]);
+
+    expect(verifyTrustedCoveragePlan({
+      assetFamilies: ["api", "event"],
+      coveragePlan,
+      allowedExtractorIds: ["typescript-node-conservative"]
+    })).toEqual(coveragePlan);
+  });
+
+  it("rejects native coverage claimed by an unsigned extractor", () => {
+    const coveragePlan = nativePlan([
+      { assetFamily: "api", framework: "repository", state: "FULL", required: true, reasonCodes: [], extractorIds: ["unknown-extractor"] }
+    ]);
+
+    expect(() => verifyTrustedCoveragePlan({
+      assetFamilies: ["api"], coveragePlan, allowedExtractorIds: ["typescript-node-conservative"]
+    })).toThrow("SCAN_COVERAGE_PLAN_EXTRACTOR_UNTRUSTED:api");
+  });
+
+  it("rejects duplicate or missing native coverage capabilities", () => {
+    const coveragePlan = nativePlan([
+      { assetFamily: "api", framework: "repository", state: "FULL", required: true, reasonCodes: [], extractorIds: ["typescript-node-conservative"] },
+      { assetFamily: "api", framework: "repository", state: "FULL", required: true, reasonCodes: [], extractorIds: ["typescript-node-conservative"] }
+    ], ["api", "event"]);
+
+    expect(() => verifyTrustedCoveragePlan({
+      assetFamilies: ["api", "event"], coveragePlan, allowedExtractorIds: ["typescript-node-conservative"]
+    })).toThrow("SCAN_COVERAGE_PLAN_CAPABILITY_INVALID");
+  });
+
   it("derives a deterministic semantic-review plan from persisted observations", () => {
     const first = deriveCoveragePlan({
       assetFamilies: ["api", "dataModel", "event"],
@@ -84,4 +119,27 @@ describe("governed scan finalization", () => {
     const result = assessScanFinalization({ finalization: finalization(), expectedPolicyReceipt: { ...receipt, effectivePolicyDigest: "9".repeat(64) } });
     expect(result).toEqual({ status: "STALE", blockingIssues: ["SCAN_RESUME_CONTEXT_MISMATCH:POLICY_RECEIPT"] });
   });
+
+  it("keeps advisory parser gaps as evidence without blocking analysis", () => {
+    const result = assessScanFinalization({
+      finalization: finalization({ coverage: { indexedFiles: 2, skippedFiles: 2, observationCount: 1, coverageGaps: ["README.md:UNSUPPORTED_SOURCE_TYPE", "src/index.ts:TYPESCRIPT_PARSER_DEPTH_CONSERVATIVE_LEXICAL"] } }),
+      expectedPolicyReceipt: receipt
+    });
+    expect(result.status).toBe("READY");
+    expect(result.blockingIssues).toEqual([]);
+  });
+
+  it("blocks unreadable source evidence", () => {
+    const result = assessScanFinalization({
+      finalization: finalization({ coverage: { indexedFiles: 1, skippedFiles: 1, observationCount: 1, coverageGaps: ["src/private.ts:SOURCE_PATH_UNREADABLE"] } }),
+      expectedPolicyReceipt: receipt
+    });
+    expect(result.blockingIssues).toEqual(["COVERAGE_GAP:src/private.ts:SOURCE_PATH_UNREADABLE"]);
+  });
 });
+
+function nativePlan(capabilities: AssetCoveragePlan["capabilities"], assetFamilies = capabilities.map((capability) => capability.assetFamily)): AssetCoveragePlan {
+  const plan: AssetCoveragePlan = { assetFamilies, capabilities, complete: true, digest: "" };
+  plan.digest = createHash("sha256").update(JSON.stringify({ ...plan, digest: "" })).digest("hex");
+  return plan;
+}

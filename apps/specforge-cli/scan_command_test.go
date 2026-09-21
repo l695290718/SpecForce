@@ -12,11 +12,11 @@ import (
 
 func TestParseLocalScanOptionsRequiresSignedInputs(t *testing.T) {
 	root := t.TempDir()
-	options, err := parseLocalScanOptions(root, []string{"--release", "release.json", "--session", "session.json", "--trust", "trust.json", "--artifact", "specforge.exe"}, true)
+	options, err := parseLocalScanOptions(root, []string{"--repository-id", "repo:test", "--release", "release.json", "--session", "session.json", "--trust", "trust.json", "--artifact", "specforge.exe"}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if options.spoolBase != filepath.Join(root, ".specforge", "scan-spool") || options.artifact != "specforge.exe" {
+	if options.spoolBase != filepath.Join(root, ".specforge", "scan-spool") || options.artifact != "specforge.exe" || options.repositoryID != "repo:test" {
 		t.Fatalf("options=%+v", options)
 	}
 	if _, err := parseLocalScanOptions(root, []string{"--session", "session.json"}, true); err == nil {

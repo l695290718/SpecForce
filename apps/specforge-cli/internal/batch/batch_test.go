@@ -1,6 +1,7 @@
 package batch
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/l695290718/specforge/apps/specforge-cli/internal/scancontract"
@@ -40,6 +41,19 @@ func TestBuildCreatesServerCompatibleDigestChain(t *testing.T) {
 	}
 	if second.PreviousBatchDigest == nil || *second.PreviousBatchDigest != first.BatchDigest || second.BatchDigest == first.BatchDigest {
 		t.Fatalf("second=%+v", second)
+	}
+}
+
+func TestCanonicalJSONPreservesHTMLSensitiveCharacters(t *testing.T) {
+	encoded, err := canonicalJSON(map[string]any{"source": "value <T> && ready"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(encoded) != `{"source":"value <T> && ready"}` {
+		t.Fatalf("canonical json must match JavaScript JSON encoding, got %s", encoded)
+	}
+	if strings.Contains(string(encoded), `\u003c`) || strings.Contains(string(encoded), `\u0026`) {
+		t.Fatalf("canonical json unexpectedly escaped HTML-sensitive characters: %s", encoded)
 	}
 }
 

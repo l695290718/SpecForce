@@ -2717,7 +2717,7 @@
                       "scopePath": "pf-huawei/product-celon/subproduct-platform/module-celon-designer/com.huawei.celon.desiner"
                     },
                     "proposalId": "proposal-requirement-assessment-center",
-                    "proposalStatus": "approved",
+                    "proposalStatus": "implemented",
                     "proposalNonGoal": {
                       "en": "Repository and runtime evidence ingestion, calibrated P50/P90 prediction, automatic implementation, and external connector delivery remain deferred to later phases.",
                       "zh": "仓库与运行时证据接入、校准后的 P50/P90 预测、自动实现和外部连接器交付延期到后续阶段。"
@@ -3384,9 +3384,9 @@
                     "contextPackId": "context-pack-system-owned-full-asset-repository-discovery",
                     "relatedAssetIds": ["api-specforge-mcp-tools", "data-specforge-assets", "adr-governed-scan-coverage-policy"],
                     "owner": "SpecForge Architecture and Design Governance",
-                    "status": "Approved design; implementation is split into six governed delivery slices.",
-                    "reason": "Complete repository discovery requires system-owned governance, framework-specific deterministic extraction, and evidence-bounded Agent semantics.",
-                    "retryTrigger": "Begin implementation after the phased plan is reviewed and approved.",
+                    "status": "Signed native framework-aware extraction is implemented and verified; authorized semantic promotion remains deferred.",
+                    "reason": "Complete repository discovery requires system-owned governance, signed framework-specific deterministic extraction, and evidence-bounded Agent semantics.",
+                    "retryTrigger": "Run an authorized semantic Agent over the ready native scan, complete T1 review, then promote and reconcile through MCP.",
                     "localizedContent": {
                       "en": {
                         "decision": "Use system-owned versioned governance, a signed framework extractor registry, per-asset capability coverage, bounded Agent semantics, and a provider-neutral orchestration Skill.",
@@ -3401,7 +3401,10 @@
                       { "command": "rg AssetType packages/core/src/types.ts", "result": "Confirmed sixteen top-level SpecForge asset types." },
                       { "command": "rg ScannerObservationType packages/core/src/scanner/types.ts", "result": "Confirmed the current scanner exposes six coarse observation types." },
                       { "command": "design review 2026-09-17", "result": "Approved system-owned governance, framework capability matrix, full-asset candidates, and governed promotion boundaries." },
-                      { "command": "git diff --check", "result": "Passed for the rewritten specification, ADR, and manifest." }
+                      { "command": "git diff --check", "result": "Passed for the rewritten specification, ADR, and manifest." },
+                      { "command": "go test ./...", "result": "Passed for the native scanner, framework extractors, repository policy, and cross-language digest chain." },
+                      { "command": "pnpm exec vitest run apps/mcp-server/src/scanner/finalization.test.ts", "result": "Passed: 10 trusted coverage and finalization tests." },
+                      { "command": "pnpm scan:governed-local", "result": "Passed: signed native session knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751 accepted 6078 observations in 13 batches and finalized READY_FOR_ANALYSIS." }
                     ]
                   },
                   {

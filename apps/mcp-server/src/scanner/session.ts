@@ -1,11 +1,11 @@
-import { validateScanFinalization, type AssetCapability, type AssetCoveragePlan, type ScanFinalization, type ScanLimits, type ScanPolicyReceipt, type ScanSessionDescriptor, type TechnologyProfile } from "@specforge/scan-contract";
+import { validateScannerRelease, validateScanFinalization, type AssetCapability, type AssetCoveragePlan, type ScanFinalization, type ScanLimits, type ScanPolicyReceipt, type ScanSessionDescriptor, type TechnologyProfile } from "@specforge/scan-contract";
 import { contentDigest, type ArchitectureScopeRef } from "@specforge/core";
 import { Prisma } from "@prisma/client";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { ensureMcpPersistenceSchema, prisma, resolveWritableScope, writableActor } from "../persistence";
 import { assertScannerReleaseAvailable, selectScannerRelease, type ScannerCapabilities } from "./release";
 import { resolvePersistedEffectiveScanGovernance } from "./governance-persistence";
-import { assessScanFinalization, deriveCoveragePlan } from "./finalization";
+import { assessScanFinalization, deriveCoveragePlan, verifyTrustedCoveragePlan } from "./finalization";
 
 const MAX_SESSION_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_SESSION_LIFETIME_MS = 30 * 60 * 1000;
@@ -198,11 +198,18 @@ export async function finalizeKnowledgeScan(input: FinalizeKnowledgeScanInput) {
       where: { ...scope, payload: { path: ["scanSessionId"], equals: session.id } },
       select: { payload: true }
     });
-    const verifiedCoveragePlan = deriveCoveragePlan({
-      assetFamilies: sessionAssetFamilies,
-      observationTypes: observationRows.map((row) => readObservationType(row.payload)),
-      extractorId: "portable-repository-observer"
-    });
+    const releaseManifest = validateScannerRelease(release.manifest);
+    const verifiedCoveragePlan = (releaseManifest.artifactKind ?? "NATIVE_BINARY") === "NATIVE_BINARY"
+      ? verifyTrustedCoveragePlan({
+        assetFamilies: sessionAssetFamilies,
+        coveragePlan: finalization.coveragePlan,
+        allowedExtractorIds: releaseManifest.extractors.map((extractor) => extractor.id)
+      })
+      : deriveCoveragePlan({
+        assetFamilies: sessionAssetFamilies,
+        observationTypes: observationRows.map((row) => readObservationType(row.payload)),
+        extractorId: "portable-repository-observer"
+      });
     const verifiedFinalization = { ...finalization, coveragePlan: verifiedCoveragePlan };
     const finalizationDigest = sha256(canonicalJson(verifiedFinalization));
     if (session.finalizationDigest) {

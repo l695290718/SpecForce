@@ -1,6 +1,7 @@
 package batch
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -73,8 +74,10 @@ func canonicalJSON(value any) ([]byte, error) {
 
 func canonicalValue(value any) ([]byte, error) {
 	switch typed := value.(type) {
-	case nil, bool, string, float64:
+	case nil, bool, float64:
 		return json.Marshal(typed)
+	case string:
+		return jsonString(typed)
 	case []any:
 		parts := make([]string, len(typed))
 		for index, item := range typed {
@@ -93,7 +96,7 @@ func canonicalValue(value any) ([]byte, error) {
 		sort.Strings(keys)
 		parts := make([]string, 0, len(keys))
 		for _, key := range keys {
-			encodedKey, _ := json.Marshal(key)
+			encodedKey, _ := jsonString(key)
 			encodedValue, err := canonicalValue(typed[key])
 			if err != nil {
 				return nil, err
@@ -104,6 +107,16 @@ func canonicalValue(value any) ([]byte, error) {
 	default:
 		return nil, errors.New("CANONICAL_JSON_VALUE_INVALID")
 	}
+}
+
+func jsonString(value string) ([]byte, error) {
+	var buffer bytes.Buffer
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(value); err != nil {
+		return nil, err
+	}
+	return bytes.TrimSpace(buffer.Bytes()), nil
 }
 
 func digestString(value string) string {

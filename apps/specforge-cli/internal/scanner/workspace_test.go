@@ -48,6 +48,21 @@ func TestInventoryDoesNotFollowEscapingSymlink(t *testing.T) {
 	assertGap(t, result.Gaps, "escape.txt", "SYMLINK_ESCAPES_ROOT")
 }
 
+func TestInventoryWithPolicySkipsConfiguredDirectories(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "node_modules/dependency/index.js", []byte("ignored"))
+	writeFixture(t, root, "apps/web/node_modules/dependency/index.js", []byte("ignored"))
+	writeFixture(t, root, "main.go", []byte("package main"))
+
+	result, err := InventoryWithPolicy(root, 1024, []string{"node_modules/**"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Files) != 1 || result.Files[0].Path != "main.go" {
+		t.Fatalf("expected only main.go, got %#v", result.Files)
+	}
+}
+
 func writeFixture(t *testing.T, root, path string, contents []byte) {
 	t.Helper()
 	fullPath := filepath.Join(root, filepath.FromSlash(path))

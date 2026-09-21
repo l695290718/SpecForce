@@ -1,5 +1,6 @@
 import { contentDigest } from "@specforge/core";
 import type { AssetCapability, AssetCoveragePlan, ScanFinalization, ScanPolicyReceipt } from "@specforge/scan-contract";
+import { createHash } from "node:crypto";
 
 const OBSERVATION_FAMILY_MAP: Readonly<Record<string, string>> = {
   "api-contract": "api",
@@ -42,6 +43,53 @@ export function deriveCoveragePlan(input: {
   };
 }
 
+export function verifyTrustedCoveragePlan(input: {
+  assetFamilies: readonly string[];
+  coveragePlan: AssetCoveragePlan;
+  allowedExtractorIds: readonly string[];
+}): AssetCoveragePlan {
+  const expectedFamilies = [...new Set(input.assetFamilies)].sort();
+  const actualFamilies = [...new Set(input.coveragePlan.assetFamilies)].sort();
+  if (!sameStrings(expectedFamilies, actualFamilies)) throw new Error("SCAN_COVERAGE_PLAN_SCOPE_MISMATCH");
+  if (input.coveragePlan.capabilities.length !== expectedFamilies.length) throw new Error("SCAN_COVERAGE_PLAN_CAPABILITY_COUNT_INVALID");
+
+  const allowedExtractors = new Set(input.allowedExtractorIds);
+  const seenFamilies = new Set<string>();
+  for (const capability of input.coveragePlan.capabilities) {
+    if (!expectedFamilies.includes(capability.assetFamily) || seenFamilies.has(capability.assetFamily)) {
+      throw new Error("SCAN_COVERAGE_PLAN_CAPABILITY_INVALID");
+    }
+    seenFamilies.add(capability.assetFamily);
+    if (capability.extractorIds.some((extractorId) => !allowedExtractors.has(extractorId))) {
+      throw new Error(`SCAN_COVERAGE_PLAN_EXTRACTOR_UNTRUSTED:${capability.assetFamily}`);
+    }
+    if (capability.state === "FULL" || capability.state === "PARTIAL") {
+      if (!capability.required || capability.extractorIds.length === 0) {
+        throw new Error(`SCAN_COVERAGE_PLAN_EXTRACTOR_MISSING:${capability.assetFamily}`);
+      }
+      continue;
+    }
+    if (capability.state === "NOT_APPLICABLE") {
+      if (capability.required || capability.extractorIds.length > 0) {
+        throw new Error(`SCAN_COVERAGE_PLAN_NOT_APPLICABLE_INVALID:${capability.assetFamily}`);
+      }
+      continue;
+    }
+    if (capability.state === "UNSUPPORTED") {
+      if (!capability.required || capability.extractorIds.length > 0) {
+        throw new Error(`SCAN_COVERAGE_PLAN_UNSUPPORTED_INVALID:${capability.assetFamily}`);
+      }
+      continue;
+    }
+    throw new Error(`SCAN_COVERAGE_PLAN_NATIVE_STATE_INVALID:${capability.assetFamily}`);
+  }
+
+  if (input.coveragePlan.digest !== nativeCoverageDigest(input.coveragePlan)) {
+    throw new Error("SCAN_COVERAGE_PLAN_DIGEST_MISMATCH");
+  }
+  return input.coveragePlan;
+}
+
 export interface ScanFinalizationAssessment {
   status: "READY" | "BLOCKED" | "STALE";
   blockingIssues: string[];
@@ -52,7 +100,9 @@ export function assessScanFinalization(input: {
   expectedPolicyReceipt: ScanPolicyReceipt;
 }): ScanFinalizationAssessment {
   const blockingIssues = new Set<string>();
-  for (const gap of input.finalization.coverage.coverageGaps) blockingIssues.add(`COVERAGE_GAP:${gap}`);
+  for (const gap of input.finalization.coverage.coverageGaps) {
+    if (isBlockingCoverageGap(gap)) blockingIssues.add(`COVERAGE_GAP:${gap}`);
+  }
   for (const capability of input.finalization.coveragePlan.capabilities) {
     if (!capability.required) continue;
     if (capability.state === "UNSUPPORTED") {
@@ -77,4 +127,35 @@ function samePolicyReceipt(left: ScanPolicyReceipt, right: ScanPolicyReceipt): b
     && left.semanticPromptPackDigest === right.semanticPromptPackDigest
     && left.scopeRuntimeProfileDigest === right.scopeRuntimeProfileDigest
     && left.effectivePolicyDigest === right.effectivePolicyDigest;
+}
+
+function isBlockingCoverageGap(gap: string): boolean {
+  const reason = gap.includes(":") ? gap.slice(gap.lastIndexOf(":") + 1) : gap;
+  return reason !== "UNSUPPORTED_SOURCE_TYPE"
+    && reason !== "BINARY_SOURCE_SKIPPED"
+    && reason !== "CREDENTIAL_FILE_BLOCKED"
+    && reason !== "SQL_SCHEMA_HAS_NO_CREATE_TABLE"
+    && !reason.endsWith("_NO_SUPPORTED_CONSTRUCTS")
+    && !reason.includes("_PARSER_DEPTH_CONSERVATIVE");
+}
+
+function nativeCoverageDigest(plan: AssetCoveragePlan): string {
+  const normalized = {
+    assetFamilies: plan.assetFamilies,
+    capabilities: plan.capabilities.map((capability) => ({
+      assetFamily: capability.assetFamily,
+      framework: capability.framework,
+      state: capability.state,
+      required: capability.required,
+      reasonCodes: capability.reasonCodes,
+      extractorIds: capability.extractorIds
+    })),
+    complete: plan.complete,
+    digest: ""
+  };
+  return createHash("sha256").update(JSON.stringify(normalized)).digest("hex");
+}
+
+function sameStrings(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }

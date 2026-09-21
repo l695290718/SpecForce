@@ -18,6 +18,10 @@ var (
 type GitCommand func(args ...string) (string, error)
 
 func ResolveRepositoryIdentity(root, repositoryID string, allowDirty bool, maxSourceFileBytes int64, git GitCommand) (scancontract.RepositoryIdentity, InventoryResult, error) {
+	return ResolveRepositoryIdentityWithPolicy(root, repositoryID, allowDirty, maxSourceFileBytes, nil, git)
+}
+
+func ResolveRepositoryIdentityWithPolicy(root, repositoryID string, allowDirty bool, maxSourceFileBytes int64, ignorePatterns []string, git GitCommand) (scancontract.RepositoryIdentity, InventoryResult, error) {
 	status, err := git("status", "--porcelain", "--untracked-files=all")
 	if err != nil {
 		return scancontract.RepositoryIdentity{}, InventoryResult{}, errors.New("GIT_STATUS_UNAVAILABLE")
@@ -34,7 +38,7 @@ func ResolveRepositoryIdentity(root, repositoryID string, allowDirty bool, maxSo
 	if !allowDirty {
 		return scancontract.RepositoryIdentity{}, InventoryResult{}, ErrDirtyWorktreeForbidden
 	}
-	inventory, err := Inventory(root, maxSourceFileBytes)
+	inventory, err := InventoryWithPolicy(root, maxSourceFileBytes, ignorePatterns)
 	if err != nil {
 		return scancontract.RepositoryIdentity{}, InventoryResult{}, err
 	}
@@ -46,10 +50,14 @@ func ResolveRepositoryIdentity(root, repositoryID string, allowDirty bool, maxSo
 }
 
 func VerifyDirtySnapshot(root string, expected scancontract.RepositoryIdentity, maxSourceFileBytes int64) error {
+	return VerifyDirtySnapshotWithPolicy(root, expected, maxSourceFileBytes, nil)
+}
+
+func VerifyDirtySnapshotWithPolicy(root string, expected scancontract.RepositoryIdentity, maxSourceFileBytes int64, ignorePatterns []string) error {
 	if expected.SnapshotKind != scancontract.RepositorySnapshotKindDirtyManifest {
 		return nil
 	}
-	inventory, err := Inventory(root, maxSourceFileBytes)
+	inventory, err := InventoryWithPolicy(root, maxSourceFileBytes, ignorePatterns)
 	if err != nil {
 		return err
 	}

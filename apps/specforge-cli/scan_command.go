@@ -24,14 +24,15 @@ import (
 )
 
 type localScanOptions struct {
-	releasePath string
-	sessionPath string
-	trustPath   string
-	spoolBase   string
-	artifact    string
+	repositoryID string
+	releasePath  string
+	sessionPath  string
+	trustPath    string
+	spoolBase    string
+	artifact     string
 }
 
-func runLocalScan(ctx context.Context, root string, config FileConfig, args []string, stdout io.Writer) error {
+func runLocalScan(ctx context.Context, root string, args []string, stdout io.Writer) error {
 	options, err := parseLocalScanOptions(root, args, true)
 	if err != nil {
 		return err
@@ -61,12 +62,12 @@ func runLocalScan(ctx context.Context, root string, config FileConfig, args []st
 		output, commandErr := runCommand(ctx, "git", arguments...)
 		return string(output), commandErr
 	}
-	identity, inventory, err := scanner.ResolveRepositoryIdentity(root, config.Repository.ID, descriptor.RepositoryPolicy.AllowDirtyWorktree, int64(descriptor.Limits.MaxSourceFileBytes), git)
+	identity, inventory, err := scanner.ResolveRepositoryIdentityWithPolicy(root, options.repositoryID, descriptor.RepositoryPolicy.AllowDirtyWorktree, int64(descriptor.Limits.MaxSourceFileBytes), descriptor.RepositoryPolicy.IgnorePatterns, git)
 	if err != nil {
 		return err
 	}
 	if len(inventory.Files) == 0 {
-		inventory, err = scanner.Inventory(root, int64(descriptor.Limits.MaxSourceFileBytes))
+		inventory, err = scanner.InventoryWithPolicy(root, int64(descriptor.Limits.MaxSourceFileBytes), descriptor.RepositoryPolicy.IgnorePatterns)
 		if err != nil {
 			return err
 		}
@@ -114,7 +115,7 @@ func runLocalScan(ctx context.Context, root string, config FileConfig, args []st
 			return err
 		}
 	}
-	if err := scanner.VerifyDirtySnapshot(root, identity, int64(descriptor.Limits.MaxSourceFileBytes)); err != nil {
+	if err := scanner.VerifyDirtySnapshotWithPolicy(root, identity, int64(descriptor.Limits.MaxSourceFileBytes), descriptor.RepositoryPolicy.IgnorePatterns); err != nil {
 		return err
 	}
 	manifestDigest, err := scanner.InventoryDigest(inventory)
@@ -124,7 +125,7 @@ func runLocalScan(ctx context.Context, root string, config FileConfig, args []st
 	finalization := scancontract.ScanFinalization{
 		ContractVersion: descriptor.ContractVersion, SessionId: descriptor.SessionId, ArchitectureScope: descriptor.ArchitectureScope,
 		RepositorySnapshotDigest: identity.SnapshotDigest, ManifestDigest: manifestDigest, FinalBatchDigest: batches[len(batches)-1].BatchDigest,
-		BatchCount: len(batches), ObservationCount: len(observations), Coverage: coverage, CoveragePlan: coveragePlan, PolicyReceipt: descriptor.PolicyReceipt, GeneratedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		BatchCount: len(batches), ObservationCount: len(observations), Coverage: coverage, CoveragePlan: coveragePlan, PolicyReceipt: descriptor.PolicyReceipt, GeneratedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 	if err := finalization.Validate(descriptor.ArchitectureScope); err != nil {
 		return err
@@ -243,13 +244,13 @@ func parseLocalScanOptions(root string, args []string, requireRelease bool) (loc
 		}
 		values[name] = args[index+1]
 	}
-	allowed := map[string]bool{"session": true, "spool": true, "release": requireRelease, "trust": requireRelease, "artifact": requireRelease}
+	allowed := map[string]bool{"session": true, "spool": true, "repository-id": requireRelease, "release": requireRelease, "trust": requireRelease, "artifact": requireRelease}
 	for name := range values {
 		if !allowed[name] {
 			return localScanOptions{}, fmt.Errorf("SCAN_OPTION_UNSUPPORTED: %s", name)
 		}
 	}
-	if values["session"] == "" || (requireRelease && (values["release"] == "" || values["trust"] == "")) {
+	if values["session"] == "" || (requireRelease && (values["repository-id"] == "" || values["release"] == "" || values["trust"] == "")) {
 		return localScanOptions{}, usageError()
 	}
 	artifact := values["artifact"]
@@ -260,7 +261,7 @@ func parseLocalScanOptions(root string, args []string, requireRelease bool) (loc
 	if spoolBase == "" {
 		spoolBase = filepath.Join(root, ".specforge", "scan-spool")
 	}
-	return localScanOptions{releasePath: values["release"], sessionPath: values["session"], trustPath: values["trust"], spoolBase: spoolBase, artifact: artifact}, nil
+	return localScanOptions{repositoryID: values["repository-id"], releasePath: values["release"], sessionPath: values["session"], trustPath: values["trust"], spoolBase: spoolBase, artifact: artifact}, nil
 }
 
 func writeJSON(writer io.Writer, value any) error {
