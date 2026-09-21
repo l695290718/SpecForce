@@ -749,8 +749,15 @@ export function registerTools(server: McpServer): void {
 
   registerJsonTool(server, "get_knowledge_scan_report", {
     title: "Get governed knowledge scan report",
-    description: "Reads a bounded exact-Scope scan report, coverage plan, policy receipt, observations, blockers, and remediation actions without mutating candidates or accepted assets.",
-    inputSchema: { architectureScope: architectureScopeSchema, sessionId: z.string().min(1), limit: z.number().int().positive().max(500).optional() },
+    description: "Reads a stable, cursor-paginated exact-Scope scan report. Observation payload is omitted by default and, when explicitly requested, is limited to an already-redacted 50-item page.",
+    inputSchema: {
+      architectureScope: architectureScopeSchema,
+      sessionId: z.string().min(1),
+      cursor: z.string().min(1).optional(),
+      pageSize: z.number().int().positive().max(500).optional(),
+      includePayload: z.boolean().optional(),
+      limit: z.number().int().positive().max(500).optional()
+    },
     permissions: ["knowledge:read"],
     readOnly: true
   }, async (input) => getKnowledgeScanReport(input));

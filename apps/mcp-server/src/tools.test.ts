@@ -143,6 +143,7 @@ const governedScanner = vi.hoisted(() => ({
   getScannerRelease: vi.fn().mockResolvedValue({ releaseId: "scanner-release-2.0.0" }),
   startKnowledgeScan: vi.fn().mockResolvedValue({ sessionId: "knowledge-scan-1" }),
   getScanCheckpoint: vi.fn().mockResolvedValue({ acceptedSequence: -1 }),
+  getKnowledgeScanReport: vi.fn().mockResolvedValue({ sessionId: "knowledge-scan-1", observations: [], hasMore: false }),
   submitScanBatch: vi.fn().mockResolvedValue({ acceptedSequence: 0, idempotent: false }),
   finalizeKnowledgeScan: vi.fn().mockResolvedValue({ status: "READY_FOR_ANALYSIS" })
 }));
@@ -163,6 +164,7 @@ vi.mock("./scanner/session", () => ({
   finalizeKnowledgeScan: governedScanner.finalizeKnowledgeScan
 }));
 vi.mock("./scanner/batch-persistence", () => ({ submitScanBatch: governedScanner.submitScanBatch }));
+vi.mock("./scanner/report", () => ({ getKnowledgeScanReport: governedScanner.getKnowledgeScanReport }));
 vi.mock("./features", () => features);
 
 import { registerTools } from "./tools";
@@ -654,11 +656,13 @@ describe("3A knowledge foundation tools", () => {
     const tools = captureTools();
     await tools.get("get_scanner_release")!.handler({ architectureScope, sessionId: "knowledge-scan-1" });
     await tools.get("get_scan_checkpoint")!.handler({ architectureScope, sessionId: "knowledge-scan-1" });
+    await tools.get("get_knowledge_scan_report")!.handler({ architectureScope, sessionId: "knowledge-scan-1", pageSize: 25, cursor: "cursor-1", includePayload: true });
     await tools.get("submit_scan_batch")!.handler({ architectureScope, batch: { sessionId: "knowledge-scan-1" } });
     await tools.get("finalize_knowledge_scan")!.handler({ architectureScope, sessionId: "knowledge-scan-1", finalization: { acceptedSequence: 0 } });
 
     expect(governedScanner.getScannerRelease).toHaveBeenCalledWith({ architectureScope, sessionId: "knowledge-scan-1" });
     expect(governedScanner.getScanCheckpoint).toHaveBeenCalledWith({ architectureScope, sessionId: "knowledge-scan-1" });
+    expect(governedScanner.getKnowledgeScanReport).toHaveBeenCalledWith({ architectureScope, sessionId: "knowledge-scan-1", pageSize: 25, cursor: "cursor-1", includePayload: true });
     expect(governedScanner.submitScanBatch).toHaveBeenCalledWith({ architectureScope, batch: { sessionId: "knowledge-scan-1" } });
     expect(governedScanner.finalizeKnowledgeScan).toHaveBeenCalledWith({ architectureScope, sessionId: "knowledge-scan-1", finalization: { acceptedSequence: 0 } });
   });

@@ -432,26 +432,26 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **Backlog ID:** `backlog-approved-brownfield-scan-governed-promotion`
 
-**Status:** Deterministic framework-aware extraction completed; authorized semantic review and governed promotion remain blocked. Native governed session `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` reached `READY_FOR_ANALYSIS` without generating MockAI candidates.
+**Status:** Deterministic framework-aware extraction and bounded exact-Scope observation pagination are complete. Authorized semantic candidate authoring, independent T1 review, and governed promotion remain pending. Native governed session `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` remains `READY_FOR_ANALYSIS` without MockAI candidates.
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
 **Rationale:** The signed native run now proves release pinning, source-session binding, framework-aware extraction, trusted coverage-plan verification, and the production observation chain. Structural evidence still cannot decide business semantics or stable asset identity, so promotion remains an independent authorized Agent and reviewer action.
 
-**Trigger:** Run an authorized semantic Agent over the bounded observations from the ready native session, produce complete English-canonical and Chinese-localized candidates, resolve stable identity and questions, submit through `submit_semantic_candidate_batch`, obtain the required independent T1 review, and promote, reconcile, and publish only after all gates pass.
+**Trigger:** Run an authorized semantic Agent through the cursor-paginated `get_knowledge_scan_report` payload pages, produce complete English-canonical and Chinese-localized candidates, resolve stable identity and questions, submit through `submit_semantic_candidate_batch`, obtain the required independent T1 review, and promote, reconcile, and publish only after all gates pass.
 
-**Evidence:** Native release `scanner-release:2.1.20260921095754-windows-amd64` and portable fallback `scanner-release:2.1.20260921095753-portable` were signed by Key ID `local-dev-fbdd35fb26796f2e` and registered in the exact Scope. Session `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` accepted 6,078 observations in 13 batches and finalized `READY_FOR_ANALYSIS`; no semantic candidate, accepted asset, relationship, ChangeSet, or Baseline was promoted.
+**Evidence:** Native release `scanner-release:2.1.20260921095754-windows-amd64` and portable fallback `scanner-release:2.1.20260921095753-portable` were signed by Key ID `local-dev-fbdd35fb26796f2e` and registered in the exact Scope. Session `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` accepted 6,078 observations in 13 batches and finalized `READY_FOR_ANALYSIS`. Focused report/routing regression passed 81 tests; typecheck passed; two live payload pages were non-overlapping with zero blocking issues. No semantic candidate, accepted asset, relationship, ChangeSet, or Baseline was promoted.
 
 ### 通过受治理会话提升已批准的存量扫描
 
 **待办标识：** `backlog-approved-brownfield-scan-governed-promotion`
 
-**状态：** 确定性框架感知提取已经完成；授权语义审核和受治理提升仍阻塞。原生受治理会话 `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` 已进入 `READY_FOR_ANALYSIS`，且没有生成 MockAI 候选。
+**状态：** 确定性框架感知提取与精确 Scope 有界观察分页已完成；授权语义候选编写、独立 T1 审核和受治理提升仍待执行。原生受治理会话 `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` 保持 `READY_FOR_ANALYSIS`，且没有生成 MockAI 候选。
 
 **负责人：** SpecForge 架构与 Agent 集成团队。
 
 **理由：** 签名原生运行已经证明发行物固定、来源会话绑定、框架感知提取、可信覆盖计划校验和生产观察链路有效。结构证据仍不能代替业务语义与稳定身份判定，因此提升必须由授权 Agent 和审核人独立完成。
 
-**启动条件：** 获授权语义 Agent 消费已就绪原生会话的有界观察，生成英文规范字段与完整中文本地化候选，解决稳定身份与未决问题，通过 `submit_semantic_candidate_batch` 提交，完成 T1 独立评审；所有门禁通过后才能提升、对账和发布。
+**启动条件：** 获授权语义 Agent 通过游标分页的 `get_knowledge_scan_report` 载荷页消费观察，生成英文规范字段与完整中文本地化候选，解决稳定身份与未决问题，通过 `submit_semantic_candidate_batch` 提交，完成 T1 独立评审；所有门禁通过后才能提升、对账和发布。
 
-**证据：** 原生发行物 `scanner-release:2.1.20260921095754-windows-amd64` 与便携回退 `scanner-release:2.1.20260921095753-portable` 由 Key ID `local-dev-fbdd35fb26796f2e` 签名并注册到精确 Scope。会话 `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` 接收 6,078 条观察、13 个批次并最终化为 `READY_FOR_ANALYSIS`；没有生成语义候选，也没有提升正式资产、关系、ChangeSet 或 Baseline。
+**证据：** 原生发行物 `scanner-release:2.1.20260921095754-windows-amd64` 与便携回退 `scanner-release:2.1.20260921095753-portable` 由 Key ID `local-dev-fbdd35fb26796f2e` 签名并注册到精确 Scope。会话 `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` 接收 6,078 条观察、13 个批次并最终化为 `READY_FOR_ANALYSIS`。报告与路由聚焦回归通过 81 项测试，类型检查通过，真实载荷两页无重复且阻断项为 0；没有生成语义候选，也没有提升正式资产、关系、ChangeSet 或 Baseline。

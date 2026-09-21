@@ -3384,9 +3384,9 @@
                     "contextPackId": "context-pack-system-owned-full-asset-repository-discovery",
                     "relatedAssetIds": ["api-specforge-mcp-tools", "data-specforge-assets", "adr-governed-scan-coverage-policy"],
                     "owner": "SpecForge Architecture and Design Governance",
-                    "status": "Signed native framework-aware extraction is implemented and verified; authorized semantic promotion remains deferred.",
+                    "status": "Signed native framework-aware extraction and bounded exact-Scope observation pagination are implemented and verified; authorized semantic promotion remains pending.",
                     "reason": "Complete repository discovery requires system-owned governance, signed framework-specific deterministic extraction, and evidence-bounded Agent semantics.",
-                    "retryTrigger": "Run an authorized semantic Agent over the ready native scan, complete T1 review, then promote and reconcile through MCP.",
+                    "retryTrigger": "Run an authorized semantic Agent over cursor-paginated redacted payload pages from the ready native scan, complete independent T1 review, then promote and reconcile through MCP.",
                     "localizedContent": {
                       "en": {
                         "decision": "Use system-owned versioned governance, a signed framework extractor registry, per-asset capability coverage, bounded Agent semantics, and a provider-neutral orchestration Skill.",
@@ -3404,7 +3404,9 @@
                       { "command": "git diff --check", "result": "Passed for the rewritten specification, ADR, and manifest." },
                       { "command": "go test ./...", "result": "Passed for the native scanner, framework extractors, repository policy, and cross-language digest chain." },
                       { "command": "pnpm exec vitest run apps/mcp-server/src/scanner/finalization.test.ts", "result": "Passed: 10 trusted coverage and finalization tests." },
-                      { "command": "pnpm scan:governed-local", "result": "Passed: signed native session knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751 accepted 6078 observations in 13 batches and finalized READY_FOR_ANALYSIS." }
+                      { "command": "pnpm scan:governed-local", "result": "Passed: signed native session knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751 accepted 6078 observations in 13 batches and finalized READY_FOR_ANALYSIS." },
+                      { "command": "pnpm exec vitest run --dir apps/mcp-server/src apps/mcp-server/src/scanner/report.test.ts apps/mcp-server/src/tools.test.ts", "result": "Passed: 81 scanner-report, MCP routing, and federation regression tests." },
+                      { "command": "live get_knowledge_scan_report pagination read", "result": "Passed: two non-overlapping redacted payload pages from 6078 READY_FOR_ANALYSIS observations; zero blocking issues." }
                     ]
                   },
                   {

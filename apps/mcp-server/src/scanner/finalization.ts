@@ -129,7 +129,7 @@ function samePolicyReceipt(left: ScanPolicyReceipt, right: ScanPolicyReceipt): b
     && left.effectivePolicyDigest === right.effectivePolicyDigest;
 }
 
-function isBlockingCoverageGap(gap: string): boolean {
+export function isBlockingCoverageGap(gap: string): boolean {
   const reason = gap.includes(":") ? gap.slice(gap.lastIndexOf(":") + 1) : gap;
   return reason !== "UNSUPPORTED_SOURCE_TYPE"
     && reason !== "BINARY_SOURCE_SKIPPED"

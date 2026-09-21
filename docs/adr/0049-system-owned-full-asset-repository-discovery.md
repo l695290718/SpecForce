@@ -10,6 +10,7 @@ Implemented for the governed repository-scan increment; production connector del
 - Scope: `com.specforge.designcenter`.
 - Design session: `design-change-session:197ab290-ff5b-40d0-950f-55b213a58c9b`.
 - Native scanner increment session: `design-change-session:2e8bf691-87dc-4c77-8c0b-5fdee242e9b9`.
+- Bounded semantic-read increment session: `design-change-session:d3959824-0a3c-4b49-949a-055791c1b783`.
 - Specification: `docs/superpowers/specs/2026-09-17-governed-repository-scan-skill-design.md`.
 
 ## Context
@@ -56,7 +57,7 @@ A file-extension scanner cannot correctly discover the complete SpecForge asset 
 
 ## Implementation Boundary
 
-The implemented increment includes system-owned governance records, technology-aware extractor catalogs, deterministic multi-language and contract-neutral extraction, bounded bilingual semantic-candidate validation, resumable governed sessions, coverage and blocker reports, provider-neutral Skill packaging, signed native Go acceleration with a portable Node fallback, compatible release selection, safe first-scan bootstrap readiness, and governance-version uniqueness protection. Continuous scanning, runtime or CMDB connectors, outbound proposals, external `APPLY`, cross-Scope semantic merging, authorized semantic identity resolution, and formal Baseline promotion remain deferred.
+The implemented increment includes system-owned governance records, technology-aware extractor catalogs, deterministic multi-language and contract-neutral extraction, bounded bilingual semantic-candidate validation, resumable governed sessions, signed exact-Scope scan-report cursors, summary-first observation pages, opt-in redacted payload pages, coverage and blocker reports, provider-neutral Skill packaging, signed native Go acceleration with a portable Node fallback, compatible release selection, safe first-scan bootstrap readiness, and governance-version uniqueness protection. Continuous scanning, runtime or CMDB connectors, outbound proposals, external `APPLY`, cross-Scope semantic merging, authorized semantic identity resolution, and formal Baseline promotion remain deferred.
 
 ## Implementation Evidence
 
@@ -114,6 +115,14 @@ The server preserves a native coverage plan only when every capability belongs t
 
 Release `scanner-release:2.1.20260921095754-windows-amd64` completed governed session `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` in the exact Scope. It accepted 6,078 observations in 13 hash-chained batches and finalized `READY_FOR_ANALYSIS` with snapshot digest `36aeddea57688d8b7b68f9cc0d8e99fe130746245bc7d58d0670a33d5f55e672`. The runner deliberately stopped before semantic-candidate generation. An authorized Agent must consume the bounded observations, resolve bilingual semantics and stable identity, submit candidates through MCP, obtain the required review, and only then promote and reconcile. No accepted asset, typed relationship, ChangeSet, or Baseline was created by this increment.
 
+## Bounded Semantic Observation Read Increment (2026-09-21)
+
+`get_knowledge_scan_report` now exposes deterministic cursor pagination over finalized scan observations. The HMAC-signed cursor is bound to the exact Scope, actor, scan session, and payload mode; malformed, tampered, cross-session, cross-Scope, or cross-mode reuse fails with `SCAN_REPORT_CURSOR_INVALID`. Non-finalized sessions fail with `SCAN_REPORT_NOT_FINALIZED`.
+
+Reports are summary-first with a maximum page size of 500. An Agent must explicitly request `includePayload=true`, which lowers the maximum page size to 50 and returns only the approved already-redacted observation fields. Internal persistence metadata is not exposed. The report uses the same advisory-versus-blocking coverage-gap classification as scan finalization.
+
+Focused tests passed with 81 checks across scanner report, MCP routing, and federation regression coverage. MCP-server typecheck passed. A live read against session `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` returned two consecutive, non-overlapping payload pages from the 6,078 observations, preserved `READY_FOR_ANALYSIS`, and reported zero blocking issues. This completes the bounded read prerequisite only; candidate submission, independent T1 review, promotion, reconciliation, and Baseline publication remain pending.
+
 ## 中文本地化覆盖
 
 ### 背景
@@ -160,7 +169,7 @@ Release `scanner-release:2.1.20260921095754-windows-amd64` completed governed se
 
 ### 实施边界
 
-本次已实现增量包括系统级治理记录、技术栈感知提取器目录、多语言与契约中立的确定性提取、双语语义候选校验、可恢复的受治理扫描会话、覆盖与阻断报告、中立 Agent Skill 打包、签名 Go 原生加速与 Node 便携回退、兼容 Release 选择、安全首次扫描门禁和治理版本唯一性保护。持续扫描、运行时或 CMDB 连接器、出站 Proposal、外部 `APPLY`、跨 Scope 语义合并、授权语义身份解析和正式 Baseline 提升仍然延期。
+本次已实现增量包括系统级治理记录、技术栈感知提取器目录、多语言与契约中立的确定性提取、双语语义候选校验、可恢复的受治理扫描会话、签名精确 Scope 扫描报告游标、摘要优先观察分页、显式脱敏载荷分页、覆盖与阻断报告、中立 Agent Skill 打包、签名 Go 原生加速与 Node 便携回退、兼容 Release 选择、安全首次扫描门禁和治理版本唯一性保护。持续扫描、运行时或 CMDB 连接器、出站 Proposal、外部 `APPLY`、跨 Scope 语义合并、授权语义身份解析和正式 Baseline 提升仍然延期。
 
 ### 实施证据
 
@@ -201,6 +210,14 @@ Release `scanner-release:2.1.20260921095754-windows-amd64` completed governed se
 服务端只在资产族集合精确一致、能力语义合法、声明的提取器全部属于签名发行目录且 Go 兼容摘要一致时保留原生覆盖计划；便携发行仍由服务端推导为 `SEMANTIC_REVIEW_REQUIRED`。普通解析深度提示、不支持文件类型、二进制文件和凭据文件保持为证据，不再被误判为致命缺口；不可读或超限的必需源码仍会阻断。
 
 原生发行物 `scanner-release:2.1.20260921095754-windows-amd64` 在精确 Scope 下完成会话 `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751`，接收 6,078 条观察、13 个哈希链批次，并最终化为 `READY_FOR_ANALYSIS`。编排器有意停在 Agent 分析边界，不再默认生成 MockAI 候选。下一步由获授权 Agent 消费有界观察，完成英文规范字段与中文本地化、稳定身份判定和未决问题处理，再通过 MCP 提交候选并完成 T1 审核、提升与对账。本增量没有创建正式资产、类型化关系、ChangeSet 或 Baseline。
+
+## 有界语义观察读取增量（2026-09-21）
+
+`get_knowledge_scan_report` 现可对已最终化扫描观察进行确定性游标分页。HMAC 签名游标绑定精确 Scope、Actor、扫描会话和载荷模式；格式错误、篡改、跨会话、跨 Scope 或跨模式复用统一返回 `SCAN_REPORT_CURSOR_INVALID`。未最终化会话返回 `SCAN_REPORT_NOT_FINALIZED`。
+
+报告默认只返回摘要，单页最多 500 条。Agent 必须显式请求 `includePayload=true` 才能读取载荷，此时单页上限降为 50，且仅返回白名单内、已脱敏的观察字段，不暴露内部持久化元数据。报告与扫描最终化复用同一套“告警缺口/阻断缺口”分类。
+
+聚焦验证共通过 81 项扫描报告、MCP 路由与联邦回归测试，MCP Server 类型检查通过。对会话 `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` 的真实数据库读取成功返回两个连续且不重叠的载荷页，总量保持 6,078、状态保持 `READY_FOR_ANALYSIS`、阻断项为 0。本增量仅完成语义分析的有界读取前提；候选提交、独立 T1 审核、提升、对账与 Baseline 发布仍待完成。
 
 ## 跨平台 Release 增量（2026-09-19）
 
