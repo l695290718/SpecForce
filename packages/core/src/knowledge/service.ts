@@ -2,7 +2,7 @@ import type { ArchitectureScopeRef } from "../architecture/types";
 import type { AnalysisProfile } from "./types";
 import { assertAnalysisProfile } from "./profiles";
 import { contentDigest } from "../federation/digest";
-import type { Baseline, ChangeSet, KnowledgeAssertion, KnowledgePromotionDecision, ProjectionManifest, ReviewBundle, ReviewCoverage } from "./types";
+import type { Baseline, ChangeSet, KnowledgeAssertion, KnowledgePromotionDecision, KnowledgeReviewSetPromotionInput, ProjectionManifest, ReviewBundle, ReviewCoverage } from "./types";
 
 export function assertExactScope(actual: ArchitectureScopeRef, expected: ArchitectureScopeRef): void {
   if (actual.applicationServiceId !== expected.applicationServiceId || actual.scopePath !== expected.scopePath) {
@@ -51,6 +51,38 @@ export function reviewBundleDigest(input: Pick<ReviewBundle, "architectureScope"
     coverage: input.coverage,
     blockingIssues: [...input.blockingIssues].sort()
   });
+}
+
+export function promotionReviewSetDigest(input: KnowledgeReviewSetPromotionInput): string {
+  return contentDigest({
+    architectureScope: input.architectureScope,
+    reviewSetId: input.reviewSetId,
+    scanSessionId: input.scanSessionId,
+    designChangeSessionId: input.designChangeSessionId,
+    streamId: input.streamId,
+    expectedReviewBundleIds: [...input.expectedReviewBundleIds].sort(),
+    promotionDecisionIds: [...input.promotionDecisionIds].sort(),
+    approvedAssertionIds: [...input.approvedAssertionIds].sort(),
+    approvedIdentityCandidateIds: [...input.approvedIdentityCandidateIds].sort(),
+    sourceObservationIds: [...input.sourceObservationIds].sort(),
+    evidenceRefs: [...input.evidenceRefs].sort()
+  });
+}
+
+export function reviewSetCoverage(input: { expected: string[]; approved: string[] }) {
+  const expected = [...new Set(input.expected)].sort();
+  const approved = [...new Set(input.approved)].sort();
+  const expectedSet = new Set(expected);
+  const approvedSet = new Set(approved);
+  const missingSourceObservationIds = expected.filter((id) => !approvedSet.has(id));
+  const extraSourceObservationIds = approved.filter((id) => !expectedSet.has(id));
+  return {
+    totalSources: expected.length,
+    approvedSources: approved.length,
+    missingSourceObservationIds,
+    extraSourceObservationIds,
+    complete: missingSourceObservationIds.length === 0 && extraSourceObservationIds.length === 0
+  };
 }
 
 export function evaluateReviewBundle(coverage: ReviewCoverage, blockingIssues: string[]): "READY" | "BLOCKED" {

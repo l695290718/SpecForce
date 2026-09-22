@@ -285,8 +285,11 @@ export interface KnowledgePromotionDecision {
 export interface KnowledgePromotionReceipt {
   id: string;
   architectureScope: ArchitectureScopeRef;
-  promotionDecisionId: string;
-  reviewBundleId: string;
+  promotionDecisionId?: string;
+  reviewBundleId?: string;
+  reviewSetId?: string;
+  reviewBundleIds?: string[];
+  promotionDecisionIds?: string[];
   scanSessionId: string;
   scanSessionDigest: string;
   sourceDigest: string;
@@ -297,10 +300,34 @@ export interface KnowledgePromotionReceipt {
   relationshipRevisionIds: string[];
   architectureFactRevisionIds: string[];
   architectureFactBatchId?: string;
+  sourceObservationIds?: string[];
+  coverage?: KnowledgeReviewSetCoverage;
   evidenceRefs: string[];
   relationshipVersion: string;
   idempotent: boolean;
   createdAt: string;
+}
+
+export interface KnowledgeReviewSetPromotionInput {
+  architectureScope: ArchitectureScopeRef;
+  reviewSetId: string;
+  scanSessionId: string;
+  designChangeSessionId: string;
+  streamId: string;
+  expectedReviewBundleIds: string[];
+  promotionDecisionIds: string[];
+  approvedAssertionIds: string[];
+  approvedIdentityCandidateIds: string[];
+  sourceObservationIds: string[];
+  evidenceRefs: string[];
+}
+
+export interface KnowledgeReviewSetCoverage {
+  totalSources: number;
+  approvedSources: number;
+  missingSourceObservationIds: string[];
+  extraSourceObservationIds: string[];
+  complete: boolean;
 }
 
 export type KnowledgeReconciliationStatus = "CONVERGED" | "DRIFTED" | "BLOCKED";
