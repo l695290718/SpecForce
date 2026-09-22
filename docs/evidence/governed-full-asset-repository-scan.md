@@ -58,6 +58,44 @@ The exact owning Scope is `com.specforge.designcenter` / `pf-specforge/product-d
 - `pnpm --dir apps/mcp-server exec vitest run src/tools.test.ts` -> 33 tests passed, including `promote_knowledge_review_set` routing.
 - `pnpm exec vitest run packages/core/src/knowledge/aggregate-promotion.test.ts packages/core/src/knowledge/semantic-candidates.test.ts` -> passed in the focused verification run.
 
+## MockAI semantic candidate authoring evidence (2026-09-22)
+
+The exact-Scope design session was `design-change-session:9cf76392-d734-4d82-91de-1fdea1d289c5`. With `SPECFORGE_SEMANTIC_PROVIDER=mock`, `pnpm scan:governed-local` returned `GOVERNED_SCAN_READY_FOR_REVIEW` for scan session `knowledge-scan:0afad255-b0ff-4a5c-b26e-9599fc5806dc` under `com.specforge.designcenter`.
+
+- Observation count: `6,133`.
+- Hash-chained batch count: `13`.
+- Candidate count persisted through MCP: `6,133`.
+- Review coverage: complete (`6,133/6,133`).
+- Review status: `BLOCKED`, risk tier `T3`.
+- Blocking reason: candidates remain `UNMATCHED` and carry unresolved questions by MockAI policy; no candidate, authored asset, relationship, ChangeSet, or Baseline was promoted.
+- `pnpm --filter @specforge/mcp-server typecheck` -> exit 0.
+- `pnpm --dir apps/mcp-server exec vitest run src/tools.test.ts src/knowledge/candidate-persistence.test.ts` -> 41 tests passed.
+
+- `$env:SPECFORGE_DESIGN_FACT_IDS='adr-system-owned-full-asset-repository-discovery'; pnpm design-facts:sync` -> `status=complete`.
+- `$env:SPECFORGE_DESIGN_FACT_IDS='adr-system-owned-full-asset-repository-discovery'; pnpm design-facts:check` -> `missing=[]`, `mismatched=[]`, `outOfScope=[]`, `blocked=[]`.
+- `pnpm design-context:close -- --session design-change-session:9cf76392-d734-4d82-91de-1fdea1d289c5 --status CONVERGED --evidence "candidateCount=6133;reviewStatus=BLOCKED;typecheck=exit0;tests=41 passed;design-facts:check=empty"` -> `status=CONVERGED`.
+
+The run also exposed and fixed a contract gap in the MCP boundary: the submission schema now requires full-asset metadata, evidence clusters, English canonical content, and the `localizedContent.zh` overlay. The runner normalizes MockAI's summary-only output into deterministic bilingual candidate content, while preserving `UNMATCHED` identity and unresolved-question blockers. This is candidate authoring evidence only; independent T1-T3 review, atomic aggregate promotion, reconciliation, and publication remain the explicit retry trigger.
+
+## MockAI 语义候选编写证据（2026-09-22）
+
+精确 Scope 设计会话为 `design-change-session:9cf76392-d734-4d82-91de-1fdea1d289c5`。设置 `SPECFORGE_SEMANTIC_PROVIDER=mock` 执行 `pnpm scan:governed-local`，在 `com.specforge.designcenter` 下为扫描会话 `knowledge-scan:0afad255-b0ff-4a5c-b26e-9599fc5806dc` 返回 `GOVERNED_SCAN_READY_FOR_REVIEW`。
+
+- 观察数：`6,133`。
+- 哈希链批次数：`13`。
+- 通过 MCP 持久化的候选数：`6,133`。
+- 审核覆盖：完整（`6,133/6,133`）。
+- 审核状态：`BLOCKED`，风险等级 `T3`。
+- 阻断原因：MockAI 策略要求候选保持 `UNMATCHED` 并携带未决问题；没有提升候选、正式资产、关系、ChangeSet 或 Baseline。
+- `pnpm --filter @specforge/mcp-server typecheck` -> 退出码 0。
+- `pnpm --dir apps/mcp-server exec vitest run src/tools.test.ts src/knowledge/candidate-persistence.test.ts` -> 41 项通过。
+
+- 设置 `$env:SPECFORGE_DESIGN_FACT_IDS='adr-system-owned-full-asset-repository-discovery'` 执行 `pnpm design-facts:sync` -> `status=complete`。
+- 设置 `$env:SPECFORGE_DESIGN_FACT_IDS='adr-system-owned-full-asset-repository-discovery'` 执行 `pnpm design-facts:check` -> `missing=[]`、`mismatched=[]`、`outOfScope=[]`、`blocked=[]`。
+- `pnpm design-context:close -- --session design-change-session:9cf76392-d734-4d82-91de-1fdea1d289c5 --status CONVERGED --evidence "candidateCount=6133;reviewStatus=BLOCKED;typecheck=exit0;tests=41 passed;design-facts:check=empty"` -> `status=CONVERGED`。
+
+本次运行还发现并修复了 MCP 边界的契约缺口：提交 Schema 现在要求完整资产元数据、证据簇、英文规范内容和 `localizedContent.zh` 覆盖。运行器将 MockAI 仅有摘要的输出规范化为确定性的双语候选内容，同时保留 `UNMATCHED` 身份与未决问题阻断。这里仅证明候选编写；独立 T1-T3 审核、原子聚合提升、对账和发布仍是明确的重试触发条件。
+
 The automatic `prisma migrate dev --create-only` path was blocked by the historical brownfield shadow database (`P3006`/`P1014`); the checked-in migration is an additive, reviewed replacement and was deployed successfully. No 6,078-observation semantic candidate set or production Baseline was promoted by this increment; the aggregate path is implemented and the scan remains at the Agent/review boundary.
 
 ## 原子审核集合提升证据（2026-09-22）

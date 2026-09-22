@@ -432,7 +432,7 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **Backlog ID:** `backlog-approved-brownfield-scan-governed-promotion`
 
-**Status:** Deterministic framework-aware extraction, bounded exact-Scope observation pagination, full-asset semantic candidate governance, risk/domain review partitioning, and the atomic aggregate one-ChangeSet promotion/publication path are complete. Authorized candidate authoring over all 6,078 observations, independent T1-T3 review, and a real governed publication remain pending. Native governed session `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` remains `READY_FOR_ANALYSIS` without MockAI candidates.
+**Status:** Deterministic framework-aware extraction, bounded exact-Scope observation pagination, full-asset semantic candidate governance, risk/domain review partitioning, and the atomic aggregate one-ChangeSet promotion/publication path are complete. MockAI candidate authoring has now persisted 6,133 bilingual candidates for governed review in session `knowledge-scan:0afad255-b0ff-4a5c-b26e-9599fc5806dc`; independent T1-T3 review, aggregate promotion, reconciliation, and real governed publication remain pending. The earlier native session `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` remains an observation-only `READY_FOR_ANALYSIS` session.
 
 **Owner:** SpecForge Architecture and Agent Integration.
 
@@ -440,13 +440,13 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **Trigger:** Run an authorized semantic Agent through the cursor-paginated `get_knowledge_scan_report` payload pages, produce complete English-canonical and Chinese-localized candidates, resolve stable identity and questions, submit through `submit_semantic_candidate_batch`, obtain the required independent T1-T3 reviews, then call the implemented `promote_knowledge_review_set` to aggregate all approved risk/domain partitions into one atomic ChangeSet, and reconcile and publish only after all gates pass. Do not publish one partial Baseline per partition.
 
-**Evidence:** Native release `scanner-release:2.1.20260921095754-windows-amd64` and portable fallback `scanner-release:2.1.20260921095753-portable` were signed by Key ID `local-dev-fbdd35fb26796f2e` and registered in the exact Scope. Session `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` accepted 6,078 observations in 13 batches and finalized `READY_FOR_ANALYSIS`. Focused report/routing regression passed 81 tests; full-asset semantic, persistence, risk partition, promotion mapping, and MCP routing checks passed 88 tests; typechecks passed. A live dry run validated a policy-pinned cluster over real observations and rejected the legacy unclustered shape without writing candidates. No semantic candidate, accepted asset, relationship, ChangeSet, or Baseline was promoted.
+**Evidence:** Native release `scanner-release:2.1.20260921095754-windows-amd64` and portable fallback `scanner-release:2.1.20260921095753-portable` were signed by Key ID `local-dev-fbdd35fb26796f2e` and registered in the exact Scope. Session `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` accepted 6,078 observations in 13 batches and finalized `READY_FOR_ANALYSIS`. The authorized MockAI authoring run `knowledge-scan:0afad255-b0ff-4a5c-b26e-9599fc5806dc` accepted 6,133 observations in 13 batches, persisted 6,133 candidates, and assembled a complete but `BLOCKED` review set with T3 identity/unresolved-question blockers. `pnpm --filter @specforge/mcp-server typecheck` and the 41-test MCP candidate/routing persistence suite passed after the MCP batch schema was aligned with the full-asset candidate contract. No accepted asset, relationship, ChangeSet, or Baseline was promoted.
 
 ### 通过受治理会话提升已批准的存量扫描
 
 **待办标识：** `backlog-approved-brownfield-scan-governed-promotion`
 
-**状态：** 确定性框架感知提取、精确 Scope 有界观察分页、全资产语义候选治理、风险/领域审核拆包以及聚合为单一 ChangeSet 的提升/发布路径已完成；覆盖 6,078 条观察的授权候选编写、独立 T1-T3 审核和真实受治理发布仍待执行。原生受治理会话 `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` 保持 `READY_FOR_ANALYSIS`，且没有生成 MockAI 候选。
+**状态：** 确定性框架感知提取、精确 Scope 有界观察分页、全资产语义候选治理、风险/领域审核拆包以及聚合为单一 ChangeSet 的提升/发布路径已完成。MockAI 候选编写已在会话 `knowledge-scan:0afad255-b0ff-4a57-a6f8-150dba321751` 中持久化 6,133 条双语候选并进入受治理审核；独立 T1-T3 审核、聚合提升、对账和真实受治理发布仍待完成。较早的原生会话 `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` 仍是仅观察的 `READY_FOR_ANALYSIS` 会话。
 
 **负责人：** SpecForge 架构与 Agent 集成团队。
 
@@ -454,4 +454,4 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **启动条件：** 获授权语义 Agent 通过游标分页的 `get_knowledge_scan_report` 载荷页消费观察，生成英文规范字段与完整中文本地化候选，解决稳定身份与未决问题，通过 `submit_semantic_candidate_batch` 提交，完成必要的 T1-T3 独立评审，然后调用已实现的 `promote_knowledge_review_set` 将所有已批准的风险/领域分区原子汇总为一个 ChangeSet；所有门禁通过后才能对账和发布，不得按分区发布部分 Baseline。
 
-**证据：** 原生发行物 `scanner-release:2.1.20260921095754-windows-amd64` 与便携回退 `scanner-release:2.1.20260921095753-portable` 由 Key ID `local-dev-fbdd35fb26796f2e` 签名并注册到精确 Scope。会话 `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` 接收 6,078 条观察、13 个批次并最终化为 `READY_FOR_ANALYSIS`。报告与路由聚焦回归通过 81 项测试；全资产语义、持久化、风险拆包、提升映射和 MCP 路由通过 88 项测试；类型检查通过。真实只读演练验证了与会话策略摘要绑定的证据簇，并拒绝旧式无簇批次，且未写入候选；没有提升正式资产、关系、ChangeSet 或 Baseline。
+**证据：** 原生发行物 `scanner-release:2.1.20260921095754-windows-amd64` 与便携回退 `scanner-release:2.1.20260921095753-portable` 由 Key ID `local-dev-fbdd35fb26796f2e` 签名并注册到精确 Scope。会话 `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` 接收 6,078 条观察、13 个批次并最终化为 `READY_FOR_ANALYSIS`。授权 MockAI 编写会话 `knowledge-scan:0afad255-b0ff-4a5c-b26e-9599fc5806dc` 接收 6,133 条观察、13 个批次、持久化 6,133 条候选，并生成完整但 `BLOCKED` 的审核集合，阻断原因为 T3 身份未匹配和未决问题。MCP Server 类型检查和候选持久化/路由 41 项测试通过；没有提升正式资产、关系、ChangeSet 或 Baseline。

@@ -1,6 +1,6 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { FeatureChangeSetError, scopeById, type FeatureChangeSetRequest, type Permission, type ScopedPrincipal } from "@specforge/core";
+import { FeatureChangeSetError, fullAssetFamilies, scopeById, semanticEvidenceTypes, type FeatureChangeSetRequest, type Permission, type ScopedPrincipal } from "@specforge/core";
 import { z } from "zod";
 import { auditToolCall } from "./audit";
 import { validateIntegrationContractV1 as validateIntegrationContractEnvelope } from "./integration-contract";
@@ -179,7 +179,23 @@ const semanticCandidateSchema = z.object({
   evidenceRefs: z.array(z.string()),
   sourceObservationIds: z.array(z.string().min(1)).min(1),
   domainCluster: z.string().min(1),
-  identityDecision: z.enum(["UNMATCHED", "UNAMBIGUOUS", "AMBIGUOUS"])
+  identityDecision: z.enum(["UNMATCHED", "UNAMBIGUOUS", "AMBIGUOUS"]),
+  assetFamily: z.enum(fullAssetFamilies),
+  promptPackDigest: z.string().min(1),
+  policyDigest: z.string().min(1),
+  clusterId: z.string().min(1),
+  evidenceTypes: z.array(z.enum(semanticEvidenceTypes)).min(1),
+  canonicalContent: z.record(z.unknown()),
+  localizedContent: z.object({ zh: z.record(z.unknown()) })
+});
+const semanticEvidenceClusterSchema = z.object({
+  id: z.string().min(1),
+  architectureScope: architectureScopeSchema,
+  domainHint: z.string().optional(),
+  observationIds: z.array(z.string().min(1)).min(1).max(500),
+  evidenceTypes: z.array(z.enum(semanticEvidenceTypes)).min(1),
+  tokenEstimate: z.number().int().positive(),
+  clusterDigest: z.string().min(1)
 });
 
 /** ADR-0039 V1 guard: an integration contract that claims V1 governance must carry the full stable identity, and a resolved target requires its provider binding plus locator. */
@@ -806,6 +822,7 @@ export function registerTools(server: McpServer): void {
         previousBatchDigest: z.string().min(1).optional(),
         complete: z.boolean(),
         provenance: z.object({ agent: z.string().min(1), model: z.string().min(1).optional(), tool: z.string().min(1).optional(), runId: z.string().min(1).optional() }),
+        clusters: z.array(semanticEvidenceClusterSchema).min(1),
         candidates: z.array(semanticCandidateSchema).min(1).max(100)
       })
     },

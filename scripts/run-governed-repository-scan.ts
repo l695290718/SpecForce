@@ -112,11 +112,21 @@ async function submitMockSemanticCandidates(sessionId: string, scannerReleaseId:
     const cluster = { ...clusterBase, evidenceTypes: [...clusterBase.evidenceTypes], clusterDigest: semanticEvidenceClusterDigest({ ...clusterBase, evidenceTypes: [...clusterBase.evidenceTypes] }) };
     const page = pageDrafts.map(({ candidate, assetFamily }) => {
       const value = candidate.value as Record<string, unknown>;
-      const canonicalContent = value.canonicalContent as Record<string, unknown>;
-      const localizedContent = value.localizedContent as { zh: Record<string, unknown> };
+      const summary = record(value.summary);
+      const canonicalContent = record(value.canonicalContent) ?? {
+        name: candidate.semanticIdentity,
+        description: String(value.canonicalDescription ?? summary?.en ?? "Mock semantic candidate requires review.")
+      };
+      const localizedContent = record(value.localizedContent)?.zh && typeof record(value.localizedContent)?.zh === "object"
+        ? record(value.localizedContent)!.zh as Record<string, unknown>
+        : {
+          name: candidate.semanticIdentity,
+          description: String(value.localizedDescription ?? summary?.zh ?? "Mock 语义候选需要审核。")
+        };
       const evidenceRefs = [`source-observation:${candidate.sourceObservationId}`, `scanner-release:${scannerReleaseId}`];
       return {
         ...candidate,
+        value: { ...value, canonicalContent, localizedContent: { zh: localizedContent } },
         normalizedDigest: contentDigest({ semanticIdentity: candidate.semanticIdentity, source: normalizedDigests.get(candidate.sourceObservationId) ?? "" }),
         factType: factTypeForAssetFamily[assetFamily],
         matchingEvidence: evidenceRefs,
@@ -130,7 +140,7 @@ async function submitMockSemanticCandidates(sessionId: string, scannerReleaseId:
         clusterId: cluster.id,
         evidenceTypes: [...cluster.evidenceTypes],
         canonicalContent,
-        localizedContent
+        localizedContent: { zh: localizedContent }
       };
     });
     const batch = {
@@ -147,6 +157,10 @@ async function submitMockSemanticCandidates(sessionId: string, scannerReleaseId:
   }
   const reviewBundles = await call("assemble_knowledge_review_bundles", { architectureScope: scope, sessionId });
   return { candidateCount: drafts.length, reviewBundles };
+}
+
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
 }
 
 function mockAssetFamily(factType: string) {
