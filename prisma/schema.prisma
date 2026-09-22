@@ -1888,12 +1888,17 @@ model KnowledgeScanBatch {
 model KnowledgePromotionReceipt {
   dbId                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   id                      String
-  promotionDecisionId     String
+  promotionDecisionId     String?
+  reviewSetId             String?
+  reviewBundleIds         Json     @default("[]") @db.JsonB
+  promotionDecisionIds    Json     @default("[]") @db.JsonB
   sourceDigest            String
   assetRevisionIds        Json     @default("[]") @db.JsonB
   relationshipRevisionIds Json     @default("[]") @db.JsonB
   architectureFactRevisionIds Json @default("[]") @db.JsonB
   architectureFactBatchId  String?
+  sourceObservationIds    Json     @default("[]") @db.JsonB
+  coverage                Json     @default("{}") @db.JsonB
   applicationServiceId    String
   scopePath               String
   createdAt               DateTime @default(now())

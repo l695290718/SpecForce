@@ -8,6 +8,8 @@
 
 **Tech Stack:** TypeScript, Prisma/PostgreSQL, MCP stdio tools, Vitest, `@specforge/core` contracts, existing relationship command service and federation outbox.
 
+**Execution status (2026-09-22):** Implemented inline after exact-Scope preflight session `design-change-session:35824fd1-d0df-4849-a3b1-db0c1ba340de`. The aggregate contract, additive PostgreSQL migration, serializable persistence path, MCP operation, reconciliation/publication compatibility, bilingual workflow documentation, and PostgreSQL integration evidence are complete. The 6,078-observation semantic authoring/review run remains a separate pending operational action; this implementation does not claim production candidate promotion.
+
 ## Global Constraints
 
 - PostgreSQL remains authoritative for candidates, decisions, canonical assets, relationships, ChangeSets, reconciliation, and Baselines; graph stores remain derived projections.
@@ -106,7 +108,7 @@ git commit -m "feat: add aggregate promotion contract"
 - Modify: `apps/mcp-server/src/persistence.ts`
 - Modify: `apps/mcp-server/src/knowledge/promotion.ts`
 - Create: `apps/mcp-server/src/knowledge/aggregate-promotion.ts`
-- Test: `apps/mcp-server/src/knowledge/aggregate-promotion.test.ts`
+- Test: `apps/mcp-server/src/knowledge/promotion.integration.test.ts` (aggregate cases run with `SPECFORGE_KNOWLEDGE_INTEGRATION=1`)
 
 **Interfaces:**
 - Produces `promoteKnowledgeReviewSet(input): Promise<KnowledgePromotionReceipt>`.
@@ -173,7 +175,7 @@ git commit -m "feat: persist atomic aggregate promotion"
 - Modify: `apps/mcp-server/src/tools.test.ts`
 - Modify: `apps/mcp-server/src/knowledge/promotion.ts`
 - Modify: `apps/mcp-server/src/knowledge/persistence.ts`
-- Test: `apps/mcp-server/src/knowledge/aggregate-promotion.integration.test.ts`
+- Test: `apps/mcp-server/src/knowledge/promotion.integration.test.ts` (aggregate reconciliation/publication cases)
 
 **Interfaces:**
 - Produces MCP tool `promote_knowledge_review_set` with `knowledge:write` and `governance:run` permissions.

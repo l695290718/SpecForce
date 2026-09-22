@@ -78,12 +78,14 @@ Agent 将本地状态与 MCP `get_scan_checkpoint` 比对，只通过 `submit_sc
 3. Group at most 500 exact-session observations into each digest-pinned evidence cluster. Submit at most 100 full-asset candidates per hash-chained batch with `submit_semantic_candidate_batch`; mark only the last batch `complete=true`.
 4. Call `assemble_knowledge_review_bundles`. Caller-supplied risk is ignored; the server classifies candidates and partitions bundles by risk tier and domain cluster. The singular tool remains compatibility-only.
 5. Resolve all missing evidence, incomplete coverage, bilingual fields, and ambiguous identities before approval.
+6. Persist the complete expected ReviewBundle ID set from the assembly receipt, obtain one independent decision for every bundle, then call `promote_knowledge_review_set` exactly once. Do not promote partitions independently; the aggregate operation is the only path that may create the complete ChangeSet.
 
 1. 通过授权的精确 Scope MCP 工具读取已完成的观察与覆盖率。
 2. 使用 Claude Code、OpenCode 或企业 Agent 推导有界语义候选；英文规范字段必填，面向人的内容必须具备完整中文覆盖。
 3. 每个摘要固定的证据簇最多包含 500 条精确会话观察；通过 `submit_semantic_candidate_batch` 提交哈希链批次，每批最多 100 条完整资产候选，仅最后一批标记 `complete=true`。
 4. 调用 `assemble_knowledge_review_bundles`；服务端独立计算候选风险，并按风险等级与领域簇拆分 Bundle，不接受调用方自报风险；单数工具仅用于兼容旧流程。
 5. 审批前处理所有证据、覆盖率、双语和身份匹配阻塞项。
+6. 保存组装回执中的完整 ReviewBundle ID 集合，为每个 Bundle 获取一个独立决策，然后只调用一次 `promote_knowledge_review_set`。禁止按分区独立提升；只有聚合操作可以创建完整 ChangeSet。
 
 ## 6. T0-T3 Review / T0-T3 评审
 
@@ -102,13 +104,13 @@ The governed order is fixed:
 
 1. Record an approved ReviewBundle decision.
 2. Create/reopen the exact-Scope Working Stream with `create_working_stream`.
-3. Call `promote_knowledge_candidates`. The server atomically materializes immutable asset and relationship revisions, evidence, outbox records, and one monotonic ChangeSet. Never write canonical rows or call `commit_knowledge_changeset` separately for this promotion.
-4. Call `reconcile_knowledge_baseline` with the returned promotion receipt. Drift or blocked reconciliation prevents publication; retain the durable reconciliation receipt.
-5. Call `publish_knowledge_baseline` with the exact `reconciliationReceiptId`, `changeSetId`, revision IDs, and relationship version from the converged receipts. A caller-supplied status string is never trusted.
+3. After every expected partition has an approved decision, call `promote_knowledge_review_set` exactly once. The server atomically materializes all immutable asset and relationship revisions, Evidence, outbox records, and one monotonic ChangeSet; missing partitions, partial source coverage, or changed retries fail closed. Never write canonical rows or call `commit_knowledge_changeset` separately for this promotion.
+4. Call `reconcile_knowledge_baseline` once with the aggregate receipt. Drift or blocked reconciliation prevents publication; retain the durable reconciliation receipt.
+5. Call `publish_knowledge_baseline` once with the exact `reconciliationReceiptId`, complete `changeSetId`, revision IDs, and relationship version from the converged receipts. A caller-supplied status string is never trusted.
 6. Record and read back the immutable Baseline ID and manifest.
 7. Rescan the same snapshot to verify idempotent identity and no duplicate canonical assets; query a sibling Scope and verify zero Phase 1 records.
 
-治理顺序固定为：审批 ReviewBundle、创建 Working Stream、调用 `promote_knowledge_candidates` 在单一事务内生成不可变修订、证据、Outbox 和 ChangeSet，再调用 `reconcile_knowledge_baseline` 生成持久化对账凭据；仅可携带精确 `reconciliationReceiptId` 发布 Baseline。最后重扫验证幂等性并验证兄弟 Scope 为空。禁止绕过 MCP 直接写规范表，也不得为同一次提升重复调用 `commit_knowledge_changeset`。
+治理顺序固定为：完成所有预期分区的 ReviewBundle 审批，创建 Working Stream，只调用一次 `promote_knowledge_review_set`，在单一事务内生成全部不可变修订、Evidence、Outbox 和一个 ChangeSet；缺少分区、来源覆盖不完整或重试输入变化都必须失败关闭。随后只调用一次 `reconcile_knowledge_baseline`，仅可携带精确 `reconciliationReceiptId`、完整 revision 集合和关系版本发布 Baseline。最后重扫验证幂等性并验证兄弟 Scope 为空。禁止绕过 MCP 直接写规范表，也不得为同一次聚合提升重复调用 `commit_knowledge_changeset`。
 
 ## 8. Revocation and Key Rotation / 吊销与密钥轮换
 

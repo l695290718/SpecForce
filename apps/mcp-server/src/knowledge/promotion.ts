@@ -68,7 +68,7 @@ export interface PromotionAssetRevision {
   payload: Record<string, unknown>;
 }
 
-interface PromotionRelationshipRevision {
+export interface PromotionRelationshipRevision {
   assertionId: string;
   source: RelationshipEndpoint;
   target: RelationshipEndpoint;
@@ -333,7 +333,9 @@ export async function reconcileKnowledgeBaseline(input: ReconcileKnowledgeBaseli
     new PrismaRelationshipRepository(prisma).currentGraphVersion(relationshipScope)
   ]);
   const issues: string[] = [];
-  if (!changeSet || changeSet.status !== "COMMITTED" || changeSet.promotionDecisionId !== receipt.promotionDecisionId) issues.push("RECONCILIATION_CHANGESET_MISMATCH");
+  const changeSetPromotionDecisionId = changeSet?.promotionDecisionId ?? null;
+  const receiptPromotionDecisionId = receipt.promotionDecisionId ?? null;
+  if (!changeSet || changeSet.status !== "COMMITTED" || changeSetPromotionDecisionId !== receiptPromotionDecisionId) issues.push("RECONCILIATION_CHANGESET_MISMATCH");
   if (!sameSet(assets.map((asset) => asset.id), receipt.assetRevisionIds)) issues.push("RECONCILIATION_ASSET_REVISIONS_MISMATCH");
   if (!sameSet(events.map((event) => event.dbId), receipt.relationshipRevisionIds)) issues.push("RECONCILIATION_RELATIONSHIP_EVENTS_MISMATCH");
   if (!sameSet(links.map((link) => link.id), receipt.relationshipRevisionIds)) issues.push("RECONCILIATION_TYPED_LINKS_MISMATCH");
@@ -384,7 +386,7 @@ export async function loadConvergedReconciliation(scope: ArchitectureScopeRef, r
   return result;
 }
 
-async function loadReceiptInTransaction(tx: Prisma.TransactionClient, scope: ArchitectureScopeRef, receiptId: string, idempotent: boolean): Promise<KnowledgePromotionReceipt> {
+export async function loadReceiptInTransaction(tx: Prisma.TransactionClient, scope: ArchitectureScopeRef, receiptId: string, idempotent: boolean): Promise<KnowledgePromotionReceipt> {
   const event = await tx.federationOutbox.findUnique({ where: { applicationServiceId_scopePath_idempotencyKey: { ...scope, idempotencyKey: promotionEventKey(receiptId) } } });
   const receipt = event?.eventType === promotionEventType ? promotionReceiptFromPayload(event.payload) : undefined;
   if (!receipt) throw new Error("PROMOTION_RECEIPT_INCOMPLETE");
@@ -417,7 +419,7 @@ function relationshipEndpoint(value: unknown, label: string): RelationshipEndpoi
   return { semanticIdentity, assetId, assetType };
 }
 
-async function resolveEndpoint(tx: Prisma.TransactionClient, scope: ArchitectureScopeRef, promoted: Map<string, MaterializedEndpoint>, endpoint: RelationshipEndpoint): Promise<MaterializedEndpoint> {
+export async function resolveEndpoint(tx: Prisma.TransactionClient, scope: ArchitectureScopeRef, promoted: Map<string, MaterializedEndpoint>, endpoint: RelationshipEndpoint): Promise<MaterializedEndpoint> {
   if (endpoint.semanticIdentity && promoted.has(endpoint.semanticIdentity)) return promoted.get(endpoint.semanticIdentity)!;
   const assetId = endpoint.assetId;
   if (!assetId) throw new Error("PROMOTION_RELATIONSHIP_ENDPOINT_NOT_FOUND");
@@ -427,7 +429,7 @@ async function resolveEndpoint(tx: Prisma.TransactionClient, scope: Architecture
   return { assetId: row.id, assetType: row.type as AssetType };
 }
 
-async function persistImmutableAsset(tx: Prisma.TransactionClient, scope: ArchitectureScopeRef, revision: PromotionAssetRevision): Promise<void> {
+export async function persistImmutableAsset(tx: Prisma.TransactionClient, scope: ArchitectureScopeRef, revision: PromotionAssetRevision): Promise<void> {
   const existing = await tx.designAsset.findUnique({ where: { applicationServiceId_scopePath_id: { ...scope, id: revision.id } } });
   if (existing) {
     const payload = parseJsonRecord(existing.payload);
@@ -439,7 +441,7 @@ async function persistImmutableAsset(tx: Prisma.TransactionClient, scope: Archit
   });
 }
 
-function evidenceRevision(evidenceRef: string, scope: ArchitectureScopeRef, timestamp: string): PromotionAssetRevision {
+export function evidenceRevision(evidenceRef: string, scope: ArchitectureScopeRef, timestamp: string): PromotionAssetRevision {
   const revisionDigest = contentDigest({ evidenceRef });
   const id = `knowledge-evidence:${revisionDigest}`;
   const payload = {
@@ -467,13 +469,13 @@ async function assertSourceObservations(tx: Prisma.TransactionClient, scope: Arc
   if (rows.length !== ids.length) throw new Error("PROMOTION_SOURCE_OBSERVATION_MISMATCH");
 }
 
-async function ensureRootNode(repository: PrismaRelationshipRepository, scope: ReturnType<typeof configuredRelationshipScope>, endpoint: MaterializedEndpoint): Promise<void> {
+export async function ensureRootNode(repository: PrismaRelationshipRepository, scope: ReturnType<typeof configuredRelationshipScope>, endpoint: MaterializedEndpoint): Promise<void> {
   const identity = { nodeType: endpoint.assetType, logicalId: endpoint.assetId };
   if (await repository.findNode(scope, identity)) return;
   await repository.upsertNode(scope, { applicationServiceId: scope.applicationServiceId, scopePath: scope.scopePath, ...identity, rootAssetType: endpoint.assetType, rootAssetId: endpoint.assetId, nodePath: `${endpoint.assetType}/${endpoint.assetId}`, displayName: endpoint.assetId, metadata: { source: "knowledge-promotion" } });
 }
 
-function endpointIdentity(scope: ArchitectureScopeRef, endpoint: MaterializedEndpoint) {
+export function endpointIdentity(scope: ArchitectureScopeRef, endpoint: MaterializedEndpoint) {
   return { ...scope, nodeType: endpoint.assetType, logicalId: endpoint.assetId, rootAssetType: endpoint.assetType, rootAssetId: endpoint.assetId };
 }
 
@@ -498,7 +500,7 @@ function assertHumanFacingContent(assertion: KnowledgeAssertion): void {
   if (assertion.unresolvedQuestions.length > 0) throw new Error(`PROMOTION_UNRESOLVED_QUESTIONS:${assertion.id}`);
 }
 
-function assertStoredDecisionApprovalPolicy(bundle: ReviewBundle, assertions: KnowledgeAssertion[], decisionActorId: string): void {
+export function assertStoredDecisionApprovalPolicy(bundle: ReviewBundle, assertions: KnowledgeAssertion[], decisionActorId: string): void {
   const governed = assertions.filter((assertion) => Boolean(assertion.generatedByActorId));
   const assessment = assessReviewCandidates(governed);
   if (assessment.blockingIssues.length > 0) throw new Error(`CANDIDATE_REVIEW_BLOCKED:${assessment.blockingIssues.join(",")}`);
@@ -514,11 +516,11 @@ function assertScope(actual: ArchitectureScopeRef, expected: ArchitectureScopeRe
   if (actual.applicationServiceId !== expected.applicationServiceId || actual.scopePath !== expected.scopePath) throw new Error("SCOPE_MISMATCH");
 }
 
-function assertionFromRow(row: any): KnowledgeAssertion {
+export function assertionFromRow(row: any): KnowledgeAssertion {
   return { id: row.id, semanticIdentity: row.semanticIdentity, factType: row.factType, layer: row.layer, aspect: row.aspect, value: row.value as Record<string, unknown>, status: row.status, confidence: row.confidence, matchingEvidence: row.matchingEvidence as string[], counterEvidence: row.counterEvidence as string[], unresolvedQuestions: row.unresolvedQuestions as string[], evidenceRefs: row.evidenceRefs as string[], sourceObservationIds: row.sourceObservationIds as string[], extractorId: row.extractorId, riskTier: row.riskTier, domainCluster: row.domainCluster ?? undefined, generatedByActorId: row.generatedByActorId ?? undefined, revision: row.revision, changeSetId: row.changeSetId ?? undefined, architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
 }
 
-function reviewBundleFromRow(row: any): ReviewBundle {
+export function reviewBundleFromRow(row: any): ReviewBundle {
   return { id: row.id, designChangeSessionId: row.designChangeSessionId, status: row.status, riskTier: row.riskTier, assertionIds: row.assertionIds as string[], identityCandidateIds: row.identityCandidateIds as string[], architectureFactRevisionIds: (row.architectureFactRevisionIds ?? []) as string[], evidenceRefs: row.evidenceRefs as string[], coverage: row.coverage as ReviewCoverage, blockingIssues: row.blockingIssues as string[], digest: row.digest, createdBy: row.createdBy, architectureScope: { applicationServiceId: row.applicationServiceId, scopePath: row.scopePath }, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
 }
 
@@ -534,15 +536,15 @@ function reconciliationFromPayload(value: Prisma.JsonValue): KnowledgeReconcilia
   return typeof result.id === "string" && typeof result.status === "string" ? { ...result, architectureFactRevisionIds: Array.isArray(result.architectureFactRevisionIds) ? result.architectureFactRevisionIds : [] } as unknown as KnowledgeReconciliationResult : undefined;
 }
 
-function promotionEventKey(receiptId: string): string {
+export function promotionEventKey(receiptId: string): string {
   return `knowledge-promotion-receipt:${receiptId}`;
 }
 
-function isAssetRevision(value: PromotionAssetRevision | PromotionRelationshipRevision): value is PromotionAssetRevision {
+export function isAssetRevision(value: PromotionAssetRevision | PromotionRelationshipRevision): value is PromotionAssetRevision {
   return "assetType" in value;
 }
 
-function isRelationshipRevision(value: PromotionAssetRevision | PromotionRelationshipRevision): value is PromotionRelationshipRevision {
+export function isRelationshipRevision(value: PromotionAssetRevision | PromotionRelationshipRevision): value is PromotionRelationshipRevision {
   return "relationType" in value;
 }
 
@@ -584,7 +586,7 @@ function sameSet(left: string[], right: string[]): boolean {
   return JSON.stringify(sortedUnique(left)) === JSON.stringify(sortedUnique(right));
 }
 
-function jsonValue(value: unknown): Prisma.InputJsonValue {
+export function jsonValue(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
 }
 
@@ -592,7 +594,7 @@ function isGovernedPromotionError(message: string): boolean {
   return /^(PROMOTION_|REVIEW_|CANDIDATE_|SCOPE_|WORKING_STREAM_|DESIGN_CHANGE_SESSION_)/u.test(message);
 }
 
-class PromotionTransactionRelationshipRepository extends PrismaRelationshipRepository {
+export class PromotionTransactionRelationshipRepository extends PrismaRelationshipRepository {
   override async transaction<T>(operation: (repository: RelationshipCommandRepository) => Promise<T>): Promise<T> {
     return operation(this);
   }

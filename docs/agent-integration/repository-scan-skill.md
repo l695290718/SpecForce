@@ -12,7 +12,9 @@ All three clients must provide `repositoryPath`, `applicationServiceId`, and `sc
 
 ## Operational contract
 
-The local scanner performs deterministic extraction only. Semantic interpretation is performed by the available Agent and submitted as bounded bilingual candidate batches. Each batch carries digest-pinned evidence clusters, the system prompt-pack and policy digests, full-asset-family identity, evidence types, stable identity decisions, counter-evidence, and unresolved questions. High-impact candidates require multiple evidence types. Candidates remain isolated from accepted design assets until risk-and-domain-partitioned review, promotion, relationship, reconciliation, and Baseline gates complete.
+The local scanner performs deterministic extraction only. Semantic interpretation is performed by the available Agent and submitted as bounded bilingual candidate batches. Each batch carries digest-pinned evidence clusters, the system prompt-pack and policy digests, full-asset-family identity, evidence types, stable identity decisions, counter-evidence, and unresolved questions. High-impact candidates require multiple evidence types. Candidates remain isolated from accepted design assets until every risk/domain ReviewBundle is independently approved, the complete set is submitted once to `promote_knowledge_review_set`, and aggregate promotion, relationship, reconciliation, and Baseline gates complete. A partition cannot create a partial Baseline.
+
+The aggregate receipt is the handoff boundary: persist its `reviewSetId`, expected bundle IDs, decision IDs, source coverage, ChangeSet ID, and digest; retry only with the same input set. A missing or changed partition is a blocker, not a reason to publish the reviewed subset.
 
 Keep `.specforge/scans/` private. Retain signed manifests, session and actor IDs, snapshot and policy digests, batch receipts, blocker reasons, and MCP reconciliation evidence according to the enterprise retention policy.
 

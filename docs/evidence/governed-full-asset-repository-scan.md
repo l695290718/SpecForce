@@ -45,3 +45,31 @@ The default Next standalone build is environment-blocked on Windows OneDrive bec
 权威数据库基线已闭环：受保护的 `pnpm baseline:canonical` 命令先在恢复的探针库演练，再在最终备份后应用到 `specforge_canonical`。`pnpm exec prisma migrate status` 现报告 27 个迁移且 Schema 已是最新；审计显示历史待迁移为空、关系缺口为 0、意外漂移为空、Scope 空值为 0、治理重复组为 0。正式库中该迁移写入 373 条 `RelationshipCurrent`、373 条 `RelationshipEvent` 和 373 条 `RelationshipOutbox`，探针库和正式库集成测试各通过 3 项。`backlog-portable-scanner-postgres-baseline` 已完成；未来存量环境必须使用受保护审计/应用命令，禁止 `db push` 或重置数据库。
 
 已核实配置的 `localhost:15433` 端点转发到 Docker 服务 `deploy-postgres-1/specforge_canonical`；旁边的 `specforge-postgres` 容器不是应用配置使用的数据库。最终回滚备份 `.specforge/backups/specforge_canonical-20260920-final.dump` 为 2,540,597 字节并通过 `pg_restore -l` 校验。历史迁移包含数据回填和图关系种子写入，因此基线命令只处理审核过的显式 allowlist，绝不重放历史 SQL。
+
+## Atomic review-set promotion evidence (2026-09-22)
+
+The exact owning Scope is `com.specforge.designcenter` / `pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter`, and the implementation session is `design-change-session:35824fd1-d0df-4849-a3b1-db0c1ba340de`.
+
+- `pnpm exec prisma migrate deploy` -> applied `20260922000000_add_aggregate_review_set_promotion` to `specforge_canonical` without resetting data.
+- `pnpm exec prisma migrate status` -> `Database schema is up to date!`.
+- `pnpm --filter @specforge/core typecheck` -> exit 0.
+- `pnpm --filter @specforge/mcp-server typecheck` -> exit 0.
+- `pnpm --dir apps/mcp-server exec vitest run src/knowledge/promotion.integration.test.ts` with `SPECFORGE_KNOWLEDGE_INTEGRATION=1` -> 5 tests passed, including two approved partitions promoted as one ChangeSet, idempotent retry, aggregate reconciliation, Baseline publication, rollback, and missing-partition rejection.
+- `pnpm --dir apps/mcp-server exec vitest run src/tools.test.ts` -> 33 tests passed, including `promote_knowledge_review_set` routing.
+- `pnpm exec vitest run packages/core/src/knowledge/aggregate-promotion.test.ts packages/core/src/knowledge/semantic-candidates.test.ts` -> passed in the focused verification run.
+
+The automatic `prisma migrate dev --create-only` path was blocked by the historical brownfield shadow database (`P3006`/`P1014`); the checked-in migration is an additive, reviewed replacement and was deployed successfully. No 6,078-observation semantic candidate set or production Baseline was promoted by this increment; the aggregate path is implemented and the scan remains at the Agent/review boundary.
+
+## 原子审核集合提升证据（2026-09-22）
+
+精确归属 Scope 为 `com.specforge.designcenter` / `pf-specforge/product-design-center/governance/design-facts/com.specforge.designcenter`，实现会话为 `design-change-session:35824fd1-d0df-4849-a3b1-db0c1ba340de`。
+
+- `pnpm exec prisma migrate deploy` -> 在不重置数据的前提下，将 `20260922000000_add_aggregate_review_set_promotion` 应用到 `specforge_canonical`。
+- `pnpm exec prisma migrate status` -> `Database schema is up to date!`。
+- `pnpm --filter @specforge/core typecheck` -> 退出码 0。
+- `pnpm --filter @specforge/mcp-server typecheck` -> 退出码 0。
+- 设置 `SPECFORGE_KNOWLEDGE_INTEGRATION=1` 执行 `pnpm --dir apps/mcp-server exec vitest run src/knowledge/promotion.integration.test.ts` -> 5 项通过，覆盖双分区单 ChangeSet、幂等重试、聚合对账、Baseline 发布、回滚和缺失分区拒绝。
+- `pnpm --dir apps/mcp-server exec vitest run src/tools.test.ts` -> 33 项通过，包含 `promote_knowledge_review_set` 路由。
+- `pnpm exec vitest run packages/core/src/knowledge/aggregate-promotion.test.ts packages/core/src/knowledge/semantic-candidates.test.ts` -> 聚焦验证通过。
+
+自动 `prisma migrate dev --create-only` 由于历史棕地影子数据库失败（`P3006`/`P1014`）；提交的迁移是经审查的增量替代方案，已成功部署。本增量没有提升 6,078 条观察的语义候选集或生产 Baseline；聚合提升路径已经实现，扫描仍停留在 Agent/审核边界。

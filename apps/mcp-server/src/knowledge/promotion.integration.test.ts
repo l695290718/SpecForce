@@ -4,6 +4,7 @@ import { disconnectMcpPersistence, ensureMcpPersistenceSchema, prisma } from "..
 import { createDesignChangeSession } from "../federation/persistence";
 import { createKnowledgeAssertion, createKnowledgeReviewBundle, createWorkingStream, decideKnowledgeReviewBundle, publishKnowledgeBaseline } from "./persistence";
 import { mapKnowledgeAssertionForPromotion, promoteKnowledgeCandidates, reconcileKnowledgeBaseline } from "./promotion";
+import { promoteKnowledgeReviewSet } from "./aggregate-promotion";
 
 const integrationEnabled = process.env.SPECFORGE_KNOWLEDGE_INTEGRATION === "1";
 const registeredScope = scopeById("com.huawei.celon.desiner")!;
@@ -105,6 +106,89 @@ describe.runIf(integrationEnabled)("transactional knowledge promotion", () => {
     expect(await prisma.knowledgePromotionReceipt.count({ where: { ...architectureScope, promotionDecisionId: fixture.decisionId } })).toBe(0);
     expect(await prisma.relationshipOutbox.count({ where: { enterpriseId, ...architectureScope, relationshipEvent: { correlationId: `knowledge-promotion:${fixture.decisionId}` } } })).toBe(0);
   }, 30000);
+
+  it("promotes every approved partition as one ChangeSet and retries idempotently", async () => {
+    const fixture = await createFixture("aggregate", "WRITES");
+    const extraAssertion = candidate(
+      `${prefix}-assertion-aggregate-extra`,
+      `${prefix}.aggregate.business-rule`,
+      "business-rule",
+      `${prefix}-source-aggregate-model`,
+      fixture.scanSessionId,
+      { summary: "Orders require an authenticated owner." },
+      { summary: "订单必须有已认证的所有者。" }
+    );
+    await createKnowledgeAssertion({ architectureScope, assertion: extraAssertion });
+    const extraReview = await createKnowledgeReviewBundle({
+      id: `${prefix}-review-aggregate-extra`,
+      designChangeSessionId: fixture.designSessionId,
+      architectureScope,
+      riskTier: "T1",
+      assertionIds: [extraAssertion.id],
+      identityCandidateIds: [],
+      evidenceRefs: [`${prefix}-source-aggregate-model`],
+      coverage: { totalSources: 1, processedSources: 1, supportedSources: 1, candidateCount: 1, complete: true },
+      blockingIssues: []
+    });
+    const extraDecisionId = `${prefix}-decision-aggregate-extra`;
+    await decideKnowledgeReviewBundle({
+      id: extraDecisionId,
+      reviewBundleId: extraReview.id,
+      architectureScope,
+      decision: "APPROVE",
+      approvedAssertionIds: [extraAssertion.id],
+      approvedIdentityCandidateIds: [],
+      evidenceRefs: [`${prefix}-source-aggregate-model`],
+      reason: "Reviewed by an independent integration actor."
+    });
+
+    const input = {
+      architectureScope,
+      reviewSetId: `${prefix}-review-set-aggregate`,
+      scanSessionId: fixture.scanSessionId,
+      designChangeSessionId: fixture.designSessionId,
+      streamId: fixture.streamId,
+      expectedReviewBundleIds: [fixture.reviewId, extraReview.id],
+      promotionDecisionIds: [fixture.decisionId, extraDecisionId],
+      evidenceRefs: [`${prefix}-source-aggregate-api`, `${prefix}-source-aggregate-model`, `${prefix}-source-aggregate-relationship`]
+    };
+    const receipt = await promoteKnowledgeReviewSet(input);
+    const retry = await promoteKnowledgeReviewSet(input);
+
+    expect(receipt).toMatchObject({ idempotent: false, reviewSetId: input.reviewSetId, changeSetSequence: 1, scanSessionDigest: fixture.scanDigest });
+    expect(receipt.reviewBundleIds).toEqual([...input.expectedReviewBundleIds].sort());
+    expect(receipt.promotionDecisionIds).toEqual([...input.promotionDecisionIds].sort());
+    expect(receipt.coverage).toMatchObject({ totalSources: 3, approvedSources: 3, complete: true });
+    expect(retry).toMatchObject({ id: receipt.id, sourceDigest: receipt.sourceDigest, changeSetId: receipt.changeSetId, idempotent: true });
+    expect(await prisma.knowledgeChangeSet.count({ where: { ...architectureScope, id: receipt.changeSetId } })).toBe(1);
+    expect(await prisma.knowledgePromotionReceipt.count({ where: { ...architectureScope, reviewSetId: input.reviewSetId } })).toBe(1);
+    const reconciliation = await reconcileKnowledgeBaseline({ architectureScope, promotionReceiptId: receipt.id });
+    expect(reconciliation).toMatchObject({ status: "CONVERGED", issues: [], changeSetId: receipt.changeSetId });
+    const baseline = await publishKnowledgeBaseline({
+      id: `${prefix}-baseline-aggregate`,
+      streamId: fixture.streamId,
+      changeSetId: receipt.changeSetId,
+      architectureScope,
+      sourceRevisionIds: receipt.assetRevisionIds,
+      relationshipVersion: receipt.relationshipVersion,
+      reconciliationReceiptId: reconciliation.id
+    });
+    expect(baseline).toMatchObject({ status: "PUBLISHED", changeSetId: receipt.changeSetId });
+  }, 30000);
+
+  it("rejects an aggregate when an expected review partition is missing", async () => {
+    const fixture = await createFixture("aggregate-missing", "WRITES");
+    await expect(promoteKnowledgeReviewSet({
+      architectureScope,
+      reviewSetId: `${prefix}-review-set-missing`,
+      scanSessionId: fixture.scanSessionId,
+      designChangeSessionId: fixture.designSessionId,
+      streamId: fixture.streamId,
+      expectedReviewBundleIds: [fixture.reviewId, `${prefix}-review-missing-partition`],
+      promotionDecisionIds: [fixture.decisionId],
+      evidenceRefs: [`${prefix}-source-aggregate-missing-api`]
+    })).rejects.toThrow("REVIEW_SET_BUNDLE_COVERAGE_MISMATCH");
+  }, 30000);
 });
 
 async function createFixture(suffix: string, relationType: "WRITES" | "PROVIDES" | null) {
@@ -164,7 +248,7 @@ async function createFixture(suffix: string, relationType: "WRITES" | "PROVIDES"
   for (const item of assertions) await createKnowledgeAssertion({ architectureScope, assertion: item });
   const review = await createKnowledgeReviewBundle({ id: `${prefix}-review-${suffix}`, designChangeSessionId: designSessionId, architectureScope, riskTier: "T1", assertionIds: assertions.map((item) => item.id), identityCandidateIds: [], evidenceRefs: sourceIds, coverage: { totalSources: sourceIds.length, processedSources: sourceIds.length, supportedSources: sourceIds.length, candidateCount: assertions.length, complete: true }, blockingIssues: [] });
   await decideKnowledgeReviewBundle({ id: decisionId, reviewBundleId: review.id, architectureScope, decision: "APPROVE", approvedAssertionIds: assertions.map((item) => item.id), approvedIdentityCandidateIds: [], evidenceRefs: sourceIds, reason: "Reviewed by an independent integration actor." });
-  return { assertions, decisionId, streamId, scanDigest };
+  return { assertions, decisionId, streamId, scanDigest, designSessionId, scanSessionId, reviewId: review.id };
 }
 
 function candidate(id: string, semanticIdentity: string, factType: string, sourceObservationId: string, scanSessionId: string, canonicalContent: Record<string, unknown>, chineseContent: Record<string, unknown>): KnowledgeAssertion {
@@ -195,23 +279,38 @@ function candidate(id: string, semanticIdentity: string, factType: string, sourc
 }
 
 async function deleteFixtures(): Promise<void> {
-  const receipts = await prisma.knowledgePromotionReceipt.findMany({ where: { ...architectureScope, promotionDecisionId: { startsWith: prefix } } });
+  const receipts = await prisma.knowledgePromotionReceipt.findMany({ where: { ...architectureScope, OR: [{ promotionDecisionId: { startsWith: prefix } }, { reviewSetId: { startsWith: prefix } }] } });
   const assetIds = [...new Set(receipts.flatMap((receipt) => receipt.assetRevisionIds as string[]))];
-  const events = await prisma.relationshipEvent.findMany({ where: { enterpriseId, ...architectureScope, correlationId: { startsWith: `knowledge-promotion:${prefix}` } }, select: { dbId: true } });
+  const federationEvents = await prisma.federationOutbox.findMany({
+    where: { ...architectureScope, OR: [{ idempotencyKey: { contains: prefix } }, { designChangeSessionId: { startsWith: prefix } }] },
+    select: { payload: true }
+  });
+  const changeSetIds = federationEvents
+    .map((event) => (event.payload as { receipt?: { changeSetId?: unknown } }).receipt?.changeSetId)
+    .filter((id): id is string => typeof id === "string");
+  const staleChangeSets = await prisma.knowledgeChangeSet.findMany({
+    where: { ...architectureScope, id: { startsWith: "knowledge-changeset:" } },
+    select: { id: true, evidenceRefs: true }
+  });
+  const allChangeSetIds = [...new Set([
+    ...changeSetIds,
+    ...staleChangeSets.filter((changeSet) => JSON.stringify(changeSet.evidenceRefs).includes(prefix)).map((changeSet) => changeSet.id)
+  ])];
+  const events = await prisma.relationshipEvent.findMany({ where: { enterpriseId, ...architectureScope, OR: [{ correlationId: { startsWith: `knowledge-promotion:${prefix}` } }, { correlationId: { startsWith: `knowledge-review-set:${prefix}` } }] }, select: { dbId: true } });
   const eventIds = events.map((event) => event.dbId);
   await prisma.projectionManifest.deleteMany({ where: { ...architectureScope, id: { startsWith: prefix } } });
   await prisma.knowledgeBaseline.deleteMany({ where: { ...architectureScope, id: { startsWith: prefix } } });
   await prisma.relationshipOutbox.deleteMany({ where: { enterpriseId, ...architectureScope, relationshipEventId: { in: eventIds } } });
-  await prisma.relationshipCommandReceipt.deleteMany({ where: { enterpriseId, ...architectureScope, idempotencyKey: { startsWith: `knowledge-promotion:${prefix}` } } });
+  await prisma.relationshipCommandReceipt.deleteMany({ where: { enterpriseId, ...architectureScope, OR: [{ idempotencyKey: { startsWith: `knowledge-promotion:${prefix}` } }, { idempotencyKey: { startsWith: `knowledge-review-set:${prefix}` } }] } });
   await prisma.relationshipEvent.deleteMany({ where: { enterpriseId, ...architectureScope, dbId: { in: eventIds } } });
-  await prisma.relationshipCurrent.deleteMany({ where: { enterpriseId, ...architectureScope, sourceReference: { startsWith: `knowledge-promotion:${prefix}` } } });
+  await prisma.relationshipCurrent.deleteMany({ where: { enterpriseId, ...architectureScope, OR: [{ sourceReference: { startsWith: `knowledge-promotion:${prefix}` } }, { sourceReference: { startsWith: `knowledge-review-set:${prefix}` } }] } });
   await prisma.assetLink.deleteMany({ where: { ...architectureScope, id: { in: eventIds } } });
   await prisma.assetNode.deleteMany({ where: { enterpriseId, ...architectureScope, rootAssetId: { in: assetIds } } });
   await prisma.federationOutbox.deleteMany({ where: { ...architectureScope, OR: [{ idempotencyKey: { contains: prefix } }, { designChangeSessionId: { startsWith: prefix } }] } });
-  await prisma.knowledgePromotionReceipt.deleteMany({ where: { ...architectureScope, promotionDecisionId: { startsWith: prefix } } });
+  await prisma.knowledgePromotionReceipt.deleteMany({ where: { ...architectureScope, OR: [{ promotionDecisionId: { startsWith: prefix } }, { reviewSetId: { startsWith: prefix } }] } });
   await prisma.knowledgePromotionDecision.deleteMany({ where: { ...architectureScope, id: { startsWith: prefix } } });
   await prisma.knowledgeReviewBundle.deleteMany({ where: { ...architectureScope, id: { startsWith: prefix } } });
-  await prisma.knowledgeChangeSet.deleteMany({ where: { ...architectureScope, id: { startsWith: "knowledge-changeset:" }, promotionDecisionId: { startsWith: prefix } } });
+  if (allChangeSetIds.length > 0) await prisma.knowledgeChangeSet.deleteMany({ where: { ...architectureScope, id: { in: allChangeSetIds } } });
   await prisma.workingStream.deleteMany({ where: { ...architectureScope, id: { startsWith: prefix } } });
   await prisma.knowledgeAssertion.deleteMany({ where: { ...architectureScope, id: { startsWith: prefix } } });
   await prisma.sourceObservation.deleteMany({ where: { ...architectureScope, id: { startsWith: prefix } } });

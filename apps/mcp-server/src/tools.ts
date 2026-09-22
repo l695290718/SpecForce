@@ -21,6 +21,7 @@ import { generateKnowledgeCandidates } from "./knowledge/semantic-persistence";
 import { matchKnowledgeIdentities } from "./knowledge/identity-persistence";
 import { assembleKnowledgeReviewBundle, assembleKnowledgeReviewBundles, submitSemanticCandidateBatch } from "./knowledge/candidate-persistence";
 import { promoteKnowledgeCandidates, reconcileKnowledgeBaseline } from "./knowledge/promotion";
+import { promoteKnowledgeReviewSet } from "./knowledge/aggregate-promotion";
 import { bootstrapThreeAFromDesignAssets } from "./knowledge/bootstrap";
 import { deriveScopedKnowledgeProjection } from "./knowledge/projection";
 import { getProjectionBuild, requestProjectionBuild } from "./knowledge/projection-build";
@@ -927,6 +928,23 @@ export function registerTools(server: McpServer): void {
     permissions: ["knowledge:write", "governance:run"],
     readOnly: false
   }, promoteKnowledgeCandidates);
+
+  registerJsonTool(server, "promote_knowledge_review_set", {
+    title: "Promote complete knowledge review set",
+    description: "Atomically materializes every approved risk/domain ReviewBundle from one finalized scan into one complete ChangeSet. Partial Baseline publication is rejected.",
+    inputSchema: {
+      architectureScope: architectureScopeSchema,
+      reviewSetId: z.string().min(1),
+      scanSessionId: z.string().min(1),
+      designChangeSessionId: z.string().min(1),
+      streamId: z.string().min(1),
+      expectedReviewBundleIds: z.array(z.string().min(1)).min(1),
+      promotionDecisionIds: z.array(z.string().min(1)).min(1),
+      evidenceRefs: z.array(z.string().min(1)).min(1)
+    },
+    permissions: ["knowledge:write", "governance:run"],
+    readOnly: false
+  }, async (input) => promoteKnowledgeReviewSet(input as Parameters<typeof promoteKnowledgeReviewSet>[0]));
 
     registerJsonTool(server, "reconcile_knowledge_baseline", {
     title: "Reconcile promoted knowledge",

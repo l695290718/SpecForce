@@ -773,12 +773,17 @@ async function initializeMcpPersistenceSchema() {
     CREATE TABLE IF NOT EXISTS "KnowledgePromotionReceipt" (
       "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
       id TEXT NOT NULL,
-      "promotionDecisionId" TEXT NOT NULL,
+      "promotionDecisionId" TEXT,
+      "reviewSetId" TEXT,
+      "reviewBundleIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "promotionDecisionIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
       "sourceDigest" TEXT NOT NULL,
       "assetRevisionIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
       "relationshipRevisionIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
       "architectureFactRevisionIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
       "architectureFactBatchId" TEXT,
+      "sourceObservationIds" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      coverage JSONB NOT NULL DEFAULT '{}'::jsonb,
       "applicationServiceId" TEXT NOT NULL,
       "scopePath" TEXT NOT NULL,
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -786,6 +791,12 @@ async function initializeMcpPersistenceSchema() {
       CONSTRAINT "KnowledgePromotionReceipt_scope_decision_digest_key" UNIQUE("applicationServiceId", "scopePath", "promotionDecisionId", "sourceDigest")
     )
   `);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "KnowledgePromotionReceipt" ALTER COLUMN "promotionDecisionId" DROP NOT NULL`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "KnowledgePromotionReceipt" ADD COLUMN IF NOT EXISTS "reviewSetId" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "KnowledgePromotionReceipt" ADD COLUMN IF NOT EXISTS "reviewBundleIds" JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "KnowledgePromotionReceipt" ADD COLUMN IF NOT EXISTS "promotionDecisionIds" JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "KnowledgePromotionReceipt" ADD COLUMN IF NOT EXISTS "sourceObservationIds" JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "KnowledgePromotionReceipt" ADD COLUMN IF NOT EXISTS coverage JSONB NOT NULL DEFAULT '{}'::jsonb`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "KnowledgePromotionReceipt" ADD COLUMN IF NOT EXISTS "architectureFactRevisionIds" JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "KnowledgePromotionReceipt" ADD COLUMN IF NOT EXISTS "architectureFactBatchId" TEXT`);
   await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "KnowledgePromotionReceipt_scope_decision_key" ON "KnowledgePromotionReceipt"("applicationServiceId", "scopePath", "promotionDecisionId")`);

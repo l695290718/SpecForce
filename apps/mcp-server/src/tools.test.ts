@@ -133,6 +133,7 @@ const semanticCandidates = vi.hoisted(() => ({
 
 const promotion = vi.hoisted(() => ({
   promoteKnowledgeCandidates: vi.fn().mockResolvedValue({ id: "promotion-1", changeSetId: "changeset-1", idempotent: false }),
+  promoteKnowledgeReviewSet: vi.fn().mockResolvedValue({ id: "aggregate-promotion-1", changeSetId: "changeset-aggregate-1", idempotent: false }),
   reconcileKnowledgeBaseline: vi.fn().mockResolvedValue({ id: "reconciliation-1", status: "CONVERGED" })
 }));
 
@@ -157,6 +158,7 @@ vi.mock("./knowledge/semantic-persistence", () => ({ generateKnowledgeCandidates
 vi.mock("./knowledge/identity-persistence", () => ({ matchKnowledgeIdentities: scanner.matchKnowledgeIdentities }));
 vi.mock("./knowledge/candidate-persistence", () => semanticCandidates);
 vi.mock("./knowledge/promotion", () => promotion);
+vi.mock("./knowledge/aggregate-promotion", () => ({ promoteKnowledgeReviewSet: promotion.promoteKnowledgeReviewSet }));
 vi.mock("./knowledge/projection", () => knowledgeProjection);
 vi.mock("./scanner/release", () => ({ getScannerRelease: governedScanner.getScannerRelease }));
 vi.mock("./scanner/session", () => ({
@@ -683,6 +685,7 @@ describe("3A knowledge foundation tools", () => {
     await tools.get("create_knowledge_review_bundle")!.handler({ architectureScope, id: "review-1", designChangeSessionId: "session-1", riskTier: "T1", assertionIds: ["assertion-1"], identityCandidateIds: [], evidenceRefs: ["evidence-1"], coverage: { totalSources: 1, processedSources: 1, supportedSources: 1, candidateCount: 1, complete: true }, blockingIssues: [] });
     await tools.get("decide_knowledge_review_bundle")!.handler({ architectureScope, id: "decision-1", reviewBundleId: "review-1", decision: "APPROVE", approvedAssertionIds: ["assertion-1"], approvedIdentityCandidateIds: [], evidenceRefs: ["evidence-1"], reason: "Reviewed" });
     await tools.get("promote_knowledge_candidates")!.handler({ architectureScope, promotionDecisionId: "decision-1", streamId: "stream-1" });
+    await tools.get("promote_knowledge_review_set")!.handler({ architectureScope, reviewSetId: "review-set-1", scanSessionId: "scan-session-1", designChangeSessionId: "session-1", streamId: "stream-1", expectedReviewBundleIds: ["review-1"], promotionDecisionIds: ["decision-1"], evidenceRefs: ["evidence-1"] });
     await tools.get("reconcile_knowledge_baseline")!.handler({ architectureScope, promotionReceiptId: "promotion-1" });
     await tools.get("create_working_stream")!.handler({ architectureScope, id: "stream-1", name: "Main" });
     await tools.get("commit_knowledge_changeset")!.handler({ architectureScope, id: "changeset-1", streamId: "stream-1", assetRevisionIds: [], relationshipRevisionIds: [], evidenceRefs: [], promotionDecisionId: "decision-1" });
@@ -701,6 +704,7 @@ describe("3A knowledge foundation tools", () => {
     expect(knowledge.createKnowledgeReviewBundle).toHaveBeenCalledOnce();
     expect(knowledge.decideKnowledgeReviewBundle).toHaveBeenCalledOnce();
     expect(promotion.promoteKnowledgeCandidates).toHaveBeenCalledWith({ architectureScope, promotionDecisionId: "decision-1", streamId: "stream-1" });
+    expect(promotion.promoteKnowledgeReviewSet).toHaveBeenCalledWith({ architectureScope, reviewSetId: "review-set-1", scanSessionId: "scan-session-1", designChangeSessionId: "session-1", streamId: "stream-1", expectedReviewBundleIds: ["review-1"], promotionDecisionIds: ["decision-1"], evidenceRefs: ["evidence-1"] });
     expect(promotion.reconcileKnowledgeBaseline).toHaveBeenCalledWith({ architectureScope, promotionReceiptId: "promotion-1" });
     expect(knowledge.createWorkingStream).toHaveBeenCalledOnce();
     expect(knowledge.commitKnowledgeChangeSet).toHaveBeenCalledOnce();

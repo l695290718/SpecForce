@@ -244,3 +244,23 @@ Core 与 MCP 类型检查通过；核心语义/风险通过 28 项检查，候�
 用于保证 ACTIVE 治理版本唯一性的仓库迁移已经准备好，但尚未在当前环境部署。`pnpm exec prisma migrate status` 报告 26 个待执行迁移，`pnpm exec prisma migrate deploy` 因现有 `specforge_canonical` Schema 非空且没有 Prisma 迁移基线而返回 `P3005`。这是由部署环境负责的阻断待办，不是 MCP 同步失败；部署前必须完成基线核对和审核。
 
 已核实 `localhost:15433` 转发到 Docker 服务 `deploy-postgres-1/specforge_canonical`；旁边的 `specforge-postgres` 容器不是应用配置使用的数据库。已创建 `.specforge/backups/specforge_canonical-20260920.dump` 格式备份，并用 `pg_restore -l` 校验到 608 个归档目录项。由于历史迁移包含数据回填和图关系种子数据，备份只是审核前提，不能证明可以自动将历史迁移标记为已应用。
+
+## Atomic Review-Set Promotion Increment (2026-09-22)
+
+The risk/domain review partition is now closed by a server-owned aggregate boundary. `promote_knowledge_review_set` requires the exact Scope, finalized scan and DesignChangeSession, Working Stream, complete expected ReviewBundle set, one approved PromotionDecision per bundle, and caller evidence references. The server derives the approved assertion and identity sets, verifies source-observation coverage, bilingual/evidence closure, actor policy, and policy/session binding, then writes all assets, typed relationships, Evidence, relationship outboxes, one ChangeSet, one aggregate receipt, and one federation outbox event in a single serializable PostgreSQL transaction. Missing partitions, partial approval, duplicate targets, incomplete source coverage, changed retries, and cross-Scope/session inputs fail closed before canonical writes.
+
+Aggregate receipts carry `reviewSetId`, sorted ReviewBundle and decision IDs, source-observation IDs, coverage, and the aggregate digest. Same-input retries return the original receipt. Reconciliation treats an aggregate receipt as having no singular PromotionDecision and verifies the single ChangeSet and complete revision sets; publication still requires the converged reconciliation receipt and cannot publish a partition subset. PostgreSQL remains authoritative and graph stores remain derived projections.
+
+The additive migration `20260922000000_add_aggregate_review_set_promotion` was applied with `pnpm exec prisma migrate deploy` to `localhost:15433/specforge_canonical`; `pnpm exec prisma migrate status` reports `Database schema is up to date!`. Automatic `migrate dev --create-only` was not used because the historical brownfield shadow database cannot replay an old data-migration; the checked-in migration contains only nullable receipt metadata and JSON defaults.
+
+Focused evidence passed: Core and MCP typechecks, MCP routing tests (33), and the PostgreSQL promotion integration suite (5 tests), including aggregate two-partition promotion, one-ChangeSet assertion, idempotent retry, aggregate reconciliation, Baseline publication, rollback, and missing-partition rejection. The exact implementation session is `design-change-session:35824fd1-d0df-4849-a3b1-db0c1ba340de` under `com.specforge.designcenter`. The 6,078-observation production scan remains `READY_FOR_ANALYSIS`; no semantic candidates or production assets were promoted by this increment.
+
+### 原子审核集合提升增量（2026-09-22）
+
+风险/领域审核拆分现在通过服务端聚合边界闭环。`promote_knowledge_review_set` 要求精确 Scope、已最终化的扫描会话和 DesignChangeSession、Working Stream、完整的预期 ReviewBundle 集合、每个 Bundle 恰好一个已批准 PromotionDecision，以及调用方证据引用。服务端推导已批准的断言和身份候选，校验来源观察覆盖、双语/证据闭包、角色策略以及策略/会话绑定，然后在一个可串行化 PostgreSQL 事务中写入全部资产、有类型关系、Evidence、关系 Outbox、一个 ChangeSet、一个聚合回执和一个联邦 Outbox 事件。缺少分区、部分审批、重复目标、来源覆盖不完整、重试输入变化以及跨 Scope/会话输入都会在规范写入前失败关闭。
+
+聚合回执携带 `reviewSetId`、排序后的 ReviewBundle 与决策 ID、来源观察 ID、覆盖率和聚合摘要。相同输入重试返回原回执；聚合回执没有单一 PromotionDecision，对账会校验一个 ChangeSet 和完整修订集合；发布仍必须携带已收敛的对账回执，不能发布分区子集。PostgreSQL 继续作为权威存储，图数据库仍是派生投影。
+
+增量迁移 `20260922000000_add_aggregate_review_set_promotion` 已通过 `pnpm exec prisma migrate deploy` 应用到 `localhost:15433/specforge_canonical`；`pnpm exec prisma migrate status` 报告 `Database schema is up to date!`。由于历史存量影子数据库无法重放旧数据迁移，自动 `migrate dev --create-only` 被棕地基线限制；提交的迁移仅包含可空回执字段和 JSON 默认值。
+
+聚焦证据通过：Core 与 MCP 类型检查、MCP 路由测试（33 项）以及 PostgreSQL 提升集成套件（5 项），覆盖双分区聚合提升、单 ChangeSet、幂等重试、聚合对账、Baseline 发布、回滚和缺失分区拒绝。精确实现会话为 `design-change-session:35824fd1-d0df-4849-a3b1-db0c1ba340de`，归属 `com.specforge.designcenter`。6,078 条观察的生产扫描仍为 `READY_FOR_ANALYSIS`；本增量没有提升语义候选或生产资产。
