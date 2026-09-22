@@ -626,6 +626,7 @@ describe("3A knowledge foundation tools", () => {
       "submit_semantic_candidate_batch",
       "assemble_knowledge_review_bundle",
       "assemble_knowledge_review_bundles",
+      "read_knowledge_review_queue",
       "match_knowledge_identities",
       "create_identity_candidate",
       "create_knowledge_review_bundle",
@@ -638,6 +639,8 @@ describe("3A knowledge foundation tools", () => {
       "create_projection_manifest",
       "list_knowledge_assertions"
     ]));
+    expect((tools.get("read_knowledge_review_queue")!.config._meta as { permissions: string[]; write: boolean })).toEqual({ permissions: ["knowledge:read", "governance:run"], write: false });
+    expect(tools.get("read_knowledge_review_queue")!.config.annotations).toMatchObject({ readOnlyHint: true, idempotentHint: true });
     expect((tools.get("reconcile_knowledge_baseline")!.config._meta as { permissions: string[]; write: boolean })).toEqual({ permissions: ["knowledge:write", "governance:run"], write: true });
     expect(tools.get("reconcile_knowledge_baseline")!.config.annotations).toMatchObject({ readOnlyHint: false, idempotentHint: false });
   });

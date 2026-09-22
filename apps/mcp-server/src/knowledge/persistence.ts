@@ -75,6 +75,20 @@ export interface PromotionDecisionInput {
   reason: string;
 }
 
+export function assertReviewerIndependent(input: {
+  riskTier: string;
+  sessionActorId: string;
+  assertionGeneratorActorIds: readonly (string | null | undefined)[];
+  reviewerActorId: string;
+  evidenceRefs: readonly string[];
+}): void {
+  if (["T2", "T3"].includes(input.riskTier) && input.evidenceRefs.length === 0) throw new Error("REVIEW_DECISION_EVIDENCE_REQUIRED");
+  if (input.riskTier === "T0") return;
+  if (input.sessionActorId === input.reviewerActorId || input.assertionGeneratorActorIds.some((actorId) => actorId === input.reviewerActorId)) {
+    throw new Error("REVIEWER_INDEPENDENCE_REQUIRED");
+  }
+}
+
 export interface BaselineInput {
   id: string;
   streamId: string;
@@ -340,6 +354,17 @@ export async function decideKnowledgeReviewBundle(input: PromotionDecisionInput)
       where: { applicationServiceId_scopePath_id: { ...scope, id: bundle.designChangeSessionId } }
     });
     if (!session) throw new Error("DESIGN_CHANGE_SESSION_NOT_FOUND");
+    const reviewAssertions = await transaction.knowledgeAssertion.findMany({
+      where: { ...scope, id: { in: bundleValue.assertionIds } },
+      select: { generatedByActorId: true }
+    });
+    assertReviewerIndependent({
+      riskTier: bundleValue.riskTier,
+      sessionActorId: session.actorId,
+      assertionGeneratorActorIds: reviewAssertions.map((assertion) => assertion.generatedByActorId),
+      reviewerActorId: writableActor().actorId,
+      evidenceRefs: input.evidenceRefs
+    });
     const approvedAssertionIds = [...new Set(input.approvedAssertionIds)];
     const approvedIdentityCandidateIds = [...new Set(input.approvedIdentityCandidateIds)];
     const approvedArchitectureFactRevisionIds = [...new Set(input.approvedArchitectureFactRevisionIds ?? [])];

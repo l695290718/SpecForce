@@ -446,7 +446,7 @@ Only incomplete work is listed here. Completed and superseded records are preser
 
 **待办标识：** `backlog-approved-brownfield-scan-governed-promotion`
 
-**状态：** 确定性框架感知提取、精确 Scope 有界观察分页、全资产语义候选治理、风险/领域审核拆包以及聚合为单一 ChangeSet 的提升/发布路径已完成。MockAI 候选编写已在会话 `knowledge-scan:0afad255-b0ff-4a57-a6f8-150dba321751` 中持久化 6,133 条双语候选并进入受治理审核；独立 T1-T3 审核、聚合提升、对账和真实受治理发布仍待完成。较早的原生会话 `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` 仍是仅观察的 `READY_FOR_ANALYSIS` 会话。
+**状态：** 确定性框架感知提取、精确 Scope 有界观察分页、全资产语义候选治理、风险/领域审核拆包、独立只读审核队列以及聚合为单一 ChangeSet 的提升/发布路径已完成。MockAI 候选编写已在会话 `knowledge-scan:0afad255-b0ff-4a5c-b26e-9599fc5806dc` 中持久化 6,133 条双语候选并进入受治理审核；独立 T1-T3 决策、聚合提升、对账和真实受治理发布仍待完成。较早的原生会话 `knowledge-scan:4d3513f9-6dd8-4a57-a6f8-150dba321751` 仍是仅观察的 `READY_FOR_ANALYSIS` 会话。
 
 **负责人：** SpecForge 架构与 Agent 集成团队。
 

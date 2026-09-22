@@ -20,6 +20,7 @@ import { submitScanBatch } from "./scanner/batch-persistence";
 import { generateKnowledgeCandidates } from "./knowledge/semantic-persistence";
 import { matchKnowledgeIdentities } from "./knowledge/identity-persistence";
 import { assembleKnowledgeReviewBundle, assembleKnowledgeReviewBundles, submitSemanticCandidateBatch } from "./knowledge/candidate-persistence";
+import { readKnowledgeReviewQueue } from "./knowledge/review-queue";
 import { promoteKnowledgeCandidates, reconcileKnowledgeBaseline } from "./knowledge/promotion";
 import { promoteKnowledgeReviewSet } from "./knowledge/aggregate-promotion";
 import { bootstrapThreeAFromDesignAssets } from "./knowledge/bootstrap";
@@ -140,7 +141,7 @@ function registerJsonTool<T extends z.ZodRawShape>(
           if (error instanceof FeatureChangeSetError) {
             return errorResult(JSON.stringify({ code: error.code, details: error.details }));
           }
-          const safeCode = /^(?:FEATURE_[A-Z_]+|SCOPE_ACCESS_DENIED|OPERATION_DENIED)$/u.test(message) ? message : "TOOL_CALL_FAILED";
+          const safeCode = /^(?:FEATURE_[A-Z_]+|SCOPE_ACCESS_DENIED|OPERATION_DENIED|REVIEW_QUEUE_[A-Z_]+|REVIEWER_INDEPENDENCE_REQUIRED|REVIEW_DECISION_EVIDENCE_REQUIRED)$/u.test(message) ? message : "TOOL_CALL_FAILED";
           return errorResult(JSON.stringify({ code: safeCode, tool: name }));
         }
       };
@@ -845,6 +846,24 @@ export function registerTools(server: McpServer): void {
     permissions: ["knowledge:write", "governance:run"],
     readOnly: false
   }, assembleKnowledgeReviewBundles);
+
+  registerJsonTool(server, "read_knowledge_review_queue", {
+    title: "Read independent knowledge review queue",
+    description: "Reads a finalized, exact-Scope semantic review queue after a DESIGN_CATALOG_CURATION readiness receipt. The queue is read-only, independently reviewable, cursor-paginated, snapshot-bound, and returns only bounded bilingual candidate fields.",
+    inputSchema: {
+      architectureScope: architectureScopeSchema,
+      readinessReceiptId: z.string().min(1),
+      scanSessionId: z.string().min(1),
+      projection: z.enum(["BUNDLES", "CANDIDATES"]),
+      cursor: z.string().min(1).optional(),
+      pageSize: z.number().int().positive().optional(),
+      riskTier: z.enum(["T0", "T1", "T2", "T3"]).optional(),
+      bundleStatus: z.enum(["DRAFT", "READY", "BLOCKED", "APPROVED", "REJECTED"]).optional(),
+      reviewBundleId: z.string().min(1).optional()
+    },
+    permissions: ["knowledge:read", "governance:run"],
+    readOnly: true
+  }, async (input) => readKnowledgeReviewQueue(input as Parameters<typeof readKnowledgeReviewQueue>[0]));
 
   registerJsonTool(server, "match_knowledge_identities", {
     title: "Match knowledge identities",

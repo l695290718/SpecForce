@@ -647,6 +647,29 @@ async function initializeMcpPersistenceSchema() {
       UNIQUE("applicationServiceId", "scopePath", id)
     )
   `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "KnowledgeReviewQueueReceipt" (
+      "dbId" UUID PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+      id TEXT NOT NULL,
+      "actorId" TEXT NOT NULL,
+      "readinessReceiptId" TEXT NOT NULL,
+      "scanSessionId" TEXT NOT NULL,
+      projection TEXT NOT NULL,
+      "filterDigest" TEXT NOT NULL,
+      "reviewSetDigest" TEXT NOT NULL,
+      "expectedBundleIdsDigest" TEXT NOT NULL,
+      "pageSize" INTEGER NOT NULL,
+      exposure JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "issuedAt" TIMESTAMP NOT NULL,
+      "expiresAt" TIMESTAMP NOT NULL,
+      "applicationServiceId" TEXT NOT NULL,
+      "scopePath" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE("applicationServiceId", "scopePath", id)
+    )
+  `);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "KnowledgeReviewQueueReceipt_scope_session_actor_idx" ON "KnowledgeReviewQueueReceipt"("applicationServiceId", "scopePath", "scanSessionId", "actorId", "createdAt")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "KnowledgeReviewQueueReceipt_expiry_idx" ON "KnowledgeReviewQueueReceipt"("expiresAt")`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "KnowledgeChangeSet" ADD COLUMN IF NOT EXISTS "promotionDecisionId" TEXT`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "KnowledgeChangeSet" ADD COLUMN IF NOT EXISTS "architectureFactRevisionIds" JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "KnowledgeReviewBundle" ADD COLUMN IF NOT EXISTS "architectureFactRevisionIds" JSONB NOT NULL DEFAULT '[]'::jsonb`);

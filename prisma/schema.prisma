@@ -1731,6 +1731,29 @@ model KnowledgeReviewBundle {
   @@index([applicationServiceId, scopePath, designChangeSessionId, status], map: "KnowledgeReviewBundle_scope_session_status_idx")
 }
 
+model KnowledgeReviewQueueReceipt {
+  dbId                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                    String
+  actorId               String
+  readinessReceiptId    String
+  scanSessionId         String
+  projection            String
+  filterDigest          String
+  reviewSetDigest       String
+  expectedBundleIdsDigest String
+  pageSize              Int
+  exposure              Json     @default("{}") @db.JsonB
+  issuedAt              DateTime
+  expiresAt             DateTime
+  applicationServiceId  String
+  scopePath             String
+  createdAt             DateTime @default(now())
+
+  @@unique([applicationServiceId, scopePath, id], map: "KnowledgeReviewQueueReceipt_scope_id_key")
+  @@index([applicationServiceId, scopePath, scanSessionId, actorId, createdAt], map: "KnowledgeReviewQueueReceipt_scope_session_actor_idx")
+  @@index([expiresAt], map: "KnowledgeReviewQueueReceipt_expiry_idx")
+}
+
 model KnowledgePromotionDecision {
   dbId                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   id                      String
